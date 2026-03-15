@@ -13,7 +13,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table (name="clientes")
+@Table (name="cliente")
 
 
 public class Cliente {
@@ -39,6 +39,7 @@ public class Cliente {
 
     @OneToMany(mappedBy = "cliente", fetch = FetchType.LAZY)
     private List<Usuario> usuarios = new ArrayList<>();
+
 
     public Cliente(String nif, String nombre, String email) {
         this.nif = nif;

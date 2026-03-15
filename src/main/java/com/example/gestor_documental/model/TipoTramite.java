@@ -29,4 +29,5 @@ public class TipoTramite {
     private boolean activo;
 
 
+
 }

@@ -5,13 +5,16 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import com.example.gestor_documental.enums.Rol;
 
+import java.util.ArrayList;
+import java.util.List;
+
 //Mediante el uso de Lombrok generamos los getters, setters y constructor vacío
     @Getter
     @Setter
     @NoArgsConstructor
 
     @Entity
-    @Table(name = "usuarios")
+    @Table(name = "usuario")
     public class Usuario {
 
         @Id
@@ -40,6 +43,11 @@ import com.example.gestor_documental.enums.Rol;
         @ManyToOne(fetch = FetchType.LAZY)
         @JoinColumn(name = "cliente_id")
         private Cliente cliente;
+
+    @OneToMany(mappedBy = "usuario", fetch = FetchType.LAZY)
+    private List<Solicitud> solicitudes = new ArrayList<>();
+
+
 
         public Usuario(String nombre, String apellidos, String email, String password, Rol rol, boolean activo) {
             this.nombre = nombre;
