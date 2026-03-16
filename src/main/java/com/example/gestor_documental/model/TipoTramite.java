@@ -19,7 +19,7 @@ public class TipoTramite {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 100, unique = true)
     private TipoTramiteEnum nombre;
 
     @Column(nullable = false, length = 200)
