@@ -30,4 +30,11 @@ public class ExpedienteInteresado {
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
     private RolInteresado rol;
+
+    public ExpedienteInteresado(Expediente expediente, Interesado interesado, RolInteresado rol) {
+        this.expediente = expediente;
+        this.interesado = interesado;
+        this.rol = rol;
+    }
 }
+
