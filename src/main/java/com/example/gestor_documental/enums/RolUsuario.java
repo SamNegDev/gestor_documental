@@ -1,5 +1,5 @@
 package com.example.gestor_documental.enums;
 
-public enum Rol {
+public enum RolUsuario {
     CLIENTE,ADMIN
 }

@@ -3,7 +3,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import com.example.gestor_documental.enums.Rol;
+import com.example.gestor_documental.enums.RolUsuario;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +35,7 @@ import java.util.List;
 
         @Enumerated(EnumType.STRING)
         @Column(nullable = false, length = 20)
-        private Rol rol;
+        private RolUsuario rolUsuario;
 
         @Column(nullable = false)
         private boolean activo;
@@ -49,12 +49,12 @@ import java.util.List;
 
 
 
-        public Usuario(String nombre, String apellidos, String email, String password, Rol rol, boolean activo) {
+        public Usuario(String nombre, String apellidos, String email, String password, RolUsuario rolUsuario, boolean activo) {
             this.nombre = nombre;
             this.apellidos = apellidos;
             this.email = email;
             this.password = password;
-            this.rol = rol;
+            this.rolUsuario = rolUsuario;
             this.activo = activo;
         }
 
