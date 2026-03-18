@@ -11,6 +11,27 @@
 <p><strong>Estado:</strong> <span th:text="${expediente.estadoExpediente}"></span></p>
 <p><strong>Fecha creación:</strong> <span th:text="${expediente.fechaCreacion}"></span></p>
 
+<h2>Documentos</h2>
+
+<ul>
+    <li th:each="doc : ${expediente.documentos}">
+        <span th:text="${doc.nombre}"></span>
+    </li>
+</ul>
+<p th:if="${expediente.documentos == null or expediente.documentos.isEmpty()}">
+    No hay documentos asociados a este expediente.
+</p>
+<form th:action="@{/documentos/subir}" method="post" enctype="multipart/form-data">
+
+    <input type="hidden" name="expedienteId" th:value="${expediente.id}" />
+    <input type="file" name="archivo" required />
+    <button type="submit">Subir documento</button>
+    <input type="hidden"
+           th:name="${_csrf.parameterName}"
+           th:value="${_csrf.token}" />
+
+</form>
+
 <a th:href="@{/expedientes}">Volver al listado</a>
 </body>
 </html>

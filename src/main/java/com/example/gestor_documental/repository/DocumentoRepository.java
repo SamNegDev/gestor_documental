@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface DocumentoRepository extends JpaRepository<Documento, Long> {
     List<Documento> findByExpedienteId(Long expedienteId);
+
+
 }
