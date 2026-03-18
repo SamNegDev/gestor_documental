@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Detalle de expediente</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+<h1>Detalle de expediente</h1>
+
+<p><strong>ID:</strong> <span th:text="${expediente.id}"></span></p>
+<p><strong>Estado:</strong> <span th:text="${expediente.estadoExpediente}"></span></p>
+<p><strong>Fecha creación:</strong> <span th:text="${expediente.fechaCreacion}"></span></p>
+
+<a th:href="@{/expedientes}">Volver al listado</a>
+</body>
+</html>
