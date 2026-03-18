@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Listado de expedientes</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+<h1>Mis Expedientes</h1>
+<h2>Gestiona y consulta tus expedientes</h2>
+
+<table border="1">
+    <thead>
+    <tr>
+        <th>Nº Expediente</th>
+        <th>Tipo Trámite</th>
+        <th>Matrícula</th>
+        <th>Fecha creación</th>
+        <th>Estado</th>
+        <th>Docs</th>
+        <th>Detalle</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="expediente : ${expedientes}">
+        <td th:text="${expediente.id}"></td>
+        <td th:text="${expediente.tipoTramite}"></td>
+        <td th:text="${expediente.matricula}"></td>
+        <td th:text="${expediente.estadoExpediente}"></td>
+        <td th:text="${#temporals.format(expediente.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></td>
+        <td>
+            <a th:href="@{/expedientes/{id}(id=${expediente.id})}">Ver detalle</a>
+        </td>
+    </tr>
+    </tbody>
+</table>
+</body>
+</html>

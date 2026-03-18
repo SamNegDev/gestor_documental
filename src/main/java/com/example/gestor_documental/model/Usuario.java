@@ -5,6 +5,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import com.example.gestor_documental.enums.RolUsuario;
 
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,8 +45,8 @@ import java.util.List;
         @JoinColumn(name = "cliente_id")
         private Cliente cliente;
 
-    @OneToMany(mappedBy = "usuario", fetch = FetchType.LAZY)
-    private List<Solicitud> solicitudes = new ArrayList<>();
+        @OneToMany(mappedBy = "usuario", fetch = FetchType.LAZY)
+        private List<Solicitud> solicitudes = new ArrayList<>();
 
 
 

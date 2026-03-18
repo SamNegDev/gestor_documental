@@ -1,0 +1,81 @@
+package com.example.gestor_documental.controller;
+
+import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.UsuarioService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@Controller
+@RequiredArgsConstructor
+@RequestMapping("/expedientes")
+public class ExpedienteController {
+
+    private final ExpedienteService expedienteService;
+    private final UsuarioService usuarioService;
+
+
+    @GetMapping
+    public String listarExpedientes(Authentication authentication, Model model) {
+
+        String email = authentication.getName();
+
+        Usuario usuario = usuarioService.buscarPorEmail(email);
+
+        List<Expediente> expedientes;
+
+        if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
+            expedientes = expedienteService.listarTodos();
+        } else {
+
+            if (usuario.getCliente() == null) {
+                expedientes = List.of();
+            } else {
+                expedientes = expedienteService.listarPorClienteId(usuario.getCliente().getId());
+            }
+
+        }
+
+        model.addAttribute("expedientes", expedientes);
+        model.addAttribute("usuario", usuario);
+
+        return "expedientes/lista";
+    }
+
+@GetMapping("/{id}")
+public String verDetalleExpediente(
+        @PathVariable Long id,
+        Authentication authentication,
+        Model model) {
+
+    Expediente expediente = expedienteService.buscarPorId(id)
+            .orElseThrow(() -> new RuntimeException("Expediente no encontrado"));
+
+    String email = authentication.getName();
+
+    Usuario usuario = usuarioService.buscarPorEmail(email);
+
+
+    if (usuario.getRolUsuario() != RolUsuario.ADMIN) {
+
+        if (usuario.getCliente() == null || expediente.getCliente() == null ||
+                !expediente.getCliente().getId().equals(usuario.getCliente().getId())) {
+
+            return "redirect:/expedientes";
+        }
+    }
+
+    model.addAttribute("expediente", expediente);
+    model.addAttribute("usuario", usuario);
+
+    return "expedientes/detalle";
+    }
+
+}
