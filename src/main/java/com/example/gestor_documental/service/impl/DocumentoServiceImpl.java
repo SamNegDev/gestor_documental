@@ -72,5 +72,28 @@ public class DocumentoServiceImpl implements DocumentoService {
         return documentoRepository.findById(id);
     }
 
+    @Override
+    public Long eliminar(Long id) {
+
+        Documento documento = documentoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
+
+        Long expedienteId = documento.getExpediente().getId();
+
+        Path rutaArchivo = Paths.get("uploads").resolve(documento.getNombreArchivo());
+
+        try {
+            if (Files.exists(rutaArchivo)) {
+                Files.delete(rutaArchivo);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Error al borrar el archivo físico", e);
+        }
+
+        documentoRepository.delete(documento);
+
+        return expedienteId;
+    }
+
 
 }

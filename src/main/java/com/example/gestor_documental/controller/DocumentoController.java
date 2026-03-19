@@ -45,22 +45,15 @@ public class DocumentoController {
     @GetMapping("/descargar/{id}")
     public void descargarDocumento(@PathVariable Long id, HttpServletResponse response) throws IOException {
 
-        System.out.println("1. Entra en descargarDocumento. ID = " + id);
-
         Documento documento = documentoService.buscarPorId(id)
                 .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
 
-        System.out.println("2. Documento encontrado: " + documento.getNombreArchivoOriginal());
-        System.out.println("3. Nombre archivo guardado en disco: " + documento.getNombreArchivo());
-
         Path rutaArchivo = Paths.get("uploads").resolve(documento.getNombreArchivo());
 
-        System.out.println("4. Ruta completa: " + rutaArchivo.toAbsolutePath());
 
         if (!Files.exists(rutaArchivo)) {
             throw new RuntimeException("El archivo no existe en disco");
         }
-
         response.setContentType("application/octet-stream");
         response.setHeader("Content-Disposition",
                 "attachment; filename=\"" + documento.getNombreArchivoOriginal() + "\"");
@@ -68,6 +61,12 @@ public class DocumentoController {
         Files.copy(rutaArchivo, response.getOutputStream());
         response.getOutputStream().flush();
 
-        System.out.println("5. Archivo enviado correctamente");
+    }
+    @PostMapping("/eliminar/{id}")
+    public String eliminarDocumento(@PathVariable Long id) {
+
+        Long expedienteId = documentoService.eliminar(id);
+
+        return "redirect:/expedientes/" + expedienteId;
     }
 }

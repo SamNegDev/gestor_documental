@@ -14,4 +14,6 @@ public interface DocumentoService {
 
     Optional<Documento> buscarPorId(Long id);
 
+    Long eliminar(Long id);
+
 }

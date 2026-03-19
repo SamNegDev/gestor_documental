@@ -35,6 +35,10 @@
         <span th:text="${doc.nombreArchivoOriginal}"></span>
         <span th:text="${doc.tipoDocumento}"></span>
         <a th:href="@{/documentos/descargar/{id}(id=${doc.id})}">Descargar</a>
+        <form th:action="@{/documentos/eliminar/{id}(id=${doc.id})}" method="post" style="display:inline;">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <button type="submit">Eliminar</button>
+        </form>
     </li>
 </ul>
 <p th:if="${expediente.documentos == null or expediente.documentos.isEmpty()}">
