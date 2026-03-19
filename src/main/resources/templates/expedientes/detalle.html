@@ -10,12 +10,31 @@
 <p><strong>ID:</strong> <span th:text="${expediente.id}"></span></p>
 <p><strong>Estado:</strong> <span th:text="${expediente.estadoExpediente}"></span></p>
 <p><strong>Fecha creación:</strong> <span th:text="${expediente.fechaCreacion}"></span></p>
+<p><strong>Matrícula</strong><span th:text="${expediente.matricula}"</p>
+
+<h2>Interesados</h2>
+<ul>
+    <li th:each="doc : ${expediente.interesados}">
+        <span th:text="${expediente.interesados.nombre}"></span>
+
+        <span th:text="${expediente.interesados.expedienteinteresado.rolInteresado}"></span>
+        <p th:if="${expediente.interesados == null or expediente.interesados.isEmpty()}">
+            No hay interesados asociados a este expediente.
+        </p>
+    </li>
+
+</ul>
+<p th:if="${expediente.interesados == null or expediente.interesados.isEmpty()}">
+    No hay interesados asociados a este expediente.
+</p>
 
 <h2>Documentos</h2>
 
 <ul>
     <li th:each="doc : ${expediente.documentos}">
-        <span th:text="${doc.nombre}"></span>
+        <span th:text="${doc.nombreArchivoOriginal}"></span>
+        <span th:text="${doc.tipoDocumento}"></span>
+        <a th:href="@{/documentos/descargar/{id}(id=${doc.id})}">Descargar</a>
     </li>
 </ul>
 <p th:if="${expediente.documentos == null or expediente.documentos.isEmpty()}">
@@ -25,6 +44,14 @@
 
     <input type="hidden" name="expedienteId" th:value="${expediente.id}" />
     <input type="file" name="archivo" required />
+    <label for="tipoDocumento">Tipo de documento:</label>
+    <select name="tipoDocumento" id="tipoDocumento" required>
+        <option value="">-- Selecciona un tipo --</option>
+        <option th:each="tipo : ${tiposDocumento}"
+                th:value="${tipo}"
+                th:text="${tipo}">
+        </option>
+    </select>
     <button type="submit">Subir documento</button>
     <input type="hidden"
            th:name="${_csrf.parameterName}"

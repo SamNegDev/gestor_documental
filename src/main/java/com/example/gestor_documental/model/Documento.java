@@ -31,13 +31,13 @@ public class Documento {
     @Column(nullable = false, length = 100)
     private TipoDocumento tipoDocumento;
 
-    @Column(nullable = false, length = 200)
+    @Column(length = 200)
     private String nombreArchivo;
 
     @Column(nullable = false, length = 200)
     private String nombreArchivoOriginal;
 
-    @Column(nullable = false, length = 200)
+    @Column(length = 200)
     private String descripcionArchivo;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -54,16 +54,14 @@ public class Documento {
 
     // Creo dos constructores ya que un documento pertenece a una solicitud O a un expediente, nunca a los dos a la vez
 
-    public Documento(TipoDocumento tipoDocumento,String nombreArchivo, String nombreArchivoOriginal, Solicitud solicitud, Usuario usuario) {
-        this.nombreArchivo = nombreArchivo;
+    public Documento(TipoDocumento tipoDocumento, String nombreArchivoOriginal, Solicitud solicitud, Usuario usuario) {
         this.nombreArchivoOriginal = nombreArchivoOriginal;
         this.solicitud = solicitud;
         this.usuario = usuario;
         this.tipoDocumento = tipoDocumento;
     }
 
-    public Documento(TipoDocumento tipoDocumento, String nombreArchivo, String nombreArchivoOriginal, Expediente expediente, Usuario usuario) {
-        this.nombreArchivo = nombreArchivo;
+    public Documento(TipoDocumento tipoDocumento, String nombreArchivoOriginal, Expediente expediente, Usuario usuario) {
         this.nombreArchivoOriginal = nombreArchivoOriginal;
         this.expediente = expediente;
         this.usuario = usuario;

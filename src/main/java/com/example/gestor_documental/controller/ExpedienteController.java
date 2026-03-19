@@ -1,6 +1,7 @@
 package com.example.gestor_documental.controller;
 
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.ExpedienteService;
@@ -74,6 +75,7 @@ public String verDetalleExpediente(
 
     model.addAttribute("expediente", expediente);
     model.addAttribute("usuario", usuario);
+    model.addAttribute("tiposDocumento", TipoDocumento.values());
 
     return "expedientes/detalle";
     }
