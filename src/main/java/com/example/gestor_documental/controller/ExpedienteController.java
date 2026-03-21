@@ -63,15 +63,10 @@ public String verDetalleExpediente(
 
     Usuario usuario = usuarioService.buscarPorEmail(email);
 
-
-    if (usuario.getRolUsuario() != RolUsuario.ADMIN) {
-
-        if (usuario.getCliente() == null || expediente.getCliente() == null ||
-                !expediente.getCliente().getId().equals(usuario.getCliente().getId())) {
-
-            return "redirect:/expedientes";
-        }
+    if (!expedienteService.tienePermisoExpediente(expediente, usuario)) {
+        return "redirect:/expedientes";
     }
+
 
     model.addAttribute("expediente", expediente);
     model.addAttribute("usuario", usuario);

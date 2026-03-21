@@ -1,6 +1,8 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.service.ExpedienteService;
 import org.springframework.stereotype.Service;
@@ -41,4 +43,19 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     public List<Expediente> listarPorClienteId(Long clienteId) {
         return expedienteRepository.findByClienteId(clienteId);
     }
+
+    @Override
+    public boolean tienePermisoExpediente(Expediente expediente, Usuario usuario) {
+
+        if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
+            return true;
+        }
+        //Si el usuario/expediente no tiene cliente asignado se deniega el acceso ya que no podemos comprobar de quien es
+        if (usuario.getCliente() == null || expediente.getCliente() == null) {
+            return false;
+        }
+
+        return expediente.getCliente().getId().equals(usuario.getCliente().getId());
+    }
+
 }

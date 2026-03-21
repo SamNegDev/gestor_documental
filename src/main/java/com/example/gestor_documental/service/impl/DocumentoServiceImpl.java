@@ -3,9 +3,11 @@ package com.example.gestor_documental.service.impl;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.service.DocumentoService;
+import com.example.gestor_documental.service.ExpedienteService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,10 +25,12 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     private final ExpedienteRepository expedienteRepository;
     private final DocumentoRepository documentoRepository;
+    private final ExpedienteService expedienteService;
 
-    public DocumentoServiceImpl(ExpedienteRepository expedienteRepository, DocumentoRepository documentoRepository) {
+    public DocumentoServiceImpl(ExpedienteRepository expedienteRepository, DocumentoRepository documentoRepository, ExpedienteService expedienteService) {
         this.expedienteRepository = expedienteRepository;
         this.documentoRepository = documentoRepository;
+        this.expedienteService = expedienteService;
     }
 
 
@@ -93,6 +97,18 @@ public class DocumentoServiceImpl implements DocumentoService {
         documentoRepository.delete(documento);
 
         return expedienteId;
+    }
+    @Override
+    public Documento obtenerDocumentoConPermiso(Long documentoId, Usuario usuario) {
+
+        Documento documento = documentoRepository.findById(documentoId)
+                .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
+
+        if (!expedienteService.tienePermisoExpediente(documento.getExpediente(), usuario)) {
+            throw new RuntimeException("No tienes permiso para acceder a este documento");
+        }
+
+        return documento;
     }
 
 
