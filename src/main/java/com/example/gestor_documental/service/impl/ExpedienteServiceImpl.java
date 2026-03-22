@@ -1,6 +1,8 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ExpedienteRepository;
@@ -56,6 +58,21 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         }
 
         return expediente.getCliente().getId().equals(usuario.getCliente().getId());
+    }
+
+    @Override
+    public int contarPorCliente(Cliente cliente) {
+        return expedienteRepository.countByCliente(cliente);
+    }
+
+    @Override
+    public int contarPorClienteYEstado(Cliente cliente, EstadoExpediente estadoExpediente) {
+        return expedienteRepository.countByClienteAndEstadoExpediente(cliente, estadoExpediente);
+    }
+
+    @Override
+    public int contarPorEstado(EstadoExpediente estadoExpediente) {
+        return expedienteRepository.countByEstadoExpediente();
     }
 
 }

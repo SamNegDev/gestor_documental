@@ -1,4 +1,4 @@
-package com.example.gestor_documental.service.impl;
+package com.example.gestor_documental.security;
 
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.UsuarioRepository;

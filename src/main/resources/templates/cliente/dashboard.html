@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/app}">
+
+<section layout:fragment="content">
+<div class="container mt-4">
+
+    <h2 th:text="${titulo}">Dashboard</h2>
+    <p class="text-muted" th:text="${subtitulo}">Resumen general de tu actividad</p>
+
+    <div class="row mt-4 g-3">
+
+        <div class="col-md-3">
+            <div class="card bg-primary text-white shadow-sm border-0 h-100">
+                <div class="card-body text-center p-4">
+                    <h3 class="display-6 fw-bold" th:text="${totalExpedientes}">0</h3>
+                    <p class="mb-0">Total expedientes</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark shadow-sm border-0 h-100">
+                <div class="card-body text-center p-4">
+                    <h3 class="display-6 fw-bold" th:text="${enTramite}">0</h3>
+                    <p class="mb-0">En trámite</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-success text-white shadow-sm border-0 h-100">
+                <div class="card-body text-center p-4">
+                    <h3 class="display-6 fw-bold" th:text="${finalizados}">0</h3>
+                    <p class="mb-0">Finalizados</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-danger text-white shadow-sm border-0 h-100">
+                <div class="card-body text-center p-4">
+                    <h3 class="display-6 fw-bold" th:text="${incidencias}">0</h3>
+                    <p class="mb-0">Incidencias</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
