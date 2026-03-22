@@ -1,0 +1,237 @@
+body {
+    background-color: #fafaf8;
+    color: #111827;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    margin:0;
+}
+
+.app-shell {
+    min-height: 100vh;
+}
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a2332 0%, #243247 100%);
+    padding: 24px;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 520px;
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    overflow: hidden;
+}
+
+.login-card-body {
+    padding: 2.5rem;
+}
+
+.login-card img {
+    max-height: 80px;
+    margin-bottom: 10px;
+}
+
+.login-card .form-control {
+    padding: 0.75rem 0.9rem;
+    font-size: 1rem;
+}
+
+.login-card .btn {
+    padding: 0.7rem;
+    font-size: 1.05rem;
+}
+
+.login-brand {
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: #1a2332;
+    margin-bottom: 0.25rem;
+}
+
+.login-subtitle {
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+}
+
+.login-footer {
+    margin-top: 1.25rem;
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-align: center;
+}
+
+.sidebar {
+    background-color: #1a2332;
+    min-height: 100vh;
+    color: #e5e7eb;
+    padding: 24px 16px;
+}
+.logo-icon {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    border-radius: 10px;
+    background-color: #1a2332;
+    padding: 2px;
+}
+.sidebar-brand{
+    margin-bottom: 2rem;
+}
+
+.sidebar-title {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.2;
+}
+
+
+.sidebar .nav-link {
+        color: #cbd5e1;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 8px;
+        font-size: 1.4rem;
+        font-weight: 600;
+}
+
+
+.sidebar .nav-link:hover,
+.sidebar .nav-link.active {
+    background-color: #243247;
+    color: #ffffff;
+}
+
+.main-content {
+    padding: 32px;
+}
+
+.container-fluid.app-shell {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.page-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+}
+
+.soft-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+}
+
+.soft-card .card-body {
+    padding: 1.25rem;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.table thead th {
+    color: #6b7280;
+    font-weight: 600;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.table tbody td {
+    vertical-align: middle;
+}
+
+.badge-estado {
+    border-radius: 999px;
+    font-weight: 600;
+    padding: 0.45em 0.8em;
+    font-size: 0.78rem;
+}
+
+.badge-tramite {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.badge-finalizado {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.badge-incidencia {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.badge-revision {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+.actions-inline {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.doc-form-inline {
+    display: inline;
+}
+
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.info-item {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    border: 1px solid #eef2f7;
+}
+
+.info-label {
+    font-size: 0.82rem;
+    color: #6b7280;
+    margin-bottom: 0.25rem;
+}
+
+.info-value {
+    font-weight: 600;
+    color: #111827;
+}
+
+.alert {
+    border-radius: 12px;
+}
+
+.btn {
+    border-radius: 10px;
+}
+
+.form-control,
+.form-select {
+    border-radius: 10px;
+}
+
+.empty-state {
+    color: #6b7280;
+    padding: 0.75rem 0;
+}

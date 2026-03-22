@@ -1,0 +1,20 @@
+<div th:fragment="topbar(titulo, subtitulo, usuario)" class="top-bar">
+    <div>
+        <h1 class="page-title mb-1" th:text="${titulo}">Título</h1>
+        <div class="text-muted" th:text="${subtitulo}">Subtítulo</div>
+    </div>
+    <div class="topbar-user d-flex align-items-center gap-3">
+
+        <div class="text-end">
+            <div class="fw-semibold" th:text="${usuario.nombre}">Usuario</div>
+            <div class="text-muted small" th:text="${usuario.email}">email</div>
+        </div>
+
+        <form th:action="@{/logout}" method="post">
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+                Cerrar sesión
+            </button>
+        </form>
+
+    </div>
+</div>

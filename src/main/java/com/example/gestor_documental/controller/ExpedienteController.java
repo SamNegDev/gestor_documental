@@ -46,6 +46,8 @@ public class ExpedienteController {
 
         model.addAttribute("expedientes", expedientes);
         model.addAttribute("usuario", usuario);
+        model.addAttribute("titulo", "Mis expedientes");
+        model.addAttribute("subtitulo", "Gestiona y consulta tus expedientes");
 
         return "expedientes/lista";
     }
@@ -70,7 +72,10 @@ public String verDetalleExpediente(
 
     model.addAttribute("expediente", expediente);
     model.addAttribute("usuario", usuario);
+    model.addAttribute("titulo", "Mis expedientes");
+    model.addAttribute("subtitulo", "Gestiona y consulta tus expedientes");
     model.addAttribute("tiposDocumento", TipoDocumento.values());
+
 
     return "expedientes/detalle";
     }

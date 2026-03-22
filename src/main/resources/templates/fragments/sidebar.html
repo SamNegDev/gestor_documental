@@ -1,0 +1,20 @@
+
+<aside th:fragment="sidebar(usuario)" class="col-md-3 col-lg-2 sidebar">
+    <div class="sidebar-brand text-center mb-4">
+        <img th:src="@{/images/simbolo.jpg}" class="logo-icon" alt="Logo" style="max-height: 40px;">
+        <div class="sidebar-title mt-2">Gestoría Portal</div>
+    </div>
+
+    <nav class="nav flex-column">
+        <a class="nav-link" th:href="@{/expedientes}">Expedientes</a>
+
+        <th:block th:if="${usuario != null and usuario.rolUsuario.name() == 'ADMIN'}">
+            <a class="nav-link" href="#">Panel admin</a>
+            <a class="nav-link" href="#">Usuarios</a>
+        </th:block>
+
+        <th:block th:if="${usuario != null and usuario.rolUsuario.name() == 'CLIENTE'}">
+            <a class="nav-link" href="#">Mi perfil</a>
+        </th:block>
+    </nav>
+</aside>

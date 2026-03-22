@@ -1,82 +1,128 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <title>Detalle de expediente</title>
-    <meta charset="UTF-8">
-</head>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/app}">
 <body>
-<h1>Detalle de expediente</h1>
+<section layout:fragment="content">
 
-<p><strong>ID:</strong> <span th:text="${expediente.id}"></span></p>
-<p><strong>Estado:</strong> <span th:text="${expediente.estadoExpediente}"></span></p>
-<p><strong>Fecha creación:</strong> <span th:text="${#temporals.format(expediente.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></span>
-<p><strong>Matrícula</strong><span th:text="${expediente.matricula}"</p>
+    <div class="card soft-card mb-4">
+        <div class="card-body">
+            <h2 class="section-title">Información general</h2>
 
-<h2>Interesados</h2>
-<ul>
-    <li th:each="doc : ${expediente.interesados}">
-        <span th:text="${expediente.interesados.nombre}"></span>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">ID</div>
+                    <div class="info-value" th:text="${expediente.id}"></div>
+                </div>
 
-        <span th:text="${expediente.interesados.expedienteinteresado.rolInteresado}"></span>
-        <p th:if="${expediente.interesados == null or expediente.interesados.isEmpty()}">
-            No hay interesados asociados a este expediente.
-        </p>
-    </li>
+                <div class="info-item">
+                    <div class="info-label">Estado</div>
+                    <div class="info-value">
+                        <span class="badge badge-estado"
+                              th:text="${expediente.estadoExpediente}"
+                              th:classappend="${expediente.estadoExpediente.name() == 'EN_TRAMITE'} ? ' badge-tramite' :
+                                              (${expediente.estadoExpediente.name() == 'FINALIZADO'} ? ' badge-finalizado' :
+                                              (${expediente.estadoExpediente.name() == 'INCIDENCIA'} ? ' badge-incidencia' : ' badge-revision'))">
+                        </span>
+                    </div>
+                </div>
 
-</ul>
-<p th:if="${expediente.interesados == null or expediente.interesados.isEmpty()}">
-    No hay interesados asociados a este expediente.
-</p>
+                <div class="info-item">
+                    <div class="info-label">Fecha creación</div>
+                    <div class="info-value"
+                         th:text="${#temporals.format(expediente.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></div>
+                </div>
 
-<h2>Documentos</h2>
+                <div class="info-item">
+                    <div class="info-label">Cliente</div>
+                    <div class="info-value" th:text="${expediente.cliente.nombre}"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<ul>
-    <li th:each="doc : ${expediente.documentos}">
-        <span th:text="${doc.nombreArchivoOriginal}"></span>
-        <span th:text="${doc.tipoDocumento}"></span>
-        <a th:href="@{/documentos/ver/{id}(id=${doc.id})}" target="_blank">Ver</a>
-        <a th:href="@{/documentos/descargar/{id}(id=${doc.id})}">Descargar</a>
-        <form th:action="@{/documentos/eliminar/{id}(id=${doc.id})}"
-              method="post"
-              style="display:inline;"
-              onsubmit="return confirm('¿Seguro que quieres eliminar este documento?');">
+    <div class="card soft-card mb-4">
+        <div class="card-body">
+            <h2 class="section-title">Subir documento</h2>
 
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <form th:action="@{/documentos/subir}" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="expedienteId" th:value="${expediente.id}" />
 
-            <button type="submit">Eliminar</button>
-        </form>
-    </li>
-</ul>
-<p th:if="${expediente.documentos == null or expediente.documentos.isEmpty()}">
-    No hay documentos asociados a este expediente.
-</p>
-<form th:action="@{/documentos/subir}" method="post" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="tipoDocumento" class="form-label">Tipo de documento</label>
+                        <select name="tipoDocumento" id="tipoDocumento" class="form-select" required>
+                            <option value="">-- Selecciona un tipo --</option>
+                            <option th:each="tipo : ${tiposDocumento}"
+                                    th:value="${tipo}"
+                                    th:text="${tipo}">
+                            </option>
+                        </select>
+                    </div>
 
-    <input type="hidden" name="expedienteId" th:value="${expediente.id}" />
-    <input type="file" name="archivo" required />
-    <label for="tipoDocumento">Tipo de documento:</label>
-    <select name="tipoDocumento" id="tipoDocumento" required>
-        <option value="">-- Selecciona un tipo --</option>
-        <option th:each="tipo : ${tiposDocumento}"
-                th:value="${tipo}"
-                th:text="${tipo}">
-        </option>
-    </select>
-    <button type="submit">Subir documento</button>
-    <input type="hidden"
-           th:name="${_csrf.parameterName}"
-           th:value="${_csrf.token}" />
+                    <div class="col-md-5">
+                        <label for="archivo" class="form-label">Archivo</label>
+                        <input type="file" name="archivo" id="archivo" class="form-control" required />
+                    </div>
 
-</form>
-<p th:if="${mensaje}" style="
-    color: green;
-    background-color: #e6ffe6;
-    padding: 10px;
-    border: 1px solid green;
-">
-    <span th:text="${mensaje}"></span>
-</p>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">Subir documento</button>
+                    </div>
+                </div>
 
-<a th:href="@{/expedientes}">Volver al listado</a>
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            </form>
+        </div>
+    </div>
+
+    <div class="card soft-card">
+        <div class="card-body">
+            <h2 class="section-title">Documentos</h2>
+
+            <div th:if="${expediente.documentos == null or expediente.documentos.isEmpty()}" class="empty-state">
+                No hay documentos asociados a este expediente.
+            </div>
+
+            <div class="table-responsive" th:if="${expediente.documentos != null and !expediente.documentos.isEmpty()}">
+                <table class="table align-middle">
+                    <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Tipo</th>
+                        <th>Fecha subida</th>
+                        <th>Acciones</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="doc : ${expediente.documentos}">
+                        <td th:text="${doc.nombreArchivoOriginal}"></td>
+                        <td th:text="${doc.tipoDocumento}"></td>
+                        <td th:text="${#temporals.format(doc.fechaSubida, 'dd/MM/yyyy HH:mm')}"></td>
+                        <td>
+                            <div class="actions-inline">
+                                <a th:href="@{/documentos/ver/{id}(id=${doc.id})}" target="_blank" class="btn btn-sm btn-outline-secondary">Ver</a>
+                                <a th:href="@{/documentos/descargar/{id}(id=${doc.id})}" class="btn btn-sm btn-outline-primary">Descargar</a>
+
+                                <form th:action="@{/documentos/eliminar/{id}(id=${doc.id})}"
+                                      method="post"
+                                      class="doc-form-inline"
+                                      onsubmit="return confirm('¿Seguro que quieres eliminar este documento?');">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <a th:href="@{/expedientes}" class="btn btn-outline-secondary">Volver al listado</a>
+    </div>
+
+</section>
 </body>
 </html>
