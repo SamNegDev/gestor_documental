@@ -17,4 +17,8 @@ public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
     int countByClienteAndEstadoExpediente(Cliente cliente, EstadoExpediente estadoExpediente);
 
     int countByEstadoExpediente(EstadoExpediente estadoExpediente);
+
+    List<Expediente> findTop5ByOrderByFechaCreacionDesc();
+
+    List<Expediente> findTop5ByClienteOrderByFechaCreacionDesc(Cliente cliente);
 }

@@ -24,7 +24,7 @@ public class AdminDashboardController {
 
         Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
 
-        int totalExpedientes = expedienteService.listarTodos().size();
+        long totalExpedientes = expedienteService.contarTodos();
         int enTramite = expedienteService.contarPorEstado(EstadoExpediente.EN_TRAMITE);
         int finalizado = expedienteService.contarPorEstado(EstadoExpediente.FINALIZADO);
         int incidencia = expedienteService.contarPorEstado(EstadoExpediente.INCIDENCIA);
@@ -38,6 +38,7 @@ public class AdminDashboardController {
         model.addAttribute("enTramite", enTramite);
         model.addAttribute("finalizados", finalizado);
         model.addAttribute("incidencias", incidencia);
+        model.addAttribute("ultimosExpedientes", expedienteService.listarUltimos());
 
         return "admin/dashboard";
     }

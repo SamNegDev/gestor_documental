@@ -16,9 +16,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @RequestMapping("/cliente/dashboard")
 public class ClienteDashboardController {
 
-
-
-
         private final UsuarioService usuarioService;
         private final ExpedienteService expedienteService;
 
@@ -41,6 +38,7 @@ public class ClienteDashboardController {
             model.addAttribute("enTramite", enTramite);
             model.addAttribute("finalizados", finalizado);
             model.addAttribute("incidencias", incidencia);
+            model.addAttribute("ultimoExpedientes", expedienteService.listarUltimosPorCliente(usuario.getCliente()));
 
             return "cliente/dashboard";
         }

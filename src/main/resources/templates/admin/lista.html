@@ -27,7 +27,7 @@
                     <tbody>
                     <tr th:each="expediente : ${expedientes}">
                         <td th:text="${expediente.id}"></td>
-                        <td th:text="${expediente.tipoTramite}"></td>
+                        <td th:text="${expediente.tipoTramite != null ? expediente.tipoTramite.nombre : 'Sin tipo'}"></td>
                         <td th:text="${expediente.matricula}"></td>
                         <td>
                             <span class="badge badge-estado"

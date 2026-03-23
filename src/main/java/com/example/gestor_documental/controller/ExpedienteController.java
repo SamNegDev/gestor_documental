@@ -49,7 +49,11 @@ public class ExpedienteController {
         model.addAttribute("titulo", "Mis expedientes");
         model.addAttribute("subtitulo", "Gestiona y consulta tus expedientes");
 
-        return "expedientes/lista";
+        if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
+            return "admin/lista";
+        } else {
+            return "cliente/lista";
+        }
     }
 
 @GetMapping("/{id}")

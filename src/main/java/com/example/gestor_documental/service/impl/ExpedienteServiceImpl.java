@@ -42,6 +42,11 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     }
 
     @Override
+    public long contarTodos() {
+        return expedienteRepository.count();
+    }
+
+    @Override
     public List<Expediente> listarPorClienteId(Long clienteId) {
         return expedienteRepository.findByClienteId(clienteId);
     }
@@ -72,7 +77,17 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
     @Override
     public int contarPorEstado(EstadoExpediente estadoExpediente) {
-        return expedienteRepository.countByEstadoExpediente();
+        return expedienteRepository.countByEstadoExpediente(estadoExpediente);
+    }
+
+    @Override
+    public List<Expediente> listarUltimos() {
+        return expedienteRepository.findTop5ByOrderByFechaCreacionDesc();
+    }
+
+    @Override
+    public List<Expediente> listarUltimosPorCliente(Cliente cliente) {
+        return expedienteRepository.findTop5ByClienteOrderByFechaCreacionDesc(cliente);
     }
 
 }
