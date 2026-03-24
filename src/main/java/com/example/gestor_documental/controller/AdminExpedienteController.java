@@ -33,14 +33,12 @@ public class AdminExpedienteController {
     public String formularioNuevoCliente(Authentication authentication,Model model) {
 
         Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
-        System.out.println("Entra Controller");
+
         model.addAttribute("usuario", usuario);
         model.addAttribute("clientes", clienteService.listarTodos());
         model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
         model.addAttribute("titulo", "Nuevo Expediente");
         model.addAttribute("subtitulo", "Registro de nuevo expediente");
-        System.out.println("Sale Controller");
-
 
         return "admin/expediente-form";
     }

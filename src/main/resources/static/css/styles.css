@@ -156,12 +156,12 @@ body {
     font-size: 0.78rem;
 }
 
-.badge-tramite {
+.badge-tramite,  .badge-pendiente-revision {
     background-color: #fef3c7;
     color: #92400e;
 }
 
-.badge-finalizado {
+.badge-finalizado, .badge-convertida {
     background-color: #d1fae5;
     color: #065f46;
 }

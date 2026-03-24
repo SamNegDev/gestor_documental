@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/app}">
+
+<section layout:fragment="content">
+
+  <div class="card soft-card">
+    <div class="card-body">
+
+      <div th:if="${solicitudes == null or solicitudes.isEmpty()}" class="empty-state">
+        No tienes solicitudes disponibles.
+      </div>
+
+      <div class="table-responsive" th:if="${solicitudes != null and !solicitudes.isEmpty()}">
+        <table class="table align-middle">
+          <thead>
+          <tr>
+            <th>Nº</th>
+            <th>Tipo trámite</th>
+            <th>Matrícula</th>
+            <th>Estado</th>
+            <th>Fecha</th>
+            <th>Acciones</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr th:each="solicitud : ${solicitudes}">
+            <td th:text="${solicitud.id}"></td>
+            <td th:text="${solicitud.tipoTramite != null ? solicitud.tipoTramite.nombre : 'Sin tipo'}"></td>
+            <td th:text="${solicitud.matricula}"></td>
+            <td>
+                            <span class="badge badge-estado"
+                                  th:text="${solicitud.estadoSolicitud}"
+                                  th:classappend="${solicitud.estadoSolicitud.name() == 'PENDIENTE_REVISION'} ? ' badge-pendiente-revision' :
+                                              (${solicitud.estadoSolicitud.name() == 'CONVERTIDA'} ? ' badge-convertida' :
+                                              (${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'} ? ' badge-incidencia' : ' badge-revision'))">
+                            </span>
+            </td>
+            <td th:text="${#temporals.format(solicitud.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></td>
+            <td>
+              <a th:href="@{/solicitudes/{id}(id=${solicitud.id})}"
+                 class="btn btn-sm btn-outline-primary">
+                Ver detalle
+              </a>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</section>
+</html>

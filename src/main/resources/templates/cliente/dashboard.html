@@ -91,6 +91,93 @@
             </div>
         </div>
 
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-3">
+            <div class="card bg-primary text-white shadow-sm border-0 h-100">
+                <div class="card-body text-center p-4">
+                    <h3 class="display-6 fw-bold" th:text="${totalSolicitudes}">0</h3>
+                    <p class="mb-0">Total solicitudes</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark shadow-sm border-0 h-100">
+                <div class="card-body text-center p-4">
+                    <h3 class="display-6 fw-bold" th:text="${pendienteRevision}">0</h3>
+                    <p class="mb-0">Pendiente de Revisión</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-success text-white shadow-sm border-0 h-100">
+                <div class="card-body text-center p-4">
+                    <h3 class="display-6 fw-bold" th:text="${convertidas}">0</h3>
+                    <p class="mb-0">Convertidas</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-danger text-white shadow-sm border-0 h-100">
+                <div class="card-body text-center p-4">
+                    <h3 class="display-6 fw-bold" th:text="${incidenciasSolicitudes}">0</h3>
+                    <p class="mb-0">Con incidencias</p>
+                </div>
+            </div>
+        </div>
+
     </div>
+
+    <div class="card soft-card">
+        <div class="card-body">
+            <h5 class="section-title">Últimas solicitudes registradas</h5>
+
+            <div th:if="${ultimasSolicitudes == null or ultimasSolicitudes.isEmpty()}" class="empty-state">
+                No hay solicitudes registradas.
+            </div>
+
+            <div class="table-responsive" th:if="${ultimasSolicitudes != null and !ultimasSolicitudes.isEmpty()}">
+                <table class="table align-middle">
+                    <thead>
+                    <tr>
+                        <th>Nº</th>
+                        <th>Cliente</th>
+                        <th>Matrícula</th>
+                        <th>Estado</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="solicitud : ${ultimasSolicitudes}">
+                        <td th:text="${solicitud.id}">1</td>
+                        <td th:text="${solicitud.cliente != null ? solicitud.cliente.nombre : 'Sin cliente'}">Cliente</td>
+                        <td th:text="${solicitud.matricula != null ? solicitud.matricula : '-'}">1234ABC</td>
+                        <td>
+                            <span class="badge badge-estado"
+                                  th:text="${solicitud.estadoSolicitud}"
+                                  th:classappend="${solicitud.estadoSolicitud.name() == 'PENDIENTE_REVISION'} ? ' badge-pendiente-revision' :
+                                              (${solicitud.estadoSolicitud.name() == 'CONVERTIDA'} ? ' badge-convertida' :
+                                              (${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'} ? ' badge-incidencia' : ' badge-revision'))">
+                            </span>
+                        </td>
+                        <td th:text="${#temporals.format(solicitud.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></td>
+                        <td>
+                            <a th:href="@{/solicitudes/{id}(id=${solicitud.id})}"
+                               class="btn btn-sm btn-outline-primary">
+                                Ver detalle
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </div>
+    </div>
+
 </section>
 </html>

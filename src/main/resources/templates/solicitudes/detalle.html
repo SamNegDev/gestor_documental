@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/app}">
+<body>
+<section layout:fragment="content">
+
+  <div class="card soft-card mb-4">
+    <div class="card-body">
+      <h2 class="section-title">Información general</h2>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">ID</div>
+          <div class="info-value" th:text="${solicitud.id}"></div>
+        </div>
+
+        <div class="info-item">
+          <div class="info-label">Estado</div>
+          <div class="info-value">
+                        <span class="badge badge-estado"
+                              th:text="${solicitud.estadoSolicitud}"
+                              th:classappend="${solicitud.estadoSolicitud.name() == 'PENDIENTE_REVISION'} ? ' badge-pendiente-revision' :
+                                              (${solicitud.estadoSolicitud.name() == 'CONVERTIDA'} ? ' badge-convertida' :
+                                              (${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'} ? ' badge-incidencia' : ' badge-revision'))">
+                        </span>
+          </div>
+        </div>
+
+        <div class="info-item">
+          <div class="info-label">Fecha creación</div>
+          <div class="info-value"
+               th:text="${#temporals.format(solicitud.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></div>
+        </div>
+
+        <div class="info-item">
+          <div class="info-label">Cliente</div>
+          <div class="info-value" th:text="${solicitud.cliente.nombre}"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card soft-card mb-4">
+    <div class="card-body">
+      <h2 class="section-title">Subir documento</h2>
+
+      <form th:action="@{/documentos/subir}" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="solicitudId" th:value="${solicitud.id}" />
+
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="tipoDocumento" class="form-label">Tipo de documento</label>
+            <select name="tipoDocumento" id="tipoDocumento" class="form-select" required>
+              <option value="">-- Selecciona un tipo --</option>
+              <option th:each="tipo : ${tiposDocumento}"
+                      th:value="${tipo}"
+                      th:text="${tipo}">
+              </option>
+            </select>
+          </div>
+
+          <div class="col-md-5">
+            <label for="archivo" class="form-label">Archivo</label>
+            <input type="file" name="archivo" id="archivo" class="form-control" required />
+          </div>
+
+          <div class="col-md-3 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary w-100">Subir documento</button>
+          </div>
+        </div>
+
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      </form>
+    </div>
+  </div>
+
+  <div class="card soft-card">
+    <div class="card-body">
+      <h2 class="section-title">Documentos</h2>
+
+      <div th:if="${solicitud.documentos == null or solicitud.documentos.isEmpty()}" class="empty-state">
+        No hay documentos asociados a esta solicitud.
+      </div>
+
+      <div class="table-responsive" th:if="${solicitud.documentos != null and !solicitud.documentos.isEmpty()}">
+        <table class="table align-middle">
+          <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Tipo</th>
+            <th>Fecha subida</th>
+            <th>Acciones</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr th:each="doc : ${solicitud.documentos}">
+            <td th:text="${doc.nombreArchivoOriginal}"></td>
+            <td th:text="${doc.tipoDocumento}"></td>
+            <td th:text="${#temporals.format(doc.fechaSubida, 'dd/MM/yyyy HH:mm')}"></td>
+            <td>
+              <div class="actions-inline">
+                <a th:href="@{/documentos/ver/{id}(id=${doc.id})}" target="_blank" class="btn btn-sm btn-outline-secondary">Ver</a>
+                <a th:href="@{/documentos/descargar/{id}(id=${doc.id})}" class="btn btn-sm btn-outline-primary">Descargar</a>
+
+                <form th:action="@{/documentos/eliminar/{id}(id=${doc.id})}"
+                      method="post"
+                      class="doc-form-inline"
+                      onsubmit="return confirm('¿Seguro que quieres eliminar este documento?');">
+                  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <a th:href="@{/solicitudes}" class="btn btn-outline-secondary">Volver al listado</a>
+  </div>
+
+</section>
+</body>
+</html>

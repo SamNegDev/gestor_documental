@@ -1,8 +1,10 @@
 package com.example.gestor_documental.controller;
 
 import com.example.gestor_documental.enums.EstadoExpediente;
+import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -18,8 +20,9 @@ public class ClienteDashboardController {
 
         private final UsuarioService usuarioService;
         private final ExpedienteService expedienteService;
+    private final SolicitudService solicitudService;
 
-        @GetMapping
+    @GetMapping
         public String dashboard(Authentication authentication, Model model) {
 
             Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
@@ -27,18 +30,29 @@ public class ClienteDashboardController {
             int totalExpedientes = expedienteService.contarPorCliente(usuario.getCliente());
             int enTramite = expedienteService.contarPorClienteYEstado(usuario.getCliente(), EstadoExpediente.EN_TRAMITE);
             int finalizado = expedienteService.contarPorClienteYEstado(usuario.getCliente(), EstadoExpediente.FINALIZADO);
-            int incidencia = expedienteService.contarPorClienteYEstado(usuario.getCliente(), EstadoExpediente.INCIDENCIA);
+            int incidenciasExpedientes = expedienteService.contarPorClienteYEstado(usuario.getCliente(), EstadoExpediente.INCIDENCIA);
+
+            int totalSolicitudes = solicitudService.contarPorCliente(usuario.getCliente());
+            int pendienteRevision = solicitudService.contarPorClienteYEstado(usuario.getCliente(), EstadoSolicitud.PENDIENTE_REVISION);
+            int convertidas = solicitudService.contarPorClienteYEstado(usuario.getCliente(), EstadoSolicitud.CONVERTIDO);
+            int incidenciasSoliticudes = solicitudService.contarPorClienteYEstado(usuario.getCliente(), EstadoSolicitud.INCIDENCIA);
 
             model.addAttribute("usuario", usuario);
             model.addAttribute("titulo", "Dashboard");
             model.addAttribute("subtitulo", "Resumen general de tu actividad");
 
+            model.addAttribute("totalSolicitudes", totalSolicitudes);
+            model.addAttribute("pendienteRevision", pendienteRevision);
+            model.addAttribute("convertidas", convertidas);
+            model.addAttribute("incidenciasSoliticudes", incidenciasSoliticudes);
+            model.addAttribute("ultimasSolicitudes", solicitudService.listarUltimasPorCliente(usuario.getCliente()));
+
 
             model.addAttribute("totalExpedientes", totalExpedientes);
             model.addAttribute("enTramite", enTramite);
             model.addAttribute("finalizados", finalizado);
-            model.addAttribute("incidencias", incidencia);
-            model.addAttribute("ultimoExpedientes", expedienteService.listarUltimosPorCliente(usuario.getCliente()));
+            model.addAttribute("incidencias", incidenciasExpedientes);
+            model.addAttribute("ultimosExpedientes", expedienteService.listarUltimosPorCliente(usuario.getCliente()));
 
             return "cliente/dashboard";
         }

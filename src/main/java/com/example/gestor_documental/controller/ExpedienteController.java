@@ -46,13 +46,17 @@ public class ExpedienteController {
 
         model.addAttribute("expedientes", expedientes);
         model.addAttribute("usuario", usuario);
-        model.addAttribute("titulo", "Mis expedientes");
-        model.addAttribute("subtitulo", "Gestiona y consulta tus expedientes");
+
+
 
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
-            return "admin/lista";
+            model.addAttribute("titulo", "Listado Expedientes");
+            model.addAttribute("subtitulo", "Gestion y consulta de expedientes de clientes");
+            return "admin/lista_expedientes";
         } else {
-            return "cliente/lista";
+            model.addAttribute("titulo", "Mis expedientes");
+            model.addAttribute("subtitulo", "Mis expedientes");
+            return "cliente/lista_expedientes";
         }
     }
 
