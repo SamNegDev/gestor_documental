@@ -1,6 +1,7 @@
 package com.example.gestor_documental.controller;
 
 
+import com.example.gestor_documental.dto.InteresadosFormDto;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Expediente;
@@ -14,10 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 @Controller
 @RequiredArgsConstructor
@@ -36,6 +34,7 @@ public class AdminExpedienteController {
 
         model.addAttribute("usuario", usuario);
         model.addAttribute("clientes", clienteService.listarTodos());
+        model.addAttribute("interesadosForm", new InteresadosFormDto());
         model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
         model.addAttribute("titulo", "Nuevo Expediente");
         model.addAttribute("subtitulo", "Registro de nuevo expediente");
@@ -43,24 +42,35 @@ public class AdminExpedienteController {
         return "admin/expediente-form";
     }
     @PostMapping
-    public String guardarExpediente(@RequestParam Long clienteId,
+    public String guardarExpediente(@ModelAttribute("expediente") Expediente expediente,
+                                    @ModelAttribute("interesadosForm") InteresadosFormDto interesadosForm,
+                                    Authentication authentication,
+                                    @RequestParam Long clienteId,
                                     @RequestParam Long tipoTramiteId,
-                                    @RequestParam String matricula,
-                                    @RequestParam(required = false) String observaciones) {
-        Cliente cliente = clienteService.buscarPorId(clienteId).orElseThrow();
-        TipoTramite tipoTramite = tipoTramiteService.buscarPorId(tipoTramiteId).orElseThrow();
+                                    Model model) {
 
-        Expediente expediente = new Expediente();
-        expediente.setCliente(cliente);
-        expediente.setTipoTramite(tipoTramite);
-        expediente.setMatricula(matricula);
-        expediente.setObservaciones(observaciones);
-        expediente.setEstadoExpediente(EstadoExpediente.EN_TRAMITE);
+        try {
+            Expediente expedienteGuardado = expedienteService.crearExpedienteCompleto(
+                    expediente,
+                    clienteId,
+                    tipoTramiteId,
+                    interesadosForm.getInteresado1(),
+                    interesadosForm.getInteresado2()
+            );
 
-        expedienteService.guardar(expediente);
+            return "redirect:/expedientes/" + expedienteGuardado.getId();
 
-        return "redirect:/expedientes";
+        } catch (IllegalArgumentException e) {
+            Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+            model.addAttribute("usuario", usuario);
+            model.addAttribute("expediente", expediente);
+            model.addAttribute("interesadosForm", interesadosForm);
+            model.addAttribute("clientes", clienteService.listarTodos());
+            model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
+            model.addAttribute("error", e.getMessage());
 
+            return "admin/expediente-form";
+        }
     }
 
 

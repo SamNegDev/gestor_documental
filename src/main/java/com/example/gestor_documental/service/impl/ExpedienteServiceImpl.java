@@ -1,25 +1,31 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.RolUsuario;
-import com.example.gestor_documental.model.Cliente;
-import com.example.gestor_documental.model.Expediente;
-import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.*;
+import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
+import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.InteresadoService;
+import com.example.gestor_documental.service.TipoTramiteService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class ExpedienteServiceImpl implements ExpedienteService {
 
     private final ExpedienteRepository expedienteRepository;
-
-    public ExpedienteServiceImpl(ExpedienteRepository expedienteRepository) {
-        this.expedienteRepository = expedienteRepository;
-    }
+    private final InteresadoService interesadoService;
+    private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final ClienteService clienteService;
+    private final TipoTramiteService tipoTramiteService;
 
     @Override
     public List<Expediente> listarTodos() {
@@ -89,5 +95,107 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     public List<Expediente> listarUltimosPorCliente(Cliente cliente) {
         return expedienteRepository.findTop5ByClienteOrderByFechaCreacionDesc(cliente);
     }
+
+
+
+    @Override
+    public void guardarInteresados(Expediente expediente,
+                                   InteresadoFormDto interesado1,
+                                   InteresadoFormDto interesado2) {
+
+        guardarInteresadoSiValido(expediente, interesado1);
+        guardarInteresadoSiValido(expediente, interesado2);
+    }
+
+    private void guardarInteresadoSiValido(Expediente expediente, InteresadoFormDto dto) {
+
+        if (interesadoVacio(dto)) {
+            return;
+        }
+
+        Interesado interesado = interesadoService.buscarInteresadoPorDNI(dto.getDni())
+                .orElseGet(() -> {
+                    Interesado nuevoInteresado = new Interesado();
+                    nuevoInteresado.setNombre(dto.getNombre());
+                    nuevoInteresado.setDni(dto.getDni());
+                    nuevoInteresado.setTelefono(dto.getTelefono());
+                    nuevoInteresado.setDireccion(dto.getDireccion());
+                    return interesadoService.guardar(nuevoInteresado);
+                });
+
+        boolean yaRelacionado = expedienteInteresadoRepository
+                .findByExpedienteIdAndInteresadoId(expediente.getId(), interesado.getId())
+                .isPresent();
+
+        if (yaRelacionado) {
+            return;
+        }
+
+        ExpedienteInteresado relacion = new ExpedienteInteresado();
+        relacion.setExpediente(expediente);
+        relacion.setInteresado(interesado);
+        relacion.setRol(dto.getRol());
+
+        expedienteInteresadoRepository.save(relacion);
+    }
+
+
+
+    private boolean interesadoValido(InteresadoFormDto dto) {
+        return dto != null
+                && dto.getNombre() != null && !dto.getNombre().isBlank()
+                && dto.getDni() != null && !dto.getDni().isBlank()
+                && dto.getRol() != null;
+    }
+    private boolean interesadoVacio(InteresadoFormDto dto) {
+        return dto == null
+                || ((dto.getNombre() == null || dto.getNombre().isBlank())
+                && (dto.getDni() == null || dto.getDni().isBlank())
+                && dto.getRol() == null);
+    }
+    private void validarInteresado(InteresadoFormDto dto, String nombreInteresado) {
+        if (interesadoVacio(dto)) {
+            return;
+        }
+
+        if (!interesadoValido(dto)) {
+            throw new IllegalArgumentException(nombreInteresado + " está incompleto. Debe tener nombre, DNI y rol.");
+        }
+    }
+    private void validarInteresados(InteresadoFormDto interesado1, InteresadoFormDto interesado2) {
+        validarInteresado(interesado1, "Interesado 1");
+        validarInteresado(interesado2, "Interesado 2");
+
+        if (!interesadoVacio(interesado1) && !interesadoVacio(interesado2)) {
+            if (interesado1.getDni().equalsIgnoreCase(interesado2.getDni())) {
+                throw new IllegalArgumentException("Los dos interesados no pueden tener el mismo DNI.");
+            }
+        }
+    }
+    @Override
+    @Transactional
+    public Expediente crearExpedienteCompleto(Expediente expediente,
+                                              Long clienteId,
+                                              Long tipoTramiteId,
+                                              InteresadoFormDto interesado1,
+                                              InteresadoFormDto interesado2) {
+
+        validarInteresados(interesado1, interesado2);
+
+        Cliente cliente = clienteService.buscarPorId(clienteId).orElseThrow();
+        TipoTramite tipoTramite = tipoTramiteService.buscarPorId(tipoTramiteId).orElseThrow();
+
+        expediente.setCliente(cliente);
+        expediente.setTipoTramite(tipoTramite);
+        expediente.setEstadoExpediente(EstadoExpediente.EN_TRAMITE);
+
+        Expediente expedienteGuardado = expedienteRepository.save(expediente);
+
+        guardarInteresadoSiValido(expedienteGuardado, interesado1);
+        guardarInteresadoSiValido(expedienteGuardado, interesado2);
+
+        return expedienteGuardado;
+    }
+
 
 }

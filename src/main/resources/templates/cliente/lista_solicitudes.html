@@ -5,6 +5,17 @@
 
 <section layout:fragment="content">
 
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="section-title mb-1">Mis solicitudes</h4>
+            <p class="text-muted mb-0">Consulta tus solicitudes y crea nuevas peticiones</p>
+        </div>
+
+        <a th:href="@{/cliente/solicitudes/nuevo}" class="btn btn-primary">
+            + Nueva solicitud
+        </a>
+    </div>
+
     <div class="card soft-card">
         <div class="card-body">
 

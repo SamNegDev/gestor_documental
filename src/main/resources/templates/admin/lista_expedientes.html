@@ -5,6 +5,17 @@
 
 <section layout:fragment="content">
 
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="section-title mb-1">Expedientes</h4>
+            <p class="text-muted mb-0">Gestiona los expedientes registrados en el sistema</p>
+        </div>
+
+        <a th:href="@{/admin/expedientes/nuevo}" class="btn btn-primary">
+            + Nuevo expediente
+        </a>
+    </div>
+
     <div class="card soft-card">
         <div class="card-body">
 

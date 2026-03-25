@@ -30,12 +30,14 @@ public class AdminDashboardController {
         long totalExpedientes = expedienteService.contarTodos();
         int enTramite = expedienteService.contarPorEstado(EstadoExpediente.EN_TRAMITE);
         int finalizado = expedienteService.contarPorEstado(EstadoExpediente.FINALIZADO);
-        int incidencia = expedienteService.contarPorEstado(EstadoExpediente.INCIDENCIA);
+        int incidenciasExpedientes = expedienteService.contarPorEstado(EstadoExpediente.INCIDENCIA);
 
         long totalSolicitudes = solicitudService.contarTodos();
         long pendienteRevision = solicitudService.contarPorEstado(EstadoSolicitud.PENDIENTE_REVISION);
         long convertidas = solicitudService.contarPorEstado(EstadoSolicitud.CONVERTIDO);
-        long incidenciasSoliticudes = solicitudService.contarPorEstado(EstadoSolicitud.INCIDENCIA);
+        long incidenciasSolicitudes = solicitudService.contarPorEstado(EstadoSolicitud.INCIDENCIA);
+
+        long totalIncidencias = incidenciasExpedientes + incidenciasSolicitudes;
 
         model.addAttribute("usuario", usuario);
         model.addAttribute("titulo", "Dashboard Admin");
@@ -44,14 +46,16 @@ public class AdminDashboardController {
         model.addAttribute("totalExpedientes", totalExpedientes);
         model.addAttribute("enTramite", enTramite);
         model.addAttribute("finalizados", finalizado);
-        model.addAttribute("incidencias", incidencia);
+        model.addAttribute("incidenciasExpedientes", incidenciasExpedientes);
         model.addAttribute("ultimosExpedientes", expedienteService.listarUltimos());
 
         model.addAttribute("totalSolicitudes", totalSolicitudes);
         model.addAttribute("pendienteRevision", pendienteRevision);
         model.addAttribute("convertidas", convertidas);
-        model.addAttribute("incidenciasSoliticudes", incidenciasSoliticudes);
+        model.addAttribute("incidenciasSolicitudes", incidenciasSolicitudes);
         model.addAttribute("ultimasSolicitudes", solicitudService.listarUltimas());
+
+        model.addAttribute("totalIncidencias", totalIncidencias);
 
 
 

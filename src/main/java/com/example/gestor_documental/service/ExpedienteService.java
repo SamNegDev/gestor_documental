@@ -1,8 +1,10 @@
 package com.example.gestor_documental.service;
 
+import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Usuario;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -36,5 +38,15 @@ public interface ExpedienteService {
 
     List<Expediente> listarUltimosPorCliente(Cliente cliente);
 
+
+    void guardarInteresados(Expediente expediente,
+                            InteresadoFormDto interesado1,
+                            InteresadoFormDto interesado2);
+
+    Expediente crearExpedienteCompleto(Expediente expediente,
+                                       Long clienteId,
+                                       Long tipoTramiteId,
+                                       InteresadoFormDto interesado1,
+                                       InteresadoFormDto interesado2);
 
 }

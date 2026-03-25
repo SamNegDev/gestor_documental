@@ -4,47 +4,143 @@
       layout:decorate="~{layout/app}">
 
 <section layout:fragment="content">
-    <div class="container mt-4">
+    <div class="mb-3">
+        <h5 class="section-title">Resumen general</h5>
+    </div>
 
-        <div class="row mt-4 g-3 mb-4">
+    <div class="row g-3 mb-4">
 
-            <div class="col-md-3">
-                <div class="card bg-primary text-white shadow-sm border-0 h-100">
-                    <div class="card-body text-center p-4">
-                        <h3 class="display-6 fw-bold" th:text="${totalExpedientes}">0</h3>
-                        <p class="mb-0">Total expedientes</p>
-                    </div>
+        <div class="col-md-4">
+            <div class="card bg-warning text-dark shadow-sm border-0 h-100 metric-card">
+                <div class="card-body text-center">
+                    <h3 class="metric-number" th:text="${enTramite}">0</h3>
+                    <p class="metric-label">En trámite</p>
                 </div>
             </div>
-
-            <div class="col-md-3">
-                <div class="card bg-warning text-dark shadow-sm border-0 h-100">
-                    <div class="card-body text-center p-4">
-                        <h3 class="display-6 fw-bold" th:text="${enTramite}">0</h3>
-                        <p class="mb-0">En trámite</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-3">
-                <div class="card bg-success text-white shadow-sm border-0 h-100">
-                    <div class="card-body text-center p-4">
-                        <h3 class="display-6 fw-bold" th:text="${finalizados}">0</h3>
-                        <p class="mb-0">Finalizados</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-3">
-                <div class="card bg-danger text-white shadow-sm border-0 h-100">
-                    <div class="card-body text-center p-4">
-                        <h3 class="display-6 fw-bold" th:text="${incidencias}">0</h3>
-                        <p class="mb-0">Incidencias</p>
-                    </div>
-                </div>
-            </div>
-
         </div>
+
+        <div class="col-md-4">
+            <div class="card bg-primary text-white shadow-sm border-0 h-100 metric-card">
+                <div class="card-body text-center">
+                    <h3 class="metric-number" th:text="${pendienteRevision}">0</h3>
+                    <p class="metric-label">Pendiente de revisión</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card bg-danger text-white shadow-sm border-0 h-100 metric-card">
+                <div class="card-body text-center">
+                    <h3 class="metric-number" th:text="${totalIncidencias}">0</h3>
+                    <p class="metric-label">Con incidencias</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <!-- ===== ACCESOS RÁPIDOS ===== -->
+    <div class="card soft-card mb-4">
+        <div class="card-body">
+            <h5 class="section-title mb-3">Accesos rápidos</h5>
+
+            <div class="d-flex flex-wrap gap-2">
+                <a th:href="@{/admin/expedientes/nuevo}" class="btn btn-primary">
+                    + Nuevo expediente
+                </a>
+
+                <a th:href="@{/cliente/solicitudes/nuevo}" class="btn btn-outline-primary">
+                    + Nueva solicitud
+                </a>
+
+                <a th:href="@{/expedientes}" class="btn btn-outline-primary">
+                    Ver expedientes
+                </a>
+
+                <a th:href="@{/solicitudes}" class="btn btn-outline-primary">
+                    Ver solicitudes
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="row g-3 mb-4">
+        <!-- Gráfica expedientes -->
+        <div class="col-md-6">
+            <div class="card soft-card h-100">
+                <div class="card-body">
+                    <h5 class="section-title mb-3">Estado de expedientes</h5>
+                    <canvas id="expedientesChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfica expedientes -->
+        <div class="col-md-6">
+            <div class="card soft-card h-100">
+                <div class="card-body">
+                    <h5 class="section-title mb-3">Estado de solicitudes</h5>
+                    <canvas id="solicitudesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script th:inline="javascript">
+        document.addEventListener("DOMContentLoaded", function () {
+            const enTramite = [[${enTramite}]];
+            const finalizados = [[${finalizados}]];
+            const incidenciasExpedientes = [[${incidenciasExpedientes}]];
+
+            const canvasExpedientes = document.getElementById('expedientesChart');
+
+            new Chart(canvasExpedientes, {
+                type: 'doughnut',
+                data: {
+                    labels: ['En trámite', 'Finalizados', 'Incidencias'],
+                    datasets: [{
+                        data: [enTramite, finalizados, incidenciasExpedientes],
+                        backgroundColor: ['#facc15', '#16a34a', '#dc2626'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            const pendienteRevision = [[${pendienteRevision}]];
+            const convertidas = [[${convertidas}]];
+            const incidenciasSolicitudes = [[${incidenciasSolicitudes}]];
+
+            const canvasSolicitudes = document.getElementById('solicitudesChart');
+
+            new Chart(canvasSolicitudes, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pendiente Revisión', 'Convertidas', 'Incidencias'],
+                    datasets: [{
+                        data: [pendienteRevision, convertidas, incidenciasSolicitudes],
+                        backgroundColor: ['#facc15', '#16a34a', '#dc2626'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        });
+        console.log(Chart.version)
+    </script>
 
         <div class="card soft-card">
             <div class="card-body">
@@ -90,46 +186,6 @@
                 </div>
             </div>
         </div>
-
-    <div class="row g-3 mb-4">
-
-        <div class="col-md-3">
-            <div class="card bg-primary text-white shadow-sm border-0 h-100">
-                <div class="card-body text-center p-4">
-                    <h3 class="display-6 fw-bold" th:text="${totalSolicitudes}">0</h3>
-                    <p class="mb-0">Total solicitudes</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card bg-warning text-dark shadow-sm border-0 h-100">
-                <div class="card-body text-center p-4">
-                    <h3 class="display-6 fw-bold" th:text="${pendienteRevision}">0</h3>
-                    <p class="mb-0">Pendiente de Revisión</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card bg-success text-white shadow-sm border-0 h-100">
-                <div class="card-body text-center p-4">
-                    <h3 class="display-6 fw-bold" th:text="${convertidas}">0</h3>
-                    <p class="mb-0">Convertidas</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card bg-danger text-white shadow-sm border-0 h-100">
-                <div class="card-body text-center p-4">
-                    <h3 class="display-6 fw-bold" th:text="${incidenciasSolicitudes}">0</h3>
-                    <p class="mb-0">Con incidencias</p>
-                </div>
-            </div>
-        </div>
-
-    </div>
 
     <div class="card soft-card">
         <div class="card-body">

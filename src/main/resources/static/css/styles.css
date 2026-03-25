@@ -110,6 +110,21 @@ body {
 .main-content {
     padding: 32px;
 }
+.metric-card {
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.metric-number {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 0.3rem;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    opacity: 0.95;
+}
 
 .container-fluid.app-shell {
     padding-left: 0;
@@ -147,6 +162,10 @@ body {
 
 .table tbody td {
     vertical-align: middle;
+}
+
+#expedientesChart, #solicitudesChart {
+    max-height: 260px;
 }
 
 .badge-estado {

@@ -16,6 +16,13 @@
                 </div>
 
                 <div class="info-item">
+                    <div class="info-label">Tipo de trámite</div>
+                    <div class="info-value" th:text="${expediente.tipoTramite.nombre}"></div>
+                </div>
+
+
+
+                <div class="info-item">
                     <div class="info-label">Estado</div>
                     <div class="info-value">
                         <span class="badge badge-estado"
@@ -40,6 +47,38 @@
             </div>
         </div>
     </div>
+    <div class="card soft-card mb-4">
+        <div class="card-body">
+            <h2 class="section-title">Datos del vehículo</h2>
+
+            <div class="info-item">
+                <div class="info-label">Matrícula</div>
+                <div class="info-value" th:text="${expediente.matricula}"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="card soft-card mb-4">
+        <div class="card-body">
+            <h2 class="section-title">Interesados</h2>
+
+            <div th:if="${expediente.interesados != null and !expediente.interesados.isEmpty()}">
+                <div th:each="relacion : ${expediente.interesados}" class="border rounded p-3 mb-3">
+                    <div><strong>Rol:</strong> <span th:text="${relacion.rol}"></span></div>
+                    <div><strong>Nombre:</strong> <span th:text="${relacion.interesado.nombre}"></span></div>
+                    <div><strong>DNI:</strong> <span th:text="${relacion.interesado.dni}"></span></div>
+                    <div><strong>Teléfono:</strong> <span th:text="${relacion.interesado.telefono}"></span></div>
+                    <div><strong>Dirección:</strong> <span th:text="${relacion.interesado.direccion}"></span></div>
+                </div>
+            </div>
+
+            <div th:if="${expediente.interesados == null or expediente.interesados.isEmpty()}">
+                <p class="text-muted mb-0">No hay interesados registrados.</p>
+            </div>
+        </div>
+    </div>
+
 
     <div class="card soft-card mb-4">
         <div class="card-body">

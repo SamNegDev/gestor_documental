@@ -35,7 +35,10 @@ public class ClienteDashboardController {
             int totalSolicitudes = solicitudService.contarPorCliente(usuario.getCliente());
             int pendienteRevision = solicitudService.contarPorClienteYEstado(usuario.getCliente(), EstadoSolicitud.PENDIENTE_REVISION);
             int convertidas = solicitudService.contarPorClienteYEstado(usuario.getCliente(), EstadoSolicitud.CONVERTIDO);
-            int incidenciasSoliticudes = solicitudService.contarPorClienteYEstado(usuario.getCliente(), EstadoSolicitud.INCIDENCIA);
+            int incidenciasSolicitudes = solicitudService.contarPorClienteYEstado(usuario.getCliente(), EstadoSolicitud.INCIDENCIA);
+
+            long totalIncidencias = incidenciasExpedientes + incidenciasSolicitudes;
+
 
             model.addAttribute("usuario", usuario);
             model.addAttribute("titulo", "Dashboard");
@@ -44,7 +47,7 @@ public class ClienteDashboardController {
             model.addAttribute("totalSolicitudes", totalSolicitudes);
             model.addAttribute("pendienteRevision", pendienteRevision);
             model.addAttribute("convertidas", convertidas);
-            model.addAttribute("incidenciasSoliticudes", incidenciasSoliticudes);
+            model.addAttribute("incidenciasSoliticudes", incidenciasSolicitudes);
             model.addAttribute("ultimasSolicitudes", solicitudService.listarUltimasPorCliente(usuario.getCliente()));
 
 
@@ -53,6 +56,9 @@ public class ClienteDashboardController {
             model.addAttribute("finalizados", finalizado);
             model.addAttribute("incidencias", incidenciasExpedientes);
             model.addAttribute("ultimosExpedientes", expedienteService.listarUltimosPorCliente(usuario.getCliente()));
+
+            model.addAttribute("totalIncidencias", totalIncidencias);
+
 
             return "cliente/dashboard";
         }

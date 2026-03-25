@@ -1,8 +1,6 @@
 package com.example.gestor_documental.model;
 
 
-import com.example.gestor_documental.enums.EstadoExpediente;
-import com.example.gestor_documental.enums.RolInteresado;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
