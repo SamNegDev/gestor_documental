@@ -43,6 +43,54 @@
 
   <div class="card soft-card mb-4">
     <div class="card-body">
+      <h2 class="section-title">Datos del vehículo</h2>
+
+      <div class="info-item">
+        <div class="info-label">Matrícula</div>
+        <div class="info-value" th:text="${solicitud.matricula}"></div>
+      </div>
+
+    </div>
+  </div>
+  <div class="card soft-card mb-4">
+    <div class="card-body">
+      <h2 class="section-title">Interesados</h2>
+
+      <div th:if="${(solicitud.interesado1Dni != null and !#strings.isEmpty(solicitud.interesado1Dni))
+                     or (solicitud.interesado2Dni != null and !#strings.isEmpty(solicitud.interesado2Dni))}">
+
+        <div th:if="${solicitud.interesado1Dni != null and !#strings.isEmpty(solicitud.interesado1Dni)}"
+             class="border rounded p-3 mb-3">
+          <div><strong>Rol:</strong> <span th:text="${solicitud.interesado1Rol}"></span></div>
+          <div><strong>Nombre:</strong> <span th:text="${solicitud.interesado1Nombre}"></span></div>
+          <div><strong>Apellidos:</strong> <span th:text="${solicitud.interesado1Apellidos}"></span></div>
+          <div><strong>DNI:</strong> <span th:text="${solicitud.interesado1Dni}"></span></div>
+          <div><strong>Teléfono:</strong> <span th:text="${solicitud.interesado1Telefono}"></span></div>
+          <div><strong>Email:</strong> <span th:text="${solicitud.interesado1Email}"></span></div>
+          <div><strong>Dirección:</strong> <span th:text="${solicitud.interesado1Direccion}"></span></div>
+        </div>
+
+        <div th:if="${solicitud.interesado2Dni != null and !#strings.isEmpty(solicitud.interesado2Dni)}"
+             class="border rounded p-3 mb-3">
+          <div><strong>Rol:</strong> <span th:text="${solicitud.interesado2Rol}"></span></div>
+          <div><strong>Nombre:</strong> <span th:text="${solicitud.interesado2Nombre}"></span></div>
+          <div><strong>Apellidos:</strong> <span th:text="${solicitud.interesado2Apellidos}"></span></div>
+          <div><strong>DNI:</strong> <span th:text="${solicitud.interesado2Dni}"></span></div>
+          <div><strong>Teléfono:</strong> <span th:text="${solicitud.interesado2Telefono}"></span></div>
+          <div><strong>Email:</strong> <span th:text="${solicitud.interesado2Email}"></span></div>
+          <div><strong>Dirección:</strong> <span th:text="${solicitud.interesado2Direccion}"></span></div>
+        </div>
+      </div>
+
+      <div th:if="${(solicitud.interesado1Dni == null or #strings.isEmpty(solicitud.interesado1Dni))
+                     and (solicitud.interesado2Dni == null or #strings.isEmpty(solicitud.interesado2Dni))}">
+        <p class="text-muted mb-0">No hay interesados registrados.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card soft-card mb-4">
+    <div class="card-body">
       <h2 class="section-title">Subir documento</h2>
 
       <form th:action="@{/documentos/subir}" method="post" enctype="multipart/form-data">

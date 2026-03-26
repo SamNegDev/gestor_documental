@@ -7,6 +7,7 @@ import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,4 +36,8 @@ public interface SolicitudService {
     List<Solicitud> listarUltimas();
 
     List<Solicitud> listarUltimasPorCliente(Cliente cliente);
+
+     Solicitud crearSolicitudCompleta(Solicitud solicitud,
+                                     Cliente cliente,
+                                     Long tipoTramiteId);
 }

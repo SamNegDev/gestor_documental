@@ -38,6 +38,7 @@ public class ClienteSolicitudController {
         }
 
         model.addAttribute("usuario", usuario);
+        model.addAttribute("solicitud", new Solicitud());
         model.addAttribute("cliente", usuario.getCliente());
         model.addAttribute("titulo", "Nueva Solicitud");
         model.addAttribute("subtitulo", "Registro de nueva solicitud");
@@ -47,27 +48,38 @@ public class ClienteSolicitudController {
     }
 
     @PostMapping
-    public String guardarSolicitud(Authentication authentication, @RequestParam Long tipoTramiteId,
-                                   @RequestParam String matricula,
-                                   @RequestParam(required = false) String observaciones) {
+    public String guardarSolicitud(@ModelAttribute("solicitud") Solicitud solicitud,
+                                   Authentication authentication,
+                                   @RequestParam Long tipoTramiteId
+            , Model model) {
         Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
         if (usuario.getCliente() == null) {
             throw new IllegalStateException("El usuario no tiene cliente asociado");
         }
         Cliente cliente = usuario.getCliente();
-        TipoTramite tipoTramite = tipoTramiteService.buscarPorId(tipoTramiteId).orElseThrow();
 
-        Solicitud solicitud = new Solicitud();
-        solicitud.setCliente(cliente);
-        solicitud.setTipoTramite(tipoTramite);
-        solicitud.setMatricula(matricula);
-        solicitud.setObservaciones(observaciones);
-        solicitud.setUsuario(usuario);
-        solicitud.setEstadoSolicitud(EstadoSolicitud.PENDIENTE_REVISION);
 
-        solicitudService.guardar(solicitud);
+        try {
+            Solicitud solicitudGuardada = solicitudService.crearSolicitudCompleta(
+                    solicitud,
+                    cliente,
+                    tipoTramiteId
+            );
 
-        return "redirect:/solicitudes";
+            return "redirect:/solicitudes/" + solicitudGuardada.getId();
+
+        } catch (IllegalArgumentException e) {
+
+            model.addAttribute("usuario", usuario);
+            model.addAttribute("solicitud", solicitud);
+            model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
+            model.addAttribute("tipoTramiteId", tipoTramiteId);
+            model.addAttribute("titulo", "Nueva Solicitud");
+            model.addAttribute("subtitulo", "Registro de nueva solicitud");
+            model.addAttribute("error", e.getMessage());
+
+            return "redirect:cliente/solicitud-form";
+        }
+
     }
-
 }

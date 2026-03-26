@@ -1,11 +1,7 @@
 package com.example.gestor_documental.controller;
 
-
 import com.example.gestor_documental.dto.InteresadosFormDto;
-import com.example.gestor_documental.enums.EstadoExpediente;
-import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Expediente;
-import com.example.gestor_documental.model.TipoTramite;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteService;
@@ -28,25 +24,27 @@ public class AdminExpedienteController {
     private final TipoTramiteService tipoTramiteService;
 
     @GetMapping("/nuevo")
-    public String formularioNuevoCliente(Authentication authentication,Model model) {
+    public String formularioNuevoCliente(Authentication authentication, Model model) {
 
         Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
 
         model.addAttribute("usuario", usuario);
-        model.addAttribute("clientes", clienteService.listarTodos());
+        model.addAttribute("expediente", new Expediente());
         model.addAttribute("interesadosForm", new InteresadosFormDto());
+        model.addAttribute("clientes", clienteService.listarTodos());
         model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
         model.addAttribute("titulo", "Nuevo Expediente");
         model.addAttribute("subtitulo", "Registro de nuevo expediente");
 
         return "admin/expediente-form";
     }
+
     @PostMapping
     public String guardarExpediente(@ModelAttribute("expediente") Expediente expediente,
                                     @ModelAttribute("interesadosForm") InteresadosFormDto interesadosForm,
-                                    Authentication authentication,
                                     @RequestParam Long clienteId,
                                     @RequestParam Long tipoTramiteId,
+                                    Authentication authentication,
                                     Model model) {
 
         try {
@@ -62,18 +60,21 @@ public class AdminExpedienteController {
 
         } catch (IllegalArgumentException e) {
             Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+
             model.addAttribute("usuario", usuario);
             model.addAttribute("expediente", expediente);
             model.addAttribute("interesadosForm", interesadosForm);
             model.addAttribute("clientes", clienteService.listarTodos());
             model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
+            model.addAttribute("clienteId", clienteId);
+            model.addAttribute("tipoTramiteId", tipoTramiteId);
+            model.addAttribute("titulo", "Nuevo Expediente");
+            model.addAttribute("subtitulo", "Registro de nuevo expediente");
             model.addAttribute("error", e.getMessage());
 
             return "admin/expediente-form";
         }
     }
-
-
 }
 
 

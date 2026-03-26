@@ -50,23 +50,27 @@ public class Solicitud {
     @JoinColumn(name = "tipo_tramite_id")
     private TipoTramite tipoTramite;
 
-    @Column(length = 120)
-    private String nombreInteresado;
-
-    @Column(length = 20)
-    private String dniInteresado;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 50)
-    private RolInteresado rol;
-
     @OneToMany(mappedBy = "solicitud", fetch = FetchType.LAZY)
     private List<Documento> documentos = new ArrayList<>();
+    //Añadimos los campos de solicitudes simplemente para persistir los formularios, el registro definitivo se hara al convertir la solicitud en expediente.
+    @Enumerated(EnumType.STRING)
+    private RolInteresado interesado1Rol;
 
-    public Solicitud(Cliente cliente, Usuario usuario, TipoTramite tipoTramite) {
-        this.cliente = cliente;
-        this.usuario = usuario;
-        this.tipoTramite = tipoTramite;
-        this.estadoSolicitud = EstadoSolicitud.PENDIENTE_REVISION;
-    }
+    private String interesado1Nombre;
+    private String interesado1Apellidos;
+    private String interesado1Dni;
+    private String interesado1Telefono;
+    private String interesado1Email;
+    private String interesado1Direccion;
+
+    @Enumerated(EnumType.STRING)
+    private RolInteresado interesado2Rol;
+
+    private String interesado2Nombre;
+    private String interesado2Apellidos;
+    private String interesado2Dni;
+    private String interesado2Telefono;
+    private String interesado2Email;
+    private String interesado2Direccion;
+
 }
