@@ -1,5 +1,6 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
@@ -96,6 +97,7 @@ public class SolicitudServiceImpl implements SolicitudService {
 
 
         TipoTramite tipoTramite = tipoTramiteService.buscarPorId(tipoTramiteId).orElseThrow();
+
 
         solicitud.setCliente(cliente);
         solicitud.setTipoTramite(tipoTramite);

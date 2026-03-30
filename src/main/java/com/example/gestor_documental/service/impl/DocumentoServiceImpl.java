@@ -1,14 +1,16 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.dto.DocumentoDetectadoDto;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
-import com.example.gestor_documental.service.DocumentoService;
-import com.example.gestor_documental.service.ExpedienteService;
-import org.springframework.context.annotation.Bean;
+import com.example.gestor_documental.repository.SolicitudRepository;
+import com.example.gestor_documental.service.*;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,58 +19,198 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class DocumentoServiceImpl implements DocumentoService {
 
-    private final ExpedienteRepository expedienteRepository;
     private final DocumentoRepository documentoRepository;
+    private final ExpedienteRepository expedienteRepository;
+    private final SolicitudRepository solicitudRepository;
     private final ExpedienteService expedienteService;
-
-    public DocumentoServiceImpl(ExpedienteRepository expedienteRepository, DocumentoRepository documentoRepository, ExpedienteService expedienteService) {
-        this.expedienteRepository = expedienteRepository;
-        this.documentoRepository = documentoRepository;
-        this.expedienteService = expedienteService;
-    }
+    private final SolicitudService solicitudService;
+    private final OcrPdfService ocrPdfService;
+    private final PdfSplitService pdfSplitService;
 
 
     @Override
     public void guardar(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento) {
+        guardarParaExpediente(expedienteId, archivo, tipoDocumento, null);
+    }
+
+    @Override
+    public void guardarParaExpediente(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario) {
+        if (archivo == null || archivo.isEmpty()) {
+            return;
+        }
 
         try {
             Expediente expediente = expedienteRepository.findById(expedienteId)
                     .orElseThrow(() -> new RuntimeException("Expediente no encontrado"));
 
-            String nombreOriginal = archivo.getOriginalFilename();
-            if (nombreOriginal == null || nombreOriginal.isBlank()) {
-                throw new RuntimeException("El archivo no tiene nombre válido");
+            if (TipoDocumento.EXPEDIENTE_COMPLETO.equals(tipoDocumento)) {
+                List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivo);
+
+                if (documentosDetectados == null || documentosDetectados.isEmpty()) {
+                    Documento doc = construirDocumentoBase(archivo, TipoDocumento.OTROS, usuario);
+                    doc.setExpediente(expediente);
+                    documentoRepository.save(doc);
+                    return;
+                }
+
+                byte[] pdfOriginal = archivo.getBytes();
+
+                int indice = 1;
+                for (DocumentoDetectadoDto detectado : documentosDetectados) {
+                    byte[] pdfSeparado = pdfSplitService.extraerPaginas(
+                            pdfOriginal,
+                            detectado.getPaginas()
+                    );
+
+                    guardarDocumentoGeneradoParaExpediente(
+                            expediente,
+                            pdfSeparado,
+                            detectado.getTipoDocumento(),
+                            usuario,
+                            "ocr_" + indice + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf"
+                    );
+                    indice++;
+                }
+                return;
             }
-
-            String nombreUnico = UUID.randomUUID() + "_" + nombreOriginal;
-
-            Path carpetaUploads = Paths.get("uploads");
-            Files.createDirectories(carpetaUploads);
-
-            Path rutaArchivo = carpetaUploads.resolve(nombreUnico);
-
-            Files.copy(archivo.getInputStream(), rutaArchivo, StandardCopyOption.REPLACE_EXISTING);
-
-            Documento doc = new Documento();
-            doc.setNombreArchivoOriginal(nombreOriginal);
-            doc.setNombreArchivo(nombreUnico);
+            Documento doc = construirDocumentoBase(archivo, tipoDocumento, usuario);
             doc.setExpediente(expediente);
-            doc.setTipoDocumento(tipoDocumento);
 
             documentoRepository.save(doc);
-
-            System.out.println("Archivo guardado en disco: " + rutaArchivo.toAbsolutePath());
-            System.out.println("Documento guardado en BD");
 
         } catch (IOException e) {
             throw new RuntimeException("Error al guardar el archivo", e);
         }
+    }
+
+    @Override
+    public void guardarParaSolicitud(Long solicitudId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario) {
+        if (archivo == null || archivo.isEmpty()) {
+            return;
+        }
+
+        try {
+            Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                    .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+
+            if (TipoDocumento.EXPEDIENTE_COMPLETO.equals(tipoDocumento)) {
+                List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivo);
+
+                if (documentosDetectados == null || documentosDetectados.isEmpty()) {
+                    Documento doc = construirDocumentoBase(archivo, TipoDocumento.OTROS, usuario);
+                    doc.setSolicitud(solicitud);
+                    documentoRepository.save(doc);
+                    return;
+                }
+
+                byte[] pdfOriginal = archivo.getBytes();
+
+                int indice = 1;
+                for (DocumentoDetectadoDto detectado : documentosDetectados) {
+                    byte[] pdfSeparado = pdfSplitService.extraerPaginas(
+                            pdfOriginal,
+                            detectado.getPaginas()
+                    );
+
+                    guardarDocumentoGeneradoParaSolicitud(
+                            solicitud,
+                            pdfSeparado,
+                            detectado.getTipoDocumento(),
+                            usuario,
+                            "ocr_" + indice + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf"
+                    );
+                    indice++;
+                }
+                return;
+            }
+
+
+
+            Documento doc = construirDocumentoBase(archivo, tipoDocumento, usuario);
+            doc.setSolicitud(solicitud);
+
+            documentoRepository.save(doc);
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error al guardar el archivo", e);
+        }
+    }
+
+    private void guardarDocumentoGeneradoParaSolicitud(Solicitud solicitud,
+                                                       byte[] contenido,
+                                                       TipoDocumento tipoDocumento,
+                                                       Usuario usuario,
+                                                       String nombreArchivoOriginal) throws IOException {
+        Documento doc = construirDocumentoBase(contenido, nombreArchivoOriginal, tipoDocumento, usuario);
+        doc.setSolicitud(solicitud);
+        documentoRepository.save(doc);
+    }
+    private void guardarDocumentoGeneradoParaExpediente(Expediente expediente,
+                                                       byte[] contenido,
+                                                       TipoDocumento tipoDocumento,
+                                                       Usuario usuario,
+                                                       String nombreArchivoOriginal) throws IOException {
+        Documento doc = construirDocumentoBase(contenido, nombreArchivoOriginal, tipoDocumento, usuario);
+        doc.setExpediente(expediente);
+        documentoRepository.save(doc);
+    }
+
+
+    private Documento construirDocumentoBase(MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario) throws IOException {
+        String nombreOriginal = archivo.getOriginalFilename();
+
+        if (nombreOriginal == null || nombreOriginal.isBlank()) {
+            throw new RuntimeException("El archivo no tiene nombre válido");
+        }
+
+        String nombreUnico = UUID.randomUUID() + "_" + nombreOriginal;
+
+        Path carpetaUploads = Paths.get("uploads");
+        Files.createDirectories(carpetaUploads);
+
+        Path rutaArchivo = carpetaUploads.resolve(nombreUnico);
+        Files.copy(archivo.getInputStream(), rutaArchivo, StandardCopyOption.REPLACE_EXISTING);
+
+        Documento doc = new Documento();
+        doc.setNombreArchivoOriginal(nombreOriginal);
+        doc.setNombreArchivo(nombreUnico);
+        doc.setTipoDocumento(tipoDocumento);
+        doc.setUsuario(usuario);
+
+        return doc;
+    }
+
+    private Documento construirDocumentoBase(byte[] contenido,
+                                             String nombreArchivoOriginal,
+                                             TipoDocumento tipoDocumento,
+                                             Usuario usuario) throws IOException {
+        if (nombreArchivoOriginal == null || nombreArchivoOriginal.isBlank()) {
+            throw new RuntimeException("El archivo no tiene nombre válido");
+        }
+
+        String nombreUnico = UUID.randomUUID() + "_" + nombreArchivoOriginal;
+
+        Path carpetaUploads = Paths.get("uploads");
+        Files.createDirectories(carpetaUploads);
+
+        Path rutaArchivo = carpetaUploads.resolve(nombreUnico);
+        Files.write(rutaArchivo, contenido);
+
+        Documento doc = new Documento();
+        doc.setNombreArchivoOriginal(nombreArchivoOriginal);
+        doc.setNombreArchivo(nombreUnico);
+        doc.setTipoDocumento(tipoDocumento);
+        doc.setUsuario(usuario);
+
+        return doc;
     }
 
     @Override
@@ -78,11 +220,12 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     @Override
     public Long eliminar(Long id) {
-
         Documento documento = documentoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
 
-        Long expedienteId = documento.getExpediente().getId();
+        Long entidadId = documento.getExpediente() != null
+                ? documento.getExpediente().getId()
+                : documento.getSolicitud().getId();
 
         Path rutaArchivo = Paths.get("uploads").resolve(documento.getNombreArchivo());
 
@@ -96,20 +239,24 @@ public class DocumentoServiceImpl implements DocumentoService {
 
         documentoRepository.delete(documento);
 
-        return expedienteId;
+        return entidadId;
     }
+
     @Override
     public Documento obtenerDocumentoConPermiso(Long documentoId, Usuario usuario) {
-
         Documento documento = documentoRepository.findById(documentoId)
                 .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
 
-        if (!expedienteService.tienePermisoExpediente(documento.getExpediente(), usuario)) {
+        if (documento.getExpediente() != null &&
+                !expedienteService.tienePermisoExpediente(documento.getExpediente(), usuario)) {
+            throw new RuntimeException("No tienes permiso para acceder a este documento");
+        }
+
+        if (documento.getSolicitud() != null &&
+                !solicitudService.tienePermisoSolicitud(documento.getSolicitud(), usuario)) {
             throw new RuntimeException("No tienes permiso para acceder a este documento");
         }
 
         return documento;
     }
-
-
 }

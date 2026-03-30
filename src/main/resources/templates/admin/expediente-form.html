@@ -11,7 +11,7 @@
 
       <div th:if="${error}" class="alert alert-danger mb-4" th:text="${error}"></div>
 
-      <form th:action="@{/admin/expedientes}" th:object="${expediente}" method="post">
+      <form th:action="@{/admin/expedientes}" th:object="${expediente}" enctype="multipart/form-data" method="post">
         <input type="hidden"
                th:name="${_csrf.parameterName}"
                th:value="${_csrf.token}">
@@ -118,6 +118,65 @@
             </div>
           </div>
         </div>
+
+        <hr class="my-4">
+
+        <h3 class="section-title mb-3">Documentación</h3>
+
+        <div id="documentos-container"></div>
+
+        <button type="button" class="btn btn-outline-primary mb-3" onclick="addDocumentoRow()">
+          + Añadir documento
+        </button>
+
+        <script th:inline="javascript">
+
+            document.addEventListener("DOMContentLoaded", function () {
+
+            let index = 0;
+
+            window.addDocumentoRow = function () {
+            const container = document.getElementById('documentos-container');
+
+            const row = document.createElement('div');
+            row.classList.add('row', 'mb-2');
+
+            row.innerHTML = `
+            <div class="col-md-5">
+                <input type="file" name="documentos[${index}].archivo" class="form-control">
+            </div>
+
+            <div class="col-md-5">
+                <select name="documentos[${index}].tipoDocumento" class="form-select">
+                    <option value="">Tipo</option>
+                    ${generarOpcionesTipo()}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <button type="button" class="btn btn-danger" onclick="this.closest('.row').remove()">
+                    X
+                </button>
+            </div>
+        `;
+
+            container.appendChild(row);
+            index++;
+          }
+
+            function generarOpcionesTipo() {
+            const tipos = [[${tiposDocumento}]];
+            let html = "";
+
+            tipos.forEach(tipo => {
+            html += `<option value="${tipo}">${tipo}</option>`;
+          });
+
+            return html;
+          }
+          });
+        </script>
+
 
         <div class="mb-3">
           <label class="form-label">Observaciones</label>

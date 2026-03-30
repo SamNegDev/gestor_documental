@@ -1,5 +1,6 @@
 package com.example.gestor_documental.service;
 
+import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.model.Cliente;
@@ -38,6 +39,8 @@ public interface SolicitudService {
     List<Solicitud> listarUltimasPorCliente(Cliente cliente);
 
      Solicitud crearSolicitudCompleta(Solicitud solicitud,
-                                     Cliente cliente,
-                                     Long tipoTramiteId);
+                                      Cliente cliente,
+                                      Long tipoTramiteId);
+
+    Expediente convertirAExpediente(Long solicitudId, Usuario admin);
 }

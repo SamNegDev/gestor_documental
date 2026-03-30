@@ -84,7 +84,7 @@
         <div class="card-body">
             <h2 class="section-title">Subir documento</h2>
 
-            <form th:action="@{/documentos/subir}" method="post" enctype="multipart/form-data">
+            <form th:action="@{/documentos/subir/expediente}" method="post" enctype="multipart/form-data">
                 <input type="hidden" name="expedienteId" th:value="${expediente.id}" />
 
                 <div class="row g-3">
