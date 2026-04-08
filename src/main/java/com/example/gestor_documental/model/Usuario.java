@@ -45,7 +45,7 @@ import java.util.List;
         @JoinColumn(name = "cliente_id")
         private Cliente cliente;
 
-        @OneToMany(mappedBy = "usuario", fetch = FetchType.LAZY)
+        @OneToMany(mappedBy = "creadoPor", fetch = FetchType.LAZY)
         private List<Solicitud> solicitudes = new ArrayList<>();
 
 

@@ -2,6 +2,8 @@ package com.example.gestor_documental.service;
 
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,6 +23,7 @@ public interface DocumentoService {
    void guardarParaExpediente(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
 
    void guardarParaSolicitud(Long solicitudId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
+
 
 
 

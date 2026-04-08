@@ -38,7 +38,7 @@ public interface SolicitudService {
 
     List<Solicitud> listarUltimasPorCliente(Cliente cliente);
 
-     Solicitud crearSolicitudCompleta(Solicitud solicitud,
+     Solicitud crearSolicitudCompleta(Solicitud solicitud, Usuario usuarioLogueado,
                                       Cliente cliente,
                                       Long tipoTramiteId);
 

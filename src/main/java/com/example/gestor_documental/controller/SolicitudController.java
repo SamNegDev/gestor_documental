@@ -29,27 +29,27 @@ public class SolicitudController {
     @GetMapping
     public String listarSolicitudes(Authentication authentication, Model model) {
         String email = authentication.getName();
-        Usuario usuario = usuarioService.buscarPorEmail(email);
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(email);
 
         List<Solicitud> solicitudes;
 
-        if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
+        if (usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN) {
             solicitudes = solicitudService.listarTodas();
         } else {
 
-            if (usuario.getCliente() == null) {
+            if (usuarioLogueado.getCliente() == null) {
                 solicitudes = List.of();
             } else {
-                solicitudes = solicitudService.listarPorClienteId(usuario.getCliente().getId());
+                solicitudes = solicitudService.listarPorClienteId(usuarioLogueado.getCliente().getId());
             }
 
         }
 
         model.addAttribute("solicitudes", solicitudes);
-        model.addAttribute("usuario", usuario);
+        model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("titulo", "Solicitudes");
 
-        if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
+        if (usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN) {
             model.addAttribute("subtitulo", "Gestión de Solicitudes de clientes");
             return "admin/lista_solicitudes";
         } else {
@@ -69,15 +69,15 @@ public class SolicitudController {
 
         String email = authentication.getName();
 
-        Usuario usuario = usuarioService.buscarPorEmail(email);
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(email);
 
-        if (!solicitudService.tienePermisoSolicitud(solicitud, usuario)) {
+        if (!solicitudService.tienePermisoSolicitud(solicitud, usuarioLogueado)) {
             return "redirect:/solicitudes";
         }
 
 
         model.addAttribute("solicitud", solicitud);
-        model.addAttribute("usuario", usuario);
+        model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("titulo", "Solicitud de Expediente");
         model.addAttribute("subtitulo", "Detalle de Solicitud de Expediente");
         model.addAttribute("tiposDocumento", TipoDocumento.values());
@@ -85,6 +85,7 @@ public class SolicitudController {
 
         return "solicitudes/detalle";
     }
+    
 
 
 }

@@ -63,7 +63,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
             return true;
         }
-        //Si el usuario/expediente no tiene cliente asignado se deniega el acceso ya que no podemos comprobar de quien es
+        //Si el usuarioLogueado/expediente no tiene cliente asignado se deniega el acceso ya que no podemos comprobar de quien es
         if (usuario.getCliente() == null || expediente.getCliente() == null) {
             return false;
         }
@@ -107,7 +107,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         guardarInteresadoSiValido(expediente, interesado2);
     }
 
-    private void guardarInteresadoSiValido(Expediente expediente, InteresadoFormDto dto) {
+    public void guardarInteresadoSiValido(Expediente expediente, InteresadoFormDto dto) {
 
         if (interesadoVacio(dto)) {
             return;
@@ -162,7 +162,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             throw new IllegalArgumentException(nombreInteresado + " está incompleto. Debe tener nombre, DNI y rol.");
         }
     }
-    private void validarInteresados(InteresadoFormDto interesado1, InteresadoFormDto interesado2) {
+    public void validarInteresados(InteresadoFormDto interesado1, InteresadoFormDto interesado2) {
         validarInteresado(interesado1, "Interesado 1");
         validarInteresado(interesado2, "Interesado 2");
 
@@ -175,6 +175,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     @Override
     @Transactional
     public Expediente crearExpedienteCompleto(Expediente expediente,
+                                              Usuario usuarioLogueado,
                                               Long clienteId,
                                               Long tipoTramiteId,
                                               InteresadoFormDto interesado1,
@@ -188,6 +189,8 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         expediente.setCliente(cliente);
         expediente.setTipoTramite(tipoTramite);
         expediente.setEstadoExpediente(EstadoExpediente.EN_TRAMITE);
+        expediente.setCreadoPor(usuarioLogueado);
+
 
         Expediente expedienteGuardado = expedienteRepository.save(expediente);
 

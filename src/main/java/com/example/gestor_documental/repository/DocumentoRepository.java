@@ -9,5 +9,7 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long> {
 
     List<Documento> findByExpedienteId(Long expedienteId);
 
+    List<Documento> findBySolicitudId(Long solicitudId);
+
 
 }

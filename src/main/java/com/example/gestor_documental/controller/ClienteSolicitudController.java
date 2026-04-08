@@ -30,17 +30,17 @@ public class ClienteSolicitudController {
     @GetMapping("/nuevo")
     public String nuevaSolicitud(Authentication authentication, Model model, RedirectAttributes redirectAttributes) {
 
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
-        if (usuario.getCliente() == null) {
+        if (usuarioLogueado.getCliente() == null) {
             redirectAttributes.addFlashAttribute("error",
                     "No tienes un cliente asociado. Contacta con administración.");
             return "redirect:/solicitudes";
         }
 
-        model.addAttribute("usuario", usuario);
+        model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("solicitud", new Solicitud());
-        model.addAttribute("cliente", usuario.getCliente());
+        model.addAttribute("cliente", usuarioLogueado.getCliente());
         model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
         model.addAttribute("documentosWrapper", new DocumentoFormWrapper());
         model.addAttribute("tiposDocumento", TipoDocumento.values());
@@ -57,17 +57,17 @@ public class ClienteSolicitudController {
                                    Authentication authentication,
                                    Model model) {
 
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
-        if (usuario.getCliente() == null) {
-            throw new IllegalStateException("El usuario no tiene cliente asociado");
+        if (usuarioLogueado.getCliente() == null) {
+            throw new IllegalStateException("El usuarioLogueado no tiene cliente asociado");
         }
 
-        Cliente cliente = usuario.getCliente();
+        Cliente cliente = usuarioLogueado.getCliente();
 
         try {
             Solicitud solicitudGuardada = solicitudService.crearSolicitudCompleta(
-                    solicitud,
+                    solicitud, usuarioLogueado,
                     cliente,
                     tipoTramiteId
             );
@@ -79,7 +79,7 @@ public class ClienteSolicitudController {
                                 solicitudGuardada.getId(),
                                 doc.getArchivo(),
                                 doc.getTipoDocumento(),
-                                usuario
+                                usuarioLogueado
                         );
                     }
                 }
@@ -88,7 +88,7 @@ public class ClienteSolicitudController {
             return "redirect:/solicitudes/" + solicitudGuardada.getId();
 
         } catch (IllegalArgumentException e) {
-            model.addAttribute("usuario", usuario);
+            model.addAttribute("usuarioLogueado", usuarioLogueado);
             model.addAttribute("solicitud", solicitud);
             model.addAttribute("cliente", cliente);
             model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());

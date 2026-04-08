@@ -33,9 +33,9 @@ public class DocumentoController {
                                            Authentication authentication,
                                            RedirectAttributes redirectAttributes) {
 
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
-        documentoService.guardarParaExpediente(expedienteId, archivo, tipoDocumento, usuario);
+        documentoService.guardarParaExpediente(expedienteId, archivo, tipoDocumento, usuarioLogueado);
 
         redirectAttributes.addFlashAttribute("mensaje", "Documento subido correctamente");
         return "redirect:/expedientes/" + expedienteId;
@@ -48,9 +48,9 @@ public class DocumentoController {
                                           Authentication authentication,
                                           RedirectAttributes redirectAttributes) {
 
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
-        documentoService.guardarParaSolicitud(solicitudId, archivo, tipoDocumento, usuario);
+        documentoService.guardarParaSolicitud(solicitudId, archivo, tipoDocumento, usuarioLogueado);
 
         redirectAttributes.addFlashAttribute("mensaje", "Documento subido correctamente");
         return "redirect:/solicitudes/" + solicitudId;
@@ -61,8 +61,8 @@ public class DocumentoController {
                                    HttpServletResponse response,
                                    Authentication authentication) throws IOException {
 
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
-        Documento documento = documentoService.obtenerDocumentoConPermiso(id, usuario);
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Documento documento = documentoService.obtenerDocumentoConPermiso(id, usuarioLogueado);
 
         Path rutaArchivo = Paths.get("uploads").resolve(documento.getNombreArchivo());
 
@@ -83,8 +83,8 @@ public class DocumentoController {
                                     Authentication authentication,
                                     RedirectAttributes redirectAttributes) {
 
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
-        Documento documento = documentoService.obtenerDocumentoConPermiso(id, usuario);
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Documento documento = documentoService.obtenerDocumentoConPermiso(id, usuarioLogueado);
 
         Long entidadId = documentoService.eliminar(id);
 
@@ -102,8 +102,8 @@ public class DocumentoController {
                              HttpServletResponse response,
                              Authentication authentication) throws IOException {
 
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
-        Documento documento = documentoService.obtenerDocumentoConPermiso(id, usuario);
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Documento documento = documentoService.obtenerDocumentoConPermiso(id, usuarioLogueado);
 
         Path rutaArchivo = Paths.get("uploads").resolve(documento.getNombreArchivo());
 

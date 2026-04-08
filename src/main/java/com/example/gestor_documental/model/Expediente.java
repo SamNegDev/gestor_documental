@@ -48,7 +48,7 @@ public class Expediente {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "creado_por_usuario_id")
-    private Usuario usuario;
+    private Usuario creadoPor;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "solicitud_id")
@@ -68,17 +68,17 @@ public class Expediente {
     /*En este caso se crean dos expedientes, porque es posible que un admin cree el expediente sin solicitud o puede
     convertir una solicitud */
 
-    public Expediente(TipoTramite tipoTramite, Cliente cliente, Usuario usuario) {
+    public Expediente(TipoTramite tipoTramite, Cliente cliente, Usuario creadoPor) {
         this.tipoTramite = tipoTramite;
         this.cliente = cliente;
-        this.usuario = usuario;
+        this.creadoPor = creadoPor;
         this.estadoExpediente = EstadoExpediente.EN_TRAMITE;
     }
 
-    public Expediente(TipoTramite tipoTramite, Cliente cliente, Usuario usuario, Solicitud solicitud) {
+    public Expediente(TipoTramite tipoTramite, Cliente cliente, Usuario creadoPor, Solicitud solicitud) {
         this.tipoTramite = tipoTramite;
         this.cliente = cliente;
-        this.usuario = usuario;
+        this.creadoPor = creadoPor;
         this.solicitud = solicitud;
         this.estadoExpediente = EstadoExpediente.EN_TRAMITE;
     }

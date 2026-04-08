@@ -44,11 +44,14 @@ public class Solicitud {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "creado_por_usuario_id")
-    private Usuario usuario;
+    private Usuario creadoPor;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tipo_tramite_id")
     private TipoTramite tipoTramite;
+
+    @OneToOne(mappedBy = "solicitud")
+    private Expediente expediente;
 
     @OneToMany(mappedBy = "solicitud", fetch = FetchType.LAZY)
     private List<Documento> documentos = new ArrayList<>();
@@ -60,7 +63,6 @@ public class Solicitud {
     private String interesado1Apellidos;
     private String interesado1Dni;
     private String interesado1Telefono;
-    private String interesado1Email;
     private String interesado1Direccion;
 
     @Enumerated(EnumType.STRING)
@@ -70,7 +72,6 @@ public class Solicitud {
     private String interesado2Apellidos;
     private String interesado2Dni;
     private String interesado2Telefono;
-    private String interesado2Email;
     private String interesado2Direccion;
 
 }

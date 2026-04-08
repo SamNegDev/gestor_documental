@@ -1,5 +1,5 @@
 
-<aside th:fragment="sidebar(usuario)" class="col-md-3 col-lg-2 sidebar">
+<aside th:fragment="sidebar(usuarioLogueado)" class="col-md-3 col-lg-2 sidebar">
     <div class="sidebar-brand text-center mb-4">
         <img th:src="@{/images/simbolo.jpg}" class="logo-icon" alt="Logo" style="max-height: 40px;">
         <div class="sidebar-title mt-2">Gestoría Portal</div>
@@ -7,7 +7,7 @@
 
     <nav class="nav flex-column">
 
-        <th:block th:if="${usuario != null and usuario.rolUsuario.name() == 'ADMIN'}">
+        <th:block th:if="${usuarioLogueado != null and usuarioLogueado.rolUsuario.name() == 'ADMIN'}">
             <a class="nav-link" th:href="@{/admin/dashboard}">Dashboard</a>
             <a class="nav-link" th:href="@{/solicitudes}">Solicitudes</a>
             <a class="nav-link" th:href="@{/expedientes}">Expedientes</a>
@@ -15,7 +15,7 @@
             <a class="nav-link" href="#">Usuarios</a>
         </th:block>
 
-        <th:block th:if="${usuario != null and usuario.rolUsuario.name() == 'CLIENTE'}">
+        <th:block th:if="${usuarioLogueado != null and usuarioLogueado.rolUsuario.name() == 'CLIENTE'}">
             <a class="nav-link" th:href="@{/cliente/dashboard}">Dashboard</a>
             <a class="nav-link" th:href="@{/solicitudes}">Mis Solicitudes</a>
             <a class="nav-link" th:href="@{/expedientes}">Mis expedientes</a>

@@ -12,10 +12,10 @@
 <div class="container-fluid app-shell">
     <div class="row g-0">
 
-        <div th:replace="fragments/sidebar :: sidebar(${usuario})"></div>
+        <div th:replace="fragments/sidebar :: sidebar(${usuarioLogueado})"></div>
 
         <main class="col-md-9 col-lg-10 main-content">
-            <div th:replace="fragments/topbar :: topbar(${titulo}, ${subtitulo},${usuario})"></div>
+            <div th:replace="fragments/topbar :: topbar(${titulo}, ${subtitulo},${usuarioLogueado})"></div>
             <div th:replace="fragments/mensajes :: mensajes"></div>
 
             <section layout:fragment="content"></section>

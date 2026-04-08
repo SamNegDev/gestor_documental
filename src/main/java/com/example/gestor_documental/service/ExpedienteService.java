@@ -43,10 +43,15 @@ public interface ExpedienteService {
                             InteresadoFormDto interesado1,
                             InteresadoFormDto interesado2);
 
-    Expediente crearExpedienteCompleto(Expediente expediente,
+    Expediente crearExpedienteCompleto(Expediente expediente,Usuario usuarioLogueado,
                                        Long clienteId,
                                        Long tipoTramiteId,
                                        InteresadoFormDto interesado1,
                                        InteresadoFormDto interesado2);
+
+    public void validarInteresados(InteresadoFormDto interesado1, InteresadoFormDto interesado2);
+
+    public void guardarInteresadoSiValido(Expediente expediente, InteresadoFormDto dto);
+
 
 }

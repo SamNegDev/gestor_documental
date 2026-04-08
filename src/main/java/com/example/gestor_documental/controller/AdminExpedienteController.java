@@ -28,11 +28,11 @@ public class AdminExpedienteController {
     @GetMapping("/nuevo")
     public String formularioNuevoCliente(Authentication authentication, Model model) {
 
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
         System.out.println("ENTRA AL GET");
 
-        model.addAttribute("usuario", usuario);
+        model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("expediente", new Expediente());
         model.addAttribute("interesadosForm", new InteresadosFormDto());
         model.addAttribute("clientes", clienteService.listarTodos());
@@ -55,11 +55,11 @@ public class AdminExpedienteController {
                                     Model model) {
 
 
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
         try {
             Expediente expedienteGuardado = expedienteService.crearExpedienteCompleto(
-                    expediente,
+                    expediente, usuarioLogueado,
                     clienteId,
                     tipoTramiteId,
                     interesadosForm.getInteresado1(),
@@ -76,7 +76,7 @@ public class AdminExpedienteController {
                                 expedienteGuardado.getId(),
                                 doc.getArchivo(),
                                 doc.getTipoDocumento(),
-                                usuario
+                                usuarioLogueado
                         );
                     }
                 }
@@ -84,11 +84,11 @@ public class AdminExpedienteController {
 
             return "redirect:/expedientes/" + expedienteGuardado.getId();
 
+
         } catch (IllegalArgumentException e) {
 
 
-
-            model.addAttribute("usuario", usuario);
+            model.addAttribute("usuarioLogueado", usuarioLogueado);
             model.addAttribute("expediente", expediente);
             model.addAttribute("interesadosForm", interesadosForm);
             model.addAttribute("clientes", clienteService.listarTodos());

@@ -1,14 +1,16 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.InteresadoFormDto;
+import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
-import com.example.gestor_documental.model.Cliente;
-import com.example.gestor_documental.model.Solicitud;
-import com.example.gestor_documental.model.TipoTramite;
-import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.*;
+import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
+import com.example.gestor_documental.service.DocumentoService;
+import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,9 @@ public class SolicitudServiceImpl implements SolicitudService {
 
     private final SolicitudRepository solicitudRepository;
     private final TipoTramiteService tipoTramiteService;
+    private final ExpedienteRepository expedienteRepository;
+    private final ExpedienteService expedienteService;
+    private final DocumentoRepository documentoRepository;
 
     @Override
     public List<Solicitud> listarTodas() {
@@ -54,7 +59,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
             return true;
         }
-        //Si el usuario/solicitud no tiene cliente asignado se deniega el acceso ya que no podemos comprobar de quien es
+        //Si el usuarioLogueado/solicitud no tiene cliente asignado se deniega el acceso ya que no podemos comprobar de quien es
         if (usuario.getCliente() == null || solicitud.getCliente() == null) {
             return false;
         }
@@ -91,7 +96,7 @@ public class SolicitudServiceImpl implements SolicitudService {
 
     @Transactional
     @Override
-    public Solicitud crearSolicitudCompleta(Solicitud solicitud, Cliente cliente, Long tipoTramiteId) {
+    public Solicitud crearSolicitudCompleta(Solicitud solicitud,Usuario usuarioLogueado, Cliente cliente, Long tipoTramiteId) {
 
         validarInteresadosSolicitud(solicitud);
 
@@ -102,6 +107,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setCliente(cliente);
         solicitud.setTipoTramite(tipoTramite);
         solicitud.setEstadoSolicitud(EstadoSolicitud.PENDIENTE_REVISION);
+        solicitud.setCreadoPor(usuarioLogueado);
 
         return solicitudRepository.save(solicitud);
     }
@@ -160,6 +166,76 @@ public class SolicitudServiceImpl implements SolicitudService {
         return nombre != null && !nombre.isBlank()
                 && dni != null && !dni.isBlank()
                 && rol != null;
+    }
+
+    @Override
+    @Transactional
+    public Expediente convertirAExpediente(Long solicitudId, Usuario admin) {
+
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+
+        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDO) {
+            throw new RuntimeException("La solicitud ya ha sido convertida");
+        }
+
+        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO) {
+            throw new RuntimeException("No se puede convertir una solicitud rechazada");
+        }
+        if (solicitud.getExpediente() != null) {
+            throw new RuntimeException("La solicitud ya tiene un expediente asociado");
+        }
+
+        Expediente expediente = new Expediente();
+        expediente.setSolicitud(solicitud);
+        expediente.setCliente(solicitud.getCliente());
+        expediente.setTipoTramite(solicitud.getTipoTramite());
+        expediente.setMatricula(solicitud.getMatricula());
+        expediente.setEstadoExpediente(EstadoExpediente.EN_TRAMITE);
+        expediente.setObservaciones(solicitud.getObservaciones());
+        expediente.setCreadoPor(admin);
+
+        Expediente expedienteGuardado = expedienteRepository.save(expediente);
+        solicitud.setEstadoSolicitud(EstadoSolicitud.CONVERTIDO);
+        asociarDocumentosSolicitudAExpediente(solicitud, expedienteGuardado);
+        solicitud.setExpediente(expedienteGuardado);
+        solicitudRepository.save(solicitud);
+
+
+         InteresadoFormDto interesado1dto = new InteresadoFormDto();
+         interesado1dto.setDni(solicitud.getInteresado1Dni());
+         interesado1dto.setNombre(solicitud.getInteresado1Nombre());
+         interesado1dto.setRol(solicitud.getInteresado1Rol());
+         interesado1dto.setDireccion(solicitud.getInteresado1Direccion());
+         interesado1dto.setTelefono(solicitud.getInteresado1Telefono());
+
+         InteresadoFormDto interesado2dto = new InteresadoFormDto();
+         interesado2dto.setDni(solicitud.getInteresado2Dni());
+         interesado2dto.setNombre(solicitud.getInteresado2Nombre());
+         interesado2dto.setRol(solicitud.getInteresado2Rol());
+         interesado2dto.setDireccion(solicitud.getInteresado2Direccion());
+         interesado2dto.setTelefono(solicitud.getInteresado2Telefono());
+
+        expedienteService.validarInteresados(interesado1dto, interesado2dto);
+
+        expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado1dto);
+        expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado2dto);
+
+        return expedienteGuardado;
+    }
+
+    public void asociarDocumentosSolicitudAExpediente(Solicitud solicitud, Expediente expediente) {
+        List<Documento> documentos = documentoRepository.findBySolicitudId(solicitud.getId());
+
+        if (documentos == null || documentos.isEmpty()) {
+            return;
+        }
+
+        for (Documento documento : documentos) {
+            documento.setExpediente(expediente);
+        }
+
+        documentoRepository.saveAll(documentos);
     }
 }
 

@@ -25,22 +25,22 @@ public class ClienteDashboardController {
     @GetMapping
         public String dashboard(Authentication authentication, Model model) {
 
-            Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+            Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
-            int totalExpedientes = expedienteService.contarPorCliente(usuario.getCliente());
-            int enTramite = expedienteService.contarPorClienteYEstado(usuario.getCliente(), EstadoExpediente.EN_TRAMITE);
-            int finalizado = expedienteService.contarPorClienteYEstado(usuario.getCliente(), EstadoExpediente.FINALIZADO);
-            int incidenciasExpedientes = expedienteService.contarPorClienteYEstado(usuario.getCliente(), EstadoExpediente.INCIDENCIA);
+            int totalExpedientes = expedienteService.contarPorCliente(usuarioLogueado.getCliente());
+            int enTramite = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.EN_TRAMITE);
+            int finalizado = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.FINALIZADO);
+            int incidenciasExpedientes = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.INCIDENCIA);
 
-            int totalSolicitudes = solicitudService.contarPorCliente(usuario.getCliente());
-            int pendienteRevision = solicitudService.contarPorClienteYEstado(usuario.getCliente(), EstadoSolicitud.PENDIENTE_REVISION);
-            int convertidas = solicitudService.contarPorClienteYEstado(usuario.getCliente(), EstadoSolicitud.CONVERTIDO);
-            int incidenciasSolicitudes = solicitudService.contarPorClienteYEstado(usuario.getCliente(), EstadoSolicitud.INCIDENCIA);
+            int totalSolicitudes = solicitudService.contarPorCliente(usuarioLogueado.getCliente());
+            int pendienteRevision = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.PENDIENTE_REVISION);
+            int convertidas = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.CONVERTIDO);
+            int incidenciasSolicitudes = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.INCIDENCIA);
 
             long totalIncidencias = incidenciasExpedientes + incidenciasSolicitudes;
 
 
-            model.addAttribute("usuario", usuario);
+            model.addAttribute("usuarioLogueado", usuarioLogueado);
             model.addAttribute("titulo", "Dashboard");
             model.addAttribute("subtitulo", "Resumen general de tu actividad");
 
@@ -48,14 +48,14 @@ public class ClienteDashboardController {
             model.addAttribute("pendienteRevision", pendienteRevision);
             model.addAttribute("convertidas", convertidas);
             model.addAttribute("incidenciasSoliticudes", incidenciasSolicitudes);
-            model.addAttribute("ultimasSolicitudes", solicitudService.listarUltimasPorCliente(usuario.getCliente()));
+            model.addAttribute("ultimasSolicitudes", solicitudService.listarUltimasPorCliente(usuarioLogueado.getCliente()));
 
 
             model.addAttribute("totalExpedientes", totalExpedientes);
             model.addAttribute("enTramite", enTramite);
             model.addAttribute("finalizados", finalizado);
             model.addAttribute("incidencias", incidenciasExpedientes);
-            model.addAttribute("ultimosExpedientes", expedienteService.listarUltimosPorCliente(usuario.getCliente()));
+            model.addAttribute("ultimosExpedientes", expedienteService.listarUltimosPorCliente(usuarioLogueado.getCliente()));
 
             model.addAttribute("totalIncidencias", totalIncidencias);
 

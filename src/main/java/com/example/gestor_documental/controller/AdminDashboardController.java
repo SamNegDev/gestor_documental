@@ -25,7 +25,7 @@ public class AdminDashboardController {
     @GetMapping
     public String dashboard(Authentication authentication, Model model) {
 
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
         long totalExpedientes = expedienteService.contarTodos();
         int enTramite = expedienteService.contarPorEstado(EstadoExpediente.EN_TRAMITE);
@@ -39,7 +39,7 @@ public class AdminDashboardController {
 
         long totalIncidencias = incidenciasExpedientes + incidenciasSolicitudes;
 
-        model.addAttribute("usuario", usuario);
+        model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("titulo", "Dashboard Admin");
         model.addAttribute("subtitulo", "Resumen general de la actividad de la gestoría");
 
