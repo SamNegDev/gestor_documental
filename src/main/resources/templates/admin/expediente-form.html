@@ -9,7 +9,6 @@
     <div class="card-body">
       <h4 class="section-title mb-4">Crear expediente</h4>
 
-      <div th:if="${error}" class="alert alert-danger mb-4" th:text="${error}"></div>
 
       <form th:action="@{/admin/expedientes}" th:object="${expediente}" enctype="multipart/form-data" method="post">
         <input type="hidden"
@@ -42,7 +41,11 @@
 
         <div class="mb-3">
           <label class="form-label">Matrícula</label>
-          <input type="text" th:field="*{matricula}" class="form-control" required>
+          <input type="text" th:field="*{matricula}" class="form-control" required th:classappend="${#fields.hasErrors('matricula')} ? ' is-invalid' : ''">
+        <div class="invalid-feedback"
+             th:if="${#fields.hasErrors('matricula')}"
+             th:errors="*{matricula}"></div>
+
         </div>
 
         <hr class="my-4">
@@ -62,25 +65,44 @@
 
             <div class="col-md-4">
               <label class="form-label">Nombre</label>
-              <input type="text" th:field="*{interesado1.nombre}" class="form-control">
+              <input type="text" th:field="*{interesado1.nombre}" class="form-control"
+              th:classappend="${#fields.hasErrors('interesado1.nombre')} ? ' is-invalid' : ''">
+
+            <div class="invalid-feedback"
+                   th:if="${#fields.hasErrors('interesado1.nombre')}"
+                   th:errors="*{interesado1.nombre}"></div>
             </div>
 
 
             <div class="col-md-4">
               <label class="form-label">DNI/NIF</label>
-              <input type="text" th:field="*{interesado1.dni}" class="form-control">
+              <input type="text"
+                     th:field="*{interesado1.dni}"
+                     class="form-control"
+                     th:classappend="${#fields.hasErrors('interesado1.dni')} ? ' is-invalid' : ''">
+            <div class="invalid-feedback"
+                   th:if="${#fields.hasErrors('interesado1.dni')}"
+                   th:errors="*{interesado1.dni}"></div>
             </div>
 
             <div class="col-md-4">
               <label class="form-label">Teléfono</label>
-              <input type="text" th:field="*{interesado1.telefono}" class="form-control">
+              <input type="text" th:field="*{interesado1.telefono}" class="form-control"
+              th:classappend="${#fields.hasErrors('interesado1.telefono')} ? ' is-invalid' : ''">
+
+            <div class="invalid-feedback"
+                   th:if="${#fields.hasErrors('interesado1.telefono')}"
+                   th:errors="*{interesado1.telefono}"></div>
             </div>
 
 
             <div class="col-12">
               <label class="form-label">Dirección</label>
-              <input type="text" th:field="*{interesado1.direccion}" class="form-control">
-            </div>
+              <input type="text" th:field="*{interesado1.direccion}" class="form-control"
+              th:classappend="${#fields.hasErrors('interesado1.direccion')} ? ' is-invalid' : ''">
+            <div class="invalid-feedback"
+                   th:if="${#fields.hasErrors('interesado1.direccion')}"
+                   th:errors="*{interesado1.direccion}"></div>
           </div>
 
           <hr class="my-4">
@@ -99,25 +121,47 @@
 
             <div class="col-md-4">
               <label class="form-label">Nombre</label>
-              <input type="text" th:field="*{interesado2.nombre}" class="form-control">
+              <input type="text" th:field="*{interesado2.nombre}" class="form-control"
+              th:classappend="${#fields.hasErrors('interesado2.nombre')} ? ' is-invalid' : ''">
+            <div class="invalid-feedback"
+                   th:if="${#fields.hasErrors('interesado2.nombre')}"
+                 th:errors="*{interesado2.nombre}"></div>
             </div>
 
             <div class="col-md-4">
               <label class="form-label">DNI/NIF</label>
-              <input type="text" th:field="*{interesado2.dni}" class="form-control">
+              <input type="text"
+                     th:field="*{interesado2.dni}"
+                     class="form-control"
+                     th:classappend="${#fields.hasErrors('interesado2.dni')} ? ' is-invalid' : ''">
+            <div class="invalid-feedback"
+                 th:if="${#fields.hasErrors('interesado2.dni')}"
+                 th:errors="*{interesado2.dni}"></div>
             </div>
-
             <div class="col-md-4">
               <label class="form-label">Teléfono</label>
-              <input type="text" th:field="*{interesado2.telefono}" class="form-control">
+              <input type="text" th:field="*{interesado2.telefono}" class="form-control"
+              th:classappend="${#fields.hasErrors('interesado2.telefono')} ? ' is-invalid' : ''">
+
+            <div class="invalid-feedback"
+                   th:if="${#fields.hasErrors('interesado2.telefono')}"
+                   th:errors="*{interesado2.telefono}"></div>
             </div>
 
             <div class="col-12">
               <label class="form-label">Dirección</label>
-              <input type="text" th:field="*{interesado2.direccion}" class="form-control">
+              <input type="text" th:field="*{interesado2.direccion}" class="form-control"
+              th:classappend="${#fields.hasErrors('interesado2.direccion')} ? ' is-invalid' : ''">
+
+            <div class="invalid-feedback"
+                   th:if="${#fields.hasErrors('interesado2.direccion')}"
+                   th:errors="*{interesado2.direccion}"></div>
             </div>
           </div>
+          </div>
         </div>
+
+
 
         <hr class="my-4">
 
@@ -165,11 +209,11 @@
           }
 
             function generarOpcionesTipo() {
-            const tipos = [[${tiposDocumento}]];
+            const tipos = /*[[${tiposDocumento}]]*/ [];
             let html = "";
 
             tipos.forEach(tipo => {
-            html += `<option value="${tipo}">${tipo}</option>`;
+              html += `<option value="${tipo}">${tipo.replaceAll("_", " ")}</option>`;
           });
 
             return html;
@@ -184,7 +228,7 @@
         </div>
 
         <div class="d-flex gap-2">
-          <button type="submit" class="btn btn-primary">Guardar expediente</button>
+          <button type="submit" class="btn btn-primary" onclick="this.disabled=true; this.form.submit();">Guardar expediente</button>
           <a th:href="@{/expedientes}" class="btn btn-outline-secondary">Cancelar</a>
         </div>
       </form>

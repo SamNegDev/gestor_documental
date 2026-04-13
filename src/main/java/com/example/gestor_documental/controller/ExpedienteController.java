@@ -3,6 +3,8 @@ package com.example.gestor_documental.controller;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
@@ -71,14 +73,14 @@ public class ExpedienteController {
             Model model) {
 
         Expediente expediente = expedienteService.buscarPorId(id)
-                .orElseThrow(() -> new RuntimeException("Expediente no encontrado"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
 
         String email = authentication.getName();
 
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(email);
 
         if (!expedienteService.tienePermisoExpediente(expediente, usuarioLogueado)) {
-            return "redirect:/expedientes";
+            throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
         }
 
 

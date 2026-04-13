@@ -3,6 +3,9 @@ package com.example.gestor_documental.service.impl;
 import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.exception.OperacionInvalidaException;
+import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
@@ -143,16 +146,16 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     public void cambiarEstado(Long id, EstadoExpediente nuevoEstado, Usuario usuarioLogueado) {
 
         Expediente expediente = expedienteRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Expediente no encontrado"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
 
         if(!tienePermisoExpediente(expediente,usuarioLogueado)){
-            throw new RuntimeException("No tienes permiso para acceder a este expediente");
+            throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
         }
         if (usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN) {
-            throw new RuntimeException("Solo el administrador puede cambiar el estado del expediente.");
+            throw new AccesoDenegadoException("Solo el administrador puede cambiar el estado del expediente.");
         }
         if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
-            throw new RuntimeException("No se puede modificar un expediente finalizado");
+            throw new OperacionInvalidaException("No se puede modificar un expediente finalizado");
         }
 
         expediente.setEstadoExpediente(nuevoEstado);

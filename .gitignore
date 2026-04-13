@@ -31,3 +31,21 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Subidas de usuarios
+uploads/
+
+# Configuración sensible/local
+application-local.properties
+application-prod.properties
+
+# Logs adicionales
+*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+*.tmp
+*.temp

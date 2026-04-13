@@ -2,6 +2,9 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.DocumentoDetectadoDto;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.exception.OperacionInvalidaException;
+import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Solicitud;
@@ -175,7 +178,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         String nombreOriginal = archivo.getOriginalFilename();
 
         if (nombreOriginal == null || nombreOriginal.isBlank()) {
-            throw new RuntimeException("El archivo no tiene nombre válido");
+            throw new OperacionInvalidaException("El archivo no tiene nombre válido");
         }
 
         String nombreUnico = UUID.randomUUID() + "_" + nombreOriginal;
@@ -200,7 +203,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                                              TipoDocumento tipoDocumento,
                                              Usuario usuario) throws IOException {
         if (nombreArchivoOriginal == null || nombreArchivoOriginal.isBlank()) {
-            throw new RuntimeException("El archivo no tiene nombre válido");
+            throw new OperacionInvalidaException("El archivo no tiene nombre válido");
         }
 
         String nombreUnico = UUID.randomUUID() + "_" + nombreArchivoOriginal;
@@ -228,7 +231,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     @Override
     public Long eliminar(Long id) {
         Documento documento = documentoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Documento no encontrado"));
 
         Long entidadId = documento.getExpediente() != null
                 ? documento.getExpediente().getId()
@@ -252,16 +255,16 @@ public class DocumentoServiceImpl implements DocumentoService {
     @Override
     public Documento obtenerDocumentoConPermiso(Long documentoId, Usuario usuario) {
         Documento documento = documentoRepository.findById(documentoId)
-                .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Documento no encontrado"));
 
         if (documento.getExpediente() != null &&
                 !expedienteService.tienePermisoExpediente(documento.getExpediente(), usuario)) {
-            throw new RuntimeException("No tienes permiso para acceder a este documento");
+            throw new AccesoDenegadoException("No tienes permiso para acceder a este documento");
         }
 
         if (documento.getSolicitud() != null &&
                 !solicitudService.tienePermisoSolicitud(documento.getSolicitud(), usuario)) {
-            throw new RuntimeException("No tienes permiso para acceder a este documento");
+            throw new AccesoDenegadoException("No tienes permiso para acceder a este documento");
         }
 
         return documento;

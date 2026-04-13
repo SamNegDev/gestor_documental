@@ -5,6 +5,9 @@ import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.exception.OperacionInvalidaException;
+import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
@@ -229,24 +232,24 @@ public class SolicitudServiceImpl implements SolicitudService {
 
 
         Solicitud solicitud = solicitudRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
 
         if (!tienePermisoSolicitud(solicitud, usuarioLogueado)){
-            throw new RuntimeException("No tienes permiso para acceder a esta solicitud");
+            throw new AccesoDenegadoException("No tienes permiso para acceder a esta solicitud");
         }
         if (usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN) {
-            throw new RuntimeException("Solo el administrador puede cambiar el estado de la solicitud");
+            throw new AccesoDenegadoException("Solo el administrador puede cambiar el estado de la solicitud");
         }
         if (solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO) {
-            throw new RuntimeException("No se puede cambiar el estado de una solicitud rechazada");
+            throw new OperacionInvalidaException("No se puede cambiar el estado de una solicitud rechazada");
         }
 
         if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA) {
-            throw new RuntimeException("No se puede cambiar el estado de una solicitud convertida");
+            throw new OperacionInvalidaException("No se puede cambiar el estado de una solicitud convertida");
         }
 
         if (solicitud.getExpediente() != null) {
-            throw new RuntimeException("La solicitud ya tiene un expediente asociado");
+            throw new OperacionInvalidaException("La solicitud ya tiene un expediente asociado");
         }
 
         solicitud.setEstadoSolicitud(nuevoEstado);

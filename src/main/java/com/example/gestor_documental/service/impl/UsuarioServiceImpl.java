@@ -1,5 +1,6 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.UsuarioRepository;
 import com.example.gestor_documental.service.UsuarioService;
@@ -29,7 +30,7 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Override
     public Usuario buscarPorEmail(String email) {
         return usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
     }
 
     @Override

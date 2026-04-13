@@ -3,6 +3,7 @@ package com.example.gestor_documental.controller;
 import com.example.gestor_documental.dto.DocumentoFormDto;
 import com.example.gestor_documental.dto.DocumentoFormWrapper;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
@@ -10,10 +11,13 @@ import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.validation.FormularioValidacionHelper;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -26,6 +30,7 @@ public class ClienteSolicitudController {
     private final UsuarioService usuarioService;
     private final TipoTramiteService tipoTramiteService;
     private final DocumentoService documentoService;
+    private final FormularioValidacionHelper formularioValidacionHelper;
 
     @GetMapping("/nuevo")
     public String nuevaSolicitud(Authentication authentication, Model model, RedirectAttributes redirectAttributes) {
@@ -51,19 +56,42 @@ public class ClienteSolicitudController {
     }
 
     @PostMapping
-    public String guardarSolicitud(@ModelAttribute("solicitud") Solicitud solicitud,
+    public String guardarSolicitud(@Valid @ModelAttribute("solicitud") Solicitud solicitud,
+                                   BindingResult solicitudResult,
                                    @ModelAttribute DocumentoFormWrapper documentosWrapper,
                                    @RequestParam Long tipoTramiteId,
                                    Authentication authentication,
-                                   Model model) {
+                                   Model model, RedirectAttributes redirectAttributes) {
 
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
         if (usuarioLogueado.getCliente() == null) {
-            throw new IllegalStateException("El usuarioLogueado no tiene cliente asociado");
+            throw new AccesoDenegadoException("El usuarioLogueado no tiene cliente asociado");
         }
 
         Cliente cliente = usuarioLogueado.getCliente();
+
+        formularioValidacionHelper.validarDniOpcional(
+                solicitudResult,
+                "interesado1dni",
+                solicitud.getInteresado1Dni(),
+                "El DNI/NIE del interesado 1 no es válido"
+        );
+
+        formularioValidacionHelper.validarDniOpcional(
+                solicitudResult,
+                "interesado2dni",
+                solicitud.getInteresado2Dni(),
+                "El DNI/NIE del interesado 2 no es válido"
+        );
+
+        if (solicitudResult.hasErrors()) {
+            cargarModeloFormularioSolicitud(solicitud,
+                    documentosWrapper,
+                    tipoTramiteId,
+                    model, usuarioLogueado,cliente);
+            return "cliente/solicitud-form";
+        }
 
         try {
             Solicitud solicitudGuardada = solicitudService.crearSolicitudCompleta(
@@ -85,21 +113,33 @@ public class ClienteSolicitudController {
                 }
             }
 
+            redirectAttributes.addFlashAttribute("success", "Solicitud creada correctamente");
             return "redirect:/solicitudes/" + solicitudGuardada.getId();
 
         } catch (IllegalArgumentException e) {
-            model.addAttribute("usuarioLogueado", usuarioLogueado);
-            model.addAttribute("solicitud", solicitud);
-            model.addAttribute("cliente", cliente);
-            model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
-            model.addAttribute("tipoTramiteId", tipoTramiteId);
-            model.addAttribute("documentosWrapper", new DocumentoFormWrapper());
-            model.addAttribute("tiposDocumento", TipoDocumento.values());
-            model.addAttribute("titulo", "Nueva Solicitud");
-            model.addAttribute("subtitulo", "Registro de nueva solicitud");
+            cargarModeloFormularioSolicitud(solicitud,
+                    documentosWrapper,
+                    tipoTramiteId,
+                    model, usuarioLogueado,cliente);
+
             model.addAttribute("error", e.getMessage());
 
             return "cliente/solicitud-form";
         }
+    }
+    private void cargarModeloFormularioSolicitud(Solicitud solicitud,
+                                                 DocumentoFormWrapper documentosWrapper,
+                                                 Long tipoTramiteId,
+                                                 Model model, Usuario usuarioLogueado, Cliente cliente) {
+        model.addAttribute("usuarioLogueado", usuarioLogueado);
+        model.addAttribute("solicitud", solicitud);
+        model.addAttribute("cliente", cliente);
+        model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
+        model.addAttribute("tipoTramiteId", tipoTramiteId);
+        model.addAttribute("documentosWrapper", new DocumentoFormWrapper());
+        model.addAttribute("tiposDocumento", TipoDocumento.values());
+        model.addAttribute("titulo", "Nueva Solicitud");
+        model.addAttribute("subtitulo", "Registro de nueva solicitud");
+
     }
 }

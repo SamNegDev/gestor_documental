@@ -3,6 +3,8 @@ package com.example.gestor_documental.controller;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.SolicitudService;
@@ -27,7 +29,7 @@ public class SolicitudController {
     private final SolicitudService solicitudService;
 
     @GetMapping
-    public String listarSolicitudes(Authentication authentication, Model model) {
+    public String listarSolicitudes(Authentication authentication, Model model, @RequestParam(required = false) EstadoSolicitud estado) {
         String email = authentication.getName();
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(email);
 
@@ -42,7 +44,11 @@ public class SolicitudController {
             } else {
                 solicitudes = solicitudService.listarPorClienteId(usuarioLogueado.getCliente().getId());
             }
-
+        }
+        if (estado != null) {
+            solicitudes = solicitudes.stream()
+                    .filter(s -> s.getEstadoSolicitud() == estado)
+                    .toList();
         }
 
         model.addAttribute("solicitudes", solicitudes);
@@ -65,14 +71,14 @@ public class SolicitudController {
             Model model) {
 
         Solicitud solicitud = solicitudService.buscarPorId(id)
-                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
 
         String email = authentication.getName();
 
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(email);
 
         if (!solicitudService.tienePermisoSolicitud(solicitud, usuarioLogueado)) {
-            return "redirect:/solicitudes";
+            throw new AccesoDenegadoException("No tienes permiso para acceder a esta solicitud");
         }
 
 

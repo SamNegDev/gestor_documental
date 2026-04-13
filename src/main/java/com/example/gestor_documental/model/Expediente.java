@@ -2,6 +2,7 @@ package com.example.gestor_documental.model;
 
 import com.example.gestor_documental.enums.EstadoExpediente;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -33,6 +34,7 @@ public class Expediente {
     private EstadoExpediente estadoExpediente;
 
     @Column (length = 10)
+    @Size(max=10, message = "La matricula debe tener 10 caracteres")
     private String matricula;
 
     @Column (length = 200)
