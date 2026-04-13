@@ -7,6 +7,7 @@ import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Optional;
 
 
@@ -25,6 +26,5 @@ public interface DocumentoService {
    void guardarParaSolicitud(Long solicitudId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
 
 
-
-
+    List<Documento> listarPorExpediente(Long id);
 }

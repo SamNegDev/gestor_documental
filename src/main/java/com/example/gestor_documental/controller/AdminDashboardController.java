@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
 @RequiredArgsConstructor
+
 @RequestMapping("/admin/dashboard")
 public class AdminDashboardController {
 
@@ -34,8 +35,8 @@ public class AdminDashboardController {
 
         long totalSolicitudes = solicitudService.contarTodos();
         long pendienteRevision = solicitudService.contarPorEstado(EstadoSolicitud.PENDIENTE_REVISION);
-        long convertidas = solicitudService.contarPorEstado(EstadoSolicitud.CONVERTIDO);
-        long incidenciasSolicitudes = solicitudService.contarPorEstado(EstadoSolicitud.INCIDENCIA);
+        long convertidas = solicitudService.contarPorEstado(EstadoSolicitud.CONVERTIDA);
+        long incidenciasSolicitudes = solicitudService.contarPorEstado(EstadoSolicitud.PENDIENTE_DOCUMENTACION);
 
         long totalIncidencias = incidenciasExpedientes + incidenciasSolicitudes;
 

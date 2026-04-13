@@ -29,8 +29,10 @@
                     <tr>
                         <th>Nº</th>
                         <th>Tipo trámite</th>
+                        <th>Cliente</th>
                         <th>Matrícula</th>
                         <th>Estado</th>
+                        <th>Creado Por</th>
                         <th>Fecha</th>
                         <th>Acciones</th>
                     </tr>
@@ -39,7 +41,9 @@
                     <tr th:each="expediente : ${expedientes}">
                         <td th:text="${expediente.id}"></td>
                         <td th:text="${expediente.tipoTramite != null ? expediente.tipoTramite.nombre : 'Sin tipo'}"></td>
+                        <td th:text="${expediente.cliente != null ? expediente.cliente.nombre : 'Sin cliente'}"></td>
                         <td th:text="${expediente.matricula}"></td>
+
                         <td>
                             <span class="badge badge-estado"
                                   th:text="${expediente.estadoExpediente}"
@@ -49,6 +53,7 @@
                             </span>
                         </td>
                         <td th:text="${#temporals.format(expediente.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></td>
+                        <td th:text="${expediente.creadoPor != null ? expediente.creadoPor.nombre : 'Sin usuario'}"></td>
                         <td>
                             <a th:href="@{/expedientes/{id}(id=${expediente.id})}"
                                class="btn btn-sm btn-outline-primary">

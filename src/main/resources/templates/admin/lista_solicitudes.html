@@ -18,8 +18,10 @@
           <tr>
             <th>Nº</th>
             <th>Tipo trámite</th>
+            <th>Cliente</th>
             <th>Matrícula</th>
             <th>Estado</th>
+            <th>Usuario</th>
             <th>Fecha</th>
             <th>Acciones</th>
           </tr>
@@ -28,6 +30,7 @@
           <tr th:each="solicitud : ${solicitudes}">
             <td th:text="${solicitud.id}"></td>
             <td th:text="${solicitud.tipoTramite != null ? solicitud.tipoTramite.nombre : 'Sin tipo'}"></td>
+            <td th:text="${solicitud.cliente != null ? solicitud.cliente.nombre : 'Sin cliente'}"></td>
             <td th:text="${solicitud.matricula}"></td>
             <td>
                             <span class="badge badge-estado"
@@ -37,6 +40,7 @@
                                               (${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'} ? ' badge-incidencia' : ' badge-revision'))">
                             </span>
             </td>
+            <td th:text="${solicitud.creadoPor != null ? solicitud.creadoPor.nombre : 'Sin usuario'}"></td>
             <td th:text="${#temporals.format(solicitud.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></td>
             <td>
               <a th:href="@{/solicitudes/{id}(id=${solicitud.id})}"

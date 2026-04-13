@@ -139,6 +139,26 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         expedienteInteresadoRepository.save(relacion);
     }
 
+    @Override
+    public void cambiarEstado(Long id, EstadoExpediente nuevoEstado, Usuario usuarioLogueado) {
+
+        Expediente expediente = expedienteRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Expediente no encontrado"));
+
+        if(!tienePermisoExpediente(expediente,usuarioLogueado)){
+            throw new RuntimeException("No tienes permiso para acceder a este expediente");
+        }
+        if (usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new RuntimeException("Solo el administrador puede cambiar el estado del expediente.");
+        }
+        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
+            throw new RuntimeException("No se puede modificar un expediente finalizado");
+        }
+
+        expediente.setEstadoExpediente(nuevoEstado);
+
+        expedienteRepository.save(expediente);
+    }
 
 
     private boolean interesadoValido(InteresadoFormDto dto) {

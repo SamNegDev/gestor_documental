@@ -54,4 +54,5 @@ public interface ExpedienteService {
     public void guardarInteresadoSiValido(Expediente expediente, InteresadoFormDto dto);
 
 
+    void cambiarEstado(Long id, EstadoExpediente nuevoEstado, Usuario usuarioLogueado);
 }

@@ -144,6 +144,13 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
     }
 
+    @Override
+    public List<Documento> listarPorExpediente(Long id) {
+        System.out.println("DOCS EXPEDIENTE: " + documentoRepository.findByExpedienteId(id));
+        return documentoRepository.findByExpedienteId(id);
+
+    }
+
     private void guardarDocumentoGeneradoParaSolicitud(Solicitud solicitud,
                                                        byte[] contenido,
                                                        TipoDocumento tipoDocumento,
@@ -183,7 +190,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         doc.setNombreArchivoOriginal(nombreOriginal);
         doc.setNombreArchivo(nombreUnico);
         doc.setTipoDocumento(tipoDocumento);
-        doc.setUsuario(usuario);
+        doc.setSubidoPor(usuario);
 
         return doc;
     }
@@ -208,7 +215,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         doc.setNombreArchivoOriginal(nombreArchivoOriginal);
         doc.setNombreArchivo(nombreUnico);
         doc.setTipoDocumento(tipoDocumento);
-        doc.setUsuario(usuario);
+        doc.setSubidoPor(usuario);
 
         return doc;
     }

@@ -1,12 +1,10 @@
 package com.example.gestor_documental.model;
 
 
-import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.TipoDocumento;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -55,7 +53,7 @@ public class Documento {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subido_por_usuario_id")
-    private Usuario usuario;
+    private Usuario subidoPor;
 
 
 

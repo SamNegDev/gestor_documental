@@ -1,9 +1,119 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity"
       layout:decorate="~{layout/app}">
 <body>
 <section layout:fragment="content">
+
+    <div sec:authorize="hasRole('ADMIN')" class="card soft-card mb-4 admin-actions-card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                <div>
+                    <h2 class="section-title mb-1">Gestión del expediente</h2>
+                    <p class="text-muted mb-0">
+                        Actualiza el estado del expediente según el avance del trámite.
+                    </p>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+                <form th:action="@{/expedientes/{id}/estado(id=${expediente.id})}" method="post">
+                    <input type="hidden" name="nuevoEstado" value="EN_TRAMITE">
+                    <button type="submit" class="btn btn-outline-warning">
+                        Marcar en trámite
+                    </button>
+                </form>
+
+                <form th:action="@{/expedientes/{id}/estado(id=${expediente.id})}" method="post">
+                    <input type="hidden" name="nuevoEstado" value="FINALIZADO">
+                    <button type="submit" class="btn btn-outline-success">
+                        Marcar finalizado
+                    </button>
+                </form>
+
+                <form th:action="@{/expedientes/{id}/estado(id=${expediente.id})}"
+                      method="post"
+                      onsubmit="return confirm('¿Seguro que quieres marcar este expediente con incidencia?');">
+                    <input type="hidden" name="nuevoEstado" value="INCIDENCIA">
+                    <button type="submit" class="btn btn-outline-danger">
+                        Marcar incidencia
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="card soft-card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                <div>
+                    <h2 class="section-title mb-1">Información del expediente</h2>
+                    <p class="text-muted mb-0">
+                        Datos generales y trazabilidad del trámite.
+                    </p>
+                </div>
+
+                <div>
+        <span th:if="${expediente.estadoExpediente.name() == 'EN_TRAMITE'}"
+              class="badge rounded-pill bg-warning text-dark">
+          En trámite
+        </span>
+
+                    <span th:if="${expediente.estadoExpediente.name() == 'FINALIZADO'}"
+                          class="badge rounded-pill bg-success">
+          Finalizado
+        </span>
+
+                    <span th:if="${expediente.estadoExpediente.name() == 'INCIDENCIA'}"
+                          class="badge rounded-pill bg-danger">
+          Incidencia
+        </span>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div><strong>ID:</strong> <span th:text="${expediente.id}"></span></div>
+                    <div><strong>Matrícula:</strong> <span th:text="${expediente.matricula ?: '-'}"></span></div>
+                    <div><strong>Tipo de trámite:</strong> <span th:text="${expediente.tipoTramite.nombre}"></span></div>
+                    <div><strong>Cliente:</strong> <span th:text="${expediente.cliente.nombre}"></span></div>
+                </div>
+
+                <div class="col-md-6">
+                    <div>
+                        <strong>Creado por:</strong>
+                        <span th:text="${expediente.creadoPor != null ? expediente.creadoPor.nombre : '-'}"></span>
+                    </div>
+
+                    <div>
+                        <strong>Fecha de creación:</strong>
+                        <span th:text="${#temporals.format(expediente.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></span>
+                    </div>
+
+                    <div>
+                        <strong>Origen:</strong>
+                        <span th:if="${expediente.solicitud != null}">Convertido desde solicitud</span>
+                        <span th:if="${expediente.solicitud == null}">Creación directa</span>
+                    </div>
+
+                    <div th:if="${expediente.solicitud != null}">
+                        <strong>Solicitud origen:</strong>
+                        <a th:href="@{/solicitudes/{id}(id=${expediente.solicitud.id})}"
+                           th:text="${'Solicitud #' + expediente.solicitud.id}">
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3" th:if="${expediente.observaciones != null and !#strings.isEmpty(expediente.observaciones)}">
+                <strong>Observaciones:</strong>
+                <div class="mt-1 p-3 border rounded bg-light-subtle">
+                    <span th:text="${expediente.observaciones}"></span>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="card soft-card mb-4">
         <div class="card-body">
@@ -114,46 +224,55 @@
         </div>
     </div>
 
-    <div class="card soft-card">
+    <div class="card soft-card mb-4">
         <div class="card-body">
             <h2 class="section-title">Documentos</h2>
 
-            <div th:if="${expediente.documentos == null or expediente.documentos.isEmpty()}" class="empty-state">
-                No hay documentos asociados a este expediente.
+            <div th:if="${documentos != null and !documentos.isEmpty()}">
+                <div th:each="doc : ${documentos}" class="border rounded p-2 mb-2">
+                    <div class="row align-items-center g-2">
+
+                        <!-- IZQUIERDA -->
+                        <div class="col-md-3">
+                            <div class="fw-semibold" th:text="${doc.nombreArchivoOriginal}"></div>
+                            <div class="text-muted small" th:text="${doc.tipoDocumento}"></div>
+                        </div>
+
+                        <!-- CENTRO -->
+                        <div class="col-md-5 small text-muted">
+                            <strong>Subido por:</strong>
+                            <span th:text="${doc.subidoPor != null ? doc.subidoPor.nombre : '-'}"></span>
+                            <span class="mx-1">|</span>
+                            <span th:text="${#temporals.format(doc.fechaSubida, 'dd/MM/yyyy HH:mm')}"></span>
+                            <span class="badge bg-secondary"
+                                  th:text="${doc.solicitud != null ? 'Aportado en solicitud' : 'Subido en expediente'}">
+
+                            </span>
+
+                        </div>
+
+                        <!-- DERECHA -->
+                        <div class="col-md-4 d-flex justify-content-md-end align-items-center gap-2 flex-wrap">
+                        
+
+                            <a th:href="@{/documentos/ver/{id}(id=${doc.id})}"
+                               class="btn btn-sm btn-outline-primary">
+                                Ver
+                            </a>
+
+                            <a th:href="@{/documentos/descargar/{id}(id=${doc.id})}"
+                               class="btn btn-sm btn-outline-secondary">
+                                Descargar
+                            </a>
+                        </div>
+
+                    </div>
+
+                </div>
             </div>
 
-            <div class="table-responsive" th:if="${expediente.documentos != null and !expediente.documentos.isEmpty()}">
-                <table class="table align-middle">
-                    <thead>
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Tipo</th>
-                        <th>Fecha subida</th>
-                        <th>Acciones</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="doc : ${expediente.documentos}">
-                        <td th:text="${doc.nombreArchivoOriginal}"></td>
-                        <td th:text="${doc.tipoDocumento}"></td>
-                        <td th:text="${#temporals.format(doc.fechaSubida, 'dd/MM/yyyy HH:mm')}"></td>
-                        <td>
-                            <div class="actions-inline">
-                                <a th:href="@{/documentos/ver/{id}(id=${doc.id})}" target="_blank" class="btn btn-sm btn-outline-secondary">Ver</a>
-                                <a th:href="@{/documentos/descargar/{id}(id=${doc.id})}" class="btn btn-sm btn-outline-primary">Descargar</a>
-
-                                <form th:action="@{/documentos/eliminar/{id}(id=${doc.id})}"
-                                      method="post"
-                                      class="doc-form-inline"
-                                      onsubmit="return confirm('¿Seguro que quieres eliminar este documento?');">
-                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
+            <div th:if="${documentos == null or documentos.isEmpty()}" class="text-muted">
+                Este expediente todavía no tiene documentos asociados.
             </div>
         </div>
     </div>

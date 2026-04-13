@@ -1,5 +1,6 @@
 package com.example.gestor_documental.controller;
 
+import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Expediente;
@@ -10,10 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.*;
 import com.example.gestor_documental.model.Solicitud;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
 
@@ -84,6 +84,37 @@ public class SolicitudController {
 
 
         return "solicitudes/detalle";
+    }
+    @PostMapping("/{id}/convertir")
+    public String convertirSolicitud(@PathVariable Long id,
+                                     Authentication authentication,
+                                     RedirectAttributes redirectAttributes) {
+        Usuario admin = usuarioService.buscarPorEmail(authentication.getName());
+
+        try {
+            Expediente expediente = solicitudService.convertirAExpediente(id, admin);
+            redirectAttributes.addFlashAttribute("success", "Solicitud convertida a expediente correctamente");
+            return "redirect:/expedientes/" + expediente.getId();
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return "redirect:/solicitudes/" + id;
+        }
+    }
+    @PostMapping("/{id}/estado")
+    public String cambiarEstadoSolicitud(@PathVariable Long id,
+                                         @RequestParam EstadoSolicitud nuevoEstado,
+                                         Authentication authentication,
+                                         RedirectAttributes redirectAttributes) {
+        Usuario admin = usuarioService.buscarPorEmail(authentication.getName());
+
+        try {
+            solicitudService.cambiarEstadoSolicitud(id, nuevoEstado, admin);
+            redirectAttributes.addFlashAttribute("success", "Estado actualizado correctamente");
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+
+        return "redirect:/solicitudes/" + id;
     }
     
 

@@ -175,7 +175,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
 
-        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDO) {
+        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA) {
             throw new RuntimeException("La solicitud ya ha sido convertida");
         }
 
@@ -196,7 +196,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         expediente.setCreadoPor(admin);
 
         Expediente expedienteGuardado = expedienteRepository.save(expediente);
-        solicitud.setEstadoSolicitud(EstadoSolicitud.CONVERTIDO);
+        solicitud.setEstadoSolicitud(EstadoSolicitud.CONVERTIDA);
         asociarDocumentosSolicitudAExpediente(solicitud, expedienteGuardado);
         solicitud.setExpediente(expedienteGuardado);
         solicitudRepository.save(solicitud);
@@ -222,6 +222,36 @@ public class SolicitudServiceImpl implements SolicitudService {
         expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado2dto);
 
         return expedienteGuardado;
+    }
+
+    @Override
+    public void cambiarEstadoSolicitud(Long id, EstadoSolicitud nuevoEstado, Usuario usuarioLogueado) {
+
+
+        Solicitud solicitud = solicitudRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+
+        if (!tienePermisoSolicitud(solicitud, usuarioLogueado)){
+            throw new RuntimeException("No tienes permiso para acceder a esta solicitud");
+        }
+        if (usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new RuntimeException("Solo el administrador puede cambiar el estado de la solicitud");
+        }
+        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO) {
+            throw new RuntimeException("No se puede cambiar el estado de una solicitud rechazada");
+        }
+
+        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA) {
+            throw new RuntimeException("No se puede cambiar el estado de una solicitud convertida");
+        }
+
+        if (solicitud.getExpediente() != null) {
+            throw new RuntimeException("La solicitud ya tiene un expediente asociado");
+        }
+
+        solicitud.setEstadoSolicitud(nuevoEstado);
+        solicitudRepository.save(solicitud);
+
     }
 
     public void asociarDocumentosSolicitudAExpediente(Solicitud solicitud, Expediente expediente) {
