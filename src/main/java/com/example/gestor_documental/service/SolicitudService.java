@@ -40,4 +40,6 @@ public interface SolicitudService {
     Expediente convertirAExpediente(Long solicitudId, Usuario admin);
 
     void cambiarEstadoSolicitud(Long id, EstadoSolicitud nuevoEstado, Usuario admin);
+
+    Solicitud actualizarSolicitud(Long id, Solicitud solicitudActualizada, Usuario usuarioLogueado, Long tipoTramiteId);
 }

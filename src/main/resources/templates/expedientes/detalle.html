@@ -25,6 +25,12 @@
                     </button>
                 </form>
 
+                <a th:if="${expediente.estadoExpediente.name() != 'FINALIZADO'}"
+                   th:href="@{/admin/expedientes/{id}/editar(id=${expediente.id})}"
+                   class="btn btn-primary">
+                    <i class="bi bi-pencil"></i> Editar expediente
+                </a>
+
                 <form th:action="@{/expedientes/{id}/estado(id=${expediente.id})}" method="post">
                     <input type="hidden" name="nuevoEstado" value="FINALIZADO">
                     <button type="submit" class="btn btn-outline-success">

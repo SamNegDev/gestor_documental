@@ -220,9 +220,51 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
         guardarInteresadoSiValido(expedienteGuardado, interesado1);
         guardarInteresadoSiValido(expedienteGuardado, interesado2);
-
+        
         return expedienteGuardado;
     }
 
+    @Override
+    @Transactional
+    public Expediente actualizarExpediente(Long id, Expediente expedienteActualizado,
+                                              Usuario usuarioLogueado,
+                                              Long clienteId,
+                                              Long tipoTramiteId,
+                                              InteresadoFormDto interesado1,
+                                              InteresadoFormDto interesado2) {
 
+        Expediente expedienteBase = expedienteRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
+
+        if (!tienePermisoExpediente(expedienteBase, usuarioLogueado)) {
+            throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
+        }
+
+        if (expedienteBase.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
+            throw new OperacionInvalidaException("No se puede editar un expediente finalizado");
+        }
+
+        validarInteresados(interesado1, interesado2);
+
+        Cliente cliente = clienteService.buscarPorId(clienteId).orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado"));
+        TipoTramite tipoTramite = tipoTramiteService.buscarPorId(tipoTramiteId).orElseThrow(() -> new RecursoNoEncontradoException("Tipo de trámite no encontrado"));
+
+        expedienteBase.setCliente(cliente);
+        expedienteBase.setTipoTramite(tipoTramite);
+        expedienteBase.setMatricula(expedienteActualizado.getMatricula());
+        expedienteBase.setObservaciones(expedienteActualizado.getObservaciones());
+
+        // Limpiar asociaciones previas
+        expedienteInteresadoRepository.deleteByExpedienteId(expedienteBase.getId());
+        
+        // Es necesario hacer el flush/clear o sencillamente como es LAZY en expediente.getInteresados() no importa si no se lee en esta transaccion.
+        // Pero para asegurar, simplemente lo guardamos despues.
+
+        Expediente expedienteGuardado = expedienteRepository.save(expedienteBase);
+
+        guardarInteresadoSiValido(expedienteGuardado, interesado1);
+        guardarInteresadoSiValido(expedienteGuardado, interesado2);
+
+        return expedienteGuardado;
+    }
 }

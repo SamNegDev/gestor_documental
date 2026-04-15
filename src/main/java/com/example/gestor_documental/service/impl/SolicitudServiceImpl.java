@@ -270,5 +270,47 @@ public class SolicitudServiceImpl implements SolicitudService {
 
         documentoRepository.saveAll(documentos);
     }
+
+    @Override
+    @Transactional
+    public Solicitud actualizarSolicitud(Long id, Solicitud solicitudActualizada, Usuario usuarioLogueado, Long tipoTramiteId) {
+
+        Solicitud solicitudBase = solicitudRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+
+        if (!tienePermisoSolicitud(solicitudBase, usuarioLogueado)){
+            throw new AccesoDenegadoException("No tienes permiso para acceder a esta solicitud");
+        }
+
+        if (solicitudBase.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA ||
+            solicitudBase.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO) {
+            throw new OperacionInvalidaException("No se puede editar una solicitud convertida o rechazada");
+        }
+
+        validarInteresadosSolicitud(solicitudActualizada);
+
+        TipoTramite tipoTramite = tipoTramiteService.buscarPorId(tipoTramiteId).orElseThrow(() -> new RecursoNoEncontradoException("Tipo de trámite no encontrado"));
+
+        solicitudBase.setTipoTramite(tipoTramite);
+        solicitudBase.setMatricula(solicitudActualizada.getMatricula());
+
+        solicitudBase.setInteresado1Rol(solicitudActualizada.getInteresado1Rol());
+        solicitudBase.setInteresado1Nombre(solicitudActualizada.getInteresado1Nombre());
+        solicitudBase.setInteresado1Apellidos(solicitudActualizada.getInteresado1Apellidos());
+        solicitudBase.setInteresado1Dni(solicitudActualizada.getInteresado1Dni());
+        solicitudBase.setInteresado1Telefono(solicitudActualizada.getInteresado1Telefono());
+        solicitudBase.setInteresado1Direccion(solicitudActualizada.getInteresado1Direccion());
+
+        solicitudBase.setInteresado2Rol(solicitudActualizada.getInteresado2Rol());
+        solicitudBase.setInteresado2Nombre(solicitudActualizada.getInteresado2Nombre());
+        solicitudBase.setInteresado2Apellidos(solicitudActualizada.getInteresado2Apellidos());
+        solicitudBase.setInteresado2Dni(solicitudActualizada.getInteresado2Dni());
+        solicitudBase.setInteresado2Telefono(solicitudActualizada.getInteresado2Telefono());
+        solicitudBase.setInteresado2Direccion(solicitudActualizada.getInteresado2Direccion());
+
+        solicitudBase.setObservaciones(solicitudActualizada.getObservaciones());
+
+        return solicitudRepository.save(solicitudBase);
+    }
 }
 

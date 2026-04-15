@@ -142,4 +142,61 @@ public class ClienteSolicitudController {
         model.addAttribute("subtitulo", "Registro de nueva solicitud");
 
     }
+
+    @GetMapping("/{id}/editar")
+    public String editarSolicitud(@PathVariable Long id, Authentication authentication, Model model, RedirectAttributes redirectAttributes) {
+
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Solicitud solicitud = solicitudService.buscarPorId(id).orElse(null);
+
+        if (solicitud == null || !solicitudService.tienePermisoSolicitud(solicitud, usuarioLogueado)) {
+            redirectAttributes.addFlashAttribute("error", "No tienes permiso para editar esta solicitud.");
+            return "redirect:/solicitudes";
+        }
+
+        if (solicitud.getEstadoSolicitud() == com.example.gestor_documental.enums.EstadoSolicitud.CONVERTIDA ||
+            solicitud.getEstadoSolicitud() == com.example.gestor_documental.enums.EstadoSolicitud.RECHAZADO) {
+            redirectAttributes.addFlashAttribute("error", "Vaya, esta solicitud ya no se puede editar en este estado.");
+            return "redirect:/solicitudes/" + id;
+        }
+
+        cargarModeloFormularioSolicitud(solicitud, null, solicitud.getTipoTramite().getId(), model, usuarioLogueado, usuarioLogueado.getCliente());
+        model.addAttribute("titulo", "Editar Solicitud");
+        model.addAttribute("subtitulo", "Actualización de datos");
+
+        return "cliente/solicitud-form";
+    }
+
+    @PostMapping("/{id}/editar")
+    public String procesarEdicionSolicitud(@PathVariable Long id,
+                                           @Valid @ModelAttribute("solicitud") Solicitud solicitud,
+                                           BindingResult solicitudResult,
+                                           @RequestParam Long tipoTramiteId,
+                                           Authentication authentication,
+                                           Model model, RedirectAttributes redirectAttributes) {
+
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+
+        formularioValidacionHelper.validarDniOpcional(solicitudResult, "interesado1Dni", solicitud.getInteresado1Dni(), "El DNI/NIE 1 no es válido");
+        formularioValidacionHelper.validarDniOpcional(solicitudResult, "interesado2Dni", solicitud.getInteresado2Dni(), "El DNI/NIE 2 no es válido");
+
+        if (solicitudResult.hasErrors()) {
+            cargarModeloFormularioSolicitud(solicitud, null, tipoTramiteId, model, usuarioLogueado, usuarioLogueado.getCliente());
+            model.addAttribute("titulo", "Editar Solicitud");
+            model.addAttribute("subtitulo", "Actualización de datos");
+            return "cliente/solicitud-form";
+        }
+
+        try {
+            solicitudService.actualizarSolicitud(id, solicitud, usuarioLogueado, tipoTramiteId);
+            redirectAttributes.addFlashAttribute("success", "Solicitud editada correctamente");
+            return "redirect:/solicitudes/" + id;
+        } catch (Exception e) {
+            cargarModeloFormularioSolicitud(solicitud, null, tipoTramiteId, model, usuarioLogueado, usuarioLogueado.getCliente());
+            model.addAttribute("error", e.getMessage());
+            model.addAttribute("titulo", "Editar Solicitud");
+            model.addAttribute("subtitulo", "Actualización de datos");
+            return "cliente/solicitud-form";
+        }
+    }
 }

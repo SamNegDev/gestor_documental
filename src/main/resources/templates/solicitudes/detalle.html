@@ -94,6 +94,14 @@
     </div>
   </div>
 
+  <div sec:authorize="hasRole('CLIENTE')"
+       th:if="${solicitud.estadoSolicitud.name() == 'PENDIENTE_REVISION' or solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'}"
+       class="mb-3 d-flex justify-content-end">
+    <a th:href="@{/cliente/solicitudes/{id}/editar(id=${solicitud.id})}" class="btn btn-primary">
+       Editar solicitud
+    </a>
+  </div>
+
   <div class="card soft-card mb-4">
     <div class="card-body">
       <h2 class="section-title">Información general</h2>
