@@ -7,7 +7,6 @@ import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.*;
-import com.example.gestor_documental.validation.DniNieValidator;
 import com.example.gestor_documental.validation.FormularioValidacionHelper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,12 +29,10 @@ public class AdminExpedienteController {
     private final DocumentoService documentoService;
     private final FormularioValidacionHelper formularioValidacionHelper;
 
-
     @GetMapping("/nuevo")
     public String formularioNuevoCliente(Authentication authentication, Model model) {
 
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
-
 
         model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("expediente", new Expediente());
@@ -52,15 +49,14 @@ public class AdminExpedienteController {
 
     @PostMapping
     public String guardarExpediente(@Valid @ModelAttribute("expediente") Expediente expediente,
-                                    BindingResult expedienteResult,
-                                    @Valid @ModelAttribute("interesadosForm") InteresadosFormDto interesadosForm,
-                                    BindingResult interesadoResult,
-                                    @ModelAttribute DocumentoFormWrapper documentosWrapper,
-                                    @RequestParam Long clienteId,
-                                    @RequestParam Long tipoTramiteId,
-                                    Authentication authentication,
-                                    Model model, RedirectAttributes redirectAttributes) {
-
+            BindingResult expedienteResult,
+            @Valid @ModelAttribute("interesadosForm") InteresadosFormDto interesadosForm,
+            BindingResult interesadoResult,
+            @ModelAttribute DocumentoFormWrapper documentosWrapper,
+            @RequestParam Long clienteId,
+            @RequestParam Long tipoTramiteId,
+            Authentication authentication,
+            Model model, RedirectAttributes redirectAttributes) {
 
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
@@ -68,15 +64,13 @@ public class AdminExpedienteController {
                 interesadoResult,
                 "interesado1.dni",
                 interesadosForm.getInteresado1() != null ? interesadosForm.getInteresado1().getDni() : null,
-                "El DNI/NIE del interesado 1 no es válido"
-        );
+                "El DNI/NIE del interesado 1 no es válido");
 
         formularioValidacionHelper.validarDniOpcional(
                 interesadoResult,
                 "interesado2.dni",
                 interesadosForm.getInteresado2() != null ? interesadosForm.getInteresado2().getDni() : null,
-                "El DNI/NIE del interesado 2 no es válido"
-        );
+                "El DNI/NIE del interesado 2 no es válido");
 
         if (expedienteResult.hasErrors() || interesadoResult.hasErrors()) {
             cargarModeloFormularioExpediente(model, usuarioLogueado, expediente, interesadosForm,
@@ -90,8 +84,7 @@ public class AdminExpedienteController {
                     clienteId,
                     tipoTramiteId,
                     interesadosForm.getInteresado1(),
-                    interesadosForm.getInteresado2()
-            );
+                    interesadosForm.getInteresado2());
 
             if (documentosWrapper.getDocumentos() != null) {
 
@@ -103,14 +96,12 @@ public class AdminExpedienteController {
                                 expedienteGuardado.getId(),
                                 doc.getArchivo(),
                                 doc.getTipoDocumento(),
-                                usuarioLogueado
-                        );
+                                usuarioLogueado);
                     }
                 }
             }
             redirectAttributes.addFlashAttribute("success", "Expediente creado correctamente");
             return "redirect:/expedientes/" + expedienteGuardado.getId();
-
 
         } catch (IllegalArgumentException e) {
             cargarModeloFormularioExpediente(model, usuarioLogueado, expediente, interesadosForm,
@@ -120,18 +111,20 @@ public class AdminExpedienteController {
             return "admin/expediente-form";
         }
     }
+
     private void cargarModeloFormularioExpediente(Model model,
-                                                  Usuario usuarioLogueado,
-                                                  Expediente expediente,
-                                                  InteresadosFormDto interesadosForm,
-                                                  DocumentoFormWrapper documentosWrapper,
-                                                  Long clienteId,
-                                                  Long tipoTramiteId) {
+            Usuario usuarioLogueado,
+            Expediente expediente,
+            InteresadosFormDto interesadosForm,
+            DocumentoFormWrapper documentosWrapper,
+            Long clienteId,
+            Long tipoTramiteId) {
 
         model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("expediente", expediente);
         model.addAttribute("interesadosForm", interesadosForm);
-        model.addAttribute("documentosWrapper", documentosWrapper != null ? documentosWrapper : new DocumentoFormWrapper());
+        model.addAttribute("documentosWrapper",
+                documentosWrapper != null ? documentosWrapper : new DocumentoFormWrapper());
         model.addAttribute("clientes", clienteService.listarTodos());
         model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
         model.addAttribute("clienteId", clienteId);
@@ -141,5 +134,3 @@ public class AdminExpedienteController {
         model.addAttribute("subtitulo", "Registro de nuevo expediente");
     }
 }
-
-

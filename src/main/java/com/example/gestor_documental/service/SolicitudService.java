@@ -1,18 +1,13 @@
 package com.example.gestor_documental.service;
 
-import com.example.gestor_documental.dto.InteresadoFormDto;
-import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-
 
 public interface SolicitudService {
 
@@ -38,9 +33,9 @@ public interface SolicitudService {
 
     List<Solicitud> listarUltimasPorCliente(Cliente cliente);
 
-     Solicitud crearSolicitudCompleta(Solicitud solicitud, Usuario usuarioLogueado,
-                                      Cliente cliente,
-                                      Long tipoTramiteId);
+    Solicitud crearSolicitudCompleta(Solicitud solicitud, Usuario usuarioLogueado,
+            Cliente cliente,
+            Long tipoTramiteId);
 
     Expediente convertirAExpediente(Long solicitudId, Usuario admin);
 

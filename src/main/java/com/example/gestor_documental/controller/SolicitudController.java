@@ -6,7 +6,6 @@ import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Expediente;
-import com.example.gestor_documental.model.TipoTramite;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.SolicitudService;
@@ -35,10 +34,10 @@ public class SolicitudController {
 
     @GetMapping
     public String listarSolicitudes(Authentication authentication, Model model,
-                                    @RequestParam(required = false) EstadoSolicitud estado,
-                                    @RequestParam (required = false)Long tipoTramiteId,
-                                    @RequestParam (required = false) String matricula,
-                                    @RequestParam (required = false) Long clienteId) {
+            @RequestParam(required = false) EstadoSolicitud estado,
+            @RequestParam(required = false) Long tipoTramiteId,
+            @RequestParam(required = false) String matricula,
+            @RequestParam(required = false) Long clienteId) {
         String email = authentication.getName();
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(email);
 
@@ -48,7 +47,7 @@ public class SolicitudController {
             solicitudes = solicitudService.listarTodas();
             model.addAttribute("clientes", clienteService.listarTodos());
 
-            if (clienteId !=null ){
+            if (clienteId != null) {
                 solicitudes = solicitudes.stream()
                         .filter(s -> s.getCliente() != null && s.getCliente().getId().equals(clienteId))
                         .toList();
@@ -82,10 +81,9 @@ public class SolicitudController {
                         .toList();
             }
         }
-        boolean hayFiltrosActivos =
-                estado != null
-                        || tipoTramiteId != null|| clienteId != null
-                        || (matricula != null && !matricula.trim().isEmpty());
+        boolean hayFiltrosActivos = estado != null
+                || tipoTramiteId != null || clienteId != null
+                || (matricula != null && !matricula.trim().isEmpty());
 
         model.addAttribute("hayFiltrosActivos", hayFiltrosActivos);
         model.addAttribute("solicitudes", solicitudes);
@@ -107,6 +105,7 @@ public class SolicitudController {
         }
 
     }
+
     @GetMapping("/{id}")
     public String verDetalleSolicitud(
             @PathVariable Long id,
@@ -124,20 +123,19 @@ public class SolicitudController {
             throw new AccesoDenegadoException("No tienes permiso para acceder a esta solicitud");
         }
 
-
         model.addAttribute("solicitud", solicitud);
         model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("titulo", "Solicitud de Expediente");
         model.addAttribute("subtitulo", "Detalle de Solicitud de Expediente");
         model.addAttribute("tiposDocumento", TipoDocumento.values());
 
-
         return "solicitudes/detalle";
     }
+
     @PostMapping("/{id}/convertir")
     public String convertirSolicitud(@PathVariable Long id,
-                                     Authentication authentication,
-                                     RedirectAttributes redirectAttributes) {
+            Authentication authentication,
+            RedirectAttributes redirectAttributes) {
         Usuario admin = usuarioService.buscarPorEmail(authentication.getName());
 
         try {
@@ -149,11 +147,12 @@ public class SolicitudController {
             return "redirect:/solicitudes/" + id;
         }
     }
+
     @PostMapping("/{id}/estado")
     public String cambiarEstadoSolicitud(@PathVariable Long id,
-                                         @RequestParam EstadoSolicitud nuevoEstado,
-                                         Authentication authentication,
-                                         RedirectAttributes redirectAttributes) {
+            @RequestParam EstadoSolicitud nuevoEstado,
+            Authentication authentication,
+            RedirectAttributes redirectAttributes) {
         Usuario admin = usuarioService.buscarPorEmail(authentication.getName());
 
         try {
@@ -165,8 +164,5 @@ public class SolicitudController {
 
         return "redirect:/solicitudes/" + id;
     }
-    
-
 
 }
-

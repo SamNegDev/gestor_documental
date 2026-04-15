@@ -6,7 +6,6 @@ import com.example.gestor_documental.repository.UsuarioRepository;
 import com.example.gestor_documental.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import com.example.gestor_documental.model.Usuario;
 
 import java.util.List;
 import java.util.Optional;

@@ -1,7 +1,7 @@
 package com.example.gestor_documental.model;
 
 import com.example.gestor_documental.enums.RolInteresado;
-import com.example.gestor_documental.enums.TipoIncidenciaEnum;
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,7 +12,7 @@ import lombok.Setter;
 @NoArgsConstructor
 
 @Entity
-@Table(name= "expediente_interesado")
+@Table(name = "expediente_interesado")
 public class ExpedienteInteresado {
 
     @Id
@@ -37,4 +37,3 @@ public class ExpedienteInteresado {
         this.rol = rol;
     }
 }
-

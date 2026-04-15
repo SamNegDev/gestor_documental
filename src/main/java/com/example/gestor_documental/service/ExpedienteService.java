@@ -4,10 +4,7 @@ import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Expediente;
-import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Usuario;
-import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
@@ -38,21 +35,19 @@ public interface ExpedienteService {
 
     List<Expediente> listarUltimosPorCliente(Cliente cliente);
 
-
     void guardarInteresados(Expediente expediente,
-                            InteresadoFormDto interesado1,
-                            InteresadoFormDto interesado2);
+            InteresadoFormDto interesado1,
+            InteresadoFormDto interesado2);
 
-    Expediente crearExpedienteCompleto(Expediente expediente,Usuario usuarioLogueado,
-                                       Long clienteId,
-                                       Long tipoTramiteId,
-                                       InteresadoFormDto interesado1,
-                                       InteresadoFormDto interesado2);
+    Expediente crearExpedienteCompleto(Expediente expediente, Usuario usuarioLogueado,
+            Long clienteId,
+            Long tipoTramiteId,
+            InteresadoFormDto interesado1,
+            InteresadoFormDto interesado2);
 
     public void validarInteresados(InteresadoFormDto interesado1, InteresadoFormDto interesado2);
 
     public void guardarInteresadoSiValido(Expediente expediente, InteresadoFormDto dto);
-
 
     void cambiarEstado(Long id, EstadoExpediente nuevoEstado, Usuario usuarioLogueado);
 }
