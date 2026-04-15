@@ -143,6 +143,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     }
 
     @Override
+    @Transactional
     public void cambiarEstado(Long id, EstadoExpediente nuevoEstado, Usuario usuarioLogueado) {
 
         Expediente expediente = expedienteRepository.findById(id)

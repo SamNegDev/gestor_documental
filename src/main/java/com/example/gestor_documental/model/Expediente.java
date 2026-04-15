@@ -56,7 +56,7 @@ public class Expediente {
     @JoinColumn(name = "solicitud_id")
     private Solicitud solicitud;
 
-    @OneToMany(mappedBy = "expediente", fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "expediente", fetch = FetchType.LAZY)
     private List<Documento> documentos = new ArrayList<>();
 
     //pendiente crear entidad incidencia

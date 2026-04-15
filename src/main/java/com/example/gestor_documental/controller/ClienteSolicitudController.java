@@ -73,14 +73,14 @@ public class ClienteSolicitudController {
 
         formularioValidacionHelper.validarDniOpcional(
                 solicitudResult,
-                "interesado1dni",
+                "interesado1Dni",
                 solicitud.getInteresado1Dni(),
                 "El DNI/NIE del interesado 1 no es válido"
         );
 
         formularioValidacionHelper.validarDniOpcional(
                 solicitudResult,
-                "interesado2dni",
+                "interesado2Dni",
                 solicitud.getInteresado2Dni(),
                 "El DNI/NIE del interesado 2 no es válido"
         );

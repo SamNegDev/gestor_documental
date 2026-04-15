@@ -1,7 +1,7 @@
 package com.example.gestor_documental.dto;
 
 import com.example.gestor_documental.enums.RolInteresado;
-import com.example.gestor_documental.service.InteresadoService;
+
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -13,7 +13,6 @@ import lombok.Setter;
 @NoArgsConstructor
 public class InteresadoFormDto {
 
-    private InteresadoService interesadoService;
 
     @Size(max = 120, message = "El nombre no debe tener mas de 120 caracteres")
     private String nombre;

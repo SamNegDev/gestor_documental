@@ -64,7 +64,12 @@ public class DocumentoController {
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
         Documento documento = documentoService.obtenerDocumentoConPermiso(id, usuarioLogueado);
 
-        Path rutaArchivo = Paths.get("uploads").resolve(documento.getNombreArchivo());
+        Path rutaBase = Paths.get("uploads").normalize().toAbsolutePath();
+        Path rutaArchivo = rutaBase.resolve(documento.getNombreArchivo()).normalize();
+
+        if (!rutaArchivo.startsWith(rutaBase)) {
+            throw new RuntimeException("Acceso denegado: Ruta de archivo no permitida");
+        }
 
         if (!Files.exists(rutaArchivo)) {
             throw new RuntimeException("El archivo no existe en disco");
@@ -105,7 +110,12 @@ public class DocumentoController {
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
         Documento documento = documentoService.obtenerDocumentoConPermiso(id, usuarioLogueado);
 
-        Path rutaArchivo = Paths.get("uploads").resolve(documento.getNombreArchivo());
+        Path rutaBase = Paths.get("uploads").normalize().toAbsolutePath();
+        Path rutaArchivo = rutaBase.resolve(documento.getNombreArchivo()).normalize();
+
+        if (!rutaArchivo.startsWith(rutaBase)) {
+            throw new RuntimeException("Acceso denegado: Ruta de archivo no permitida");
+        }
 
         if (!Files.exists(rutaArchivo)) {
             throw new RuntimeException("El archivo no existe en disco");

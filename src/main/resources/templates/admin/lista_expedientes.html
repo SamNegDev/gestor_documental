@@ -16,11 +16,70 @@
         </a>
     </div>
 
+    <form th:action="@{/expedientes}" method="get" class="row g-2 align-items-end mb-4">
+
+
+            <div class="col-md-3">
+                <label class="form-label">Cliente</label>
+                <select name="clienteId" class="form-select">
+                    <option value="">Todos</option>
+                    <option th:each="cliente : ${clientes}"
+                            th:value="${cliente.id}"
+                            th:text="${cliente.nombre}"
+                            th:selected="${clienteSeleccionado != null and cliente.id == clienteSeleccionado}">
+                    </option>
+                </select>
+            </div>
+
+
+        <div class="col-md-2">
+            <label class="form-label">Estado</label>
+            <select name="estado" class="form-select">
+                <option value="">Todos</option>
+                <option th:each="estado : ${estadosExpediente}"
+                        th:value="${estado}"
+                        th:text="${#strings.replace(estado.name(), '_', ' ')}"
+                        th:selected="${estadoSeleccionado != null and estado == estadoSeleccionado}">
+                </option>
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Tipo de trámite</label>
+            <select name="tipoTramiteId" class="form-select">
+                <option value="">Todos</option>
+                <option th:each="tipo : ${tiposTramite}"
+                        th:value="${tipo.id}"
+                        th:text="${tipo.nombre}"
+                        th:selected="${tipoTramiteIdSeleccionado != null and tipo.id == tipoTramiteIdSeleccionado}">
+                </option>
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Matrícula</label>
+            <input type="text"
+                   name="matricula"
+                   class="form-control"
+                   placeholder="Buscar matrícula"
+                   th:value="${matriculaSeleccionada}">
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+        </div>
+        <div class="col-md-auto" th:if="${hayFiltrosActivos}">
+            <a th:href="@{/expedientes}" class="btn btn-outline-secondary w-100">Limpiar</a>
+        </div>
+    </form>
+
     <div class="card soft-card">
         <div class="card-body">
 
-            <div th:if="${expedientes == null or expedientes.isEmpty()}" class="empty-state">
+            <div th:if="${expedientes == null or expedientes.isEmpty() and !hayFiltrosActivos}" class="empty-state">
                 No tienes expedientes disponibles.
+            </div>
+            <div th:if="${expedientes == null or expedientes.isEmpty() and hayFiltrosActivos}" class="empty-state">
+                No tienes expedientes disponibles con los filtros seleccionados.
             </div>
 
             <div class="table-responsive" th:if="${expedientes != null and !expedientes.isEmpty()}">

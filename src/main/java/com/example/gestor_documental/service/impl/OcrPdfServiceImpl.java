@@ -112,8 +112,8 @@ public class OcrPdfServiceImpl implements OcrPdfService {
     private ITesseract crearTesseract() {
         Tesseract tesseract = new Tesseract();
 
-        tesseract.setDatapath("C:\\Tesseract\\Tesseract-OCR\\tessdata");
-        tesseract.setLanguage("spa");
+        tesseract.setDatapath(ocrProperties.getTessdataPath());
+        tesseract.setLanguage(ocrProperties.getLanguage());
 
         // Más estable para documentos escaneados normales
         tesseract.setPageSegMode(6);

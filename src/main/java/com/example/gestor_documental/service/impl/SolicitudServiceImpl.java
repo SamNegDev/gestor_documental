@@ -12,7 +12,6 @@ import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
-import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
@@ -228,6 +227,7 @@ public class SolicitudServiceImpl implements SolicitudService {
     }
 
     @Override
+    @Transactional
     public void cambiarEstadoSolicitud(Long id, EstadoSolicitud nuevoEstado, Usuario usuarioLogueado) {
 
 

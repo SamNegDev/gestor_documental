@@ -8,6 +8,7 @@ import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.UsuarioService;
@@ -28,10 +29,15 @@ public class ExpedienteController {
     private final ExpedienteService expedienteService;
     private final UsuarioService usuarioService;
     private final DocumentoService documentoService;
+    private final ClienteService clienteService;
 
 
     @GetMapping
-    public String listarExpedientes(Authentication authentication, Model model) {
+    public String listarExpedientes(Authentication authentication, Model model,
+                                    @RequestParam(required = false) EstadoExpediente estado,
+                                    @RequestParam (required = false)Long tipoTramiteId,
+                                    @RequestParam (required = false) String matricula,
+                                    @RequestParam (required = false) Long clienteId){
 
         String email = authentication.getName();
 
@@ -41,6 +47,13 @@ public class ExpedienteController {
 
         if (usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN) {
             expedientes = expedienteService.listarTodos();
+            model.addAttribute("clientes", clienteService.listarTodos());
+            if (clienteId !=null ){
+                expedientes = expedientes.stream()
+                        .filter(e -> e.getCliente() != null && e.getCliente().getId().equals(clienteId))
+                        .toList();
+                model.addAttribute("clienteSeleccionado", clienteId);
+            }
         } else {
 
             if (usuarioLogueado.getCliente() == null) {
@@ -50,9 +63,39 @@ public class ExpedienteController {
             }
 
         }
+        if (estado != null) {
+            expedientes = expedientes.stream()
+                    .filter(e -> e.getEstadoExpediente() == estado)
+                    .toList();
+        }
+        if (tipoTramiteId != null) {
+            expedientes = expedientes.stream()
+                    .filter(e -> e.getTipoTramite() != null && e.getTipoTramite().getId().equals(tipoTramiteId))
+                    .toList();
+        }
+        if (matricula != null) {
+            String matriculaBusqueda = matricula.trim();
 
+            if (!matriculaBusqueda.isEmpty()) {
+                expedientes = expedientes.stream()
+                        .filter(e -> e.getMatricula() != null &&
+                                e.getMatricula().toLowerCase().contains(matriculaBusqueda.toLowerCase()))
+                        .toList();
+            }
+        }
+        boolean hayFiltrosActivos =
+                estado != null
+                        || tipoTramiteId != null|| clienteId != null
+                        || (matricula != null && !matricula.trim().isEmpty());
+
+        model.addAttribute("hayFiltrosActivos", hayFiltrosActivos);
         model.addAttribute("expedientes", expedientes);
         model.addAttribute("usuarioLogueado", usuarioLogueado);
+        model.addAttribute("estadosExpediente", EstadoExpediente.values());
+        model.addAttribute("estadoSeleccionado", estado);
+        model.addAttribute("tipoTramiteIdSeleccionado", tipoTramiteId);
+        model.addAttribute("matriculaSeleccionada", matricula);
+
 
 
         if (usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN) {
@@ -90,8 +133,8 @@ public class ExpedienteController {
         model.addAttribute("expediente", expediente);
         model.addAttribute("documentos", documentos);
         model.addAttribute("usuarioLogueado", usuarioLogueado);
-        model.addAttribute("titulo", "Mis expedientes");
-        model.addAttribute("subtitulo", "Gestiona y consulta tus expedientes");
+        model.addAttribute("titulo", "Detalle Expediente");
+        model.addAttribute("subtitulo", "Datos del expediente y documentos asociados");
         model.addAttribute("tiposDocumento", TipoDocumento.values());
 
 

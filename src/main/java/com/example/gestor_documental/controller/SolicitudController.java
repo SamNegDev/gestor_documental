@@ -6,8 +6,11 @@ import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.TipoTramite;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.SolicitudService;
+import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -27,9 +30,15 @@ public class SolicitudController {
 
     private final UsuarioService usuarioService;
     private final SolicitudService solicitudService;
+    private final TipoTramiteService tipoTramiteService;
+    private final ClienteService clienteService;
 
     @GetMapping
-    public String listarSolicitudes(Authentication authentication, Model model, @RequestParam(required = false) EstadoSolicitud estado) {
+    public String listarSolicitudes(Authentication authentication, Model model,
+                                    @RequestParam(required = false) EstadoSolicitud estado,
+                                    @RequestParam (required = false)Long tipoTramiteId,
+                                    @RequestParam (required = false) String matricula,
+                                    @RequestParam (required = false) Long clienteId) {
         String email = authentication.getName();
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(email);
 
@@ -37,6 +46,14 @@ public class SolicitudController {
 
         if (usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN) {
             solicitudes = solicitudService.listarTodas();
+            model.addAttribute("clientes", clienteService.listarTodos());
+
+            if (clienteId !=null ){
+                solicitudes = solicitudes.stream()
+                        .filter(s -> s.getCliente() != null && s.getCliente().getId().equals(clienteId))
+                        .toList();
+                model.addAttribute("clienteSeleccionado", clienteId);
+            }
         } else {
 
             if (usuarioLogueado.getCliente() == null) {
@@ -50,9 +67,35 @@ public class SolicitudController {
                     .filter(s -> s.getEstadoSolicitud() == estado)
                     .toList();
         }
+        if (tipoTramiteId != null) {
+            solicitudes = solicitudes.stream()
+                    .filter(s -> s.getTipoTramite() != null && s.getTipoTramite().getId().equals(tipoTramiteId))
+                    .toList();
+        }
+        if (matricula != null) {
+            String matriculaBusqueda = matricula.trim();
 
+            if (!matriculaBusqueda.isEmpty()) {
+                solicitudes = solicitudes.stream()
+                        .filter(s -> s.getMatricula() != null &&
+                                s.getMatricula().toLowerCase().contains(matriculaBusqueda.toLowerCase()))
+                        .toList();
+            }
+        }
+        boolean hayFiltrosActivos =
+                estado != null
+                        || tipoTramiteId != null|| clienteId != null
+                        || (matricula != null && !matricula.trim().isEmpty());
+
+        model.addAttribute("hayFiltrosActivos", hayFiltrosActivos);
         model.addAttribute("solicitudes", solicitudes);
+        model.addAttribute("estadosSolicitud", EstadoSolicitud.values());
+        model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
         model.addAttribute("usuarioLogueado", usuarioLogueado);
+        model.addAttribute("hayFiltrosActivos", hayFiltrosActivos);
+        model.addAttribute("estadoSeleccionado", estado);
+        model.addAttribute("tipoTramiteIdSeleccionado", tipoTramiteId);
+        model.addAttribute("matriculaSeleccionada", matricula);
         model.addAttribute("titulo", "Solicitudes");
 
         if (usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN) {
