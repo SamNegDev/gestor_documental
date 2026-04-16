@@ -18,22 +18,22 @@
 
         <div>
         <span th:if="${solicitud.estadoSolicitud.name() == 'PENDIENTE_REVISION'}"
-              class="badge rounded-pill text-bg-warning">
+              class="badge rounded-pill text-bg-warning fs-5 py-2 px-4 shadow-sm border border-warning">
           Pendiente de revisión
         </span>
 
           <span th:if="${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'}"
-                class="badge rounded-pill text-bg-info">
+                class="badge rounded-pill text-bg-danger fs-5 py-2 px-4 shadow-sm border border-danger">
           Pendiente de documentación
         </span>
 
           <span th:if="${solicitud.estadoSolicitud.name() == 'CONVERTIDA'}"
-                class="badge rounded-pill text-bg-success">
+                class="badge rounded-pill text-bg-success fs-5 py-2 px-4 shadow-sm">
           Convertida
         </span>
 
           <span th:if="${solicitud.estadoSolicitud.name() == 'RECHAZADO'}"
-                class="badge rounded-pill text-bg-danger">
+                class="badge rounded-pill text-bg-dark fs-5 py-2 px-4 shadow-sm">
           Rechazada
         </span>
         </div>
@@ -63,9 +63,14 @@
               onsubmit="return confirm('¿Seguro que quieres rechazar esta solicitud?');">
           <input type="hidden" name="nuevoEstado" value="RECHAZADO">
           <button type="submit" class="btn btn-outline-danger">
-            Rechazar
+            Rechazar directa
           </button>
         </form>
+
+        <!-- Botón que activa modal de incidencia -->
+        <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#incidenciaModal">
+          Marcar Incidencia
+        </button>
       </div>
 
       <div class="d-flex flex-wrap gap-2"
@@ -91,12 +96,51 @@
            class="alert alert-light border mt-3 mb-0">
         Esta solicitud ha sido rechazada y ya no admite conversión.
       </div>
+
+      <!-- Modal de Incidencia -->
+      <div class="modal fade" id="incidenciaModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <form th:action="@{/incidencias/solicitud/{id}/crear(id=${solicitud.id})}" method="post">
+              <div class="modal-header">
+                <h5 class="modal-title">Levantar Incidencia</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                  <div class="mb-3">
+                    <label class="form-label">Tipo de incidencia</label>
+                    <select name="tipoIncidenciaId" class="form-select" required>
+                      <option value="">Seleccione el tipo exacto...</option>
+                      <option th:each="tipo : ${tiposIncidencia}" th:value="${tipo.id}" th:text="${tipo.nombre + ' - ' + tipo.descripcion}"></option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Observaciones</label>
+                    <textarea name="observaciones" class="form-control" rows="3" maxlength="500" required></textarea>
+                  </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-danger">Confirmar Incidencia</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <div sec:authorize="hasRole('CLIENTE')"
        th:if="${solicitud.estadoSolicitud.name() == 'PENDIENTE_REVISION' or solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'}"
-       class="mb-3 d-flex justify-content-end">
+       class="mb-3 d-flex justify-content-end gap-2">
+
+    <form th:if="${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'}" 
+          th:action="@{/incidencias/solicitud/{id}/solicitar-revision(id=${solicitud.id})}" method="post">
+        <button type="submit" class="btn btn-success">
+           Solicitar nueva revisión
+        </button>
+    </form>
+
     <a th:href="@{/cliente/solicitudes/{id}/editar(id=${solicitud.id})}" class="btn btn-primary">
        Editar solicitud
     </a>
@@ -108,7 +152,20 @@
 
       <div class="info-grid">
         <div class="info-item">
-          <div class="info-label">ID</div>
+          <div class="info-label mb-2">Matrícula</div>
+          <div class="info-value">
+              <div class="d-inline-flex align-items-center border border-2 border-dark rounded overflow-hidden shadow-sm">
+                  <div class="bg-primary text-white d-flex flex-column justify-content-between px-2 py-1 h-100" style="min-width: 40px; font-size: 0.7rem;">
+                      <i class="bi bi-stars text-warning mx-auto"></i>
+                      <strong class="mx-auto mt-1">E</strong>
+                  </div>
+                  <div class="bg-white text-dark fw-bold px-4 py-2 fs-3 h-100 font-monospace text-uppercase" style="letter-spacing: 4px;" th:text="${solicitud.matricula}"></div>
+              </div>
+          </div>
+        </div>
+
+        <div class="info-item">
+          <div class="info-label">ID Solicitud</div>
           <div class="info-value" th:text="${solicitud.id}"></div>
         </div>
 
@@ -138,17 +195,7 @@
     </div>
   </div>
 
-  <div class="card soft-card mb-4">
-    <div class="card-body">
-      <h2 class="section-title">Datos del vehículo</h2>
 
-      <div class="info-item">
-        <div class="info-label">Matrícula</div>
-        <div class="info-value" th:text="${solicitud.matricula}"></div>
-      </div>
-
-    </div>
-  </div>
   <div class="card soft-card mb-4">
     <div class="card-body">
       <h2 class="section-title">Interesados</h2>
@@ -180,6 +227,55 @@
       <div th:if="${(solicitud.interesado1Dni == null or #strings.isEmpty(solicitud.interesado1Dni))
                      and (solicitud.interesado2Dni == null or #strings.isEmpty(solicitud.interesado2Dni))}">
         <p class="text-muted mb-0">No hay interesados registrados.</p>
+      </div>
+    </div>
+  </div>
+
+  <div th:if="${incidencias != null and !incidencias.isEmpty()}" 
+       th:with="hayAbiertas=${incidencias.?[resuelta == false].size() > 0}"
+       class="card mb-4 shadow"
+       th:classappend="${hayAbiertas ? 'border-danger border-2 text-danger' : 'border-success border-2'}">
+       
+      <div class="card-header d-flex align-items-center gap-2 py-3" 
+           th:classappend="${hayAbiertas ? 'bg-danger text-white' : 'bg-success text-white'}">
+          <i class="fs-5" th:classappend="${hayAbiertas ? 'bi bi-exclamation-triangle-fill' : 'bi bi-check-circle-fill'}"></i>
+          <h2 class="section-title m-0 pb-0 border-0 text-white">Registro de Incidencias</h2>
+      </div>
+    <div class="card-body">
+      
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Observaciones</th>
+              <th>Firmas</th>
+              <th>Estado</th>
+              <th sec:authorize="hasRole('ADMIN')">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr th:each="incidencia : ${incidencias}">
+              <td th:text="${#temporals.format(incidencia.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></td>
+              <td th:text="${incidencia.tipoIncidencia.nombre}"></td>
+              <td th:text="${incidencia.observaciones}"></td>
+              <td>
+                  <div><small class="text-muted"><i class="bi bi-person-badge"></i> Abierta por: <strong th:text="${incidencia.creadoPor != null ? incidencia.creadoPor.nombre : 'Sistema'}"></strong></small></div>
+                  <div th:if="${incidencia.resuelta}"><small class="text-success"><i class="bi bi-check-circle"></i> Resuelta por: <strong th:text="${incidencia.resueltoPor != null ? incidencia.resueltoPor.nombre : 'Usuario'}"></strong></small></div>
+              </td>
+              <td>
+                <span th:if="${incidencia.resuelta}" class="badge bg-success">Resuelta</span>
+                <span th:if="${!incidencia.resuelta}" class="badge bg-danger">Abierta</span>
+              </td>
+              <td sec:authorize="hasRole('ADMIN')">
+                  <form th:if="${!incidencia.resuelta}" th:action="@{/incidencias/{id}/resolver(id=${incidencia.id})}" method="post" onsubmit="return confirm('¿Marcar incidencia como resuelta manualmente?');">
+                      <button type="submit" class="btn btn-sm btn-outline-success">Resolver</button>
+                  </form>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

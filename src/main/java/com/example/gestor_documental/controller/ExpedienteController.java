@@ -20,6 +20,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
+import com.example.gestor_documental.model.Incidencia;
+import com.example.gestor_documental.service.TipoIncidenciaService;
+import com.example.gestor_documental.service.IncidenciaService;
 
 @Controller
 @RequiredArgsConstructor
@@ -30,14 +33,15 @@ public class ExpedienteController {
     private final UsuarioService usuarioService;
     private final DocumentoService documentoService;
     private final ClienteService clienteService;
-
+    private final TipoIncidenciaService tipoIncidenciaService;
+    private final IncidenciaService incidenciaService;
 
     @GetMapping
     public String listarExpedientes(Authentication authentication, Model model,
-                                    @RequestParam(required = false) EstadoExpediente estado,
-                                    @RequestParam (required = false)Long tipoTramiteId,
-                                    @RequestParam (required = false) String matricula,
-                                    @RequestParam (required = false) Long clienteId){
+            @RequestParam(required = false) EstadoExpediente estado,
+            @RequestParam(required = false) Long tipoTramiteId,
+            @RequestParam(required = false) String matricula,
+            @RequestParam(required = false) Long clienteId) {
 
         String email = authentication.getName();
 
@@ -48,7 +52,7 @@ public class ExpedienteController {
         if (usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN) {
             expedientes = expedienteService.listarTodos();
             model.addAttribute("clientes", clienteService.listarTodos());
-            if (clienteId !=null ){
+            if (clienteId != null) {
                 expedientes = expedientes.stream()
                         .filter(e -> e.getCliente() != null && e.getCliente().getId().equals(clienteId))
                         .toList();
@@ -83,10 +87,9 @@ public class ExpedienteController {
                         .toList();
             }
         }
-        boolean hayFiltrosActivos =
-                estado != null
-                        || tipoTramiteId != null|| clienteId != null
-                        || (matricula != null && !matricula.trim().isEmpty());
+        boolean hayFiltrosActivos = estado != null
+                || tipoTramiteId != null || clienteId != null
+                || (matricula != null && !matricula.trim().isEmpty());
 
         model.addAttribute("hayFiltrosActivos", hayFiltrosActivos);
         model.addAttribute("expedientes", expedientes);
@@ -95,8 +98,6 @@ public class ExpedienteController {
         model.addAttribute("estadoSeleccionado", estado);
         model.addAttribute("tipoTramiteIdSeleccionado", tipoTramiteId);
         model.addAttribute("matriculaSeleccionada", matricula);
-
-
 
         if (usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN) {
             model.addAttribute("titulo", "Listado Expedientes");
@@ -126,27 +127,27 @@ public class ExpedienteController {
             throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
         }
 
-
         List<Documento> documentos = documentoService.listarPorExpediente(id);
 
+        List<Incidencia> incidencias = incidenciaService.listarPorExpediente(id);
 
         model.addAttribute("expediente", expediente);
         model.addAttribute("documentos", documentos);
+        model.addAttribute("incidencias", incidencias);
+        model.addAttribute("tiposIncidencia", tipoIncidenciaService.listarTodosActivos());
         model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("titulo", "Detalle Expediente");
         model.addAttribute("subtitulo", "Datos del expediente y documentos asociados");
         model.addAttribute("tiposDocumento", TipoDocumento.values());
 
-
         return "expedientes/detalle";
     }
 
-
     @PostMapping("/{id}/estado")
     public String cambiarEstadoExpediente(@PathVariable Long id,
-                                          @RequestParam EstadoExpediente nuevoEstado,
-                                          Authentication authentication,
-                                          RedirectAttributes redirectAttributes) {
+            @RequestParam EstadoExpediente nuevoEstado,
+            Authentication authentication,
+            RedirectAttributes redirectAttributes) {
 
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 

@@ -37,15 +37,36 @@ public class Incidencia {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "resuelto_por_usuario_id")
-    private Usuario usuario;
+    private Usuario resueltoPor;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "creado_por_usuario_id")
+    private Usuario creadoPor;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "expediente_id")
     private Expediente expediente;
 
-    public Incidencia(TipoIncidencia tipoIncidencia, Expediente expediente) {
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "solicitud_id")
+    private Solicitud solicitud;
+
+    @Column(length = 500)
+    private String observaciones;
+
+    public Incidencia(TipoIncidencia tipoIncidencia, Expediente expediente, String observaciones, Usuario creadoPor) {
         this.tipoIncidencia = tipoIncidencia;
         this.expediente = expediente;
+        this.observaciones = observaciones;
+        this.creadoPor = creadoPor;
+        this.resuelta = false;
+    }
+
+    public Incidencia(TipoIncidencia tipoIncidencia, Solicitud solicitud, String observaciones, Usuario creadoPor) {
+        this.tipoIncidencia = tipoIncidencia;
+        this.solicitud = solicitud;
+        this.observaciones = observaciones;
+        this.creadoPor = creadoPor;
         this.resuelta = false;
     }
 }

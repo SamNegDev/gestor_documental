@@ -20,6 +20,9 @@ import com.example.gestor_documental.model.Solicitud;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
+import com.example.gestor_documental.model.Incidencia;
+import com.example.gestor_documental.service.TipoIncidenciaService;
+import com.example.gestor_documental.service.IncidenciaService;
 
 @Controller
 @RequiredArgsConstructor
@@ -31,6 +34,8 @@ public class SolicitudController {
     private final SolicitudService solicitudService;
     private final TipoTramiteService tipoTramiteService;
     private final ClienteService clienteService;
+    private final TipoIncidenciaService tipoIncidenciaService;
+    private final IncidenciaService incidenciaService;
 
     @GetMapping
     public String listarSolicitudes(Authentication authentication, Model model,
@@ -123,7 +128,11 @@ public class SolicitudController {
             throw new AccesoDenegadoException("No tienes permiso para acceder a esta solicitud");
         }
 
+        List<Incidencia> incidencias = incidenciaService.listarPorSolicitud(id);
+
         model.addAttribute("solicitud", solicitud);
+        model.addAttribute("incidencias", incidencias);
+        model.addAttribute("tiposIncidencia", tipoIncidenciaService.listarTodosActivos());
         model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("titulo", "Solicitud de Expediente");
         model.addAttribute("subtitulo", "Detalle de Solicitud de Expediente");
