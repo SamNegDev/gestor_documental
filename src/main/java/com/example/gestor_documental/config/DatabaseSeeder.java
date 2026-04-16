@@ -29,5 +29,18 @@ public class DatabaseSeeder implements CommandLineRunner {
             tipoIncidenciaRepository.saveAll(incidencias);
             System.out.println("Base de datos inicializada: Se insertaron " + incidencias.size() + " registros base para TipoIncidencia.");
         }
+
+        // Add the new state if it hasn't been added yet
+        boolean existsPendiente = false;
+        for (TipoIncidencia ti : tipoIncidenciaRepository.findAll()) {
+            if (ti.getNombre() == TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION) {
+                existsPendiente = true;
+                break;
+            }
+        }
+        if (!existsPendiente) {
+            tipoIncidenciaRepository.save(new TipoIncidencia(TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION, "Falta documentación necesaria u obligatoria para el trámite.", true));
+            System.out.println("Se insertó el nuevo TipoIncidencia: PENDIENTE_DOCUMENTACION");
+        }
     }
 }

@@ -11,6 +11,7 @@ import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
+import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.SolicitudService;
@@ -30,6 +31,7 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final ExpedienteRepository expedienteRepository;
     private final ExpedienteService expedienteService;
     private final DocumentoRepository documentoRepository;
+    private final IncidenciaRepository incidenciaRepository;
 
     @Override
     public List<Solicitud> listarTodas() {
@@ -250,6 +252,14 @@ public class SolicitudServiceImpl implements SolicitudService {
 
         if (solicitud.getExpediente() != null) {
             throw new OperacionInvalidaException("La solicitud ya tiene un expediente asociado");
+        }
+
+        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.REVISANDO_INCIDENCIAS 
+            && nuevoEstado == EstadoSolicitud.PENDIENTE_REVISION) {
+            long incidenciasActivas = incidenciaRepository.findBySolicitudIdAndResueltaFalse(solicitud.getId()).size();
+            if (incidenciasActivas > 0) {
+                throw new OperacionInvalidaException("No se puede volver a revisión una solicitud con incidencias activas sin resolver.");
+            }
         }
 
         solicitud.setEstadoSolicitud(nuevoEstado);

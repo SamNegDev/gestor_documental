@@ -108,7 +108,8 @@
                                   th:text="${expediente.estadoExpediente}"
                                   th:classappend="${expediente.estadoExpediente.name() == 'EN_TRAMITE'} ? ' badge-tramite' :
                                                   (${expediente.estadoExpediente.name() == 'FINALIZADO'} ? ' badge-finalizado' :
-                                                  (${expediente.estadoExpediente.name() == 'INCIDENCIA'} ? ' badge-incidencia' : ' badge-revision'))">
+                                                  (${expediente.estadoExpediente.name() == 'REVISANDO_INCIDENCIAS'} ? ' badge-info' :
+                                              (${expediente.estadoExpediente.name() == 'INCIDENCIA'} ? ' badge-incidencia' : ' badge-revision')))">
                             </span>
                         </td>
                         <td th:text="${#temporals.format(expediente.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></td>

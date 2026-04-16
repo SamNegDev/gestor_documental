@@ -9,6 +9,7 @@ import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
+import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.InteresadoService;
@@ -29,6 +30,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
     private final ClienteService clienteService;
     private final TipoTramiteService tipoTramiteService;
+    private final IncidenciaRepository incidenciaRepository;
 
     @Override
     public List<Expediente> listarTodos() {
@@ -157,6 +159,15 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         }
         if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
             throw new OperacionInvalidaException("No se puede modificar un expediente finalizado");
+        }
+
+        if (expediente.getEstadoExpediente() == EstadoExpediente.REVISANDO_INCIDENCIAS 
+            && nuevoEstado == EstadoExpediente.EN_TRAMITE) {
+            
+            long incidenciasActivas = incidenciaRepository.findByExpedienteIdAndResueltaFalse(expediente.getId()).size();
+            if (incidenciasActivas > 0) {
+                throw new OperacionInvalidaException("No se puede poner en trámite un expediente con incidencias activas sin resolver.");
+            }
         }
 
         expediente.setEstadoExpediente(nuevoEstado);

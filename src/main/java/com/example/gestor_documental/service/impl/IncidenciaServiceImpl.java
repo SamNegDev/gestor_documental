@@ -95,20 +95,10 @@ public class IncidenciaServiceImpl implements IncidenciaService {
             throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
         }
 
-        List<Incidencia> activas = incidenciaRepository.findByExpedienteIdAndResueltaFalse(expediente.getId());
-        for (Incidencia i : activas) {
-            i.setResuelta(true);
-            i.setFechaResolucion(LocalDateTime.now());
-            i.setResueltoPor(cliente);
-        }
-        incidenciaRepository.saveAll(activas);
-
         if (expediente.getEstadoExpediente() == EstadoExpediente.INCIDENCIA) {
             // El propio administrador lo marca EN_TRAMITE manualmente si necesita o aqui?
-            // Aquí lo está mandando el cliente, entonces un ADMIN no tiene que usar cambiarEstado (como es admin only en Service).
-            // ¡Espera! El metodo cambiarEstado de expedienteService exige ser ADMIN.
-            // Asi que lo hacemos manualmente en el objeto:
-            expediente.setEstadoExpediente(EstadoExpediente.EN_TRAMITE);
+            // Aquí lo está mandando el cliente tras subir documentación, marcamos como revisión de incidencias.
+            expediente.setEstadoExpediente(EstadoExpediente.REVISANDO_INCIDENCIAS);
             expedienteService.guardar(expediente);
         }
     }
@@ -123,17 +113,8 @@ public class IncidenciaServiceImpl implements IncidenciaService {
             throw new AccesoDenegadoException("No tienes permiso sobre esta solicitud");
         }
 
-        List<Incidencia> activas = incidenciaRepository.findBySolicitudIdAndResueltaFalse(solicitud.getId());
-        for (Incidencia i : activas) {
-            i.setResuelta(true);
-            i.setFechaResolucion(LocalDateTime.now());
-            i.setResueltoPor(cliente);
-        }
-        incidenciaRepository.saveAll(activas);
-
         if (solicitud.getEstadoSolicitud() == EstadoSolicitud.PENDIENTE_DOCUMENTACION) {
-            // Al igual que con expediente, actualizarlo directamente puesto que cambiarEstado exige ADMIN a veces
-            solicitud.setEstadoSolicitud(EstadoSolicitud.PENDIENTE_REVISION);
+            solicitud.setEstadoSolicitud(EstadoSolicitud.REVISANDO_INCIDENCIAS);
             solicitudService.guardar(solicitud);
         }
     }

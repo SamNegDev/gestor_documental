@@ -27,6 +27,11 @@
           Pendiente de documentación
         </span>
 
+          <span th:if="${solicitud.estadoSolicitud.name() == 'REVISANDO_INCIDENCIAS'}"
+                class="badge rounded-pill text-bg-info fs-5 py-2 px-4 shadow-sm border border-info">
+          Revisando Incidencias
+        </span>
+
           <span th:if="${solicitud.estadoSolicitud.name() == 'CONVERTIDA'}"
                 class="badge rounded-pill text-bg-success fs-5 py-2 px-4 shadow-sm">
           Convertida
@@ -131,7 +136,7 @@
   </div>
 
   <div sec:authorize="hasRole('CLIENTE')"
-       th:if="${solicitud.estadoSolicitud.name() == 'PENDIENTE_REVISION' or solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'}"
+       th:if="${solicitud.estadoSolicitud.name() == 'PENDIENTE_REVISION' or solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION' or solicitud.estadoSolicitud.name() == 'REVISANDO_INCIDENCIAS'}"
        class="mb-3 d-flex justify-content-end gap-2">
 
     <form th:if="${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'}" 
@@ -176,7 +181,8 @@
                               th:text="${solicitud.estadoSolicitud}"
                               th:classappend="${solicitud.estadoSolicitud.name() == 'PENDIENTE_REVISION'} ? ' badge-pendiente-revision' :
                                               (${solicitud.estadoSolicitud.name() == 'CONVERTIDA'} ? ' badge-convertida' :
-                                              (${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'} ? ' badge-incidencia' : ' badge-revision'))">
+                                              (${solicitud.estadoSolicitud.name() == 'REVISANDO_INCIDENCIAS'} ? ' badge-info' :
+                                              (${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'} ? ' badge-incidencia' : ' badge-revision')))">
                         </span>
           </div>
         </div>
