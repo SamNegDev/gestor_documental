@@ -21,6 +21,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
 import com.example.gestor_documental.model.Incidencia;
+import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.TipoIncidenciaService;
 import com.example.gestor_documental.service.IncidenciaService;
 
@@ -36,6 +37,7 @@ public class SolicitudController {
     private final ClienteService clienteService;
     private final TipoIncidenciaService tipoIncidenciaService;
     private final IncidenciaService incidenciaService;
+    private final HistorialCambioService historialCambioService;
 
     @GetMapping
     public String listarSolicitudes(Authentication authentication, Model model,
@@ -129,6 +131,8 @@ public class SolicitudController {
         }
 
         List<Incidencia> incidencias = incidenciaService.listarPorSolicitud(id);
+        
+        model.addAttribute("historialCambios", historialCambioService.listarPorSolicitud(id));
 
         model.addAttribute("solicitud", solicitud);
         model.addAttribute("incidencias", incidencias);

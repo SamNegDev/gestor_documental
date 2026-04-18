@@ -12,6 +12,7 @@ import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     private final ClienteService clienteService;
     private final TipoTramiteService tipoTramiteService;
     private final IncidenciaRepository incidenciaRepository;
+    private final HistorialCambioService historialCambioService;
 
     @Override
     public List<Expediente> listarTodos() {
@@ -68,7 +70,8 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
             return true;
         }
-        //Si el usuarioLogueado/expediente no tiene cliente asignado se deniega el acceso ya que no podemos comprobar de quien es
+        // Si el usuarioLogueado/expediente no tiene cliente asignado se deniega el
+        // acceso ya que no podemos comprobar de quien es
         if (usuario.getCliente() == null || expediente.getCliente() == null) {
             return false;
         }
@@ -101,12 +104,10 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         return expedienteRepository.findTop5ByClienteOrderByFechaCreacionDesc(cliente);
     }
 
-
-
     @Override
     public void guardarInteresados(Expediente expediente,
-                                   InteresadoFormDto interesado1,
-                                   InteresadoFormDto interesado2) {
+            InteresadoFormDto interesado1,
+            InteresadoFormDto interesado2) {
 
         guardarInteresadoSiValido(expediente, interesado1);
         guardarInteresadoSiValido(expediente, interesado2);
@@ -151,7 +152,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         Expediente expediente = expedienteRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
 
-        if(!tienePermisoExpediente(expediente,usuarioLogueado)){
+        if (!tienePermisoExpediente(expediente, usuarioLogueado)) {
             throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
         }
         if (usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN) {
@@ -161,20 +162,32 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             throw new OperacionInvalidaException("No se puede modificar un expediente finalizado");
         }
 
-        if (expediente.getEstadoExpediente() == EstadoExpediente.REVISANDO_INCIDENCIAS 
-            && nuevoEstado == EstadoExpediente.EN_TRAMITE) {
-            
-            long incidenciasActivas = incidenciaRepository.findByExpedienteIdAndResueltaFalse(expediente.getId()).size();
+        if (nuevoEstado == EstadoExpediente.EN_TRAMITE || nuevoEstado == EstadoExpediente.FINALIZADO) {
+
+            long incidenciasActivas = incidenciaRepository.findByExpedienteIdAndResueltaFalse(expediente.getId())
+                    .size();
             if (incidenciasActivas > 0) {
-                throw new OperacionInvalidaException("No se puede poner en trámite un expediente con incidencias activas sin resolver.");
+                throw new OperacionInvalidaException(
+                        "No se puede poner en trámite o finalizar un expediente con incidencias activas sin resolver.");
             }
+        }
+
+        EstadoExpediente estadoAnterior = expediente.getEstadoExpediente();
+
+        if (estadoAnterior == nuevoEstado) {
+            return;
         }
 
         expediente.setEstadoExpediente(nuevoEstado);
 
         expedienteRepository.save(expediente);
-    }
 
+        historialCambioService.registrarCambioExpediente(
+                expediente,
+                usuarioLogueado,
+                "CAMBIO ESTADO",
+                "El estado cambió de '" + estadoAnterior.name() + "' a '" + nuevoEstado.name() + "'");
+    }
 
     private boolean interesadoValido(InteresadoFormDto dto) {
         return dto != null
@@ -182,12 +195,14 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 && dto.getDni() != null && !dto.getDni().isBlank()
                 && dto.getRol() != null;
     }
+
     private boolean interesadoVacio(InteresadoFormDto dto) {
         return dto == null
                 || ((dto.getNombre() == null || dto.getNombre().isBlank())
-                && (dto.getDni() == null || dto.getDni().isBlank())
-                && dto.getRol() == null);
+                        && (dto.getDni() == null || dto.getDni().isBlank())
+                        && dto.getRol() == null);
     }
+
     private void validarInteresado(InteresadoFormDto dto, String nombreInteresado) {
         if (interesadoVacio(dto)) {
             return;
@@ -197,6 +212,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             throw new IllegalArgumentException(nombreInteresado + " está incompleto. Debe tener nombre, DNI y rol.");
         }
     }
+
     public void validarInteresados(InteresadoFormDto interesado1, InteresadoFormDto interesado2) {
         validarInteresado(interesado1, "Interesado 1");
         validarInteresado(interesado2, "Interesado 2");
@@ -207,14 +223,15 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             }
         }
     }
+
     @Override
     @Transactional
     public Expediente crearExpedienteCompleto(Expediente expediente,
-                                              Usuario usuarioLogueado,
-                                              Long clienteId,
-                                              Long tipoTramiteId,
-                                              InteresadoFormDto interesado1,
-                                              InteresadoFormDto interesado2) {
+            Usuario usuarioLogueado,
+            Long clienteId,
+            Long tipoTramiteId,
+            InteresadoFormDto interesado1,
+            InteresadoFormDto interesado2) {
 
         validarInteresados(interesado1, interesado2);
 
@@ -226,23 +243,28 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         expediente.setEstadoExpediente(EstadoExpediente.EN_TRAMITE);
         expediente.setCreadoPor(usuarioLogueado);
 
-
         Expediente expedienteGuardado = expedienteRepository.save(expediente);
 
         guardarInteresadoSiValido(expedienteGuardado, interesado1);
         guardarInteresadoSiValido(expedienteGuardado, interesado2);
-        
+
+        historialCambioService.registrarCambioExpediente(
+                expedienteGuardado,
+                usuarioLogueado,
+                "CREACIÓN DIRECTA",
+                "Expediente inicializado con el trámite " + tipoTramite.getNombre());
+
         return expedienteGuardado;
     }
 
     @Override
     @Transactional
     public Expediente actualizarExpediente(Long id, Expediente expedienteActualizado,
-                                              Usuario usuarioLogueado,
-                                              Long clienteId,
-                                              Long tipoTramiteId,
-                                              InteresadoFormDto interesado1,
-                                              InteresadoFormDto interesado2) {
+            Usuario usuarioLogueado,
+            Long clienteId,
+            Long tipoTramiteId,
+            InteresadoFormDto interesado1,
+            InteresadoFormDto interesado2) {
 
         Expediente expedienteBase = expedienteRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
@@ -257,8 +279,15 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
         validarInteresados(interesado1, interesado2);
 
-        Cliente cliente = clienteService.buscarPorId(clienteId).orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado"));
-        TipoTramite tipoTramite = tipoTramiteService.buscarPorId(tipoTramiteId).orElseThrow(() -> new RecursoNoEncontradoException("Tipo de trámite no encontrado"));
+        Cliente cliente = clienteService.buscarPorId(clienteId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado"));
+        TipoTramite tipoTramite = tipoTramiteService.buscarPorId(tipoTramiteId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Tipo de trámite no encontrado"));
+
+        String matriculaAnterior = expedienteBase.getMatricula();
+        String obsAnterior = expedienteBase.getObservaciones();
+        Long tipoTramiteAnterior = expedienteBase.getTipoTramite() != null ? expedienteBase.getTipoTramite().getId()
+                : null;
 
         expedienteBase.setCliente(cliente);
         expedienteBase.setTipoTramite(tipoTramite);
@@ -267,14 +296,33 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
         // Limpiar asociaciones previas
         expedienteInteresadoRepository.deleteByExpedienteId(expedienteBase.getId());
-        
-        // Es necesario hacer el flush/clear o sencillamente como es LAZY en expediente.getInteresados() no importa si no se lee en esta transaccion.
+
+        // Es necesario hacer el flush/clear o sencillamente como es LAZY en
+        // expediente.getInteresados() no importa si no se lee en esta transaccion.
         // Pero para asegurar, simplemente lo guardamos despues.
 
         Expediente expedienteGuardado = expedienteRepository.save(expedienteBase);
 
         guardarInteresadoSiValido(expedienteGuardado, interesado1);
         guardarInteresadoSiValido(expedienteGuardado, interesado2);
+
+        java.util.List<String> cambios = new java.util.ArrayList<>();
+        if (!java.util.Objects.equals(matriculaAnterior, expedienteActualizado.getMatricula())) {
+            cambios.add("Matrícula");
+        }
+        if (!java.util.Objects.equals(obsAnterior, expedienteActualizado.getObservaciones())) {
+            cambios.add("Observaciones");
+        }
+        if (!java.util.Objects.equals(tipoTramiteAnterior, tipoTramite.getId())) {
+            cambios.add("Tipo de trámite (" + tipoTramite.getNombre() + ")");
+        }
+
+        historialCambioService.registrarCambioExpediente(
+                expedienteGuardado,
+                usuarioLogueado,
+                "EDICIÓN",
+                cambios.isEmpty() ? "Se editaron interesados u otros datos del expediente."
+                        : "Se modificaron los campos: " + String.join(", ", cambios));
 
         return expedienteGuardado;
     }

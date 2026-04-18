@@ -23,6 +23,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
     private final ExpedienteService expedienteService;
     private final SolicitudService solicitudService;
     private final TipoIncidenciaService tipoIncidenciaService;
+    private final HistorialCambioService historialCambioService;
 
     @Override
     public List<Incidencia> listarPorExpediente(Long expedienteId) {
@@ -56,6 +57,13 @@ public class IncidenciaServiceImpl implements IncidenciaService {
 
         // Cambiamos el estado a INCIDENCIA automáticamente
         expedienteService.cambiarEstado(expedienteId, EstadoExpediente.INCIDENCIA, admin);
+        
+        historialCambioService.registrarCambioExpediente(
+                expediente, 
+                admin, 
+                "INCIDENCIA", 
+                "Nueva incidencia: " + tipo.getNombre().name() + " - " + observaciones
+        );
 
         return incidencia;
     }
@@ -81,6 +89,13 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         incidenciaRepository.save(incidencia);
 
         solicitudService.cambiarEstadoSolicitud(solicitudId, EstadoSolicitud.PENDIENTE_DOCUMENTACION, admin);
+
+        historialCambioService.registrarCambioSolicitud(
+                solicitud, 
+                admin, 
+                "INCIDENCIA", 
+                "Nueva incidencia: " + tipo.getNombre().name() + " - " + observaciones
+        );
 
         return incidencia;
     }
@@ -137,5 +152,21 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         incidencia.setFechaResolucion(LocalDateTime.now());
         incidencia.setResueltoPor(admin);
         incidenciaRepository.save(incidencia);
+        
+        if (incidencia.getExpediente() != null) {
+            historialCambioService.registrarCambioExpediente(
+                    incidencia.getExpediente(), 
+                    admin, 
+                    "INCIDENCIA RESUELTA", 
+                    "Se resolvió la incidencia: " + incidencia.getTipoIncidencia().getNombre().name()
+            );
+        } else if (incidencia.getSolicitud() != null) {
+            historialCambioService.registrarCambioSolicitud(
+                    incidencia.getSolicitud(), 
+                    admin, 
+                    "INCIDENCIA RESUELTA", 
+                    "Se resolvió la incidencia: " + incidencia.getTipoIncidencia().getNombre().name()
+            );
+        }
     }
 }

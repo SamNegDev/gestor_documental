@@ -207,6 +207,11 @@ body {
     color: #1d4ed8;
 }
 
+.badge-info {
+    background-color: #f3e8ff;
+    color: #7e22ce;
+}
+
 .actions-inline {
     display: flex;
     gap: 0.5rem;

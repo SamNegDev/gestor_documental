@@ -14,6 +14,7 @@ import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final ExpedienteService expedienteService;
     private final DocumentoRepository documentoRepository;
     private final IncidenciaRepository incidenciaRepository;
+    private final HistorialCambioService historialCambioService;
 
     @Override
     public List<Solicitud> listarTodas() {
@@ -113,7 +115,16 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setEstadoSolicitud(EstadoSolicitud.PENDIENTE_REVISION);
         solicitud.setCreadoPor(usuarioLogueado);
 
-        return solicitudRepository.save(solicitud);
+        Solicitud solicitudGuardada = solicitudRepository.save(solicitud);
+        
+        historialCambioService.registrarCambioSolicitud(
+                solicitudGuardada, 
+                usuarioLogueado, 
+                "CREACIÓN DIRECTA", 
+                "Solicitud inicializada con el trámite " + tipoTramite.getNombre()
+        );
+
+        return solicitudGuardada;
     }
 
     private void validarInteresadosSolicitud(Solicitud solicitud) {
@@ -224,6 +235,13 @@ public class SolicitudServiceImpl implements SolicitudService {
 
         expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado1dto);
         expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado2dto);
+        
+        historialCambioService.registrarCambioSolicitud(
+                solicitud, 
+                admin, 
+                "CONVERSIÓN", 
+                "Se ha convertido la solicitud a Expediente #" + expedienteGuardado.getId()
+        );
 
         return expedienteGuardado;
     }
@@ -254,17 +272,28 @@ public class SolicitudServiceImpl implements SolicitudService {
             throw new OperacionInvalidaException("La solicitud ya tiene un expediente asociado");
         }
 
-        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.REVISANDO_INCIDENCIAS 
-            && nuevoEstado == EstadoSolicitud.PENDIENTE_REVISION) {
+        if (nuevoEstado == EstadoSolicitud.PENDIENTE_REVISION) {
             long incidenciasActivas = incidenciaRepository.findBySolicitudIdAndResueltaFalse(solicitud.getId()).size();
             if (incidenciasActivas > 0) {
                 throw new OperacionInvalidaException("No se puede volver a revisión una solicitud con incidencias activas sin resolver.");
             }
         }
+        
+        EstadoSolicitud estadoAnterior = solicitud.getEstadoSolicitud();
+        
+        if (estadoAnterior == nuevoEstado) {
+            return;
+        }
 
         solicitud.setEstadoSolicitud(nuevoEstado);
         solicitudRepository.save(solicitud);
-
+        
+        historialCambioService.registrarCambioSolicitud(
+                solicitud, 
+                usuarioLogueado, 
+                "CAMBIO ESTADO", 
+                "El estado cambió de '" + estadoAnterior.name() + "' a '" + nuevoEstado.name() + "'"
+        );
     }
 
     public void asociarDocumentosSolicitudAExpediente(Solicitud solicitud, Expediente expediente) {
@@ -301,6 +330,9 @@ public class SolicitudServiceImpl implements SolicitudService {
 
         TipoTramite tipoTramite = tipoTramiteService.buscarPorId(tipoTramiteId).orElseThrow(() -> new RecursoNoEncontradoException("Tipo de trámite no encontrado"));
 
+        String matriculaAnterior = solicitudBase.getMatricula();
+        Long tipoTramiteAnterior = solicitudBase.getTipoTramite() != null ? solicitudBase.getTipoTramite().getId() : null;
+
         solicitudBase.setTipoTramite(tipoTramite);
         solicitudBase.setMatricula(solicitudActualizada.getMatricula());
 
@@ -320,7 +352,24 @@ public class SolicitudServiceImpl implements SolicitudService {
 
         solicitudBase.setObservaciones(solicitudActualizada.getObservaciones());
 
-        return solicitudRepository.save(solicitudBase);
+        java.util.List<String> cambios = new java.util.ArrayList<>();
+        if (!java.util.Objects.equals(matriculaAnterior, solicitudActualizada.getMatricula())) {
+            cambios.add("Matrícula");
+        }
+        if (!java.util.Objects.equals(tipoTramiteAnterior, tipoTramite.getId())) {
+            cambios.add("Tipo de trámite (" + tipoTramite.getNombre() + ")");
+        }
+        
+        Solicitud solicitudGuardada = solicitudRepository.save(solicitudBase);
+        
+        historialCambioService.registrarCambioSolicitud(
+                solicitudGuardada, 
+                usuarioLogueado, 
+                "EDICIÓN", 
+                cambios.isEmpty() ? "Se editaron interesados u otros datos." : "Se modificaron los campos: " + String.join(", ", cambios)
+        );
+
+        return solicitudGuardada;
     }
 }
 

@@ -87,41 +87,10 @@
       </form>
     </div>
 
-    <div class="card soft-card mb-4">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-                <div>
-                    <h2 class="section-title mb-1">Información del expediente</h2>
-                    <p class="text-muted mb-0">
-                        Datos generales y trazabilidad del trámite.
-                    </p>
-                </div>
-
-                <div>
-        <span th:if="${expediente.estadoExpediente.name() == 'EN_TRAMITE'}"
-              class="badge rounded-pill bg-warning text-dark fs-5 py-2 px-4 shadow-sm border border-warning">
-          En trámite
-        </span>
-
-         <span th:if="${expediente.estadoExpediente.name() == 'REVISANDO_INCIDENCIAS'}"
-              class="badge rounded-pill bg-info fs-5 py-2 px-4 shadow-sm border border-info">
-          Revisando Incidencias
-        </span>
-
-                    <span th:if="${expediente.estadoExpediente.name() == 'FINALIZADO'}"
-                          class="badge rounded-pill bg-success fs-5 py-2 px-4 shadow-sm">
-          Finalizado
-        </span>
-
-                    <span th:if="${expediente.estadoExpediente.name() == 'INCIDENCIA'}"
-                          class="badge rounded-pill bg-danger fs-5 py-2 px-4 shadow-sm border border-danger">
-          Incidencia
-        </span>
-                </div>
-            </div>
-
-            <div class="row g-3">
-                <div class="col-12 mb-3">
+    <div class="card soft-card mb-4" style="border-left: 4px solid #0d6efd;">
+        <div class="card-body py-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-4">
                     <div class="d-inline-flex align-items-center border border-2 border-dark rounded overflow-hidden shadow-sm">
                         <div class="bg-primary text-white d-flex flex-column justify-content-between px-2 py-1 h-100" style="min-width: 40px; font-size: 0.7rem;">
                             <i class="bi bi-stars text-warning mx-auto"></i>
@@ -129,105 +98,132 @@
                         </div>
                         <div class="bg-white text-dark fw-bold px-4 py-2 fs-3 h-100 font-monospace text-uppercase" style="letter-spacing: 4px;" th:text="${expediente.matricula}"></div>
                     </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div><strong>ID:</strong> <span th:text="${expediente.id}"></span></div>
-                    <div><strong>Tipo de trámite:</strong> <span th:text="${expediente.tipoTramite.nombre}"></span></div>
-                    <div><strong>Cliente:</strong> <span th:text="${expediente.cliente.nombre}"></span></div>
-                </div>
-
-                <div class="col-md-6">
-                    <div>
-                        <strong>Creado por:</strong>
-                        <span th:text="${expediente.creadoPor != null ? expediente.creadoPor.nombre : '-'}"></span>
-                    </div>
-
-                    <div>
-                        <strong>Fecha de creación:</strong>
-                        <span th:text="${#temporals.format(expediente.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></span>
-                    </div>
-
-                    <div>
-                        <strong>Origen:</strong>
-                        <span th:if="${expediente.solicitud != null}">Convertido desde solicitud</span>
-                        <span th:if="${expediente.solicitud == null}">Creación directa</span>
-                    </div>
-
-                    <div th:if="${expediente.solicitud != null}">
-                        <strong>Solicitud origen:</strong>
-                        <a th:href="@{/solicitudes/{id}(id=${expediente.solicitud.id})}"
-                           th:text="${'Solicitud #' + expediente.solicitud.id}">
-                        </a>
+                    
+                    <div sec:authorize="hasRole('ADMIN')" class="d-flex flex-column">
+                        <span class="text-muted small text-uppercase fw-bold" style="font-size: 0.7rem;">Cliente</span>
+                        <span class="fw-bold fs-5" th:text="${expediente.cliente.nombre}"></span>
                     </div>
                 </div>
-            </div>
 
-            <div class="mt-3" th:if="${expediente.observaciones != null and !#strings.isEmpty(expediente.observaciones)}">
-                <strong>Observaciones:</strong>
-                <div class="mt-1 p-3 border rounded bg-light-subtle">
-                    <span th:text="${expediente.observaciones}"></span>
+                <div>
+                    <span th:if="${expediente.estadoExpediente.name() == 'EN_TRAMITE'}"
+                          class="badge rounded-pill bg-warning text-dark fs-5 py-2 px-4 shadow-sm border border-warning">
+                      En trámite
+                    </span>
+                    <span th:if="${expediente.estadoExpediente.name() == 'REVISANDO_INCIDENCIAS'}"
+                          class="badge rounded-pill bg-info fs-5 py-2 px-4 shadow-sm border border-info">
+                      Revisando Incidencias
+                    </span>
+                    <span th:if="${expediente.estadoExpediente.name() == 'FINALIZADO'}"
+                          class="badge rounded-pill bg-success fs-5 py-2 px-4 shadow-sm">
+                      Finalizado
+                    </span>
+                    <span th:if="${expediente.estadoExpediente.name() == 'INCIDENCIA'}"
+                          class="badge rounded-pill bg-danger fs-5 py-2 px-4 shadow-sm border border-danger">
+                      Incidencia
+                    </span>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card soft-card mb-4">
-        <div class="card-body">
-            <h2 class="section-title">Información general</h2>
+    <div class="row mb-4">
+        <div class="col-lg-6 mb-4 mb-lg-0">
+            <div class="card soft-card h-100">
+                <div class="card-body">
+                    <h2 class="section-title">Información general</h2>
+        
+                    <ul class="list-group list-group-flush overflow-y-auto pe-2" style="max-height: 400px;">
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent">
+                            <span class="text-secondary"><i class="bi bi-hash me-2"></i>ID Expediente</span>
+                            <span class="fw-semibold text-dark" th:text="${expediente.id}"></span>
+                        </li>
+        
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent">
+                            <span class="text-secondary"><i class="bi bi-file-earmark-text me-2"></i>Tipo de trámite</span>
+                            <span class="fw-semibold text-dark" th:text="${expediente.tipoTramite.nombre}"></span>
+                        </li>
 
-            <div class="info-grid">
-                <div class="info-item">
-                    <div class="info-label">ID</div>
-                    <div class="info-value" th:text="${expediente.id}"></div>
-                </div>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent">
+                            <span class="text-secondary"><i class="bi bi-person-badge me-2"></i>Creado por</span>
+                            <span class="fw-semibold text-dark" th:text="${expediente.creadoPor != null ? expediente.creadoPor.nombre : '-'}"></span>
+                        </li>
+        
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent">
+                            <span class="text-secondary"><i class="bi bi-calendar3 me-2"></i>Fecha creación</span>
+                            <span class="fw-semibold text-dark"
+                                 th:text="${#temporals.format(expediente.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></span>
+                        </li>
 
-                <div class="info-item">
-                    <div class="info-label">Tipo de trámite</div>
-                    <div class="info-value" th:text="${expediente.tipoTramite.nombre}"></div>
-                </div>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent">
+                            <span class="text-secondary"><i class="bi bi-box-arrow-in-right me-2"></i>Origen</span>
+                            <span class="fw-semibold text-dark">
+                                <span th:if="${expediente.solicitud != null}">Conversión</span>
+                                <span th:if="${expediente.solicitud == null}">Creación directa</span>
+                            </span>
+                        </li>
+                        
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent mt-2 border-top" th:if="${expediente.solicitud != null}">
+                            <span class="text-secondary"><i class="bi bi-link-45deg me-2 fs-5"></i>Solicitud Origen</span>
+                            <span>
+                                <a th:href="@{/solicitudes/{id}(id=${expediente.solicitud.id})}" th:text="${'Ver #' + expediente.solicitud.id}" class="badge bg-primary text-decoration-none py-2 px-3 fw-normal"></a>
+                            </span>
+                        </li>
+                    </ul>
 
-
-
-                <div class="info-item">
-                    <div class="info-label">Estado</div>
-                    <div class="info-value">
-                        <span class="badge badge-estado"
-                              th:text="${expediente.estadoExpediente}"
-                              th:classappend="${expediente.estadoExpediente.name() == 'EN_TRAMITE'} ? ' badge-tramite' :
-                                              (${expediente.estadoExpediente.name() == 'FINALIZADO'} ? ' badge-finalizado' :
-                                              (${expediente.estadoExpediente.name() == 'REVISANDO_INCIDENCIAS'} ? ' badge-info' :
-                                              (${expediente.estadoExpediente.name() == 'INCIDENCIA'} ? ' badge-incidencia' : ' badge-revision')))">
-                        </span>
+                    <div class="mt-3 pt-3 border-top" th:if="${expediente.observaciones != null and !#strings.isEmpty(expediente.observaciones)}">
+                        <span class="text-secondary d-block mb-2 fw-medium"><i class="bi bi-chat-left-text me-2"></i>Observaciones</span>
+                        <div class="p-3 border rounded bg-light text-dark" style="font-size: 0.95rem;">
+                            <span th:text="${expediente.observaciones}"></span>
+                        </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <div class="info-item">
-                    <div class="info-label">Fecha creación</div>
-                    <div class="info-value"
-                         th:text="${#temporals.format(expediente.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></div>
-                </div>
-
-                <div class="info-item">
-                    <div class="info-label">Cliente</div>
-                    <div class="info-value" th:text="${expediente.cliente.nombre}"></div>
+        <!-- TARJETA DE HISTORIAL DE CAMBIOS -->
+        <div class="col-lg-6">
+            <div class="card soft-card h-100" th:if="${historialCambios != null and !historialCambios.isEmpty()}">
+                <div class="card-body d-flex flex-column">
+                    <h2 class="section-title"><i class="bi bi-clock-history"></i> Historial de Cambios</h2>
+                    <div class="timeline mt-3 position-relative flex-grow-1 overflow-y-auto" style="border-left: 2px solid #dee2e6; margin-left: 1rem; padding-left: 1.5rem; max-height: 400px; padding-right: 10px;">
+                        <div th:each="cambio : ${historialCambios}" class="timeline-item mb-3 position-relative">
+                            <span class="position-absolute bg-secondary rounded-circle" style="width: 12px; height: 12px; left: -1.9rem; top: 5px;"></span>
+                            <div class="fw-bold text-dark d-flex align-items-center gap-2">
+                                <span th:text="${cambio.accion}"></span>
+                            </div>
+                            <div class="text-muted small mb-1">
+                                <i class="bi bi-person"></i> <span th:text="${cambio.usuario != null ? cambio.usuario.nombre : 'Sistema'}"></span> |
+                                <i class="bi bi-calendar"></i> <span th:text="${#temporals.format(cambio.fechaCambio, 'dd/MM/yyyy HH:mm:ss')}"></span>
+                            </div>
+                            <div class="bg-light p-2 rounded" style="font-size: 0.85rem;" th:text="${cambio.descripcion}"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-
 
     <div class="card soft-card mb-4">
         <div class="card-body">
             <h2 class="section-title">Interesados</h2>
 
             <div th:if="${expediente.interesados != null and !expediente.interesados.isEmpty()}">
-                <div th:each="relacion : ${expediente.interesados}" class="border rounded p-3 mb-3">
-                    <div><strong>Rol:</strong> <span th:text="${relacion.rol}"></span></div>
-                    <div><strong>Nombre:</strong> <span th:text="${relacion.interesado.nombre}"></span></div>
-                    <div><strong>DNI:</strong> <span th:text="${relacion.interesado.dni}"></span></div>
-                    <div><strong>Teléfono:</strong> <span th:text="${relacion.interesado.telefono}"></span></div>
-                    <div><strong>Dirección:</strong> <span th:text="${relacion.interesado.direccion}"></span></div>
+                <div th:each="relacion : ${expediente.interesados}" class="border rounded p-3 mb-3 d-flex flex-column flex-sm-row gap-3 shadow-sm align-items-start">
+                    <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center p-3" style="min-width: 50px; min-height: 50px;">
+                        <i class="bi bi-person-fill text-primary fs-3"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                            <h5 class="mb-0 fw-bold" th:text="${relacion.interesado.nombre}"></h5>
+                            <span class="badge border border-primary text-primary px-2" th:text="${relacion.rol}"></span>
+                        </div>
+                        <div class="text-muted small d-flex flex-wrap gap-3 mt-2">
+                            <span><i class="bi bi-card-text me-1"></i> <span th:text="${relacion.interesado.dni}"></span></span>
+                            <span><i class="bi bi-telephone me-1"></i> <span th:text="${relacion.interesado.telefono}"></span></span>
+                            <span><i class="bi bi-geo-alt me-1"></i> <span th:text="${relacion.interesado.direccion}"></span></span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -330,9 +326,12 @@
                     <div class="row align-items-center g-2">
 
                         <!-- IZQUIERDA -->
-                        <div class="col-md-3">
-                            <div class="fw-semibold" th:text="${doc.nombreArchivoOriginal}"></div>
-                            <div class="text-muted small" th:text="${doc.tipoDocumento}"></div>
+                        <div class="col-md-3 d-flex align-items-center gap-3">
+                            <i class="bi bi-file-earmark-pdf-fill text-danger fs-1"></i>
+                            <div>
+                                <div class="fw-semibold text-truncate" th:text="${doc.nombreArchivoOriginal}" th:title="${doc.nombreArchivoOriginal}"></div>
+                                <div class="text-muted small" th:text="${doc.tipoDocumento}"></div>
+                            </div>
                         </div>
 
                         <!-- CENTRO -->

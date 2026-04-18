@@ -151,56 +151,86 @@
     </a>
   </div>
 
-  <div class="card soft-card mb-4">
-    <div class="card-body">
-      <h2 class="section-title">Información general</h2>
+  <div class="row mb-4">
+      <div class="col-lg-6 mb-4 mb-lg-0">
+          <div class="card soft-card h-100">
+            <div class="card-body">
+              <h2 class="section-title">Información general</h2>
+        
+              <ul class="list-group list-group-flush overflow-y-auto pe-2" style="max-height: 400px;">
+                  
+                  <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent">
+                      <span class="text-secondary fw-medium"><i class="bi bi-car-front me-2"></i>Matrícula</span>
+                      <div class="d-inline-flex align-items-center border border-2 border-dark rounded overflow-hidden shadow-sm" style="transform: scale(0.85); transform-origin: right;">
+                          <div class="bg-primary text-white d-flex flex-column justify-content-between px-2 py-1 h-100" style="min-width: 30px; font-size: 0.6rem;">
+                              <i class="bi bi-stars text-warning mx-auto"></i>
+                              <strong class="mx-auto mt-1">E</strong>
+                          </div>
+                          <div class="bg-white text-dark fw-bold px-3 py-1 fs-5 h-100 font-monospace text-uppercase" style="letter-spacing: 3px;" th:text="${solicitud.matricula}"></div>
+                      </div>
+                  </li>
 
-      <div class="info-grid">
-        <div class="info-item">
-          <div class="info-label mb-2">Matrícula</div>
-          <div class="info-value">
-              <div class="d-inline-flex align-items-center border border-2 border-dark rounded overflow-hidden shadow-sm">
-                  <div class="bg-primary text-white d-flex flex-column justify-content-between px-2 py-1 h-100" style="min-width: 40px; font-size: 0.7rem;">
-                      <i class="bi bi-stars text-warning mx-auto"></i>
-                      <strong class="mx-auto mt-1">E</strong>
+                  <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent">
+                      <span class="text-secondary"><i class="bi bi-hash me-2"></i>ID Solicitud</span>
+                      <span class="fw-semibold text-dark" th:text="${solicitud.id}"></span>
+                  </li>
+                  
+                  <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent">
+                      <span class="text-secondary"><i class="bi bi-flag me-2"></i>Estado</span>
+                      <span class="badge badge-estado shadow-sm"
+                            th:text="${solicitud.estadoSolicitud}"
+                            th:classappend="${solicitud.estadoSolicitud.name() == 'PENDIENTE_REVISION'} ? ' badge-pendiente-revision' :
+                                            (${solicitud.estadoSolicitud.name() == 'CONVERTIDA'} ? ' badge-convertida' :
+                                            (${solicitud.estadoSolicitud.name() == 'REVISANDO_INCIDENCIAS'} ? ' badge-info' :
+                                            (${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'} ? ' badge-incidencia' : ' badge-revision')))">
+                      </span>
+                  </li>
+
+                  <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent">
+                      <span class="text-secondary"><i class="bi bi-calendar3 me-2"></i>Fecha creación</span>
+                      <span class="fw-semibold text-dark"
+                           th:text="${#temporals.format(solicitud.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></span>
+                  </li>
+
+                  <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent">
+                      <span class="text-secondary"><i class="bi bi-person-badge me-2"></i>Cliente</span>
+                      <span class="fw-semibold text-dark" th:text="${solicitud.cliente.nombre}"></span>
+                  </li>
+
+                  <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent mt-2 border-top" th:if="${solicitud.observaciones != null and !#strings.isEmpty(solicitud.observaciones)}">
+                      <span class="text-secondary d-block fw-medium w-100"><i class="bi bi-chat-left-text me-2"></i>Observaciones
+                          <div class="mt-2 p-3 border rounded bg-light text-dark fw-normal" style="font-size: 0.95rem;">
+                              <span th:text="${solicitud.observaciones}"></span>
+                          </div>
+                      </span>
+                  </li>
+              </ul>
+            </div>
+          </div>
+      </div>
+
+      <!-- TARJETA DE HISTORIAL DE CAMBIOS -->
+      <div class="col-lg-6">
+          <div class="card soft-card h-100" th:if="${historialCambios != null and !historialCambios.isEmpty()}">
+              <div class="card-body d-flex flex-column">
+                  <h2 class="section-title"><i class="bi bi-clock-history"></i> Historial de Cambios</h2>
+                  <div class="timeline mt-3 position-relative flex-grow-1 overflow-y-auto" style="border-left: 2px solid #dee2e6; margin-left: 1rem; padding-left: 1.5rem; max-height: 400px; padding-right: 10px;">
+                      <div th:each="cambio : ${historialCambios}" class="timeline-item mb-3 position-relative">
+                          <span class="position-absolute bg-secondary rounded-circle" style="width: 12px; height: 12px; left: -1.9rem; top: 5px;"></span>
+                          <div class="fw-bold text-dark d-flex align-items-center gap-2">
+                              <span th:text="${cambio.accion}"></span>
+                          </div>
+                          <div class="text-muted small mb-1">
+                              <i class="bi bi-person"></i> <span th:text="${cambio.usuario != null ? cambio.usuario.nombre : 'Sistema'}"></span> |
+                              <i class="bi bi-calendar"></i> <span th:text="${#temporals.format(cambio.fechaCambio, 'dd/MM/yyyy HH:mm:ss')}"></span>
+                          </div>
+                          <div class="bg-light p-2 rounded" style="font-size: 0.85rem;" th:text="${cambio.descripcion}"></div>
+                      </div>
                   </div>
-                  <div class="bg-white text-dark fw-bold px-4 py-2 fs-3 h-100 font-monospace text-uppercase" style="letter-spacing: 4px;" th:text="${solicitud.matricula}"></div>
               </div>
           </div>
-        </div>
-
-        <div class="info-item">
-          <div class="info-label">ID Solicitud</div>
-          <div class="info-value" th:text="${solicitud.id}"></div>
-        </div>
-
-        <div class="info-item">
-          <div class="info-label">Estado</div>
-          <div class="info-value">
-                        <span class="badge badge-estado"
-                              th:text="${solicitud.estadoSolicitud}"
-                              th:classappend="${solicitud.estadoSolicitud.name() == 'PENDIENTE_REVISION'} ? ' badge-pendiente-revision' :
-                                              (${solicitud.estadoSolicitud.name() == 'CONVERTIDA'} ? ' badge-convertida' :
-                                              (${solicitud.estadoSolicitud.name() == 'REVISANDO_INCIDENCIAS'} ? ' badge-info' :
-                                              (${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'} ? ' badge-incidencia' : ' badge-revision')))">
-                        </span>
-          </div>
-        </div>
-
-        <div class="info-item">
-          <div class="info-label">Fecha creación</div>
-          <div class="info-value"
-               th:text="${#temporals.format(solicitud.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></div>
-        </div>
-
-        <div class="info-item">
-          <div class="info-label">Cliente</div>
-          <div class="info-value" th:text="${solicitud.cliente.nombre}"></div>
-        </div>
       </div>
-    </div>
   </div>
-
 
   <div class="card soft-card mb-4">
     <div class="card-body">
@@ -210,23 +240,39 @@
                      or (solicitud.interesado2Dni != null and !#strings.isEmpty(solicitud.interesado2Dni))}">
 
         <div th:if="${solicitud.interesado1Dni != null and !#strings.isEmpty(solicitud.interesado1Dni)}"
-             class="border rounded p-3 mb-3">
-          <div><strong>Rol:</strong> <span th:text="${solicitud.interesado1Rol}"></span></div>
-          <div><strong>Nombre:</strong> <span th:text="${solicitud.interesado1Nombre}"></span></div>
-          <div><strong>Apellidos:</strong> <span th:text="${solicitud.interesado1Apellidos}"></span></div>
-          <div><strong>DNI:</strong> <span th:text="${solicitud.interesado1Dni}"></span></div>
-          <div><strong>Teléfono:</strong> <span th:text="${solicitud.interesado1Telefono}"></span></div>
-          <div><strong>Dirección:</strong> <span th:text="${solicitud.interesado1Direccion}"></span></div>
+             class="border rounded p-3 mb-3 d-flex flex-column flex-sm-row gap-3 shadow-sm align-items-start">
+            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center p-3" style="min-width: 50px; min-height: 50px;">
+                <i class="bi bi-person-fill text-primary fs-3"></i>
+            </div>
+            <div class="flex-grow-1">
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                    <h5 class="mb-0 fw-bold" th:text="${solicitud.interesado1Nombre + ' ' + (solicitud.interesado1Apellidos != null ? solicitud.interesado1Apellidos : '')}"></h5>
+                    <span class="badge border border-primary text-primary px-2" th:text="${solicitud.interesado1Rol}"></span>
+                </div>
+                <div class="text-muted small d-flex flex-wrap gap-3 mt-2">
+                    <span><i class="bi bi-card-text me-1"></i> <span th:text="${solicitud.interesado1Dni}"></span></span>
+                    <span><i class="bi bi-telephone me-1"></i> <span th:text="${solicitud.interesado1Telefono}"></span></span>
+                    <span><i class="bi bi-geo-alt me-1"></i> <span th:text="${solicitud.interesado1Direccion}"></span></span>
+                </div>
+            </div>
         </div>
 
         <div th:if="${solicitud.interesado2Dni != null and !#strings.isEmpty(solicitud.interesado2Dni)}"
-             class="border rounded p-3 mb-3">
-          <div><strong>Rol:</strong> <span th:text="${solicitud.interesado2Rol}"></span></div>
-          <div><strong>Nombre:</strong> <span th:text="${solicitud.interesado2Nombre}"></span></div>
-          <div><strong>Apellidos:</strong> <span th:text="${solicitud.interesado2Apellidos}"></span></div>
-          <div><strong>DNI:</strong> <span th:text="${solicitud.interesado2Dni}"></span></div>
-          <div><strong>Teléfono:</strong> <span th:text="${solicitud.interesado2Telefono}"></span></div>
-          <div><strong>Dirección:</strong> <span th:text="${solicitud.interesado2Direccion}"></span></div>
+             class="border rounded p-3 mb-3 d-flex flex-column flex-sm-row gap-3 shadow-sm align-items-start">
+            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center p-3" style="min-width: 50px; min-height: 50px;">
+                <i class="bi bi-person-fill text-primary fs-3"></i>
+            </div>
+            <div class="flex-grow-1">
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                    <h5 class="mb-0 fw-bold" th:text="${solicitud.interesado2Nombre + ' ' + (solicitud.interesado2Apellidos != null ? solicitud.interesado2Apellidos : '')}"></h5>
+                    <span class="badge border border-primary text-primary px-2" th:text="${solicitud.interesado2Rol}"></span>
+                </div>
+                <div class="text-muted small d-flex flex-wrap gap-3 mt-2">
+                    <span><i class="bi bi-card-text me-1"></i> <span th:text="${solicitud.interesado2Dni}"></span></span>
+                    <span><i class="bi bi-telephone me-1"></i> <span th:text="${solicitud.interesado2Telefono}"></span></span>
+                    <span><i class="bi bi-geo-alt me-1"></i> <span th:text="${solicitud.interesado2Direccion}"></span></span>
+                </div>
+            </div>
         </div>
       </div>
 
@@ -340,7 +386,10 @@
           </thead>
           <tbody>
           <tr th:each="doc : ${solicitud.documentos}">
-            <td th:text="${doc.nombreArchivoOriginal}"></td>
+            <td>
+               <i class="bi bi-file-earmark-pdf-fill text-danger fs-4 align-middle me-2"></i>
+               <span class="align-middle fw-medium" th:text="${doc.nombreArchivoOriginal}"></span>
+            </td>
             <td th:text="${doc.tipoDocumento}"></td>
             <td th:text="${#temporals.format(doc.fechaSubida, 'dd/MM/yyyy HH:mm')}"></td>
             <td>

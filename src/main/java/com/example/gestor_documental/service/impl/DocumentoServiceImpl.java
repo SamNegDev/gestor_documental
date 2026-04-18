@@ -37,6 +37,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     private final SolicitudService solicitudService;
     private final OcrPdfService ocrPdfService;
     private final PdfSplitService pdfSplitService;
+    private final HistorialCambioService historialCambioService;
 
 
     @Override
@@ -61,6 +62,13 @@ public class DocumentoServiceImpl implements DocumentoService {
                     Documento doc = construirDocumentoBase(archivo, TipoDocumento.OTROS, usuario);
                     doc.setExpediente(expediente);
                     documentoRepository.save(doc);
+                    
+                    historialCambioService.registrarCambioExpediente(
+                            expediente, 
+                            usuario, 
+                            "NUEVO DOCUMENTO", 
+                            "Se subió el documento: " + doc.getNombreArchivoOriginal()
+                    );
                     return;
                 }
 
@@ -88,6 +96,13 @@ public class DocumentoServiceImpl implements DocumentoService {
             doc.setExpediente(expediente);
 
             documentoRepository.save(doc);
+            
+            historialCambioService.registrarCambioExpediente(
+                    expediente, 
+                    usuario, 
+                    "NUEVO DOCUMENTO", 
+                    "Se subió el documento: " + doc.getNombreArchivoOriginal()
+            );
 
         } catch (IOException e) {
             throw new RuntimeException("Error al guardar el archivo", e);
@@ -111,6 +126,13 @@ public class DocumentoServiceImpl implements DocumentoService {
                     Documento doc = construirDocumentoBase(archivo, TipoDocumento.OTROS, usuario);
                     doc.setSolicitud(solicitud);
                     documentoRepository.save(doc);
+                    
+                    historialCambioService.registrarCambioSolicitud(
+                            solicitud, 
+                            usuario, 
+                            "NUEVO DOCUMENTO", 
+                            "Se subió el documento: " + doc.getNombreArchivoOriginal()
+                    );
                     return;
                 }
 
@@ -141,6 +163,13 @@ public class DocumentoServiceImpl implements DocumentoService {
             doc.setSolicitud(solicitud);
 
             documentoRepository.save(doc);
+            
+            historialCambioService.registrarCambioSolicitud(
+                    solicitud, 
+                    usuario, 
+                    "NUEVO DOCUMENTO", 
+                    "Se subió el documento: " + doc.getNombreArchivoOriginal()
+            );
 
         } catch (IOException e) {
             throw new RuntimeException("Error al guardar el archivo", e);
@@ -162,6 +191,13 @@ public class DocumentoServiceImpl implements DocumentoService {
         Documento doc = construirDocumentoBase(contenido, nombreArchivoOriginal, tipoDocumento, usuario);
         doc.setSolicitud(solicitud);
         documentoRepository.save(doc);
+        
+        historialCambioService.registrarCambioSolicitud(
+                solicitud, 
+                usuario, 
+                "NUEVO DOCUMENTO", 
+                "Se generó el documento OCR: " + doc.getNombreArchivoOriginal()
+        );
     }
     private void guardarDocumentoGeneradoParaExpediente(Expediente expediente,
                                                        byte[] contenido,
@@ -171,6 +207,13 @@ public class DocumentoServiceImpl implements DocumentoService {
         Documento doc = construirDocumentoBase(contenido, nombreArchivoOriginal, tipoDocumento, usuario);
         doc.setExpediente(expediente);
         documentoRepository.save(doc);
+        
+        historialCambioService.registrarCambioExpediente(
+                expediente, 
+                usuario, 
+                "NUEVO DOCUMENTO", 
+                "Se generó el documento OCR: " + doc.getNombreArchivoOriginal()
+        );
     }
 
 

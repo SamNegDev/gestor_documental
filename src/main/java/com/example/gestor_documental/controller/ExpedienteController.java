@@ -21,8 +21,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
 import com.example.gestor_documental.model.Incidencia;
+import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.TipoIncidenciaService;
 import com.example.gestor_documental.service.IncidenciaService;
+import com.example.gestor_documental.service.TipoTramiteService;
 
 @Controller
 @RequiredArgsConstructor
@@ -35,6 +37,8 @@ public class ExpedienteController {
     private final ClienteService clienteService;
     private final TipoIncidenciaService tipoIncidenciaService;
     private final IncidenciaService incidenciaService;
+    private final HistorialCambioService historialCambioService;
+    private final TipoTramiteService tipoTramiteService;
 
     @GetMapping
     public String listarExpedientes(Authentication authentication, Model model,
@@ -96,6 +100,7 @@ public class ExpedienteController {
         model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("estadosExpediente", EstadoExpediente.values());
         model.addAttribute("estadoSeleccionado", estado);
+        model.addAttribute("tiposTramite", tipoTramiteService.listarTodos());
         model.addAttribute("tipoTramiteIdSeleccionado", tipoTramiteId);
         model.addAttribute("matriculaSeleccionada", matricula);
 
@@ -130,6 +135,8 @@ public class ExpedienteController {
         List<Documento> documentos = documentoService.listarPorExpediente(id);
 
         List<Incidencia> incidencias = incidenciaService.listarPorExpediente(id);
+        
+        model.addAttribute("historialCambios", historialCambioService.listarPorExpediente(id));
 
         model.addAttribute("expediente", expediente);
         model.addAttribute("documentos", documentos);
