@@ -197,12 +197,11 @@
                       <span class="fw-semibold text-dark" th:text="${solicitud.cliente.nombre}"></span>
                   </li>
 
-                  <li class="list-group-item d-flex justify-content-between align-items-center px-1 py-3 bg-transparent mt-2 border-top" th:if="${solicitud.observaciones != null and !#strings.isEmpty(solicitud.observaciones)}">
-                      <span class="text-secondary d-block fw-medium w-100"><i class="bi bi-chat-left-text me-2"></i>Observaciones
-                          <div class="mt-2 p-3 border rounded bg-light text-dark fw-normal" style="font-size: 0.95rem;">
-                              <span th:text="${solicitud.observaciones}"></span>
-                          </div>
-                      </span>
+                  <li class="list-group-item bg-transparent mt-2 border-top border-bottom-0" th:if="${solicitud.observaciones != null and !#strings.isEmpty(solicitud.observaciones)}">
+                      <div class="info-item highlight-observations p-3 rounded w-100 mt-2">
+                          <span class="info-label d-block mb-1"><i class="bi bi-exclamation-circle me-1"></i>Observaciones de solicitud</span>
+                          <div class="info-value" style="font-size: 0.95rem; white-space: pre-wrap;" th:text="${solicitud.observaciones}"></div>
+                      </div>
                   </li>
               </ul>
             </div>
@@ -232,55 +231,91 @@
       </div>
   </div>
 
-  <div class="card soft-card mb-4">
-    <div class="card-body">
-      <h2 class="section-title">Interesados</h2>
+  <div class="row mb-4">
+      <!-- SECCION INTERESADOS -->
+      <div class="col-lg-5 mb-4 mb-lg-0">
+          <div class="card soft-card h-100">
+            <div class="card-body">
+              <h2 class="section-title">Interesados</h2>
 
-      <div th:if="${(solicitud.interesado1Dni != null and !#strings.isEmpty(solicitud.interesado1Dni))
-                     or (solicitud.interesado2Dni != null and !#strings.isEmpty(solicitud.interesado2Dni))}">
+              <div th:if="${(solicitud.interesado1Dni != null and !#strings.isEmpty(solicitud.interesado1Dni))
+                             or (solicitud.interesado2Dni != null and !#strings.isEmpty(solicitud.interesado2Dni))}">
 
-        <div th:if="${solicitud.interesado1Dni != null and !#strings.isEmpty(solicitud.interesado1Dni)}"
-             class="border rounded p-3 mb-3 d-flex flex-column flex-sm-row gap-3 shadow-sm align-items-start">
-            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center p-3" style="min-width: 50px; min-height: 50px;">
-                <i class="bi bi-person-fill text-primary fs-3"></i>
-            </div>
-            <div class="flex-grow-1">
-                <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
-                    <h5 class="mb-0 fw-bold" th:text="${solicitud.interesado1Nombre + ' ' + (solicitud.interesado1Apellidos != null ? solicitud.interesado1Apellidos : '')}"></h5>
-                    <span class="badge border border-primary text-primary px-2" th:text="${solicitud.interesado1Rol}"></span>
+                <div th:if="${solicitud.interesado1Dni != null and !#strings.isEmpty(solicitud.interesado1Dni)}"
+                     class="border rounded p-3 mb-3 d-flex flex-column flex-sm-row gap-3 shadow-sm align-items-start">
+                    <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center p-3" style="min-width: 50px; min-height: 50px;">
+                        <i class="bi bi-person-fill text-primary fs-3"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                            <h5 class="mb-0 fw-bold" th:text="${solicitud.interesado1Nombre + ' ' + (solicitud.interesado1Apellidos != null ? solicitud.interesado1Apellidos : '')}"></h5>
+                            <span class="badge border border-primary text-primary px-2" th:text="${solicitud.interesado1Rol}"></span>
+                        </div>
+                        <div class="text-muted small d-flex flex-wrap gap-3 mt-2">
+                            <span><i class="bi bi-card-text me-1"></i> <span th:text="${solicitud.interesado1Dni}"></span></span>
+                            <span><i class="bi bi-telephone me-1"></i> <span th:text="${solicitud.interesado1Telefono}"></span></span>
+                            <span><i class="bi bi-geo-alt me-1"></i> <span th:text="${solicitud.interesado1Direccion}"></span></span>
+                        </div>
+                    </div>
                 </div>
-                <div class="text-muted small d-flex flex-wrap gap-3 mt-2">
-                    <span><i class="bi bi-card-text me-1"></i> <span th:text="${solicitud.interesado1Dni}"></span></span>
-                    <span><i class="bi bi-telephone me-1"></i> <span th:text="${solicitud.interesado1Telefono}"></span></span>
-                    <span><i class="bi bi-geo-alt me-1"></i> <span th:text="${solicitud.interesado1Direccion}"></span></span>
-                </div>
-            </div>
-        </div>
 
-        <div th:if="${solicitud.interesado2Dni != null and !#strings.isEmpty(solicitud.interesado2Dni)}"
-             class="border rounded p-3 mb-3 d-flex flex-column flex-sm-row gap-3 shadow-sm align-items-start">
-            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center p-3" style="min-width: 50px; min-height: 50px;">
-                <i class="bi bi-person-fill text-primary fs-3"></i>
-            </div>
-            <div class="flex-grow-1">
-                <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
-                    <h5 class="mb-0 fw-bold" th:text="${solicitud.interesado2Nombre + ' ' + (solicitud.interesado2Apellidos != null ? solicitud.interesado2Apellidos : '')}"></h5>
-                    <span class="badge border border-primary text-primary px-2" th:text="${solicitud.interesado2Rol}"></span>
+                <div th:if="${solicitud.interesado2Dni != null and !#strings.isEmpty(solicitud.interesado2Dni)}"
+                     class="border rounded p-3 mb-3 d-flex flex-column flex-sm-row gap-3 shadow-sm align-items-start">
+                    <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center p-3" style="min-width: 50px; min-height: 50px;">
+                        <i class="bi bi-person-fill text-primary fs-3"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                            <h5 class="mb-0 fw-bold" th:text="${solicitud.interesado2Nombre + ' ' + (solicitud.interesado2Apellidos != null ? solicitud.interesado2Apellidos : '')}"></h5>
+                            <span class="badge border border-primary text-primary px-2" th:text="${solicitud.interesado2Rol}"></span>
+                        </div>
+                        <div class="text-muted small d-flex flex-wrap gap-3 mt-2">
+                            <span><i class="bi bi-card-text me-1"></i> <span th:text="${solicitud.interesado2Dni}"></span></span>
+                            <span><i class="bi bi-telephone me-1"></i> <span th:text="${solicitud.interesado2Telefono}"></span></span>
+                            <span><i class="bi bi-geo-alt me-1"></i> <span th:text="${solicitud.interesado2Direccion}"></span></span>
+                        </div>
+                    </div>
                 </div>
-                <div class="text-muted small d-flex flex-wrap gap-3 mt-2">
-                    <span><i class="bi bi-card-text me-1"></i> <span th:text="${solicitud.interesado2Dni}"></span></span>
-                    <span><i class="bi bi-telephone me-1"></i> <span th:text="${solicitud.interesado2Telefono}"></span></span>
-                    <span><i class="bi bi-geo-alt me-1"></i> <span th:text="${solicitud.interesado2Direccion}"></span></span>
-                </div>
+              </div>
+
+              <div th:if="${(solicitud.interesado1Dni == null or #strings.isEmpty(solicitud.interesado1Dni))
+                             and (solicitud.interesado2Dni == null or #strings.isEmpty(solicitud.interesado2Dni))}">
+                <p class="text-muted mb-0">No hay interesados registrados.</p>
+              </div>
             </div>
-        </div>
+          </div>
       </div>
 
-      <div th:if="${(solicitud.interesado1Dni == null or #strings.isEmpty(solicitud.interesado1Dni))
-                     and (solicitud.interesado2Dni == null or #strings.isEmpty(solicitud.interesado2Dni))}">
-        <p class="text-muted mb-0">No hay interesados registrados.</p>
+      <!-- TARJETA DE MENSAJES / CHAT -->
+      <div class="col-lg-7">
+          <div class="card soft-card h-100">
+              <div class="card-body d-flex flex-column">
+                  <h2 class="section-title"><i class="bi bi-chat-dots text-primary me-2"></i>Mensajes de la Solicitud</h2>
+                  
+                  <div class="chat-container mb-3 flex-grow-1" style="max-height: 400px;">
+                      <div th:each="mensaje : ${mensajes}" 
+                           class="chat-message" 
+                           th:classappend="${mensaje.autor.rolUsuario.name() == 'ADMIN'} ? 'admin' : 'client'">
+                          <div class="chat-header">
+                              <span th:text="${mensaje.autor.nombre}"></span>
+                              <span class="chat-date" th:text="${#temporals.format(mensaje.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></span>
+                          </div>
+                          <div class="chat-text" th:text="${mensaje.contenido}"></div>
+                      </div>
+                      <div th:if="${mensajes == null or mensajes.isEmpty()}" class="text-muted text-center mt-3 mb-3">
+                          Aún no hay mensajes de comunicación en esta solicitud.
+                      </div>
+                  </div>
+
+                  <form th:action="@{/solicitudes/{id}/mensajes(id=${solicitud.id})}" method="post" class="mt-auto">
+                      <div class="input-group">
+                          <textarea name="contenido" class="form-control" placeholder="Escribe un mensaje para el cliente/administrador..." rows="2" required></textarea>
+                          <button class="btn btn-primary px-4" type="submit"><i class="bi bi-send me-1"></i> Enviar</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
       </div>
-    </div>
   </div>
 
   <div th:if="${incidencias != null and !incidencias.isEmpty()}" 
@@ -385,7 +420,8 @@
           </tr>
           </thead>
           <tbody>
-          <tr th:each="doc : ${solicitud.documentos}">
+          <tr th:each="doc : ${solicitud.documentos}"
+              th:classappend="${doc.tipoDocumento.name() == 'EXPEDIENTE_COMPLETO'} ? 'bg-primary bg-opacity-10 shadow-sm border-primary border-2' : ''">
             <td>
                <i class="bi bi-file-earmark-pdf-fill text-danger fs-4 align-middle me-2"></i>
                <span class="align-middle fw-medium" th:text="${doc.nombreArchivoOriginal}"></span>
@@ -393,18 +429,107 @@
             <td th:text="${doc.tipoDocumento}"></td>
             <td th:text="${#temporals.format(doc.fechaSubida, 'dd/MM/yyyy HH:mm')}"></td>
             <td>
-              <div class="actions-inline">
+              <div class="actions-inline d-flex gap-2 align-items-center">
+                <button type="button" class="btn btn-sm btn-outline-warning fw-semibold" data-bs-toggle="modal" th:data-bs-target="'#editarDocModal-' + ${doc.id}">
+                    <i class="bi bi-pencil-square"></i> Gestión PDF
+                </button>
+
                 <a th:href="@{/documentos/ver/{id}(id=${doc.id})}" target="_blank" class="btn btn-sm btn-outline-secondary">Ver</a>
                 <a th:href="@{/documentos/descargar/{id}(id=${doc.id})}" class="btn btn-sm btn-outline-primary">Descargar</a>
 
-                <form th:action="@{/documentos/eliminar/{id}(id=${doc.id})}"
+                <form sec:authorize="hasRole('ADMIN')" th:action="@{/documentos/eliminar/{id}(id=${doc.id})}"
                       method="post"
-                      class="doc-form-inline"
+                      class="doc-form-inline mb-0"
                       onsubmit="return confirm('¿Seguro que quieres eliminar este documento?');">
                   <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                 </form>
               </div>
+
+               <!-- Modal Editar/Extraer Documento -->
+               <div class="modal fade" th:id="'editarDocModal-' + ${doc.id}" tabindex="-1" aria-hidden="true">
+                   <div class="modal-dialog modal-xl text-start">
+                       <div class="modal-content">
+                           <div class="modal-header">
+                               <h5 class="modal-title">Gestión de Documento PDF: <strong class="text-primary" th:text="${doc.nombreArchivoOriginal}"></strong></h5>
+                               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                           </div>
+                           <div class="modal-body">
+                               <div class="row">
+                                   <!-- Columna de previsualización -->
+                                   <div class="col-lg-7 mb-3">
+                                       <div class="border rounded overflow-hidden shadow-sm" style="height: 600px; background-color: #f8f9fa;">
+                                           <iframe th:src="@{/documentos/ver/{id}(id=${doc.id})}" 
+                                                   style="width: 100%; height: 100%; border: none;"></iframe>
+                                       </div>
+                                   </div>
+                                   <!-- Columna de formularios -->
+                                   <div class="col-lg-5">
+                                       <ul class="nav nav-tabs" role="tablist">
+                                         <li class="nav-item" role="presentation">
+                                           <button class="nav-link active" data-bs-toggle="tab" th:data-bs-target="'#edit-' + ${doc.id}" type="button" role="tab">Editar Metadatos</button>
+                                         </li>
+                                         <li class="nav-item" role="presentation">
+                                           <button class="nav-link" data-bs-toggle="tab" th:data-bs-target="'#extract-' + ${doc.id}" type="button" role="tab"><i class="bi bi-files"></i> Extraer Páginas</button>
+                                         </li>
+                                       </ul>
+                                       
+                                       <div class="tab-content pt-3">
+                                           <!-- Tab Editar -->
+                                           <div class="tab-pane fade show active" th:id="'edit-' + ${doc.id}" role="tabpanel">
+                                               <form th:action="@{/documentos/editar/{id}(id=${doc.id})}" method="post">
+                                                   <div class="mb-3">
+                                                       <label class="form-label fw-bold">Nombre del Archivo</label>
+                                                       <input type="text" name="nuevoNombreArchivo" class="form-control" th:value="${doc.nombreArchivoOriginal}" required>
+                                                   </div>
+                                                   <div class="mb-3">
+                                                       <label class="form-label fw-bold">Tipo de Documento</label>
+                                                       <select name="nuevoTipoDocumento" class="form-select" required>
+                                                           <option th:each="tipo : ${tiposDocumento}"
+                                                                   th:value="${tipo}"
+                                                                   th:text="${tipo}"
+                                                                   th:selected="${tipo == doc.tipoDocumento}"></option>
+                                                       </select>
+                                                   </div>
+                                                   <button type="submit" class="btn btn-primary w-100">Guardar Cambios</button>
+                                               </form>
+                                           </div>
+                                           
+                                           <!-- Tab Extraer -->
+                                           <div class="tab-pane fade" th:id="'extract-' + ${doc.id}" role="tabpanel">
+                                               <div class="alert alert-info small shadow-sm">
+                                                   Separa páginas específicas de este archivo original y guárdalas en un documento independiente. El original no se alterará.
+                                               </div>
+                                               <form th:action="@{/documentos/extraer/{id}(id=${doc.id})}" method="post">
+                                                   <div class="mb-3">
+                                                       <label class="form-label fw-bold">Páginas a extraer</label>
+                                                       <input type="text" name="rangoPaginas" class="form-control" placeholder="Ej: 1, 3, 5-7" required>
+                                                       <div class="form-text">Usa comas para separar páginas y guiones para rangos. (Todo junto 1,2,5-8)</div>
+                                                   </div>
+                                                   <div class="mb-3">
+                                                       <label class="form-label">Nombre del nuevo archivo</label>
+                                                       <input type="text" name="nuevoNombreArchivo" class="form-control" th:value="'extract_' + ${doc.nombreArchivoOriginal}" required>
+                                                   </div>
+                                                   <div class="mb-3">
+                                                       <label class="form-label">Clasificar nuevo documento como</label>
+                                                       <select name="nuevoTipoDocumento" class="form-select" required>
+                                                           <option value="">-- Selecciona un tipo --</option>
+                                                           <option th:each="tipo : ${tiposDocumento}"
+                                                                   th:value="${tipo}"
+                                                                   th:text="${tipo}"></option>
+                                                       </select>
+                                                   </div>
+                                                   <button type="submit" class="btn btn-warning w-100 fw-bold"><i class="bi bi-scissors me-1"></i> Extraer y Crear Documento</button>
+                                               </form>
+                                           </div>
+                                       </div>
+                                   </div>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+               </div>
+
             </td>
           </tr>
           </tbody>

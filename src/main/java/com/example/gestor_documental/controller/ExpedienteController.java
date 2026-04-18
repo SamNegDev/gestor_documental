@@ -25,6 +25,7 @@ import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.TipoIncidenciaService;
 import com.example.gestor_documental.service.IncidenciaService;
 import com.example.gestor_documental.service.TipoTramiteService;
+import com.example.gestor_documental.service.MensajeService;
 
 @Controller
 @RequiredArgsConstructor
@@ -39,6 +40,7 @@ public class ExpedienteController {
     private final IncidenciaService incidenciaService;
     private final HistorialCambioService historialCambioService;
     private final TipoTramiteService tipoTramiteService;
+    private final MensajeService mensajeService;
 
     @GetMapping
     public String listarExpedientes(Authentication authentication, Model model,
@@ -141,6 +143,7 @@ public class ExpedienteController {
         model.addAttribute("expediente", expediente);
         model.addAttribute("documentos", documentos);
         model.addAttribute("incidencias", incidencias);
+        model.addAttribute("mensajes", mensajeService.listarPorExpediente(id));
         model.addAttribute("tiposIncidencia", tipoIncidenciaService.listarTodosActivos());
         model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("titulo", "Detalle Expediente");
@@ -161,6 +164,24 @@ public class ExpedienteController {
         try {
             expedienteService.cambiarEstado(id, nuevoEstado, usuarioLogueado);
             redirectAttributes.addFlashAttribute("success", "Estado del expediente actualizado correctamente");
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+
+        return "redirect:/expedientes/" + id;
+    }
+
+    @PostMapping("/{id}/mensajes")
+    public String añadirMensajeExpediente(@PathVariable Long id,
+            @RequestParam String contenido,
+            Authentication authentication,
+            RedirectAttributes redirectAttributes) {
+
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+
+        try {
+            mensajeService.añadirAExpediente(id, contenido, usuarioLogueado);
+            redirectAttributes.addFlashAttribute("success", "Mensaje enviado correctamente");
         } catch (RuntimeException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }

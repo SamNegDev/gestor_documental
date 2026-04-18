@@ -39,14 +39,14 @@ public class DocumentoServiceImpl implements DocumentoService {
     private final PdfSplitService pdfSplitService;
     private final HistorialCambioService historialCambioService;
 
-
     @Override
     public void guardar(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento) {
         guardarParaExpediente(expedienteId, archivo, tipoDocumento, null);
     }
 
     @Override
-    public void guardarParaExpediente(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario) {
+    public void guardarParaExpediente(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento,
+            Usuario usuario) {
         if (archivo == null || archivo.isEmpty()) {
             return;
         }
@@ -56,19 +56,20 @@ public class DocumentoServiceImpl implements DocumentoService {
                     .orElseThrow(() -> new RuntimeException("Expediente no encontrado"));
 
             if (TipoDocumento.EXPEDIENTE_COMPLETO.equals(tipoDocumento)) {
+                // SIEMPRE guardar el original primero
+                Documento docOriginal = construirDocumentoBase(archivo, tipoDocumento, usuario);
+                docOriginal.setExpediente(expediente);
+                documentoRepository.save(docOriginal);
+
+                historialCambioService.registrarCambioExpediente(
+                        expediente,
+                        usuario,
+                        "NUEVO DOCUMENTO",
+                        "Se subió el documento: " + docOriginal.getNombreArchivoOriginal());
+
                 List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivo);
 
                 if (documentosDetectados == null || documentosDetectados.isEmpty()) {
-                    Documento doc = construirDocumentoBase(archivo, TipoDocumento.OTROS, usuario);
-                    doc.setExpediente(expediente);
-                    documentoRepository.save(doc);
-                    
-                    historialCambioService.registrarCambioExpediente(
-                            expediente, 
-                            usuario, 
-                            "NUEVO DOCUMENTO", 
-                            "Se subió el documento: " + doc.getNombreArchivoOriginal()
-                    );
                     return;
                 }
 
@@ -78,16 +79,14 @@ public class DocumentoServiceImpl implements DocumentoService {
                 for (DocumentoDetectadoDto detectado : documentosDetectados) {
                     byte[] pdfSeparado = pdfSplitService.extraerPaginas(
                             pdfOriginal,
-                            detectado.getPaginas()
-                    );
+                            detectado.getPaginas());
 
                     guardarDocumentoGeneradoParaExpediente(
                             expediente,
                             pdfSeparado,
                             detectado.getTipoDocumento(),
                             usuario,
-                            "ocr_" + indice + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf"
-                    );
+                            indice + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf");
                     indice++;
                 }
                 return;
@@ -96,13 +95,12 @@ public class DocumentoServiceImpl implements DocumentoService {
             doc.setExpediente(expediente);
 
             documentoRepository.save(doc);
-            
+
             historialCambioService.registrarCambioExpediente(
-                    expediente, 
-                    usuario, 
-                    "NUEVO DOCUMENTO", 
-                    "Se subió el documento: " + doc.getNombreArchivoOriginal()
-            );
+                    expediente,
+                    usuario,
+                    "NUEVO DOCUMENTO",
+                    "Se subió el documento: " + doc.getNombreArchivoOriginal());
 
         } catch (IOException e) {
             throw new RuntimeException("Error al guardar el archivo", e);
@@ -110,7 +108,8 @@ public class DocumentoServiceImpl implements DocumentoService {
     }
 
     @Override
-    public void guardarParaSolicitud(Long solicitudId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario) {
+    public void guardarParaSolicitud(Long solicitudId, MultipartFile archivo, TipoDocumento tipoDocumento,
+            Usuario usuario) {
         if (archivo == null || archivo.isEmpty()) {
             return;
         }
@@ -120,19 +119,20 @@ public class DocumentoServiceImpl implements DocumentoService {
                     .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
 
             if (TipoDocumento.EXPEDIENTE_COMPLETO.equals(tipoDocumento)) {
+                // SIEMPRE guardar el original primero
+                Documento docOriginal = construirDocumentoBase(archivo, tipoDocumento, usuario);
+                docOriginal.setSolicitud(solicitud);
+                documentoRepository.save(docOriginal);
+
+                historialCambioService.registrarCambioSolicitud(
+                        solicitud,
+                        usuario,
+                        "NUEVO DOCUMENTO",
+                        "Se subió el documento: " + docOriginal.getNombreArchivoOriginal());
+
                 List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivo);
 
                 if (documentosDetectados == null || documentosDetectados.isEmpty()) {
-                    Documento doc = construirDocumentoBase(archivo, TipoDocumento.OTROS, usuario);
-                    doc.setSolicitud(solicitud);
-                    documentoRepository.save(doc);
-                    
-                    historialCambioService.registrarCambioSolicitud(
-                            solicitud, 
-                            usuario, 
-                            "NUEVO DOCUMENTO", 
-                            "Se subió el documento: " + doc.getNombreArchivoOriginal()
-                    );
                     return;
                 }
 
@@ -142,34 +142,29 @@ public class DocumentoServiceImpl implements DocumentoService {
                 for (DocumentoDetectadoDto detectado : documentosDetectados) {
                     byte[] pdfSeparado = pdfSplitService.extraerPaginas(
                             pdfOriginal,
-                            detectado.getPaginas()
-                    );
+                            detectado.getPaginas());
 
                     guardarDocumentoGeneradoParaSolicitud(
                             solicitud,
                             pdfSeparado,
                             detectado.getTipoDocumento(),
                             usuario,
-                            "ocr_" + indice + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf"
-                    );
+                            "ocr_" + indice + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf");
                     indice++;
                 }
                 return;
             }
 
-
-
             Documento doc = construirDocumentoBase(archivo, tipoDocumento, usuario);
             doc.setSolicitud(solicitud);
 
             documentoRepository.save(doc);
-            
+
             historialCambioService.registrarCambioSolicitud(
-                    solicitud, 
-                    usuario, 
-                    "NUEVO DOCUMENTO", 
-                    "Se subió el documento: " + doc.getNombreArchivoOriginal()
-            );
+                    solicitud,
+                    usuario,
+                    "NUEVO DOCUMENTO",
+                    "Se subió el documento: " + doc.getNombreArchivoOriginal());
 
         } catch (IOException e) {
             throw new RuntimeException("Error al guardar el archivo", e);
@@ -184,40 +179,39 @@ public class DocumentoServiceImpl implements DocumentoService {
     }
 
     private void guardarDocumentoGeneradoParaSolicitud(Solicitud solicitud,
-                                                       byte[] contenido,
-                                                       TipoDocumento tipoDocumento,
-                                                       Usuario usuario,
-                                                       String nombreArchivoOriginal) throws IOException {
+            byte[] contenido,
+            TipoDocumento tipoDocumento,
+            Usuario usuario,
+            String nombreArchivoOriginal) throws IOException {
         Documento doc = construirDocumentoBase(contenido, nombreArchivoOriginal, tipoDocumento, usuario);
         doc.setSolicitud(solicitud);
         documentoRepository.save(doc);
-        
+
         historialCambioService.registrarCambioSolicitud(
-                solicitud, 
-                usuario, 
-                "NUEVO DOCUMENTO", 
-                "Se generó el documento OCR: " + doc.getNombreArchivoOriginal()
-        );
+                solicitud,
+                usuario,
+                "NUEVO DOCUMENTO",
+                "Se generó el documento OCR: " + doc.getNombreArchivoOriginal());
     }
+
     private void guardarDocumentoGeneradoParaExpediente(Expediente expediente,
-                                                       byte[] contenido,
-                                                       TipoDocumento tipoDocumento,
-                                                       Usuario usuario,
-                                                       String nombreArchivoOriginal) throws IOException {
+            byte[] contenido,
+            TipoDocumento tipoDocumento,
+            Usuario usuario,
+            String nombreArchivoOriginal) throws IOException {
         Documento doc = construirDocumentoBase(contenido, nombreArchivoOriginal, tipoDocumento, usuario);
         doc.setExpediente(expediente);
         documentoRepository.save(doc);
-        
+
         historialCambioService.registrarCambioExpediente(
-                expediente, 
-                usuario, 
-                "NUEVO DOCUMENTO", 
-                "Se generó el documento OCR: " + doc.getNombreArchivoOriginal()
-        );
+                expediente,
+                usuario,
+                "NUEVO DOCUMENTO",
+                "Se generó el documento OCR: " + doc.getNombreArchivoOriginal());
     }
 
-
-    private Documento construirDocumentoBase(MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario) throws IOException {
+    private Documento construirDocumentoBase(MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario)
+            throws IOException {
         String nombreOriginal = archivo.getOriginalFilename();
 
         if (nombreOriginal == null || nombreOriginal.isBlank()) {
@@ -242,9 +236,9 @@ public class DocumentoServiceImpl implements DocumentoService {
     }
 
     private Documento construirDocumentoBase(byte[] contenido,
-                                             String nombreArchivoOriginal,
-                                             TipoDocumento tipoDocumento,
-                                             Usuario usuario) throws IOException {
+            String nombreArchivoOriginal,
+            TipoDocumento tipoDocumento,
+            Usuario usuario) throws IOException {
         if (nombreArchivoOriginal == null || nombreArchivoOriginal.isBlank()) {
             throw new OperacionInvalidaException("El archivo no tiene nombre válido");
         }
@@ -311,6 +305,78 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
 
         return documento;
+    }
+
+    @Override
+    public void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Usuario usuario) {
+        Documento documento = obtenerDocumentoConPermiso(id, usuario);
+
+        if (nuevoTipo != null) {
+            documento.setTipoDocumento(nuevoTipo);
+        }
+        if (nuevoNombre != null && !nuevoNombre.trim().isEmpty()) {
+            documento.setNombreArchivoOriginal(nuevoNombre.trim());
+        }
+
+        documentoRepository.save(documento);
+
+        if (documento.getExpediente() != null) {
+            historialCambioService.registrarCambioExpediente(
+                    documento.getExpediente(), usuario, "ACTUALIZAR DOCUMENTO",
+                    "Se actualizó el documento: " + documento.getNombreArchivoOriginal());
+        } else if (documento.getSolicitud() != null) {
+            historialCambioService.registrarCambioSolicitud(
+                    documento.getSolicitud(), usuario, "ACTUALIZAR DOCUMENTO",
+                    "Se actualizó el documento: " + documento.getNombreArchivoOriginal());
+        }
+    }
+
+    @Override
+    public void extraerPaginasDocumento(Long idOriginal, String rangoPaginas, TipoDocumento nuevoTipo,
+            String nuevoNombre, Usuario usuario) {
+        Documento documentoOriginal = obtenerDocumentoConPermiso(idOriginal, usuario);
+
+        Path rutaOriginal = Paths.get("uploads").resolve(documentoOriginal.getNombreArchivo()).normalize();
+
+        try {
+            if (!Files.exists(rutaOriginal)) {
+                throw new RuntimeException("El archivo físico del documento no existe.");
+            }
+
+            byte[] bytesOriginales = Files.readAllBytes(rutaOriginal);
+
+            // Total number of pages
+            int totalPaginas = 0;
+            try (org.apache.pdfbox.pdmodel.PDDocument pdfDoc = org.apache.pdfbox.pdmodel.PDDocument
+                    .load(bytesOriginales)) {
+                totalPaginas = pdfDoc.getNumberOfPages();
+            }
+
+            List<Integer> paginasExtraer = pdfSplitService.parseRangoPaginas(rangoPaginas, totalPaginas);
+
+            if (paginasExtraer.isEmpty()) {
+                throw new OperacionInvalidaException("Rango de páginas inválido o vacío.");
+            }
+
+            byte[] pdfExtraido = pdfSplitService.extraerPaginas(bytesOriginales, paginasExtraer);
+            byte[] pdfRestante = pdfSplitService.eliminarPaginas(bytesOriginales, paginasExtraer);
+
+            // Sobrescribir el archivo original para que no tenga las páginas extraídas
+            // (evita duplicidad)
+            Files.write(rutaOriginal, pdfRestante);
+
+            if (documentoOriginal.getExpediente() != null) {
+                guardarDocumentoGeneradoParaExpediente(
+                        documentoOriginal.getExpediente(), pdfExtraido, nuevoTipo, usuario, nuevoNombre);
+            } else if (documentoOriginal.getSolicitud() != null) {
+                guardarDocumentoGeneradoParaSolicitud(
+                        documentoOriginal.getSolicitud(), pdfExtraido, nuevoTipo, usuario, nuevoNombre);
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error al leer o sobrescribir el archivo original físico al extraer páginas.",
+                    e);
+        }
     }
 
 }

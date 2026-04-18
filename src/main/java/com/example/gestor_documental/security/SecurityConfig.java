@@ -49,7 +49,9 @@ public class SecurityConfig {
                                                 .logoutSuccessUrl("/login?logout")
                                                 .permitAll())
                                 .exceptionHandling(exception -> exception
-                                                .accessDeniedPage("/acceso-denegado"));
+                                                .accessDeniedPage("/acceso-denegado"))
+                                .headers(headers -> headers
+                                                .frameOptions(frameOptions -> frameOptions.sameOrigin()));
 
                 return http.build();
         }

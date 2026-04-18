@@ -23,4 +23,8 @@ public interface DocumentoService {
     void guardarParaSolicitud(Long solicitudId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
 
     List<Documento> listarPorExpediente(Long id);
+
+    void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Usuario usuario);
+
+    void extraerPaginasDocumento(Long idOriginal, String rangoPaginas, TipoDocumento nuevoTipo, String nuevoNombre, Usuario usuario);
 }

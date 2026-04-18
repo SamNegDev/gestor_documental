@@ -140,4 +140,47 @@ public class DocumentoController {
 
         return "application/octet-stream";
     }
+
+    @PostMapping("/editar/{id}")
+    public String editarDocumento(@PathVariable Long id,
+                                  @RequestParam(required = false) TipoDocumento nuevoTipoDocumento,
+                                  @RequestParam(required = false) String nuevoNombreArchivo,
+                                  Authentication authentication,
+                                  RedirectAttributes redirectAttributes) {
+
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+
+        documentoService.actualizarDocumento(id, nuevoTipoDocumento, nuevoNombreArchivo, usuarioLogueado);
+
+        Documento documento = documentoService.buscarPorId(id).orElseThrow();
+        Long entidadId = documento.getExpediente() != null ? documento.getExpediente().getId() : documento.getSolicitud().getId();
+
+        redirectAttributes.addFlashAttribute("mensaje", "Documento actualizado correctamente");
+        if (documento.getExpediente() != null) {
+            return "redirect:/expedientes/" + entidadId;
+        }
+        return "redirect:/solicitudes/" + entidadId;
+    }
+
+    @PostMapping("/extraer/{id}")
+    public String extraerPaginas(@PathVariable Long id,
+                                 @RequestParam String rangoPaginas,
+                                 @RequestParam TipoDocumento nuevoTipoDocumento,
+                                 @RequestParam String nuevoNombreArchivo,
+                                 Authentication authentication,
+                                 RedirectAttributes redirectAttributes) {
+
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+
+        documentoService.extraerPaginasDocumento(id, rangoPaginas, nuevoTipoDocumento, nuevoNombreArchivo, usuarioLogueado);
+
+        Documento documento = documentoService.buscarPorId(id).orElseThrow();
+        Long entidadId = documento.getExpediente() != null ? documento.getExpediente().getId() : documento.getSolicitud().getId();
+
+        redirectAttributes.addFlashAttribute("mensaje", "Páginas extraídas y guardadas como nuevo documento correctamente");
+        if (documento.getExpediente() != null) {
+            return "redirect:/expedientes/" + entidadId;
+        }
+        return "redirect:/solicitudes/" + entidadId;
+    }
 }

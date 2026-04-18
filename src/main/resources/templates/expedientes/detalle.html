@@ -171,10 +171,10 @@
                         </li>
                     </ul>
 
-                    <div class="mt-3 pt-3 border-top" th:if="${expediente.observaciones != null and !#strings.isEmpty(expediente.observaciones)}">
-                        <span class="text-secondary d-block mb-2 fw-medium"><i class="bi bi-chat-left-text me-2"></i>Observaciones</span>
-                        <div class="p-3 border rounded bg-light text-dark" style="font-size: 0.95rem;">
-                            <span th:text="${expediente.observaciones}"></span>
+                    <div class="mt-3" th:if="${expediente.observaciones != null and !#strings.isEmpty(expediente.observaciones)}">
+                        <div class="info-item highlight-observations p-3 rounded">
+                            <span class="info-label d-block mb-1"><i class="bi bi-exclamation-circle me-1"></i>Observaciones de trámite</span>
+                            <div class="info-value" style="font-size: 0.95rem; white-space: pre-wrap;" th:text="${expediente.observaciones}"></div>
                         </div>
                     </div>
                 </div>
@@ -204,31 +204,67 @@
         </div>
     </div>
 
-    <div class="card soft-card mb-4">
-        <div class="card-body">
-            <h2 class="section-title">Interesados</h2>
+    <div class="row mb-4">
+        <!-- SECCION INTERESADOS -->
+        <div class="col-lg-5 mb-4 mb-lg-0">
+            <div class="card soft-card h-100">
+                <div class="card-body">
+                    <h2 class="section-title">Interesados</h2>
 
-            <div th:if="${expediente.interesados != null and !expediente.interesados.isEmpty()}">
-                <div th:each="relacion : ${expediente.interesados}" class="border rounded p-3 mb-3 d-flex flex-column flex-sm-row gap-3 shadow-sm align-items-start">
-                    <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center p-3" style="min-width: 50px; min-height: 50px;">
-                        <i class="bi bi-person-fill text-primary fs-3"></i>
+                    <div th:if="${expediente.interesados != null and !expediente.interesados.isEmpty()}">
+                        <div th:each="relacion : ${expediente.interesados}" class="border rounded p-3 mb-3 d-flex flex-column flex-sm-row gap-3 shadow-sm align-items-start">
+                            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center p-3" style="min-width: 50px; min-height: 50px;">
+                                <i class="bi bi-person-fill text-primary fs-3"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                                    <h5 class="mb-0 fw-bold" th:text="${relacion.interesado.nombre}"></h5>
+                                    <span class="badge border border-primary text-primary px-2" th:text="${relacion.rol}"></span>
+                                </div>
+                                <div class="text-muted small d-flex flex-wrap gap-3 mt-2">
+                                    <span><i class="bi bi-card-text me-1"></i> <span th:text="${relacion.interesado.dni}"></span></span>
+                                    <span><i class="bi bi-telephone me-1"></i> <span th:text="${relacion.interesado.telefono}"></span></span>
+                                    <span><i class="bi bi-geo-alt me-1"></i> <span th:text="${relacion.interesado.direccion}"></span></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex-grow-1">
-                        <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
-                            <h5 class="mb-0 fw-bold" th:text="${relacion.interesado.nombre}"></h5>
-                            <span class="badge border border-primary text-primary px-2" th:text="${relacion.rol}"></span>
-                        </div>
-                        <div class="text-muted small d-flex flex-wrap gap-3 mt-2">
-                            <span><i class="bi bi-card-text me-1"></i> <span th:text="${relacion.interesado.dni}"></span></span>
-                            <span><i class="bi bi-telephone me-1"></i> <span th:text="${relacion.interesado.telefono}"></span></span>
-                            <span><i class="bi bi-geo-alt me-1"></i> <span th:text="${relacion.interesado.direccion}"></span></span>
-                        </div>
+
+                    <div th:if="${expediente.interesados == null or expediente.interesados.isEmpty()}">
+                        <p class="text-muted mb-0">No hay interesados registrados.</p>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div th:if="${expediente.interesados == null or expediente.interesados.isEmpty()}">
-                <p class="text-muted mb-0">No hay interesados registrados.</p>
+        <!-- TARJETA DE MENSAJES / CHAT -->
+        <div class="col-lg-7">
+            <div class="card soft-card h-100">
+                <div class="card-body d-flex flex-column">
+                    <h2 class="section-title"><i class="bi bi-chat-dots text-primary me-2"></i>Mensajes del Expediente</h2>
+                    
+                    <div class="chat-container mb-3 flex-grow-1" style="max-height: 400px;">
+                        <div th:each="mensaje : ${mensajes}" 
+                             class="chat-message" 
+                             th:classappend="${mensaje.autor.rolUsuario.name() == 'ADMIN'} ? 'admin' : 'client'">
+                            <div class="chat-header">
+                                <span th:text="${mensaje.autor.nombre}"></span>
+                                <span class="chat-date" th:text="${#temporals.format(mensaje.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></span>
+                            </div>
+                            <div class="chat-text" th:text="${mensaje.contenido}"></div>
+                        </div>
+                        <div th:if="${mensajes == null or mensajes.isEmpty()}" class="text-muted text-center mt-3 mb-3">
+                            Aún no hay mensajes de comunicación en este expediente.
+                        </div>
+                    </div>
+
+                    <form th:action="@{/expedientes/{id}/mensajes(id=${expediente.id})}" method="post" class="mt-auto">
+                        <div class="input-group">
+                            <textarea name="contenido" class="form-control" placeholder="Escribe un mensaje para el cliente/administrador..." rows="2" required></textarea>
+                            <button class="btn btn-primary px-4" type="submit"><i class="bi bi-send me-1"></i> Enviar</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -322,7 +358,8 @@
             <h2 class="section-title">Documentos</h2>
 
             <div th:if="${documentos != null and !documentos.isEmpty()}">
-                <div th:each="doc : ${documentos}" class="border rounded p-2 mb-2">
+                <div th:each="doc : ${documentos}" class="border rounded p-2 mb-2 shadow-sm"
+                     th:classappend="${doc.tipoDocumento.name() == 'EXPEDIENTE_COMPLETO'} ? 'bg-primary bg-opacity-10 border-primary border-2' : ''">
                     <div class="row align-items-center g-2">
 
                         <!-- IZQUIERDA -->
@@ -350,8 +387,12 @@
                         <!-- DERECHA -->
                         <div class="col-md-4 d-flex justify-content-md-end align-items-center gap-2 flex-wrap">
                         
+                            <button type="button" class="btn btn-sm btn-outline-warning fw-semibold" data-bs-toggle="modal" th:data-bs-target="'#editarDocModal-' + ${doc.id}">
+                                <i class="bi bi-pencil-square"></i> Gestión PDF
+                            </button>
 
                             <a th:href="@{/documentos/ver/{id}(id=${doc.id})}"
+                               target="_blank"
                                class="btn btn-sm btn-outline-primary">
                                 Ver
                             </a>
@@ -360,8 +401,98 @@
                                class="btn btn-sm btn-outline-secondary">
                                 Descargar
                             </a>
+
+                            <form sec:authorize="hasRole('ADMIN')" th:action="@{/documentos/eliminar/{id}(id=${doc.id})}"
+                                  method="post"
+                                  onsubmit="return confirm('¿Seguro que quieres eliminar este documento?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                            </form>
                         </div>
 
+                    </div>
+
+                    <!-- Modal Editar/Extraer Documento -->
+                    <div class="modal fade" th:id="'editarDocModal-' + ${doc.id}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-xl">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Gestión de Documento PDF: <strong class="text-primary" th:text="${doc.nombreArchivoOriginal}"></strong></h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="row">
+                                        <!-- Columna de previsualización -->
+                                        <div class="col-lg-7 mb-3">
+                                            <div class="border rounded overflow-hidden shadow-sm" style="height: 600px; background-color: #f8f9fa;">
+                                                <iframe th:src="@{/documentos/ver/{id}(id=${doc.id})}" 
+                                                        style="width: 100%; height: 100%; border: none;"></iframe>
+                                            </div>
+                                        </div>
+                                        <!-- Columna de formularios -->
+                                        <div class="col-lg-5">
+                                            <ul class="nav nav-tabs" role="tablist">
+                                              <li class="nav-item" role="presentation">
+                                                <button class="nav-link active" data-bs-toggle="tab" th:data-bs-target="'#edit-' + ${doc.id}" type="button" role="tab">Editar Metadatos</button>
+                                              </li>
+                                              <li class="nav-item" role="presentation">
+                                                <button class="nav-link" data-bs-toggle="tab" th:data-bs-target="'#extract-' + ${doc.id}" type="button" role="tab"><i class="bi bi-files"></i> Extraer Páginas</button>
+                                              </li>
+                                            </ul>
+                                            
+                                            <div class="tab-content pt-3">
+                                                <!-- Tab Editar -->
+                                                <div class="tab-pane fade show active" th:id="'edit-' + ${doc.id}" role="tabpanel">
+                                                    <form th:action="@{/documentos/editar/{id}(id=${doc.id})}" method="post">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Nombre del Archivo</label>
+                                                            <input type="text" name="nuevoNombreArchivo" class="form-control" th:value="${doc.nombreArchivoOriginal}" required>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Tipo de Documento</label>
+                                                            <select name="nuevoTipoDocumento" class="form-select" required>
+                                                                <option th:each="tipo : ${tiposDocumento}"
+                                                                        th:value="${tipo}"
+                                                                        th:text="${tipo}"
+                                                                        th:selected="${tipo == doc.tipoDocumento}"></option>
+                                                            </select>
+                                                        </div>
+                                                        <button type="submit" class="btn btn-primary w-100">Guardar Cambios</button>
+                                                    </form>
+                                                </div>
+                                                
+                                                <!-- Tab Extraer -->
+                                                <div class="tab-pane fade" th:id="'extract-' + ${doc.id}" role="tabpanel">
+                                                    <div class="alert alert-info small shadow-sm">
+                                                        Separa páginas específicas de este archivo original y guárdalas en un documento independiente. El original no se alterará.
+                                                    </div>
+                                                    <form th:action="@{/documentos/extraer/{id}(id=${doc.id})}" method="post">
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-bold">Páginas a extraer</label>
+                                                            <input type="text" name="rangoPaginas" class="form-control" placeholder="Ej: 1, 3, 5-7" required>
+                                                            <div class="form-text">Usa comas para separar páginas y guiones para rangos. (Todo junto 1,2,5-8)</div>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Nombre del nuevo archivo</label>
+                                                            <input type="text" name="nuevoNombreArchivo" class="form-control" th:value="'extract_' + ${doc.nombreArchivoOriginal}" required>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Clasificar nuevo documento como</label>
+                                                            <select name="nuevoTipoDocumento" class="form-select" required>
+                                                                <option value="">-- Selecciona un tipo --</option>
+                                                                <option th:each="tipo : ${tiposDocumento}"
+                                                                        th:value="${tipo}"
+                                                                        th:text="${tipo}"></option>
+                                                            </select>
+                                                        </div>
+                                                        <button type="submit" class="btn btn-warning w-100 fw-bold"><i class="bi bi-scissors me-1"></i> Extraer y Crear Documento</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                 </div>

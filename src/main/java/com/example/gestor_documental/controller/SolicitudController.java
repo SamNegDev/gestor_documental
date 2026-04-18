@@ -24,6 +24,7 @@ import com.example.gestor_documental.model.Incidencia;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.TipoIncidenciaService;
 import com.example.gestor_documental.service.IncidenciaService;
+import com.example.gestor_documental.service.MensajeService;
 
 @Controller
 @RequiredArgsConstructor
@@ -38,6 +39,7 @@ public class SolicitudController {
     private final TipoIncidenciaService tipoIncidenciaService;
     private final IncidenciaService incidenciaService;
     private final HistorialCambioService historialCambioService;
+    private final MensajeService mensajeService;
 
     @GetMapping
     public String listarSolicitudes(Authentication authentication, Model model,
@@ -136,6 +138,7 @@ public class SolicitudController {
 
         model.addAttribute("solicitud", solicitud);
         model.addAttribute("incidencias", incidencias);
+        model.addAttribute("mensajes", mensajeService.listarPorSolicitud(id));
         model.addAttribute("tiposIncidencia", tipoIncidenciaService.listarTodosActivos());
         model.addAttribute("usuarioLogueado", usuarioLogueado);
         model.addAttribute("titulo", "Solicitud de Expediente");
@@ -171,6 +174,24 @@ public class SolicitudController {
         try {
             solicitudService.cambiarEstadoSolicitud(id, nuevoEstado, admin);
             redirectAttributes.addFlashAttribute("success", "Estado actualizado correctamente");
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+
+        return "redirect:/solicitudes/" + id;
+    }
+
+    @PostMapping("/{id}/mensajes")
+    public String añadirMensajeSolicitud(@PathVariable Long id,
+            @RequestParam String contenido,
+            Authentication authentication,
+            RedirectAttributes redirectAttributes) {
+
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+
+        try {
+            mensajeService.añadirASolicitud(id, contenido, usuarioLogueado);
+            redirectAttributes.addFlashAttribute("success", "Mensaje enviado correctamente");
         } catch (RuntimeException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
