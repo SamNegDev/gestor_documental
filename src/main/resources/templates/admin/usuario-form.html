@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/app}">
+
+<section layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="section-title mb-1" th:text="${usuario.id != null ? 'Editar Usuario' : 'Nuevo Usuario'}"></h4>
+            <p class="text-muted mb-0">Completa la información del usuario</p>
+        </div>
+        <a th:href="@{/admin/usuarios}" class="btn btn-outline-secondary">Volver al listado</a>
+    </div>
+
+    <div class="card soft-card">
+        <div class="card-body p-4">
+            <form th:action="@{/admin/usuarios/guardar}" method="post" th:object="${usuario}">
+                
+                <input type="hidden" th:field="*{id}">
+
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label class="form-label form-label-required">Nombre</label>
+                        <input type="text" class="form-control" th:field="*{nombre}" required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label form-label-required">Apellidos</label>
+                        <input type="text" class="form-control" th:field="*{apellidos}" required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label form-label-required">Email</label>
+                        <input type="email" class="form-control" th:field="*{email}" required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" th:classappend="${usuario.id == null ? 'form-label-required' : ''}">Contraseña</label>
+                        <input type="password" class="form-control" th:field="*{password}"
+                               th:placeholder="${usuario.id != null ? 'Dejar en blanco para mantener actual' : 'Introduce la contraseña'}"
+                               th:required="${usuario.id == null}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label form-label-required">Rol de Usuario</label>
+                        <select class="form-select" th:field="*{rolUsuario}" required>
+                            <option value="" selected disabled>Selecciona un rol</option>
+                            <option th:each="rol : ${roles}"
+                                    th:value="${rol}"
+                                    th:text="${rol}">
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6" id="clienteSelectContainer">
+                        <label class="form-label">Cliente Asignado (Solo rol CLIENTE)</label>
+                        <select class="form-select" name="clienteId">
+                            <option value="">Ninguno</option>
+                            <option th:each="cliente : ${clientes}"
+                                    th:value="${cliente.id}"
+                                    th:text="${cliente.nombre}"
+                                    th:selected="${usuario.cliente != null and usuario.cliente.id == cliente.id}">
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="form-check form-switch mt-3">
+                            <input class="form-check-input" type="checkbox" id="activoSwitch" th:field="*{activo}" th:checked="*{activo}">
+                            <label class="form-check-label" for="activoSwitch">
+                                Usuario Activo
+                            </label>
+                            <div class="form-text">Los usuarios inactivos no podrán iniciar sesión y solo ellos podrán ser eliminados del sistema.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a th:href="@{/admin/usuarios}" class="btn btn-outline-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">
+                        <span th:text="${usuario.id != null ? 'Guardar Cambios' : 'Crear Usuario'}"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</section>
+
+<!-- Añadimos in poquito de script al final para ocultar/mostrar cliente segun rol, aunque no es estricto -->
+<script th:inline="javascript">
+    document.addEventListener("DOMContentLoaded", function() {
+        const rolSelect = document.getElementById('rolUsuario');
+        const clienteContainer = document.getElementById('clienteSelectContainer');
+
+        function toggleClienteOptions() {
+            if (rolSelect.value === 'CLIENTE') {
+                clienteContainer.style.display = 'block';
+            } else {
+                clienteContainer.style.display = 'none';
+                // Reset select
+                clienteContainer.querySelector('select').value = '';
+            }
+        }
+
+        rolSelect.addEventListener('change', toggleClienteOptions);
+        // Call once on load
+        toggleClienteOptions();
+    });
+</script>
+
+</html>

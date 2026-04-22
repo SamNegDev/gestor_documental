@@ -12,8 +12,6 @@ import com.example.gestor_documental.service.MensajeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -39,12 +37,12 @@ public class MensajeServiceImpl implements MensajeService {
     public Mensaje añadirAExpediente(Long expedienteId, String contenido, Usuario autor) {
         Expediente expediente = expedienteRepository.findById(expedienteId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
-                
+
         Mensaje mensaje = new Mensaje();
         mensaje.setExpediente(expediente);
         mensaje.setContenido(contenido);
         mensaje.setAutor(autor);
-        
+
         return mensajeRepository.save(mensaje);
     }
 
@@ -53,12 +51,12 @@ public class MensajeServiceImpl implements MensajeService {
     public Mensaje añadirASolicitud(Long solicitudId, String contenido, Usuario autor) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
-                
+
         Mensaje mensaje = new Mensaje();
         mensaje.setSolicitud(solicitud);
         mensaje.setContenido(contenido);
         mensaje.setAutor(autor);
-        
+
         return mensajeRepository.save(mensaje);
     }
 }

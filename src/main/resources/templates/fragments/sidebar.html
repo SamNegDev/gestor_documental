@@ -11,8 +11,7 @@
             <a class="nav-link" th:href="@{/admin/dashboard}">Dashboard</a>
             <a class="nav-link" th:href="@{/solicitudes}">Solicitudes</a>
             <a class="nav-link" th:href="@{/expedientes}">Expedientes</a>
-            <a class="nav-link" href="#">Panel admin</a>
-            <a class="nav-link" href="#">Usuarios</a>
+            <a class="nav-link" th:href="@{/admin/usuarios}">Usuarios</a>
         </th:block>
 
         <th:block th:if="${usuarioLogueado != null and usuarioLogueado.rolUsuario.name() == 'CLIENTE'}">

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+    layout:decorate="~{layout/app}">
+
+<section layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="section-title mb-1">Usuarios</h4>
+            <p class="text-muted mb-0">Gestiona los usuarios registrados en el sistema</p>
+        </div>
+
+        <a th:href="@{/admin/usuarios/nuevo}" class="btn btn-primary">
+            + Nuevo usuario
+        </a>
+    </div>
+
+    <div class="card soft-card">
+        <div class="card-body">
+
+            <div th:if="${usuarios == null or usuarios.isEmpty()}" class="empty-state">
+                No hay usuarios registrados en el sistema.
+            </div>
+
+            <div class="table-responsive" th:if="${usuarios != null and !usuarios.isEmpty()}">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Email</th>
+                            <th>Rol</th>
+                            <th>Cliente Asignado</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="usuario : ${usuarios}">
+                            <td th:text="${usuario.id}"></td>
+                            <td th:text="${usuario.nombre + ' ' + usuario.apellidos}"></td>
+                            <td th:text="${usuario.email}"></td>
+
+                            <td>
+                                <span class="badge"
+                                    th:classappend="${usuario.rolUsuario.name() == 'ADMIN'} ? 'bg-danger' : 'bg-info'"
+                                    th:text="${usuario.rolUsuario}"></span>
+                            </td>
+
+                            <td th:text="${usuario.cliente != null ? usuario.cliente.nombre : '-'}"></td>
+
+                            <td>
+                                <span class="badge" th:classappend="${usuario.activo} ? 'bg-success' : 'bg-secondary'"
+                                    th:text="${usuario.activo ? 'Activo' : 'Inactivo'}">
+                                </span>
+                            </td>
+
+                            <td>
+                                <div class="d-flex gap-2">
+                                    <a th:href="@{/admin/usuarios/editar/{id}(id=${usuario.id})}"
+                                        class="btn btn-sm btn-outline-primary">
+                                        Editar
+                                    </a>
+
+                                    <form th:if="${!usuario.activo}"
+                                        th:action="@{/admin/usuarios/eliminar/{id}(id=${usuario.id})}" method="post"
+                                        onsubmit="return confirm('¿Estás seguro de que deseas eliminar permanentemente este usuario?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+</html>
