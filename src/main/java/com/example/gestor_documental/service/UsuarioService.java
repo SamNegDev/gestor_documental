@@ -16,4 +16,10 @@ public interface UsuarioService {
     Usuario guardar(Usuario usuario);
 
     void eliminarPorId(Long id);
+
+    Usuario crearUsuario(Usuario usuario, Long clienteId, String rawPassword);
+
+    Usuario actualizarUsuario(Long id, Usuario datosNuevos, Long clienteId, String newRawPassword);
+
+    void eliminarUsuarioSeguro(Long id);
 }

@@ -6,7 +6,6 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -20,7 +19,6 @@ public class AdminUsuarioController {
 
     private final UsuarioService usuarioService;
     private final ClienteService clienteService;
-    private final PasswordEncoder passwordEncoder;
 
     @ModelAttribute("usuarioLogueado")
     public Usuario getUsuarioLogueado(Authentication authentication) {
@@ -67,41 +65,11 @@ public class AdminUsuarioController {
                                  @RequestParam(value = "clienteId", required = false) Long clienteId,
                                  RedirectAttributes redirectAttributes) {
         
-        if (clienteId != null) {
-            Cliente cliente = clienteService.buscarPorId(clienteId).orElse(null);
-            usuario.setCliente(cliente);
-        } else {
-            usuario.setCliente(null);
-        }
-
         if (usuario.getId() != null) {
-            // Es edición
-            Usuario existente = usuarioService.buscarPorId(usuario.getId())
-                    .orElseThrow(() -> new IllegalArgumentException("Usuario no válido: " + usuario.getId()));
-            
-            existente.setNombre(usuario.getNombre());
-            existente.setApellidos(usuario.getApellidos());
-            existente.setEmail(usuario.getEmail());
-            existente.setRolUsuario(usuario.getRolUsuario());
-            existente.setActivo(usuario.isActivo());
-            existente.setCliente(usuario.getCliente());
-            
-            // Si llega una nueva clave, la codificamos y guardamos
-            if (usuario.getPassword() != null && !usuario.getPassword().trim().isEmpty()) {
-                existente.setPassword(passwordEncoder.encode(usuario.getPassword().trim()));
-            }
-            
-            usuarioService.guardar(existente);
+            usuarioService.actualizarUsuario(usuario.getId(), usuario, clienteId, usuario.getPassword());
             redirectAttributes.addFlashAttribute("success", "Usuario modificado correctamente");
-            
         } else {
-            // Es nuevo usuario
-            if (usuario.getPassword() == null || usuario.getPassword().trim().isEmpty()) {
-                 usuario.setPassword(passwordEncoder.encode("Gestoria123!")); // Default en caso de venir vacio por algun motivo, aunque en front validaremos
-            } else {
-                 usuario.setPassword(passwordEncoder.encode(usuario.getPassword().trim()));
-            }
-            usuarioService.guardar(usuario);
+            usuarioService.crearUsuario(usuario, clienteId, usuario.getPassword());
             redirectAttributes.addFlashAttribute("success", "Usuario creado correctamente");
         }
 
@@ -110,18 +78,13 @@ public class AdminUsuarioController {
 
     @PostMapping("/eliminar/{id}")
     public String eliminarUsuario(@PathVariable Long id, RedirectAttributes redirectAttributes) {
-        Usuario usuario = usuarioService.buscarPorId(id)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no válido: " + id));
-
-        if (!usuario.isActivo()) {
-            try {
-                usuarioService.eliminarPorId(id);
-                redirectAttributes.addFlashAttribute("success", "Usuario eliminado correctamente definitivamente.");
-            } catch (Exception e) {
-                 redirectAttributes.addFlashAttribute("error", "No se puede eliminar el usuario porque tiene registros asociados. (Se mantiene Inactivo).");
-            }
-        } else {
-            redirectAttributes.addFlashAttribute("error", "El usuario debe estar inactivo para poder ser eliminado.");
+        try {
+            usuarioService.eliminarUsuarioSeguro(id);
+            redirectAttributes.addFlashAttribute("success", "Usuario eliminado correctamente definitivamente.");
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "No se puede eliminar el usuario porque tiene registros asociados. (Se mantiene Inactivo).");
         }
         
         return "redirect:/admin/usuarios";

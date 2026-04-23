@@ -127,6 +127,10 @@ public class SolicitudServiceImpl implements SolicitudService {
         return solicitudGuardada;
     }
 
+    /**
+     * Verifica la integridad de los interesados al crear o actualizar una Solicitud.
+     * Regla estricta: Impide que los dos interesados (ej. titular y comprador) posean el mismo DNI.
+     */
     private void validarInteresadosSolicitud(Solicitud solicitud) {
         validarInteresadoSolicitud(
                 solicitud.getInteresado1Nombre(),
@@ -161,6 +165,10 @@ public class SolicitudServiceImpl implements SolicitudService {
         }
     }
 
+    /**
+     * Valida que un bloque de interesado esté completamente vacío o completamente lleno.
+     * No se permite dejar huérfanos datos parciales de un interesado (ej. solo el nombre pero sin DNI ni rol).
+     */
     private void validarInteresadoSolicitud(String nombre, String dni, RolInteresado rol, String etiqueta) {
         if (interesadoSolicitudVacio(nombre, dni, rol)) {
             return;
@@ -183,6 +191,14 @@ public class SolicitudServiceImpl implements SolicitudService {
                 && rol != null;
     }
 
+    /**
+     * Transforma una Solicitud validada en un Expediente formal.
+     * Reglas clave:
+     * - Bloquea la conversión si la solicitud está RECHAZADA, ya CONVERTIDA o ya posee un expediente.
+     * - Mapea los interesados planos de la solicitud al formato DTO para aplicar la validación 
+     *   estricta de duplicidad de DNIs propia del núcleo de Expedientes.
+     * - Traspasa la propiedad de los Documentos asociados de la Solicitud al nuevo Expediente sin duplicar archivos.
+     */
     @Override
     @Transactional
     public Expediente convertirAExpediente(Long solicitudId, Usuario admin) {
@@ -246,6 +262,13 @@ public class SolicitudServiceImpl implements SolicitudService {
         return expedienteGuardado;
     }
 
+    /**
+     * Modifica el estado de una Solicitud aplicando bloqueos de seguridad y negocio.
+     * Reglas clave:
+     * - Impide alteraciones manuales si la solicitud ya finalizó su ciclo (CONVERTIDA o RECHAZADA).
+     * - Si se intenta retomar su tramitación (volver a PENDIENTE_REVISION), el sistema aborta 
+     *   la acción si aún existen incidencias en rojo sin subsanar.
+     */
     @Override
     @Transactional
     public void cambiarEstadoSolicitud(Long id, EstadoSolicitud nuevoEstado, Usuario usuarioLogueado) {

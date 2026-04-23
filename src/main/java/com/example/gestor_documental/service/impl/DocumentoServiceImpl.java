@@ -44,6 +44,13 @@ public class DocumentoServiceImpl implements DocumentoService {
         guardarParaExpediente(expedienteId, archivo, tipoDocumento, null);
     }
 
+    /**
+     * Guarda físicamente un PDF asociado a un Expediente.
+     * Caso crítico: Si el archivo se sube con el prefijo "EXPEDIENTE_COMPLETO", opera como puente automático.
+     * No solo guarda el original, sino que desencadena el servicio de OCR para detectar y despiezar
+     * (split) automáticamente las partes internas del documento generando un histórico de registros 
+     * asíncronos bajo el mismo documento base.
+     */
     @Override
     public void guardarParaExpediente(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento,
             Usuario usuario) {
@@ -107,6 +114,11 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
     }
 
+    /**
+     * Similar a guardarParaExpediente, pero asociado a una Solicitud abierta.
+     * Detectará automáticamente archivos compuestos y los fragmentará usando el OCR si se designa
+     * el tipo especial EXPEDIENTE_COMPLETO como bandera.
+     */
     @Override
     public void guardarParaSolicitud(Long solicitudId, MultipartFile archivo, TipoDocumento tipoDocumento,
             Usuario usuario) {
@@ -331,6 +343,12 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
     }
 
+    /**
+     * DANGER (Operación Mutativa): Fracciona un PDF cortando páginas desde un documento maestro hacia uno nuevo.
+     * Regla estricta: Esta acción es "Destructiva" para el original. El archivo original pierde físicamente
+     * las páginas extraídas para evitar duplicidades de información en la Gestoría. 
+     * Usa pdfSplitService para reescribir in situ el PDF origen sin el rango extraído.
+     */
     @Override
     public void extraerPaginasDocumento(Long idOriginal, String rangoPaginas, TipoDocumento nuevoTipo,
             String nuevoNombre, Usuario usuario) {

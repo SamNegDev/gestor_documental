@@ -25,6 +25,12 @@ public class OcrPdfServiceImpl implements OcrPdfService {
 
     private final OcrProperties ocrProperties;
 
+    /**
+     * Extrae y evalúa el texto OCR de cada página independiente de un PDF.
+     * Magia principal: Agrupa de manera contigua las páginas. Si las páginas 1, 2 y 3 
+     * se detectan como el mismo tipo (ej. CONTRATO), las empaqueta en un solo bloque 
+     * en lugar de separarlas en 3 documentos individuales. Si no detecta el tipo, lo envía a OTROS.
+     */
     @Override
     public List<DocumentoDetectadoDto> detectarDocumentos(MultipartFile archivo) {
         if (archivo == null || archivo.isEmpty()) {
@@ -135,6 +141,10 @@ public class OcrPdfServiceImpl implements OcrPdfService {
         }
     }
 
+    /**
+     * Mapea un texto extraído vía Tesseract hacia un tipo de documento del sistema (Enum).
+     * Se fundamenta en comprobar palabras clave recurrentes que definen el patrón del documento.
+     */
     private TipoDocumento detectarTipoDocumento(String texto) {
         if (texto == null || texto.isBlank()) {
             return null;

@@ -35,6 +35,11 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         return incidenciaRepository.findBySolicitudId(solicitudId);
     }
 
+    /**
+     * Abre una incidencia y fuerza la detención virtual del expediente.
+     * Efecto secundario (Automático): Degrada el estado del Expediente general 
+     * a 'INCIDENCIA' paralizando su avance.
+     */
     @Override
     @Transactional
     public Incidencia crearIncidenciaExpediente(Long expedienteId, Long tipoIncidenciaId, String observaciones, Usuario admin) {
@@ -68,6 +73,11 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         return incidencia;
     }
 
+    /**
+     * Idéntico a Expediente, pero aplicable a Solicitudes.
+     * Efecto secundario (Automático): Cambia el estado directo de la Solicitud 
+     * a 'PENDIENTE_DOCUMENTACION' para requerir intervención del usuario.
+     */
     @Override
     @Transactional
     public Incidencia crearIncidenciaSolicitud(Long solicitudId, Long tipoIncidenciaId, String observaciones, Usuario admin) {
@@ -100,6 +110,12 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         return incidencia;
     }
 
+    /**
+     * Acción invocada típicamente por el Cliente desde el portal para notificar que 
+     * ha subido los datos faltantes que provocaron una incidencia.
+     * Efecto secundario (Automático): Si el Expediente estaba detenido en 'INCIDENCIA', 
+     * avanza su estado a 'REVISANDO_INCIDENCIAS' enviando la pelota al tejado del Administrador.
+     */
     @Override
     @Transactional
     public void solicitarRevisionExpediente(Long expedienteId, Usuario cliente) {
@@ -118,6 +134,11 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         }
     }
 
+    /**
+     * Reflejo de su contraparte en Expedientes.
+     * Efecto secundario (Automático): Escala la Solicitud desde 'PENDIENTE_DOCUMENTACION' 
+     * hasta 'REVISANDO_INCIDENCIAS' para alertar al Administrador.
+     */
     @Override
     @Transactional
     public void solicitarRevisionSolicitud(Long solicitudId, Usuario cliente) {

@@ -57,6 +57,13 @@ public class PdfSplitServiceImpl implements PdfSplitService {
         }
     }
 
+    /**
+     * Procesa un string de entrada humano (ej: "1, 3-5, 8") y lo convierte en una lista de índices.
+     * CUIDADO (Desfase de Índice): El usuario introduce los números asumiendo que la página 1 es la inicial 
+     * (1-indexed). Sin embargo, Apache PDFBox requiere arrays en base cero (0-indexed).
+     * Este método resta -1 automáticamente a todos los números e ignora los índices que 
+     * queden fuera del rango real de totalPaginas.
+     */
     @Override
     public List<Integer> parseRangoPaginas(String rango, int totalPaginas) {
         if (rango == null || rango.trim().isEmpty()) {
