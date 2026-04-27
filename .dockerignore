@@ -1,0 +1,11 @@
+.git
+.gitignore
+.idea
+.vscode
+target
+uploads
+*.log
+*.tmp
+.env
+application-local.properties
+src/main/resources/application-prod.properties

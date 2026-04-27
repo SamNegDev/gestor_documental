@@ -41,6 +41,7 @@ public class InitialAdminInitializer implements ApplicationRunner {
 
         Usuario admin = new Usuario();
         admin.setNombre("Administrador");
+        admin.setApellidos("Sistema");
         admin.setEmail(adminEmail);
         admin.setPassword(passwordEncoder.encode(adminPassword));
         admin.setRolUsuario(RolUsuario.ADMIN);
