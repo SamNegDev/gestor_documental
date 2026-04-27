@@ -48,8 +48,7 @@ public class OcrPdfServiceImpl implements OcrPdfService {
 
             for (int i = 0; i < totalPaginas; i++) {
                 BufferedImage imagen = renderer.renderImageWithDPI(
-                        i,
-                       200,
+                        i,ocrProperties.getDpi(),
                         ImageType.GRAY
                 );
 
@@ -127,7 +126,7 @@ public class OcrPdfServiceImpl implements OcrPdfService {
         // Motor LSTM
         tesseract.setOcrEngineMode(1);
 
-        tesseract.setVariable("user_defined_dpi", "200");
+        tesseract.setVariable("user_defined_dpi", String.valueOf((int) ocrProperties.getDpi()));
 
         return tesseract;
     }
