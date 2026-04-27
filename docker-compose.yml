@@ -50,6 +50,7 @@ services:
       MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE}
       LOG_FILE: ${LOG_FILE}
       TESSERACT_DATAPATH: ${TESSERACT_DATAPATH}
+      TESSDATA_PREFIX: ${TESSERACT_DATAPATH}
       COOKIE_SECURE: ${COOKIE_SECURE}
     volumes:
       - ./uploads:/app/uploads

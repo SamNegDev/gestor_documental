@@ -36,10 +36,13 @@ build/
 uploads/
 
 # Configuración sensible/local
+.env
+.env.*
+!.env.example
 application-local.properties
-application-prod.properties
 
 # Logs adicionales
+logs/
 *.log
 
 # Archivos del sistema

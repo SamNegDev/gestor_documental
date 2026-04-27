@@ -16,11 +16,7 @@ public class InteresadoFormDto {
 
     @Size(max = 120, message = "El nombre no debe tener mas de 120 caracteres")
     private String nombre;
-    @Size(max = 9, message = "El DNI/NIE no puede superar los 9 caracteres")
-    @Pattern(
-            regexp = "^([0-9]{8}[A-Za-z]|[XYZ][0-9]{7}[A-Za-z])$",
-            message = "El DNI/NIE no tiene un formato válido"
-    )
+    @Size(max = 20, message = "El DNI/NIE no puede superar los 20 caracteres")
     private String dni;
     @Size(max = 20, message = "El telefono no puede superar los 20 caracteres")
     private String telefono;

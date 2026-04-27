@@ -133,6 +133,7 @@ public class ExpedienteController {
 
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(email);
 
+
         if (!expedienteService.tienePermisoExpediente(expediente, usuarioLogueado)) {
             throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
         }
@@ -153,6 +154,7 @@ public class ExpedienteController {
         model.addAttribute("titulo", "Detalle Expediente");
         model.addAttribute("subtitulo", "Datos del expediente y documentos asociados");
         model.addAttribute("tiposDocumento", TipoDocumento.values());
+
 
         return "expedientes/detalle";
     }
@@ -192,4 +194,7 @@ public class ExpedienteController {
 
         return "redirect:/expedientes/" + id;
     }
+
+
+
 }

@@ -34,6 +34,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 
         @ExceptionHandler(Exception.class)
         public String handleGeneric(Exception ex, Model model) {
+            ex.printStackTrace(); // Log the exception so it can be seen in Docker logs
             model.addAttribute("titulo", "Se ha producido un error");
             model.addAttribute("mensaje", "Ha ocurrido un problema inesperado en la aplicación.");
             model.addAttribute("tipo", "danger");

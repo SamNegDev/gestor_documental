@@ -33,7 +33,7 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     public Usuario buscarPorEmail(String email) {
-        return usuarioRepository.findByEmail(email)
+        return usuarioRepository.findWithClienteByEmail(email)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
     }
 

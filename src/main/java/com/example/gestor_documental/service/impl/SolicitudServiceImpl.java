@@ -62,6 +62,9 @@ public class SolicitudServiceImpl implements SolicitudService {
 
     @Override
     public boolean tienePermisoSolicitud(Solicitud solicitud, Usuario usuario) {
+        if (usuario == null) {
+            return false;
+        }
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
             return true;
         }
@@ -227,10 +230,18 @@ public class SolicitudServiceImpl implements SolicitudService {
         expediente.setCreadoPor(admin);
 
         Expediente expedienteGuardado = expedienteRepository.save(expediente);
+        historialCambioService.registrarCambioExpediente(
+                expedienteGuardado,
+                admin,
+                "CREACIÓN DESDE SOLICITUD",
+                "Expediente creado desde solicitud ID" + solicitud.getId());
+
+
         solicitud.setEstadoSolicitud(EstadoSolicitud.CONVERTIDA);
         asociarDocumentosSolicitudAExpediente(solicitud, expedienteGuardado);
         solicitud.setExpediente(expedienteGuardado);
         solicitudRepository.save(solicitud);
+
 
 
          InteresadoFormDto interesado1dto = new InteresadoFormDto();

@@ -66,6 +66,9 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
     @Override
     public boolean tienePermisoExpediente(Expediente expediente, Usuario usuario) {
+        if (usuario == null) {
+            return false;
+        }
 
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
             return true;
@@ -146,12 +149,14 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     }
 
     /**
-     * Modifica el estado de un expediente aplicando bloqueos de seguridad y negocio.
+     * Modifica el estado de un expediente aplicando bloqueos de seguridad y
+     * negocio.
      * Reglas clave:
      * - Solo un usuario administrador puede alterar los estados.
-     * - No se puede alterar el estado de un expediente que ya se marcó como FINALIZADO.
-     * - Impide la transición a EN_TRAMITE o FINALIZADO si el expediente posee 
-     *   incidencias activas que no han sido resueltas previamente.
+     * - No se puede alterar el estado de un expediente que ya se marcó como
+     * FINALIZADO.
+     * - Impide la transición a EN_TRAMITE o FINALIZADO si el expediente posee
+     * incidencias activas que no han sido resueltas previamente.
      */
     @Override
     @Transactional
@@ -212,8 +217,10 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     }
 
     /**
-     * Valida que, si un interesado tiene algún dato rellenado, estén obligatoriamente todos 
-     * los datos esenciales completados (Nombre, DNI y Rol). Evita la creación de interesados "a medias".
+     * Valida que, si un interesado tiene algún dato rellenado, estén
+     * obligatoriamente todos
+     * los datos esenciales completados (Nombre, DNI y Rol). Evita la creación de
+     * interesados "a medias".
      */
     private void validarInteresado(InteresadoFormDto dto, String nombreInteresado) {
         if (interesadoVacio(dto)) {
@@ -226,8 +233,10 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     }
 
     /**
-     * Verifica la integridad del conjunto de interesados antes de guardar un Expediente.
-     * Regla estricta: Si se introducen dos interesados, no pueden tener el mismo DNI 
+     * Verifica la integridad del conjunto de interesados antes de guardar un
+     * Expediente.
+     * Regla estricta: Si se introducen dos interesados, no pueden tener el mismo
+     * DNI
      * (un cliente no puede ser comprador y vendedor a la vez en el mismo trámite).
      */
     public void validarInteresados(InteresadoFormDto interesado1, InteresadoFormDto interesado2) {
@@ -245,9 +254,11 @@ public class ExpedienteServiceImpl implements ExpedienteService {
      * Inicializa un Expediente validando y procesando a sus interesados.
      * Reglas clave:
      * - Verifica de forma estricta que los DNIs introducidos no sean idénticos.
-     * - Si un interesado (por DNI) ya existe previamente en el sistema (ej. un cliente habitual),
-     *   reutiliza su registro en base de datos. De lo contrario, lo crea desde cero antes de 
-     *   asignarlo al expediente con su rol específico (Ej: VENDEDOR, COMPRADOR).
+     * - Si un interesado (por DNI) ya existe previamente en el sistema (ej. un
+     * cliente habitual),
+     * reutiliza su registro en base de datos. De lo contrario, lo crea desde cero
+     * antes de
+     * asignarlo al expediente con su rol específico (Ej: VENDEDOR, COMPRADOR).
      */
     @Override
     @Transactional

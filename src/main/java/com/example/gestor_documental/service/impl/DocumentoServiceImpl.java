@@ -14,7 +14,9 @@ import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -38,6 +40,9 @@ public class DocumentoServiceImpl implements DocumentoService {
     private final OcrPdfService ocrPdfService;
     private final PdfSplitService pdfSplitService;
     private final HistorialCambioService historialCambioService;
+
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
 
     @Override
     public void guardar(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento) {
@@ -221,10 +226,13 @@ public class DocumentoServiceImpl implements DocumentoService {
 
         String nombreUnico = UUID.randomUUID() + "_" + nombreOriginal;
 
-        Path carpetaUploads = Paths.get("uploads");
+        Path carpetaUploads = obtenerCarpetaUploads();
         Files.createDirectories(carpetaUploads);
 
-        Path rutaArchivo = carpetaUploads.resolve(nombreUnico);
+        Path rutaArchivo = carpetaUploads.resolve(nombreUnico).normalize();
+        if (!rutaArchivo.startsWith(carpetaUploads)) {
+            throw new OperacionInvalidaException("Ruta de archivo no permitida");
+        }
         Files.copy(archivo.getInputStream(), rutaArchivo, StandardCopyOption.REPLACE_EXISTING);
 
         Documento doc = new Documento();
@@ -246,10 +254,13 @@ public class DocumentoServiceImpl implements DocumentoService {
 
         String nombreUnico = UUID.randomUUID() + "_" + nombreArchivoOriginal;
 
-        Path carpetaUploads = Paths.get("uploads");
+        Path carpetaUploads = obtenerCarpetaUploads();
         Files.createDirectories(carpetaUploads);
 
-        Path rutaArchivo = carpetaUploads.resolve(nombreUnico);
+        Path rutaArchivo = carpetaUploads.resolve(nombreUnico).normalize();
+        if (!rutaArchivo.startsWith(carpetaUploads)) {
+            throw new OperacionInvalidaException("Ruta de archivo no permitida");
+        }
         Files.write(rutaArchivo, contenido);
 
         Documento doc = new Documento();
@@ -268,16 +279,20 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     @Override
     public Long eliminar(Long id) {
-        Documento documento = documentoRepository.findById(id)
+        Documento documento = documentoRepository.findByIdConRelaciones(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Documento no encontrado"));
 
         Long entidadId = documento.getExpediente() != null
                 ? documento.getExpediente().getId()
                 : documento.getSolicitud().getId();
 
-        Path rutaArchivo = Paths.get("uploads").resolve(documento.getNombreArchivo());
+        Path rutaArchivo = obtenerCarpetaUploads().resolve(documento.getNombreArchivo()).normalize();
 
         try {
+            Path carpetaUploads = obtenerCarpetaUploads();
+            if (!rutaArchivo.startsWith(carpetaUploads)) {
+                throw new OperacionInvalidaException("Ruta de archivo no permitida");
+            }
             if (Files.exists(rutaArchivo)) {
                 Files.delete(rutaArchivo);
             }
@@ -291,8 +306,9 @@ public class DocumentoServiceImpl implements DocumentoService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Documento obtenerDocumentoConPermiso(Long documentoId, Usuario usuario) {
-        Documento documento = documentoRepository.findById(documentoId)
+        Documento documento = documentoRepository.findByIdConRelaciones(documentoId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Documento no encontrado"));
 
         if (documento.getExpediente() != null &&
@@ -309,6 +325,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     }
 
     @Override
+    @Transactional
     public void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Usuario usuario) {
         Documento documento = obtenerDocumentoConPermiso(id, usuario);
 
@@ -342,11 +359,12 @@ public class DocumentoServiceImpl implements DocumentoService {
      * extraído.
      */
     @Override
+    @Transactional
     public void extraerPaginasDocumento(Long idOriginal, String rangoPaginas, TipoDocumento nuevoTipo,
             String nuevoNombre, Usuario usuario) {
         Documento documentoOriginal = obtenerDocumentoConPermiso(idOriginal, usuario);
 
-        Path rutaOriginal = Paths.get("uploads").resolve(documentoOriginal.getNombreArchivo()).normalize();
+        Path rutaOriginal = obtenerCarpetaUploads().resolve(documentoOriginal.getNombreArchivo()).normalize();
 
         try {
             if (!Files.exists(rutaOriginal)) {
@@ -387,6 +405,11 @@ public class DocumentoServiceImpl implements DocumentoService {
             throw new RuntimeException("Error al leer o sobrescribir el archivo original físico al extraer páginas.",
                     e);
         }
+    }
+
+
+    private Path obtenerCarpetaUploads() {
+        return Paths.get(uploadDir).toAbsolutePath().normalize();
     }
 
 }
