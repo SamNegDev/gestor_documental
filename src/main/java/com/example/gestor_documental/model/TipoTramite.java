@@ -28,5 +28,15 @@ public class TipoTramite {
     @Column(nullable = false)
     private boolean activo;
 
+    public TipoTramite(TipoTramiteEnum nombre, String descripcion, boolean activo) {
+        this.nombre = nombre;
+        this.descripcion = descripcion;
+        this.activo = activo;
+    }
 
+    public TipoTramite(TipoTramiteEnum nombre, String descripcion) {
+        this.nombre = nombre;
+        this.descripcion = descripcion;
+        this.activo = true;
+    }
 }

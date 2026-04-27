@@ -57,7 +57,7 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
 
         if (rawPassword == null || rawPassword.trim().isEmpty()) {
-            usuario.setPassword(passwordEncoder.encode("Gestoria123!"));
+            throw new IllegalArgumentException("La contraseña es obligatoria para crear un usuario nuevo.");
         } else {
             usuario.setPassword(passwordEncoder.encode(rawPassword.trim()));
         }

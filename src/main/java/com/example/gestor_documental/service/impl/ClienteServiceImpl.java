@@ -24,4 +24,14 @@ public class ClienteServiceImpl implements ClienteService {
     public Optional<Cliente> buscarPorId(Long id) {
         return clienteRepository.findById(id);
     }
+
+    @Override
+    public Cliente guardar(Cliente cliente) {
+        return clienteRepository.save(cliente);
+    }
+
+    @Override
+    public void eliminar(Long id) {
+        clienteRepository.deleteById(id);
+    }
 }
