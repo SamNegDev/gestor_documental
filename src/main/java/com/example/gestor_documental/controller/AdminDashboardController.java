@@ -29,7 +29,8 @@ public class AdminDashboardController {
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
         long totalExpedientes = expedienteService.contarTodos();
-        int enTramite = expedienteService.contarPorEstado(EstadoExpediente.EN_TRAMITE);
+        int enTramite = expedienteService.contarPorEstado(EstadoExpediente.EN_TRAMITE)
+                + expedienteService.contarPorEstado(EstadoExpediente.REVISANDO_INCIDENCIAS);
         int finalizado = expedienteService.contarPorEstado(EstadoExpediente.FINALIZADO);
         int incidenciasExpedientes = expedienteService.contarPorEstado(EstadoExpediente.INCIDENCIA);
 
@@ -37,7 +38,6 @@ public class AdminDashboardController {
         long pendienteRevision = solicitudService.contarPorEstado(EstadoSolicitud.PENDIENTE_REVISION);
         long convertidas = solicitudService.contarPorEstado(EstadoSolicitud.CONVERTIDA);
         long incidenciasSolicitudes = solicitudService.contarPorEstado(EstadoSolicitud.PENDIENTE_DOCUMENTACION);
-
         long totalIncidencias = incidenciasExpedientes + incidenciasSolicitudes;
 
         model.addAttribute("usuarioLogueado", usuarioLogueado);
@@ -55,11 +55,7 @@ public class AdminDashboardController {
         model.addAttribute("convertidas", convertidas);
         model.addAttribute("incidenciasSolicitudes", incidenciasSolicitudes);
         model.addAttribute("ultimasSolicitudes", solicitudService.listarUltimas());
-
         model.addAttribute("totalIncidencias", totalIncidencias);
-
-
-
 
         return "admin/dashboard";
     }

@@ -333,7 +333,7 @@
                             <option value="">-- Selecciona un tipo --</option>
                             <option th:each="tipo : ${tiposDocumento}"
                                     th:value="${tipo}"
-                                    th:text="${tipo}">
+                                    th:text="${tipo.label}">
                             </option>
                         </select>
                     </div>
@@ -363,16 +363,16 @@
                     <div class="row align-items-center g-2">
 
                         <!-- IZQUIERDA -->
-                        <div class="col-md-3 d-flex align-items-center gap-3">
-                            <i class="bi bi-file-earmark-pdf-fill text-danger fs-1"></i>
-                            <div>
-                                <div class="fw-semibold text-truncate" th:text="${doc.nombreArchivoOriginal}" th:title="${doc.nombreArchivoOriginal}"></div>
-                                <div class="text-muted small" th:text="${doc.tipoDocumento}"></div>
+                        <div class="col-lg-4 col-md-12 d-flex align-items-center gap-3">
+                            <i class="bi bi-file-earmark-pdf-fill text-danger fs-1 flex-shrink-0"></i>
+                            <div class="w-100 overflow-hidden">
+                                <div class="fw-semibold text-break" th:text="${doc.nombreArchivoOriginal}" th:title="${doc.nombreArchivoOriginal}"></div>
+                                <div class="text-muted small" th:text="${doc.tipoDocumento.label}"></div>
                             </div>
                         </div>
 
                         <!-- CENTRO -->
-                        <div class="col-md-5 small text-muted">
+                        <div class="col-lg-4 col-md-12 small text-muted">
                             <strong>Subido por:</strong>
                             <span th:text="${doc.subidoPor != null ? doc.subidoPor.nombre : '-'}"></span>
                             <span class="mx-1">|</span>
@@ -385,7 +385,7 @@
                         </div>
 
                         <!-- DERECHA -->
-                        <div class="col-md-4 d-flex justify-content-md-end align-items-center gap-2 flex-wrap">
+                        <div class="col-lg-4 col-md-12 d-flex justify-content-lg-end align-items-center gap-2 flex-wrap">
                         
                             <button type="button" class="btn btn-sm btn-outline-warning fw-semibold" data-bs-toggle="modal" th:data-bs-target="'#editarDocModal-' + ${doc.id}">
                                 <i class="bi bi-pencil-square"></i> Gestión PDF
@@ -453,7 +453,7 @@
                                                             <select name="nuevoTipoDocumento" class="form-select" required>
                                                                 <option th:each="tipo : ${tiposDocumento}"
                                                                         th:value="${tipo}"
-                                                                        th:text="${tipo}"
+                                                                        th:text="${tipo.label}"
                                                                         th:selected="${tipo == doc.tipoDocumento}"></option>
                                                             </select>
                                                         </div>
@@ -483,7 +483,7 @@
                                                                 <option value="">-- Selecciona un tipo --</option>
                                                                 <option th:each="tipo : ${tiposDocumento}"
                                                                         th:value="${tipo}"
-                                                                        th:text="${tipo}"></option>
+                                                                        th:text="${tipo.label}"></option>
                                                             </select>
                                                         </div>
                                                         <button type="submit" class="btn btn-warning w-100 fw-bold"><i class="bi bi-scissors me-1"></i> Extraer y Crear Documento</button>

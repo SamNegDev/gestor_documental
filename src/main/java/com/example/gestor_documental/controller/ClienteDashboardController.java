@@ -28,7 +28,8 @@ public class ClienteDashboardController {
             Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
             int totalExpedientes = expedienteService.contarPorCliente(usuarioLogueado.getCliente());
-            int enTramite = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.EN_TRAMITE);
+            int enTramite = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.EN_TRAMITE)
+                    + expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.REVISANDO_INCIDENCIAS);
             int finalizado = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.FINALIZADO);
             int incidenciasExpedientes = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.INCIDENCIA);
 
@@ -36,9 +37,7 @@ public class ClienteDashboardController {
             int pendienteRevision = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.PENDIENTE_REVISION);
             int convertidas = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.CONVERTIDA);
             int incidenciasSolicitudes = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.PENDIENTE_DOCUMENTACION);
-
             long totalIncidencias = incidenciasExpedientes + incidenciasSolicitudes;
-
 
             model.addAttribute("usuarioLogueado", usuarioLogueado);
             model.addAttribute("titulo", "Dashboard");
@@ -54,11 +53,9 @@ public class ClienteDashboardController {
             model.addAttribute("totalExpedientes", totalExpedientes);
             model.addAttribute("enTramite", enTramite);
             model.addAttribute("finalizados", finalizado);
-            model.addAttribute("incidencias", incidenciasExpedientes);
+            model.addAttribute("incidenciasExpedientes", incidenciasExpedientes);
             model.addAttribute("ultimosExpedientes", expedienteService.listarUltimosPorCliente(usuarioLogueado.getCliente()));
-
             model.addAttribute("totalIncidencias", totalIncidencias);
-
 
             return "cliente/dashboard";
         }

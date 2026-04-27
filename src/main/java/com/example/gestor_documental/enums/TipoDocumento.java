@@ -14,4 +14,10 @@ public enum TipoDocumento {
     CAMBIO_TITULARIDAD,
     AUTORIZACION_SERAFIN,
     HUELLA_TRAMITE
+
+    ;
+
+    public String getLabel() {
+        return name().replace('_', ' ');
+    }
 }

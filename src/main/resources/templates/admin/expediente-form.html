@@ -16,7 +16,7 @@
                th:value="${_csrf.token}">
 
         <div class="mb-3">
-          <label class="form-label">Cliente</label>
+          <label class="form-label">Cliente <span class="text-danger">*</span></label>
           <select name="clienteId" class="form-select" required>
             <option value="">Selecciona un cliente</option>
             <option th:each="cliente : ${clientes}"
@@ -28,7 +28,7 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Tipo de trámite</label>
+          <label class="form-label">Tipo de trámite <span class="text-danger">*</span></label>
           <select name="tipoTramiteId" class="form-select" required>
             <option value="">Selecciona un tipo</option>
             <option th:each="tipo : ${tiposTramite}"
@@ -40,7 +40,7 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Matrícula</label>
+          <label class="form-label">Matrícula <span class="text-danger">*</span></label>
           <input type="text" th:field="*{matricula}" class="form-control" required th:classappend="${#fields.hasErrors('matricula')} ? ' is-invalid' : ''">
         <div class="invalid-feedback"
              th:if="${#fields.hasErrors('matricula')}"
@@ -51,7 +51,7 @@
         <hr class="my-4">
 
         <div th:object="${interesadosForm}">
-          <h3 class="section-title mb-3">Interesado 1</h3>
+          <h3 class="section-title mb-3">Interesado 1 <span class="text-muted small fw-normal">(opcional)</span></h3>
 
           <div class="row g-3 mb-4">
             <div class="col-md-4">
@@ -107,7 +107,7 @@
 
           <hr class="my-4">
 
-          <h3 class="section-title mb-3">Interesado 2</h3>
+          <h3 class="section-title mb-3">Interesado 2 <span class="text-muted small fw-normal">(opcional)</span></h3>
 
           <div class="row g-3 mb-4">
             <div class="col-md-4">
@@ -166,7 +166,7 @@
         <hr class="my-4">
 
         <div th:if="${expediente.id == null}">
-            <h3 class="section-title mb-3">Documentación</h3>
+            <h3 class="section-title mb-3">Documentación <span class="text-muted small fw-normal">(opcional)</span></h3>
 
             <div id="documentos-container"></div>
 
@@ -225,7 +225,7 @@
 
 
         <div class="mb-3">
-          <label class="form-label">Observaciones</label>
+          <label class="form-label">Observaciones <span class="text-muted small">(opcional)</span></label>
           <textarea th:field="*{observaciones}" class="form-control" rows="4"></textarea>
         </div>
 
