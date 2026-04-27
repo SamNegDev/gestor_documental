@@ -5,9 +5,6 @@ import com.example.gestor_documental.dto.DocumentoDetectadoDto;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.service.OcrPdfService;
 import lombok.RequiredArgsConstructor;
-import net.sourceforge.tess4j.ITesseract;
-import net.sourceforge.tess4j.Tesseract;
-import net.sourceforge.tess4j.TesseractException;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
@@ -16,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,7 +38,7 @@ public class OcrPdfServiceImpl implements OcrPdfService {
         try (PDDocument document = PDDocument.load(archivo.getBytes())) {
             int totalPaginas = document.getNumberOfPages();
             PDFRenderer renderer = new PDFRenderer(document);
-            ITesseract tesseract = crearTesseract();
+
 
             List<DocumentoDetectadoDto> resultado = new ArrayList<>();
             TipoDocumento tipoActual = null;
@@ -52,7 +50,7 @@ public class OcrPdfServiceImpl implements OcrPdfService {
                         ImageType.GRAY
                 );
 
-                String textoPagina = extraerTexto(tesseract, imagen);
+                String textoPagina = extraerTexto(imagen);
                 TipoDocumento tipoDetectado = detectarTipoDocumento(textoPagina);
 
                 System.out.println("========= PAGINA " + (i + 1) + " =========");
@@ -114,29 +112,64 @@ public class OcrPdfServiceImpl implements OcrPdfService {
         }
     }
 
-    private ITesseract crearTesseract() {
-        Tesseract tesseract = new Tesseract();
 
-        tesseract.setDatapath(ocrProperties.getTessdataPath());
-        tesseract.setLanguage(ocrProperties.getLanguage());
+    private String extraerTexto(BufferedImage imagen) {
+        Path tempImage = null;
 
-        // Más estable para documentos escaneados normales
-        tesseract.setPageSegMode(6);
-
-        // Motor LSTM
-        tesseract.setOcrEngineMode(1);
-
-        tesseract.setVariable("user_defined_dpi", String.valueOf((int) ocrProperties.getDpi()));
-
-        return tesseract;
-    }
-
-    private String extraerTexto(ITesseract tesseract, BufferedImage imagen) {
         try {
-            String texto = tesseract.doOCR(imagen);
-            return normalizar(texto);
-        } catch (TesseractException e) {
+            tempImage = java.nio.file.Files.createTempFile("ocr-page-", ".png");
+            javax.imageio.ImageIO.write(imagen, "png", tempImage.toFile());
+
+            ProcessBuilder processBuilder = new ProcessBuilder(
+                    "tesseract",
+                    tempImage.toAbsolutePath().toString(),
+                    "stdout",
+                    "-l", ocrProperties.getLanguage(),
+                    "--psm", "6",
+                    "--oem", "1",
+                    "-c", "user_defined_dpi=" + (int) ocrProperties.getDpi()
+            );
+
+            processBuilder.environment().put("TESSDATA_PREFIX", ocrProperties.getTessdataPath());
+            processBuilder.redirectErrorStream(true);
+
+            Process process = processBuilder.start();
+
+            String output;
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+
+                output = reader.lines().collect(java.util.stream.Collectors.joining("\n"));
+            }
+
+            int exitCode = process.waitFor();
+
+            if (exitCode != 0) {
+                System.out.println("Error ejecutando Tesseract CLI:");
+                System.out.println(output);
+                return "";
+            }
+
+            return normalizar(output);
+
+        } catch (IOException e) {
+            System.out.println("Error de entrada/salida ejecutando OCR:");
+            System.out.println(e.getMessage());
             return "";
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.println("Proceso OCR interrumpido:");
+            System.out.println(e.getMessage());
+            return "";
+
+        } finally {
+            if (tempImage != null) {
+                try {
+                    java.nio.file.Files.deleteIfExists(tempImage);
+                } catch (IOException ignored) {
+                }
+            }
         }
     }
 
