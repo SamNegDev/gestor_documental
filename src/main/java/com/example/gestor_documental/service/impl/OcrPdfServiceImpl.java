@@ -5,6 +5,8 @@ import com.example.gestor_documental.dto.DocumentoDetectadoDto;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.service.OcrPdfService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
@@ -20,6 +22,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class OcrPdfServiceImpl implements OcrPdfService {
+
+    private static final Logger log = LoggerFactory.getLogger(OcrPdfServiceImpl.class);
 
     private final OcrProperties ocrProperties;
 
@@ -53,17 +57,7 @@ public class OcrPdfServiceImpl implements OcrPdfService {
                 String textoPagina = extraerTexto(imagen);
                 TipoDocumento tipoDetectado = detectarTipoDocumento(textoPagina);
 
-                System.out.println("========= PAGINA " + (i + 1) + " =========");
-
-                System.out.println("TEXTO OCR (primeros 300 chars):");
-                System.out.println(
-                        textoPagina.length() > 300
-                                ? textoPagina.substring(0, 300)
-                                : textoPagina
-                );
-
-                System.out.println("TIPO DETECTADO: " + tipoDetectado);
-                System.out.println("======================================");
+                log.debug("OCR pagina {} de {} detectada como {}", i + 1, totalPaginas, tipoDetectado);
 
                 if (tipoDetectado != null) {
                     if (tipoActual == null) {
@@ -145,22 +139,20 @@ public class OcrPdfServiceImpl implements OcrPdfService {
             int exitCode = process.waitFor();
 
             if (exitCode != 0) {
-                System.out.println("Error ejecutando Tesseract CLI:");
-                System.out.println(output);
+                log.warn("Tesseract devolvio codigo {} al procesar una pagina OCR", exitCode);
+                log.debug("Salida de Tesseract: {}", output);
                 return "";
             }
 
             return normalizar(output);
 
         } catch (IOException e) {
-            System.out.println("Error de entrada/salida ejecutando OCR:");
-            System.out.println(e.getMessage());
+            log.warn("Error de entrada/salida ejecutando OCR: {}", e.getMessage());
             return "";
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            System.out.println("Proceso OCR interrumpido:");
-            System.out.println(e.getMessage());
+            log.warn("Proceso OCR interrumpido: {}", e.getMessage());
             return "";
 
         } finally {

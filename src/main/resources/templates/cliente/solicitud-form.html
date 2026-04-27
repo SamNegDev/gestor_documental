@@ -170,7 +170,7 @@
                 </div>
 
                 <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary" onclick="this.disabled=true; this.form.submit();">Guardar solicitud</button>
+                    <button type="submit" id="btnGuardarSolicitud" class="btn btn-primary">Guardar solicitud</button>
                     <a th:href="@{/solicitudes}" class="btn btn-outline-secondary">Cancelar</a>
                 </div>
             </form>
@@ -223,6 +223,41 @@
             }
 
             addDocumentoRow();
+        });
+    </script>
+
+    <!-- Modal de carga para OCR -->
+    <div id="ocrLoadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; color: white;">
+        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem; margin-bottom: 1rem;">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+        <h4>Procesando Documento (OCR)</h4>
+        <p>Esto puede tardar unos segundos. Por favor, no cierre la página.</p>
+    </div>
+
+    <script th:inline="javascript">
+        document.addEventListener("DOMContentLoaded", function () {
+            const form = document.querySelector('form[enctype="multipart/form-data"]');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const selects = document.querySelectorAll('select[name^="documentos"][name$=".tipoDocumento"]');
+                    let hasExpedienteCompleto = false;
+                    selects.forEach(select => {
+                        if (select.value === 'EXPEDIENTE_COMPLETO') {
+                            hasExpedienteCompleto = true;
+                        }
+                    });
+
+                    if (hasExpedienteCompleto) {
+                        document.getElementById('ocrLoadingOverlay').style.display = 'flex';
+                    }
+                    
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    if(submitBtn) {
+                        submitBtn.disabled = true;
+                    }
+                });
+            }
         });
     </script>
 

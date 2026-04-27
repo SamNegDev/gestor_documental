@@ -24,9 +24,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +45,9 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
+
+    @Value("${app.upload.allowed-extensions:pdf,jpg,jpeg,png}")
+    private String allowedExtensions;
 
     @Override
     public void guardar(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento) {
@@ -89,7 +94,6 @@ public class DocumentoServiceImpl implements DocumentoService {
 
                 byte[] pdfOriginal = archivo.getBytes();
 
-                int indice = 1;
                 for (DocumentoDetectadoDto detectado : documentosDetectados) {
                     byte[] pdfSeparado = pdfSplitService.extraerPaginas(
                             pdfOriginal,
@@ -100,8 +104,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                             pdfSeparado,
                             detectado.getTipoDocumento(),
                             usuario,
-                            indice + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf");
-                    indice++;
+                            expediente.getMatricula() + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf");
                 }
                 return;
             }
@@ -151,7 +154,6 @@ public class DocumentoServiceImpl implements DocumentoService {
 
                 byte[] pdfOriginal = archivo.getBytes();
 
-                int indice = 1;
                 for (DocumentoDetectadoDto detectado : documentosDetectados) {
                     byte[] pdfSeparado = pdfSplitService.extraerPaginas(
                             pdfOriginal,
@@ -162,8 +164,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                             pdfSeparado,
                             detectado.getTipoDocumento(),
                             usuario,
-                            "ocr_" + indice + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf");
-                    indice++;
+                            solicitud.getMatricula() + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf");
                 }
                 return;
             }
@@ -181,7 +182,6 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     @Override
     public List<Documento> listarPorExpediente(Long id) {
-        System.out.println("DOCS EXPEDIENTE: " + documentoRepository.findByExpedienteId(id));
         return documentoRepository.findByExpedienteId(id);
 
     }
@@ -217,8 +217,8 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     private Documento construirDocumentoBase(MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario)
             throws IOException {
-        String nombreOriginal = java.nio.file.Paths.get(archivo.getOriginalFilename()).getFileName().toString();
-        nombreOriginal = nombreOriginal.replaceAll("[^a-zA-Z0-9._-]", "_");
+        String nombreOriginal = sanitizarNombreArchivo(archivo.getOriginalFilename());
+        validarExtensionPermitida(nombreOriginal);
 
         if (nombreOriginal == null || nombreOriginal.isBlank()) {
             throw new OperacionInvalidaException("El archivo no tiene nombre válido");
@@ -251,6 +251,9 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (nombreArchivoOriginal == null || nombreArchivoOriginal.isBlank()) {
             throw new OperacionInvalidaException("El archivo no tiene nombre válido");
         }
+
+        nombreArchivoOriginal = sanitizarNombreArchivo(nombreArchivoOriginal);
+        validarExtensionPermitida(nombreArchivoOriginal);
 
         String nombreUnico = UUID.randomUUID() + "_" + nombreArchivoOriginal;
 
@@ -333,7 +336,9 @@ public class DocumentoServiceImpl implements DocumentoService {
             documento.setTipoDocumento(nuevoTipo);
         }
         if (nuevoNombre != null && !nuevoNombre.trim().isEmpty()) {
-            documento.setNombreArchivoOriginal(nuevoNombre.trim());
+            String nombreSanitizado = sanitizarNombreArchivo(nuevoNombre);
+            validarExtensionPermitida(nombreSanitizado);
+            documento.setNombreArchivoOriginal(nombreSanitizado);
         }
 
         documentoRepository.save(documento);
@@ -410,6 +415,52 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     private Path obtenerCarpetaUploads() {
         return Paths.get(uploadDir).toAbsolutePath().normalize();
+    }
+
+    private String sanitizarNombreArchivo(String nombreArchivo) {
+        if (nombreArchivo == null || nombreArchivo.isBlank()) {
+            throw new OperacionInvalidaException("El archivo no tiene nombre valido");
+        }
+
+        String nombre = Paths.get(nombreArchivo).getFileName().toString()
+                .replaceAll("[\\r\\n\\t]", "_")
+                .replaceAll("[^a-zA-Z0-9._-]", "_")
+                .replaceAll("_+", "_");
+
+        if (nombre.isBlank() || ".".equals(nombre) || "..".equals(nombre)) {
+            throw new OperacionInvalidaException("El archivo no tiene nombre valido");
+        }
+
+        if (nombre.length() > 180) {
+            int punto = nombre.lastIndexOf('.');
+            String extension = punto >= 0 ? nombre.substring(punto) : "";
+            String base = punto >= 0 ? nombre.substring(0, punto) : nombre;
+            int maxBase = Math.max(1, 180 - extension.length());
+            nombre = base.substring(0, Math.min(base.length(), maxBase)) + extension;
+        }
+
+        return nombre;
+    }
+
+    private void validarExtensionPermitida(String nombreArchivo) {
+        String extension = obtenerExtension(nombreArchivo);
+        List<String> permitidas = Arrays.stream(allowedExtensions.split(","))
+                .map(String::trim)
+                .map(String::toLowerCase)
+                .filter(ext -> !ext.isBlank())
+                .collect(Collectors.toList());
+
+        if (extension.isBlank() || !permitidas.contains(extension)) {
+            throw new OperacionInvalidaException("Tipo de archivo no permitido");
+        }
+    }
+
+    private String obtenerExtension(String nombreArchivo) {
+        int punto = nombreArchivo.lastIndexOf('.');
+        if (punto < 0 || punto == nombreArchivo.length() - 1) {
+            return "";
+        }
+        return nombreArchivo.substring(punto + 1).toLowerCase();
     }
 
 }

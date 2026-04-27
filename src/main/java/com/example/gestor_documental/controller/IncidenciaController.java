@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+
 @Controller
 @RequestMapping("/incidencias")
 @RequiredArgsConstructor
@@ -93,6 +96,31 @@ public class IncidenciaController {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         String referer = request.getHeader("Referer");
-        return referer != null ? "redirect:" + referer : "redirect:/"; 
+        return "redirect:" + obtenerRedirectLocalSeguro(referer, request);
+    }
+
+    private String obtenerRedirectLocalSeguro(String referer, jakarta.servlet.http.HttpServletRequest request) {
+        if (referer == null || referer.isBlank()) {
+            return "/";
+        }
+
+        try {
+            URI uri = new URI(referer);
+            if (!uri.isAbsolute()) {
+                String path = uri.getPath();
+                return path != null && path.startsWith("/") && !path.startsWith("//") ? referer : "/";
+            }
+
+            String host = request.getServerName();
+            if (!host.equalsIgnoreCase(uri.getHost())) {
+                return "/";
+            }
+
+            String path = uri.getRawPath() != null ? uri.getRawPath() : "/";
+            String query = uri.getRawQuery() != null ? "?" + uri.getRawQuery() : "";
+            return path + query;
+        } catch (URISyntaxException e) {
+            return "/";
+        }
     }
 }

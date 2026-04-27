@@ -372,7 +372,7 @@
     <div class="card-body">
       <h2 class="section-title">Subir documento</h2>
 
-      <form th:action="@{/documentos/subir/solicitud}" method="post" enctype="multipart/form-data">
+      <form id="uploadDocForm" th:action="@{/documentos/subir/solicitud}" method="post" enctype="multipart/form-data">
         <input type="hidden" name="solicitudId" th:value="${solicitud.id}" />
 
         <div class="row g-3">
@@ -438,7 +438,7 @@
                 <a th:href="@{/documentos/ver/{id}(id=${doc.id})}" target="_blank" class="btn btn-sm btn-outline-secondary">Ver</a>
                 <a th:href="@{/documentos/descargar/{id}(id=${doc.id})}" class="btn btn-sm btn-outline-primary">Descargar</a>
 
-                <form sec:authorize="hasRole('ADMIN')" th:action="@{/documentos/eliminar/{id}(id=${doc.id})}"
+                <form th:action="@{/documentos/eliminar/{id}(id=${doc.id})}"
                       method="post"
                       class="doc-form-inline mb-0"
                       onsubmit="return confirm('¿Seguro que quieres eliminar este documento?');">
@@ -546,6 +546,28 @@
     <a th:href="@{/solicitudes}" class="btn btn-outline-secondary">Volver al listado</a>
   </div>
 
+    <!-- Modal de carga para OCR -->
+    <div id="ocrLoadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; color: white;">
+        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem; margin-bottom: 1rem;">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+        <h4>Procesando Documento (OCR)</h4>
+        <p>Esto puede tardar unos segundos. Por favor, no cierre la página.</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('uploadDocForm');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const tipo = document.getElementById('tipoDocumento').value;
+                    if (tipo === 'EXPEDIENTE_COMPLETO') {
+                        document.getElementById('ocrLoadingOverlay').style.display = 'flex';
+                    }
+                });
+            }
+        });
+    </script>
 
 </section>
 </body>
