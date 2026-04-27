@@ -13,7 +13,15 @@ WORKDIR /app
 
 # Tesseract OCR + idioma espanol.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng \
+    && apt-get install -y --no-install-recommends \
+        tesseract-ocr \
+        tesseract-ocr-spa \
+        tesseract-ocr-eng \
+        libtesseract-dev \
+        libleptonica-dev \
+        liblept5 \
+        poppler-utils \
+        ghostscript \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /app/uploads /app/logs
