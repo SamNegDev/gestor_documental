@@ -38,15 +38,15 @@ public class Solicitud {
     @Column(nullable = false, length = 100)
     private EstadoSolicitud estadoSolicitud;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "cliente_id")
     private Cliente cliente;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "creado_por_usuario_id")
     private Usuario creadoPor;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "tipo_tramite_id")
     private TipoTramite tipoTramite;
 

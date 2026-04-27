@@ -21,7 +21,7 @@ public class Incidencia {
     @GeneratedValue (strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "tipo_incidencia_id")
     private TipoIncidencia tipoIncidencia;
 
@@ -35,11 +35,11 @@ public class Incidencia {
     @Column
     private LocalDateTime fechaResolucion;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "resuelto_por_usuario_id")
     private Usuario resueltoPor;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "creado_por_usuario_id")
     private Usuario creadoPor;
 

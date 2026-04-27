@@ -23,7 +23,7 @@ public class ExpedienteInteresado {
     @JoinColumn(name = "expediente_id")
     private Expediente expediente;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "interesado_id")
     private Interesado interesado;
 

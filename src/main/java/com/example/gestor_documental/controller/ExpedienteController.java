@@ -8,6 +8,8 @@ import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.ExpedienteInteresado;
+import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
@@ -41,6 +43,7 @@ public class ExpedienteController {
     private final HistorialCambioService historialCambioService;
     private final TipoTramiteService tipoTramiteService;
     private final MensajeService mensajeService;
+    private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
 
     @GetMapping
     public String listarExpedientes(Authentication authentication, Model model,
@@ -135,14 +138,15 @@ public class ExpedienteController {
         }
 
         List<Documento> documentos = documentoService.listarPorExpediente(id);
-
         List<Incidencia> incidencias = incidenciaService.listarPorExpediente(id);
+        List<ExpedienteInteresado> interesados = expedienteInteresadoRepository.findByExpedienteId(id);
         
         model.addAttribute("historialCambios", historialCambioService.listarPorExpediente(id));
 
         model.addAttribute("expediente", expediente);
         model.addAttribute("documentos", documentos);
         model.addAttribute("incidencias", incidencias);
+        model.addAttribute("interesados", interesados);
         model.addAttribute("mensajes", mensajeService.listarPorExpediente(id));
         model.addAttribute("tiposIncidencia", tipoIncidenciaService.listarTodosActivos());
         model.addAttribute("usuarioLogueado", usuarioLogueado);

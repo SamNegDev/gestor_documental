@@ -11,6 +11,8 @@ import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.service.DocumentoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -34,6 +36,7 @@ public class SolicitudController {
 
     private final UsuarioService usuarioService;
     private final SolicitudService solicitudService;
+    private final DocumentoService documentoService;
     private final TipoTramiteService tipoTramiteService;
     private final ClienteService clienteService;
     private final TipoIncidenciaService tipoIncidenciaService;
@@ -133,10 +136,12 @@ public class SolicitudController {
         }
 
         List<Incidencia> incidencias = incidenciaService.listarPorSolicitud(id);
+        List<Documento> documentos = documentoService.listarPorSolicitud(id);
         
         model.addAttribute("historialCambios", historialCambioService.listarPorSolicitud(id));
 
         model.addAttribute("solicitud", solicitud);
+        model.addAttribute("documentos", documentos);
         model.addAttribute("incidencias", incidencias);
         model.addAttribute("mensajes", mensajeService.listarPorSolicitud(id));
         model.addAttribute("tiposIncidencia", tipoIncidenciaService.listarTodosActivos());

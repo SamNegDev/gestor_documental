@@ -75,11 +75,6 @@ public class DocumentoServiceImpl implements DocumentoService {
                 docOriginal.setExpediente(expediente);
                 documentoRepository.save(docOriginal);
 
-                historialCambioService.registrarCambioExpediente(
-                        expediente,
-                        usuario,
-                        "NUEVO DOCUMENTO",
-                        "Se subió el documento: " + docOriginal.getNombreArchivoOriginal());
 
                 List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivo);
 
@@ -110,11 +105,6 @@ public class DocumentoServiceImpl implements DocumentoService {
 
             documentoRepository.save(doc);
 
-            historialCambioService.registrarCambioExpediente(
-                    expediente,
-                    usuario,
-                    "NUEVO DOCUMENTO",
-                    "Se subió el documento: " + doc.getNombreArchivoOriginal());
 
         } catch (IOException e) {
             throw new RuntimeException("Error al guardar el archivo", e);
@@ -147,11 +137,6 @@ public class DocumentoServiceImpl implements DocumentoService {
                 docOriginal.setSolicitud(solicitud);
                 documentoRepository.save(docOriginal);
 
-                historialCambioService.registrarCambioSolicitud(
-                        solicitud,
-                        usuario,
-                        "NUEVO DOCUMENTO",
-                        "Se subió el documento: " + docOriginal.getNombreArchivoOriginal());
 
                 List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivo);
 
@@ -183,11 +168,6 @@ public class DocumentoServiceImpl implements DocumentoService {
 
             documentoRepository.save(doc);
 
-            historialCambioService.registrarCambioSolicitud(
-                    solicitud,
-                    usuario,
-                    "NUEVO DOCUMENTO",
-                    "Se subió el documento: " + doc.getNombreArchivoOriginal());
 
         } catch (IOException e) {
             throw new RuntimeException("Error al guardar el archivo", e);
@@ -201,6 +181,11 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     }
 
+    @Override
+    public List<Documento> listarPorSolicitud(Long id) {
+        return documentoRepository.findBySolicitudId(id);
+    }
+
     private void guardarDocumentoGeneradoParaSolicitud(Solicitud solicitud,
             byte[] contenido,
             TipoDocumento tipoDocumento,
@@ -210,11 +195,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         doc.setSolicitud(solicitud);
         documentoRepository.save(doc);
 
-        historialCambioService.registrarCambioSolicitud(
-                solicitud,
-                usuario,
-                "NUEVO DOCUMENTO",
-                "Se generó el documento OCR: " + doc.getNombreArchivoOriginal());
+
     }
 
     private void guardarDocumentoGeneradoParaExpediente(Expediente expediente,
@@ -226,11 +207,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         doc.setExpediente(expediente);
         documentoRepository.save(doc);
 
-        historialCambioService.registrarCambioExpediente(
-                expediente,
-                usuario,
-                "NUEVO DOCUMENTO",
-                "Se generó el documento OCR: " + doc.getNombreArchivoOriginal());
+
     }
 
     private Documento construirDocumentoBase(MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario)

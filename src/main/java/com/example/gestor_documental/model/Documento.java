@@ -51,7 +51,7 @@ public class Documento {
     @JoinColumn(name = "expediente_id")
     private Expediente expediente;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "subido_por_usuario_id")
     private Usuario subidoPor;
 

@@ -41,7 +41,7 @@ import java.util.List;
         @Column(nullable = false)
         private boolean activo;
 
-        @ManyToOne(fetch = FetchType.LAZY)
+        @ManyToOne(fetch = FetchType.EAGER)
         @JoinColumn(name = "cliente_id")
         private Cliente cliente;
 

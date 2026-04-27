@@ -24,6 +24,8 @@ public interface DocumentoService {
 
     List<Documento> listarPorExpediente(Long id);
 
+    List<Documento> listarPorSolicitud(Long id);
+
     void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Usuario usuario);
 
     void extraerPaginasDocumento(Long idOriginal, String rangoPaginas, TipoDocumento nuevoTipo, String nuevoNombre, Usuario usuario);

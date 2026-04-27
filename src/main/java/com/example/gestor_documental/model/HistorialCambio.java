@@ -37,7 +37,7 @@ public class HistorialCambio {
     @JoinColumn(name = "solicitud_id")
     private Solicitud solicitud;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "usuario_id")
     private Usuario usuario;
 

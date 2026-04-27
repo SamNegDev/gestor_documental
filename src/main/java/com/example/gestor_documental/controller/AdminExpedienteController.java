@@ -6,6 +6,8 @@ import com.example.gestor_documental.dto.InteresadosFormDto;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.ExpedienteInteresado;
+import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.service.*;
 import com.example.gestor_documental.validation.FormularioValidacionHelper;
 import jakarta.validation.Valid;
@@ -28,6 +30,7 @@ public class AdminExpedienteController {
     private final TipoTramiteService tipoTramiteService;
     private final DocumentoService documentoService;
     private final FormularioValidacionHelper formularioValidacionHelper;
+    private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
 
     @GetMapping("/nuevo")
     public String formularioNuevoCliente(Authentication authentication, Model model) {
@@ -151,17 +154,18 @@ public class AdminExpedienteController {
         }
 
         InteresadosFormDto interesadosForm = new InteresadosFormDto();
-        if (expediente.getInteresados() != null) {
-            if (expediente.getInteresados().size() > 0) {
-                var rel1 = expediente.getInteresados().get(0);
+        java.util.List<ExpedienteInteresado> interesadosList = expedienteInteresadoRepository.findByExpedienteId(id);
+        if (interesadosList != null) {
+            if (interesadosList.size() > 0) {
+                var rel1 = interesadosList.get(0);
                 interesadosForm.getInteresado1().setRol(rel1.getRol());
                 interesadosForm.getInteresado1().setNombre(rel1.getInteresado().getNombre());
                 interesadosForm.getInteresado1().setDni(rel1.getInteresado().getDni());
                 interesadosForm.getInteresado1().setTelefono(rel1.getInteresado().getTelefono());
                 interesadosForm.getInteresado1().setDireccion(rel1.getInteresado().getDireccion());
             }
-            if (expediente.getInteresados().size() > 1) {
-                var rel2 = expediente.getInteresados().get(1);
+            if (interesadosList.size() > 1) {
+                var rel2 = interesadosList.get(1);
                 interesadosForm.getInteresado2().setRol(rel2.getRol());
                 interesadosForm.getInteresado2().setNombre(rel2.getInteresado().getNombre());
                 interesadosForm.getInteresado2().setDni(rel2.getInteresado().getDni());
