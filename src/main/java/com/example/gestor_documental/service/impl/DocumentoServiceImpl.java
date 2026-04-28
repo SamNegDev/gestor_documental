@@ -34,6 +34,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DocumentoServiceImpl implements DocumentoService {
 
+    private static final String ACCION_CARGAR_DOCUMENTO = "CARGAR DOCUMENTO";
+
     private final DocumentoRepository documentoRepository;
     private final ExpedienteRepository expedienteRepository;
     private final SolicitudRepository solicitudRepository;
@@ -84,6 +86,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                 Documento docOriginal = construirDocumentoBase(archivo, tipoDocumento, usuario);
                 docOriginal.setExpediente(expediente);
                 documentoRepository.save(docOriginal);
+                registrarCargaDocumentoExpediente(expediente, docOriginal, usuario);
 
 
                 List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivo);
@@ -112,6 +115,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             doc.setExpediente(expediente);
 
             documentoRepository.save(doc);
+            registrarCargaDocumentoExpediente(expediente, doc, usuario);
 
 
         } catch (IOException e) {
@@ -144,6 +148,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                 Documento docOriginal = construirDocumentoBase(archivo, tipoDocumento, usuario);
                 docOriginal.setSolicitud(solicitud);
                 documentoRepository.save(docOriginal);
+                registrarCargaDocumentoSolicitud(solicitud, docOriginal, usuario);
 
 
                 List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivo);
@@ -173,6 +178,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             doc.setSolicitud(solicitud);
 
             documentoRepository.save(doc);
+            registrarCargaDocumentoSolicitud(solicitud, doc, usuario);
 
 
         } catch (IOException e) {
@@ -199,6 +205,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         Documento doc = construirDocumentoBase(contenido, nombreArchivoOriginal, tipoDocumento, usuario);
         doc.setSolicitud(solicitud);
         documentoRepository.save(doc);
+        registrarCargaDocumentoSolicitud(solicitud, doc, usuario);
 
 
     }
@@ -211,6 +218,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         Documento doc = construirDocumentoBase(contenido, nombreArchivoOriginal, tipoDocumento, usuario);
         doc.setExpediente(expediente);
         documentoRepository.save(doc);
+        registrarCargaDocumentoExpediente(expediente, doc, usuario);
 
 
     }
@@ -415,6 +423,22 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     private Path obtenerCarpetaUploads() {
         return Paths.get(uploadDir).toAbsolutePath().normalize();
+    }
+
+    private void registrarCargaDocumentoExpediente(Expediente expediente, Documento documento, Usuario usuario) {
+        historialCambioService.registrarCambioExpediente(
+                expediente,
+                usuario,
+                ACCION_CARGAR_DOCUMENTO,
+                "Se cargó el documento: " + documento.getNombreArchivoOriginal());
+    }
+
+    private void registrarCargaDocumentoSolicitud(Solicitud solicitud, Documento documento, Usuario usuario) {
+        historialCambioService.registrarCambioSolicitud(
+                solicitud,
+                usuario,
+                ACCION_CARGAR_DOCUMENTO,
+                "Se cargó el documento: " + documento.getNombreArchivoOriginal());
     }
 
     private String sanitizarNombreArchivo(String nombreArchivo) {

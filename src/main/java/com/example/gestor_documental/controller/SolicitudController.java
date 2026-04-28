@@ -34,6 +34,8 @@ import com.example.gestor_documental.service.MensajeService;
 
 public class SolicitudController {
 
+    private static final String ACCION_CARGAR_DOCUMENTO = "CARGAR DOCUMENTO";
+
     private final UsuarioService usuarioService;
     private final SolicitudService solicitudService;
     private final DocumentoService documentoService;
@@ -138,7 +140,9 @@ public class SolicitudController {
         List<Incidencia> incidencias = incidenciaService.listarPorSolicitud(id);
         List<Documento> documentos = documentoService.listarPorSolicitud(id);
         
-        model.addAttribute("historialCambios", historialCambioService.listarPorSolicitud(id));
+        model.addAttribute("historialCambios", historialCambioService.listarPorSolicitud(id).stream()
+                .filter(cambio -> !ACCION_CARGAR_DOCUMENTO.equals(cambio.getAccion()))
+                .toList());
 
         model.addAttribute("solicitud", solicitud);
         model.addAttribute("documentos", documentos);

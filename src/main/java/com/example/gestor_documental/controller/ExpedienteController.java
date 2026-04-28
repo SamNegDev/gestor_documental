@@ -34,6 +34,8 @@ import com.example.gestor_documental.service.MensajeService;
 @RequestMapping("/expedientes")
 public class ExpedienteController {
 
+    private static final String ACCION_CARGAR_DOCUMENTO = "CARGAR DOCUMENTO";
+
     private final ExpedienteService expedienteService;
     private final UsuarioService usuarioService;
     private final DocumentoService documentoService;
@@ -142,7 +144,9 @@ public class ExpedienteController {
         List<Incidencia> incidencias = incidenciaService.listarPorExpediente(id);
         List<ExpedienteInteresado> interesados = expedienteInteresadoRepository.findByExpedienteId(id);
         
-        model.addAttribute("historialCambios", historialCambioService.listarPorExpediente(id));
+        model.addAttribute("historialCambios", historialCambioService.listarPorExpediente(id).stream()
+                .filter(cambio -> !ACCION_CARGAR_DOCUMENTO.equals(cambio.getAccion()))
+                .toList());
 
         model.addAttribute("expediente", expediente);
         model.addAttribute("documentos", documentos);
