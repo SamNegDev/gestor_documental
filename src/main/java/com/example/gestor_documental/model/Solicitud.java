@@ -28,6 +28,8 @@ public class Solicitud {
     @Column(nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;
 
+    private LocalDateTime fechaUltimaModificacion;
+
     @Column(length = 10)
     private String matricula;
 
@@ -45,6 +47,10 @@ public class Solicitud {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "creado_por_usuario_id")
     private Usuario creadoPor;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "modificado_por_usuario_id")
+    private Usuario modificadoPor;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "tipo_tramite_id")

@@ -36,7 +36,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
     @Override
     public List<Expediente> listarTodos() {
-        return expedienteRepository.findAll();
+        return expedienteRepository.findAllByOrderByFechaCreacionDesc();
     }
 
     @Override
@@ -61,7 +61,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
     @Override
     public List<Expediente> listarPorClienteId(Long clienteId) {
-        return expedienteRepository.findByClienteId(clienteId);
+        return expedienteRepository.findByClienteIdOrderByFechaCreacionDesc(clienteId);
     }
 
     @Override

@@ -9,6 +9,9 @@ import java.util.List;
 
 public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     List<Solicitud> findByClienteId(Long clienteId);
+    List<Solicitud> findAllByOrderByFechaCreacionDesc();
+    List<Solicitud> findByClienteIdOrderByFechaCreacionDesc(Long clienteId);
+    List<Solicitud> findByFechaUltimaModificacionIsNullOrModificadoPorIsNull();
 
     int countByCliente(Cliente cliente);
 

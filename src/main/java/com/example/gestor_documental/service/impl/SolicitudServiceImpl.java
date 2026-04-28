@@ -37,7 +37,7 @@ public class SolicitudServiceImpl implements SolicitudService {
 
     @Override
     public List<Solicitud> listarTodas() {
-        return solicitudRepository.findAll();
+        return solicitudRepository.findAllByOrderByFechaCreacionDesc();
     }
 
     @Override
@@ -57,7 +57,7 @@ public class SolicitudServiceImpl implements SolicitudService {
 
     @Override
     public List<Solicitud> listarPorClienteId(Long clienteId) {
-        return solicitudRepository.findByClienteId(clienteId);
+        return solicitudRepository.findByClienteIdOrderByFechaCreacionDesc(clienteId);
     }
 
     @Override

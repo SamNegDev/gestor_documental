@@ -79,7 +79,8 @@
                         <th>Tipo trámite</th>
                         <th>Matrícula</th>
                         <th>Estado</th>
-                        <th>Fecha</th>
+                        <th>Fecha creacion</th>
+                        <th>Ultima modificacion</th>
                         <th>Acciones</th>
                     </tr>
                     </thead>
@@ -98,6 +99,7 @@
                             </span>
                         </td>
                         <td th:text="${#temporals.format(solicitud.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></td>
+                        <td th:text="${solicitud.fechaUltimaModificacion != null ? #temporals.format(solicitud.fechaUltimaModificacion, 'dd/MM/yyyy HH:mm') : 'Sin cambios'}"></td>
                         <td>
                             <a th:href="@{/solicitudes/{id}(id=${solicitud.id})}"
                                class="btn btn-sm btn-outline-primary">

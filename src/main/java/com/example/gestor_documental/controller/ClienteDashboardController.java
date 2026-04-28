@@ -18,46 +18,46 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @RequestMapping("/cliente/dashboard")
 public class ClienteDashboardController {
 
-        private final UsuarioService usuarioService;
-        private final ExpedienteService expedienteService;
+    private final UsuarioService usuarioService;
+    private final ExpedienteService expedienteService;
     private final SolicitudService solicitudService;
 
     @GetMapping
-        public String dashboard(Authentication authentication, Model model) {
+    public String dashboard(Authentication authentication, Model model) {
 
-            Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
 
-            int totalExpedientes = expedienteService.contarPorCliente(usuarioLogueado.getCliente());
-            int enTramite = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.EN_TRAMITE)
-                    + expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.REVISANDO_INCIDENCIAS);
-            int finalizado = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.FINALIZADO);
-            int incidenciasExpedientes = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.INCIDENCIA);
+        int totalExpedientes = expedienteService.contarPorCliente(usuarioLogueado.getCliente());
+        int enTramite = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.EN_TRAMITE)
+                + expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.REVISANDO_INCIDENCIAS);
+        int finalizado = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.FINALIZADO);
+        int incidenciasExpedientes = expedienteService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoExpediente.INCIDENCIA);
 
-            int totalSolicitudes = solicitudService.contarPorCliente(usuarioLogueado.getCliente());
-            int pendienteRevision = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.PENDIENTE_REVISION);
-            int convertidas = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.CONVERTIDA);
-            int incidenciasSolicitudes = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.PENDIENTE_DOCUMENTACION);
-            long totalIncidencias = incidenciasExpedientes + incidenciasSolicitudes;
+        int totalSolicitudes = solicitudService.contarPorCliente(usuarioLogueado.getCliente());
+        int pendienteRevision = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.PENDIENTE_REVISION);
+        int convertidas = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.CONVERTIDA);
+        int incidenciasSolicitudes = solicitudService.contarPorClienteYEstado(usuarioLogueado.getCliente(), EstadoSolicitud.PENDIENTE_DOCUMENTACION);
+        long totalIncidencias = incidenciasExpedientes + incidenciasSolicitudes;
 
-            model.addAttribute("usuarioLogueado", usuarioLogueado);
-            model.addAttribute("titulo", "Dashboard");
-            model.addAttribute("subtitulo", "Resumen general de tu actividad");
+        model.addAttribute("usuarioLogueado", usuarioLogueado);
+        model.addAttribute("titulo", "Dashboard");
+        model.addAttribute("subtitulo", "Resumen general de tu actividad");
 
-            model.addAttribute("totalSolicitudes", totalSolicitudes);
-            model.addAttribute("pendienteRevision", pendienteRevision);
-            model.addAttribute("convertidas", convertidas);
-            model.addAttribute("incidenciasSolicitudes", incidenciasSolicitudes);
-            model.addAttribute("ultimasSolicitudes", solicitudService.listarUltimasPorCliente(usuarioLogueado.getCliente()));
+        model.addAttribute("totalSolicitudes", totalSolicitudes);
+        model.addAttribute("pendienteRevision", pendienteRevision);
+        model.addAttribute("convertidas", convertidas);
+        model.addAttribute("incidenciasSolicitudes", incidenciasSolicitudes);
+        model.addAttribute("ultimasSolicitudes", solicitudService.listarUltimasPorCliente(usuarioLogueado.getCliente()));
 
 
-            model.addAttribute("totalExpedientes", totalExpedientes);
-            model.addAttribute("enTramite", enTramite);
-            model.addAttribute("finalizados", finalizado);
-            model.addAttribute("incidenciasExpedientes", incidenciasExpedientes);
-            model.addAttribute("ultimosExpedientes", expedienteService.listarUltimosPorCliente(usuarioLogueado.getCliente()));
-            model.addAttribute("totalIncidencias", totalIncidencias);
+        model.addAttribute("totalExpedientes", totalExpedientes);
+        model.addAttribute("enTramite", enTramite);
+        model.addAttribute("finalizados", finalizado);
+        model.addAttribute("incidenciasExpedientes", incidenciasExpedientes);
+        model.addAttribute("ultimosExpedientes", expedienteService.listarUltimosPorCliente(usuarioLogueado.getCliente()));
+        model.addAttribute("totalIncidencias", totalIncidencias);
 
-            return "cliente/dashboard";
-        }
+        return "cliente/dashboard";
+    }
 
 }

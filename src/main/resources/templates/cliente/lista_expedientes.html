@@ -69,7 +69,8 @@
                         <th>Tipo trámite</th>
                         <th>Matrícula</th>
                         <th>Estado</th>
-                        <th>Fecha</th>
+                        <th>Fecha creacion</th>
+                        <th>Ultima modificacion</th>
                         <th>Acciones</th>
                     </tr>
                     </thead>
@@ -88,6 +89,7 @@
                             </span>
                         </td>
                         <td th:text="${#temporals.format(expediente.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></td>
+                        <td th:text="${expediente.fechaUltimaModificacion != null ? #temporals.format(expediente.fechaUltimaModificacion, 'dd/MM/yyyy HH:mm') : 'Sin cambios'}"></td>
                         <td>
                             <a th:href="@{/expedientes/{id}(id=${expediente.id})}"
                                class="btn btn-sm btn-outline-primary">

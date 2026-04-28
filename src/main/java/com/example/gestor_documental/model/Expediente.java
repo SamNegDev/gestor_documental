@@ -29,6 +29,8 @@ public class Expediente {
     @Column(nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;
 
+    private LocalDateTime fechaUltimaModificacion;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 100)
     private EstadoExpediente estadoExpediente;
@@ -51,6 +53,10 @@ public class Expediente {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "creado_por_usuario_id")
     private Usuario creadoPor;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "modificado_por_usuario_id")
+    private Usuario modificadoPor;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "solicitud_id")

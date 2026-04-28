@@ -10,6 +10,9 @@ import java.util.List;
 public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
 
     List<Expediente> findByClienteId(Long clienteId);
+    List<Expediente> findAllByOrderByFechaCreacionDesc();
+    List<Expediente> findByClienteIdOrderByFechaCreacionDesc(Long clienteId);
+    List<Expediente> findByFechaUltimaModificacionIsNullOrModificadoPorIsNull();
     List<Expediente> findByEstadoExpediente(EstadoExpediente estadoExpediente);
 
     int countByCliente(Cliente cliente);

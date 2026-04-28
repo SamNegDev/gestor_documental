@@ -84,8 +84,9 @@
             <th>Cliente</th>
             <th>Matrícula</th>
             <th>Estado</th>
-            <th>Usuario</th>
-            <th>Fecha</th>
+            <th>Fecha creacion</th>
+            <th>Ultima modificacion</th>
+            <th>Modificado por</th>
             <th>Acciones</th>
           </tr>
           </thead>
@@ -104,8 +105,9 @@
                                               (${solicitud.estadoSolicitud.name() == 'PENDIENTE_DOCUMENTACION'} ? ' badge-incidencia' : ' badge-revision')))">
                             </span>
             </td>
-            <td th:text="${solicitud.creadoPor != null ? solicitud.creadoPor.nombre : 'Sin usuario'}"></td>
             <td th:text="${#temporals.format(solicitud.fechaCreacion, 'dd/MM/yyyy HH:mm')}"></td>
+            <td th:text="${solicitud.fechaUltimaModificacion != null ? #temporals.format(solicitud.fechaUltimaModificacion, 'dd/MM/yyyy HH:mm') : 'Sin cambios'}"></td>
+            <td th:text="${solicitud.modificadoPor != null ? solicitud.modificadoPor.nombre : 'Sin cambios'}"></td>
             <td>
               <a th:href="@{/solicitudes/{id}(id=${solicitud.id})}"
                  class="btn btn-sm btn-outline-primary">
