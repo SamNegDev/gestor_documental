@@ -93,6 +93,13 @@ $env:DB_USER="root"
 $env:DB_PASS="tu_password"
 ```
 
+Si quieres crear un administrador automáticamente al arrancar con el perfil `dev`, define también:
+
+```powershell
+$env:DEV_ADMIN_EMAIL="admin.local@example.com"
+$env:DEV_ADMIN_PASSWORD="cambia_este_valor"
+```
+
 También puede configurarse la ruta de Tesseract:
 
 ```powershell
@@ -162,6 +169,8 @@ En el `docker-compose.yml` actual el puerto se expone solo en `127.0.0.1`, por l
 | `MYSQL_ROOT_PASSWORD` | Contraseña del usuario root de MySQL. |
 | `APP_ADMIN_EMAIL` | Email del administrador inicial. |
 | `APP_ADMIN_PASSWORD` | Contraseña del administrador inicial. |
+| `DEV_ADMIN_EMAIL` | Email opcional para crear un administrador en perfil `dev`. |
+| `DEV_ADMIN_PASSWORD` | Contraseña opcional para crear un administrador en perfil `dev`. |
 | `UPLOAD_DIR` | Directorio donde se guardan los archivos subidos. |
 | `UPLOAD_ALLOWED_EXTENSIONS` | Extensiones permitidas para subida de documentos. |
 | `MAX_FILE_SIZE` | Tamaño máximo de archivo. |
