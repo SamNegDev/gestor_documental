@@ -1,69 +1,261 @@
-# 📂 Gestor Documental
+# Gestor Documental para gestoría
 
-El **Gestor Documental** es una plataforma integral diseñada para la administración automatizada de trámites (Expedientes y Solicitudes), enfocada fuertemente en el **procesamiento inteligente de adjuntos**, con soporte para reconocimiento óptico de caracteres (OCR) y manipulación de archivos PDF.
+Aplicación web desarrollada con Spring Boot para centralizar la gestión documental de una gestoría especializada en trámites de vehículos.
 
----
+El sistema permite gestionar solicitudes, expedientes, clientes, documentación, incidencias, mensajes e historial de actividad desde una plataforma única. Además, incorpora procesamiento de documentos PDF mediante OCR para ayudar a clasificar y dividir automáticamente documentación escaneada.
 
-## 🛠️ Stack Tecnológico
-*   **Backend:** Java 17+, Spring Boot 3
-*   **Manejo de Datos:** Spring Data JPA (Hibernate)
-*   **Seguridad:** Spring Security (Gestión de Roles: `ADMIN`, `CLIENTE`)
-*   **Frontend (SSR):** Thymeleaf, Bootstrap 5, CSS nativo
-*   **Procesamiento de Documentos:**
-    *   **Tess4J (Tesseract OCR):** Lectura inteligente de archivos escaneados.
-    *   **Apache PDFBox:** División, unión y extracción in-situ de páginas PDF (`PdfSplitService`).
+## Funcionalidades principales
 
----
+- Autenticación de usuarios con Spring Security.
+- Roles diferenciados para administradores y clientes.
+- Panel de administración con gestión de usuarios, clientes, solicitudes y expedientes.
+- Área privada de cliente para crear solicitudes, consultar expedientes y aportar documentación.
+- Conversión de solicitudes en expedientes.
+- Gestión de estados de solicitudes y expedientes.
+- Subida y almacenamiento de documentos asociados a solicitudes o expedientes.
+- Registro y resolución de incidencias.
+- Mensajería e historial de actividad vinculados a los trámites.
+- Procesamiento OCR con Tesseract/Tess4J.
+- División y clasificación de PDFs mediante Apache PDFBox.
+- Despliegue mediante Docker y MySQL.
 
-## 📦 Arquitectura y Flujos Principales (Core)
+## Stack tecnológico
 
-El proyecto sigue una arquitectura sólida basada en el patrón **Controller - Service - Repository**. 
+- Java 17
+- Spring Boot 4
+- Spring MVC
+- Spring Security
+- Spring Data JPA / Hibernate
+- Thymeleaf
+- Thymeleaf Layout Dialect
+- Bootstrap 5
+- MySQL 8.4
+- Maven
+- Apache PDFBox
+- Tess4J / Tesseract OCR
+- Docker / Docker Compose
 
-### 1. Ecosistema Expediente / Solicitud
-*   **Solicitud:** Paso prospectivo inicial (normalmente iniciado por Clientes). Pasan por un proceso de revisión hasta ser marcadas como `CONVERTIDA` o `RECHAZADA`.
-*   **Expediente:** Entidad formal superior. Cuando una Solicitud es aprobada, hereda sus datos planos, sus documentos mediante puentes lógicos y sus interesados (validando estrictamente la duplicidad de identidad vía DNI).
+## Estructura del proyecto
 
-### 2. Motor Inteligente de Documentación (`OcrPdfService` & `DocumentoService`)
-*   Al subir un único archivo bajo la etiqueta `EXPEDIENTE_COMPLETO`, el backend actúa como puente:
-    1.  Guarda el PDF íntegro como resguardo o histórico.
-    2.  Escanea cada página con **Tesseract**.
-    3.  Aplica heurísticas por palabras clave para adivinar el contenido (DNI, Contrato Compraventa, Modelo Serafín, Ficha Técnica).
-    4.  *(Auto-Mapeo)*: Agrupa las páginas contiguas que traten de lo mismo y segmenta dinámicamente el PDF grande en varios sub-documentos pequeños clasificados automáticamente.
-
-### 3. Máquina de Estados de Incidencias (`IncidenciaService`)
-El sistema está protegido criptográficamente contra el avance de expedientes rotos. Al crearse una `Incidencia`, una máquina de estados oculta toma el control:
-*   Fuerza el estado de la Solicitud a `PENDIENTE_DOCUMENTACION`.
-*   Bajo este estado, cualquier intento de un `ADMIN` por escalar a `FINALIZADO` o `EN_TRAMITE` será bloqueado por las reglas de negocio hasta que la incidencia esté marcada manualmente como `resuelta = true`.
-
-### 4. Roles y Seguridad
-*   **ADMIN**: Creadores, editores supremos e impulsores de flujos. (Pueden resolver incidencias y purgar usuarios de la BD).
-*   **CLIENTE**: Limitados estrictamente vía **Multi-Tenant (Inquilino Multi-Cliente)**. Solo pueden interactuar (listar Expedientes, solicitar revisiones) sobre aquellos datos cuyo `ClienteId` empate exactamente con el Cliente vinculado a su propia credencial de `Usuario`.
-
----
-
-## ⚙️ Configuración y Despliegue Local
-
-### Requisitos Previos
-1. Java Development Kit (JDK) 17 o superior.
-2. Apache Maven instalado (o usar el Wrapper `mvnw`).
-3. Binarios/Data de **Tesseract OCR** descargados e inyectados localmente (Se requiere la ruta del `tessdata` en `OcrProperties` vía `application.properties`).
-
-### Comandos de Arranque
-```bash
-# Limpiar e instalar dependencias
-mvn clean install
-
-# Compilar clases localmente
-mvn compile
-
-# Arrancar el servidor Spring Boot (Por defecto en http://localhost:8080)
-mvn spring-boot:run
+```text
+src/main/java/com/example/gestor_documental
+|-- config          # Configuración e inicialización de datos
+|-- controller      # Controladores MVC
+|-- dto             # Objetos auxiliares para formularios y vistas
+|-- enums           # Estados, roles y tipos del dominio
+|-- exception       # Excepciones y manejador global
+|-- model           # Entidades JPA
+|-- repository      # Repositorios Spring Data
+|-- security        # Configuración y servicios de seguridad
+|-- service         # Interfaces de servicios
+|-- service/impl    # Implementación de lógica de negocio
+`-- validation      # Validadores de formularios
 ```
 
----
+Las plantillas Thymeleaf se encuentran en:
 
-## ⚠️ Puntos Técnicos Críticos a tener en cuenta (Para Desarrolladores)
+```text
+src/main/resources/templates
+```
 
-1.  **DANGER - Extracción Destructiva de Páginas:** La herramienta de separar páginas en el panel UI invoca a `extraerPaginasDocumento()`. Es importante notar que esta acción **NO es solo de lectura**; altera *físicamente* el PDF original restándole las páginas tomadas para evitar almacenamiento duplicado.
-2.  **Desfase de Arrays en PDFs:** Las utilidades en pantalla y String utilizan base 1 (Página 1, 2, 3). Sin embargo, `PdfSplitService` requiere base 0. La corrección se hace silenciosamente en la capa de utilidades (`parseRangoPaginas`), no manipular directamente índices crudos con Apache PDFBox.
-3.  **Lógica Oculta en Servicios:** Evita añadir validaciones complejas de BD en los Controllers. Toda decisión comercial (como el cifrado de contraseñas de Usuarios nuevos o la validación del "Interesado a Medias") reside documentada en la capa `@Service`.
+Los estilos y recursos estáticos se encuentran en:
+
+```text
+src/main/resources/static
+```
+
+## Requisitos
+
+Para ejecutar el proyecto en local:
+
+- JDK 17 o superior.
+- Maven o el wrapper incluido (`mvnw` / `mvnw.cmd`).
+- MySQL.
+- Tesseract OCR con datos de idioma español si se va a usar OCR.
+
+Para ejecutar con Docker:
+
+- Docker.
+- Docker Compose.
+
+## Configuración local
+
+El perfil de desarrollo utiliza MySQL en local. La URL por defecto apunta a la base de datos `gestor_documental`:
+
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/gestor_documental
+```
+
+Configura las credenciales mediante variables de entorno:
+
+```powershell
+$env:DB_USER="root"
+$env:DB_PASS="tu_password"
+```
+
+También puede configurarse la ruta de Tesseract:
+
+```powershell
+$env:TESSDATA_PATH="C:/Tesseract/Tesseract-OCR/tessdata"
+```
+
+## Ejecución en local
+
+En Windows:
+
+```powershell
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+En Linux/macOS:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+La aplicación se levanta por defecto en:
+
+```text
+http://localhost:8080
+```
+
+## Ejecución con Docker
+
+1. Copiar el archivo de ejemplo de variables:
+
+```bash
+cp .env.example .env
+```
+
+2. Revisar y cambiar los valores sensibles de `.env`, especialmente:
+
+```text
+MYSQL_PASSWORD
+MYSQL_ROOT_PASSWORD
+APP_ADMIN_EMAIL
+APP_ADMIN_PASSWORD
+COOKIE_SECURE
+```
+
+3. Levantar los contenedores:
+
+```bash
+docker compose up --build
+```
+
+El servicio queda publicado en:
+
+```text
+http://localhost:8080
+```
+
+En el `docker-compose.yml` actual el puerto se expone solo en `127.0.0.1`, por lo que no queda abierto directamente a toda la red del host.
+
+## Variables de entorno principales
+
+| Variable | Descripción |
+| --- | --- |
+| `SPRING_PROFILES_ACTIVE` | Perfil activo de Spring (`dev` o `prod`). |
+| `MYSQL_DATABASE` | Nombre de la base de datos MySQL. |
+| `MYSQL_USER` | Usuario de base de datos usado por la aplicación. |
+| `MYSQL_PASSWORD` | Contraseña del usuario de base de datos. |
+| `MYSQL_ROOT_PASSWORD` | Contraseña del usuario root de MySQL. |
+| `APP_ADMIN_EMAIL` | Email del administrador inicial. |
+| `APP_ADMIN_PASSWORD` | Contraseña del administrador inicial. |
+| `UPLOAD_DIR` | Directorio donde se guardan los archivos subidos. |
+| `UPLOAD_ALLOWED_EXTENSIONS` | Extensiones permitidas para subida de documentos. |
+| `MAX_FILE_SIZE` | Tamaño máximo de archivo. |
+| `MAX_REQUEST_SIZE` | Tamaño máximo de petición multipart. |
+| `LOG_FILE` | Ruta del fichero de logs. |
+| `TESSERACT_DATAPATH` | Ruta al directorio `tessdata` de Tesseract. |
+| `TESSDATA_PATH` | Ruta alternativa usada por el perfil local para localizar `tessdata`. |
+| `COOKIE_SECURE` | Activa cookies seguras. Usar `true` en HTTPS y `false` en local sin HTTPS. |
+
+## OCR y procesamiento documental
+
+El sistema utiliza Tess4J como integración Java con Tesseract OCR. Cuando se sube documentación escaneada, el servicio OCR puede extraer texto de las páginas y ayudar a identificar tipos documentales.
+
+Para el tratamiento de PDFs se utiliza Apache PDFBox. La aplicación permite trabajar con documentos completos y dividirlos en documentos más pequeños cuando se detectan bloques o páginas correspondientes a distintos tipos de documento.
+
+Tipos documentales contemplados actualmente:
+
+- DNI
+- Contrato de compraventa
+- Permiso de circulación
+- Ficha técnica
+- Mandato
+- Factura
+- Expediente completo
+- Mandato de representación
+- Cambio de titularidad
+- Autorización Serafín
+- Huella de trámite
+- Otros
+
+## Seguridad y roles
+
+La aplicación distingue dos roles principales:
+
+- `ADMIN`: gestiona clientes, usuarios, solicitudes, expedientes, documentos e incidencias.
+- `CLIENTE`: puede crear solicitudes, consultar sus expedientes y aportar documentación.
+
+Las vistas y operaciones se filtran según el usuario autenticado. Los clientes solo deben acceder a la información asociada a su propio perfil.
+
+## Estados principales
+
+Estados de solicitud:
+
+- `PENDIENTE_REVISION`
+- `CONVERTIDA`
+- `RECHAZADO`
+- `PENDIENTE_DOCUMENTACION`
+- `REVISANDO_INCIDENCIAS`
+
+Estados de expediente:
+
+- `EN_TRAMITE`
+- `INCIDENCIA`
+- `FINALIZADO`
+- `RECHAZADO`
+- `ENVIADO_DGT`
+- `REVISANDO_INCIDENCIAS`
+
+## API y monitorización
+
+El proyecto incluye:
+
+- Spring Boot Actuator para endpoints de salud e información.
+- Springdoc OpenAPI UI para documentación de endpoints cuando esté habilitada.
+
+Endpoints habituales:
+
+```text
+/actuator/health
+/swagger-ui.html
+```
+
+## Notas de desarrollo
+
+- La lógica de negocio debe mantenerse en la capa de servicios.
+- Los controladores deben limitarse a coordinar formularios, vistas y llamadas a servicios.
+- No deben incluirse credenciales reales en el repositorio.
+- Los archivos subidos y logs se montan como volúmenes en Docker:
+
+```text
+./uploads:/app/uploads
+./logs:/app/logs
+```
+
+## Pruebas
+
+Para ejecutar las pruebas:
+
+```bash
+./mvnw test
+```
+
+En Windows:
+
+```powershell
+.\mvnw.cmd test
+```
