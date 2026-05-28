@@ -213,7 +213,8 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         return dto == null
                 || ((dto.getNombre() == null || dto.getNombre().isBlank())
                         && (dto.getDni() == null || dto.getDni().isBlank())
-                        && dto.getRol() == null);
+                        && (dto.getTelefono() == null || dto.getTelefono().isBlank())
+                        && (dto.getDireccion() == null || dto.getDireccion().isBlank()));
     }
 
     /**
@@ -240,12 +241,25 @@ public class ExpedienteServiceImpl implements ExpedienteService {
      * (un cliente no puede ser comprador y vendedor a la vez en el mismo trámite).
      */
     public void validarInteresados(InteresadoFormDto interesado1, InteresadoFormDto interesado2) {
-        validarInteresado(interesado1, "Interesado 1");
-        validarInteresado(interesado2, "Interesado 2");
+        validarInteresados(List.of(interesado1, interesado2));
+    }
 
-        if (!interesadoVacio(interesado1) && !interesadoVacio(interesado2)) {
-            if (interesado1.getDni().equalsIgnoreCase(interesado2.getDni())) {
-                throw new IllegalArgumentException("Los dos interesados no pueden tener el mismo DNI.");
+    @Override
+    public void validarInteresados(List<InteresadoFormDto> interesados) {
+        List<InteresadoFormDto> informados = new java.util.ArrayList<>();
+        for (int index = 0; index < interesados.size(); index++) {
+            InteresadoFormDto interesado = interesados.get(index);
+            validarInteresado(interesado, "Interesado " + (index + 1));
+            if (!interesadoVacio(interesado)) {
+                informados.add(interesado);
+            }
+        }
+
+        for (int i = 0; i < informados.size(); i++) {
+            for (int j = i + 1; j < informados.size(); j++) {
+                if (informados.get(i).getDni().equalsIgnoreCase(informados.get(j).getDni())) {
+                    throw new IllegalArgumentException("Los interesados no pueden tener el mismo DNI.");
+                }
             }
         }
     }
@@ -268,8 +282,18 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             Long tipoTramiteId,
             InteresadoFormDto interesado1,
             InteresadoFormDto interesado2) {
+        return crearExpedienteCompleto(expediente, usuarioLogueado, clienteId, tipoTramiteId, List.of(interesado1, interesado2));
+    }
 
-        validarInteresados(interesado1, interesado2);
+    @Override
+    @Transactional
+    public Expediente crearExpedienteCompleto(Expediente expediente,
+            Usuario usuarioLogueado,
+            Long clienteId,
+            Long tipoTramiteId,
+            List<InteresadoFormDto> interesados) {
+
+        validarInteresados(interesados);
 
         Cliente cliente = clienteService.buscarPorId(clienteId).orElseThrow();
         TipoTramite tipoTramite = tipoTramiteService.buscarPorId(tipoTramiteId).orElseThrow();
@@ -281,8 +305,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
         Expediente expedienteGuardado = expedienteRepository.save(expediente);
 
-        guardarInteresadoSiValido(expedienteGuardado, interesado1);
-        guardarInteresadoSiValido(expedienteGuardado, interesado2);
+        interesados.forEach(interesado -> guardarInteresadoSiValido(expedienteGuardado, interesado));
 
         historialCambioService.registrarCambioExpediente(
                 expedienteGuardado,
@@ -301,6 +324,16 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             Long tipoTramiteId,
             InteresadoFormDto interesado1,
             InteresadoFormDto interesado2) {
+        return actualizarExpediente(id, expedienteActualizado, usuarioLogueado, clienteId, tipoTramiteId, List.of(interesado1, interesado2));
+    }
+
+    @Override
+    @Transactional
+    public Expediente actualizarExpediente(Long id, Expediente expedienteActualizado,
+            Usuario usuarioLogueado,
+            Long clienteId,
+            Long tipoTramiteId,
+            List<InteresadoFormDto> interesados) {
 
         Expediente expedienteBase = expedienteRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
@@ -313,7 +346,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             throw new OperacionInvalidaException("No se puede editar un expediente finalizado");
         }
 
-        validarInteresados(interesado1, interesado2);
+        validarInteresados(interesados);
 
         Cliente cliente = clienteService.buscarPorId(clienteId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado"));
@@ -339,8 +372,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
         Expediente expedienteGuardado = expedienteRepository.save(expedienteBase);
 
-        guardarInteresadoSiValido(expedienteGuardado, interesado1);
-        guardarInteresadoSiValido(expedienteGuardado, interesado2);
+        interesados.forEach(interesado -> guardarInteresadoSiValido(expedienteGuardado, interesado));
 
         java.util.List<String> cambios = new java.util.ArrayList<>();
         if (!java.util.Objects.equals(matriculaAnterior, expedienteActualizado.getMatricula())) {

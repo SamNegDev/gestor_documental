@@ -1,0 +1,70 @@
+import { apiGet, apiPost, apiPostForm, apiPostJson, apiPutJson } from "../../../shared/api/http";
+import type { ExpedienteDetail, ExpedienteEditCatalogs, ExpedienteEditInput, TipoIncidencia } from "../types/expedienteDetail.types";
+
+export function getExpedienteDetail(id: string | number): Promise<ExpedienteDetail> {
+  return apiGet<ExpedienteDetail>(`/api/expedientes/${id}`);
+}
+
+export function getExpedienteEditCatalogs(): Promise<ExpedienteEditCatalogs> {
+  return apiGet<ExpedienteEditCatalogs>("/api/expedientes/catalogos-edicion");
+}
+
+export function updateExpediente(id: string | number, input: ExpedienteEditInput): Promise<void> {
+  return apiPutJson(`/api/expedientes/${id}`, input);
+}
+
+export function createExpediente(input: ExpedienteEditInput): Promise<{ id: number }> {
+  return apiPostJson<{ id: number }>("/api/expedientes", input);
+}
+
+const hitoApiCodes: Record<string, string> = {
+  "tramite-programa-gestion": "TRAMITE_PROGRAMA_GESTION",
+  "modelo-620-presentado": "MODELO_620_PRESENTADO",
+  "enviado-dgt": "ENVIADO_DGT",
+};
+
+export function completeExpedienteMilestone(expedienteId: string | number, hitoId: string): Promise<void> {
+  const codigo = hitoApiCodes[hitoId] ?? hitoId;
+  if (!codigo) return Promise.reject(new Error("Hito no soportado"));
+  return apiPost(`/api/expedientes/${expedienteId}/hitos/${codigo}/completar`);
+}
+
+export function finishExpediente(expedienteId: string | number): Promise<void> {
+  return apiPost(`/api/expedientes/${expedienteId}/finalizar`);
+}
+
+export function getIncidentTypes(): Promise<TipoIncidencia[]> {
+  return apiGet<TipoIncidencia[]>("/api/expedientes/tipos-incidencia");
+}
+
+export function openExpedienteIncident(expedienteId: string | number, tipoIncidenciaId: number, observaciones: string): Promise<void> {
+  const formData = new FormData();
+  formData.append("tipoIncidenciaId", String(tipoIncidenciaId));
+  formData.append("observaciones", observaciones);
+  return apiPostForm(`/api/expedientes/${expedienteId}/incidencia`, formData);
+}
+
+export function resolveIncident(incidenciaId: number): Promise<void> {
+  return apiPost(`/api/incidencias/${incidenciaId}/resolver`);
+}
+
+export function reclaimIncident(incidenciaId: number, observaciones: string): Promise<void> {
+  const formData = new FormData();
+  formData.append("observaciones", observaciones);
+  return apiPostForm(`/api/incidencias/${incidenciaId}/reclamar`, formData);
+}
+
+export function uploadIncidentDocument(incidenciaId: number, archivo: File, tipoDocumento = "DOCUMENTO_INCIDENCIA"): Promise<void> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  formData.append("tipoDocumento", tipoDocumento);
+  return apiPostForm(`/api/incidencias/${incidenciaId}/documento`, formData);
+}
+
+export function linkIncidentDocument(incidenciaId: number, documentoId: number): Promise<void> {
+  return apiPost(`/api/incidencias/${incidenciaId}/documentos/${documentoId}/vincular`);
+}
+
+export function sendExpedienteMessage(expedienteId: string | number, contenido: string): Promise<void> {
+  return apiPostJson(`/api/expedientes/${expedienteId}/mensajes`, { contenido });
+}

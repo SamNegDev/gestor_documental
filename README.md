@@ -1,34 +1,34 @@
-# Gestor Documental para gestoría
+﻿# Gestor Documental para gestorÃ­a
 
-Aplicación web desarrollada con Spring Boot para centralizar la gestión documental de una gestoría especializada en trámites de vehículos.
+AplicaciÃ³n web desarrollada con Spring Boot para centralizar la gestiÃ³n documental de una gestorÃ­a especializada en trÃ¡mites de vehÃ­culos.
 
-El sistema permite gestionar solicitudes, expedientes, clientes, documentación, incidencias, mensajes e historial de actividad desde una plataforma única. Además, incorpora procesamiento de documentos PDF mediante OCR para ayudar a clasificar y dividir automáticamente documentación escaneada.
+El sistema permite gestionar solicitudes, expedientes, clientes, documentaciÃ³n, incidencias, mensajes e historial de actividad desde una plataforma Ãºnica. AdemÃ¡s, incorpora procesamiento de documentos PDF mediante OCR para ayudar a clasificar y dividir automÃ¡ticamente documentaciÃ³n escaneada.
 
 ## Funcionalidades principales
 
-- Autenticación de usuarios con Spring Security.
+- AutenticaciÃ³n de usuarios con Spring Security.
 - Roles diferenciados para administradores y clientes.
-- Panel de administración con gestión de usuarios, clientes, solicitudes y expedientes.
-- Área privada de cliente para crear solicitudes, consultar expedientes y aportar documentación.
-- Conversión de solicitudes en expedientes.
-- Gestión de estados de solicitudes y expedientes.
+- Panel de administraciÃ³n con gestiÃ³n de usuarios, clientes, solicitudes y expedientes.
+- Ãrea privada de cliente para crear solicitudes, consultar expedientes y aportar documentaciÃ³n.
+- ConversiÃ³n de solicitudes en expedientes.
+- GestiÃ³n de estados de solicitudes y expedientes.
 - Subida y almacenamiento de documentos asociados a solicitudes o expedientes.
-- Registro y resolución de incidencias.
-- Mensajería e historial de actividad vinculados a los trámites.
+- Registro y resoluciÃ³n de incidencias.
+- MensajerÃ­a e historial de actividad vinculados a los trÃ¡mites.
 - Procesamiento OCR con Tesseract/Tess4J.
-- División y clasificación de PDFs mediante Apache PDFBox.
+- DivisiÃ³n y clasificaciÃ³n de PDFs mediante Apache PDFBox.
 - Despliegue mediante Docker y MySQL.
 
-## Stack tecnológico
+## Stack tecnolÃ³gico
 
 - Java 17
 - Spring Boot 4
 - Spring MVC
 - Spring Security
 - Spring Data JPA / Hibernate
-- Thymeleaf
-- Thymeleaf Layout Dialect
-- Bootstrap 5
+- React
+- TypeScript
+- Vite
 - MySQL 8.4
 - Maven
 - Apache PDFBox
@@ -39,30 +39,27 @@ El sistema permite gestionar solicitudes, expedientes, clientes, documentación,
 
 ```text
 src/main/java/com/example/gestor_documental
-|-- config          # Configuración e inicialización de datos
-|-- controller      # Controladores MVC
-|-- dto             # Objetos auxiliares para formularios y vistas
+|-- config          # ConfiguraciÃ³n e inicializaciÃ³n de datos
+|-- controller      # API REST, descarga/visualizacion de documentos y fallback SPA
+|-- dto             # Objetos de transferencia para API y formularios
 |-- enums           # Estados, roles y tipos del dominio
 |-- exception       # Excepciones y manejador global
 |-- model           # Entidades JPA
 |-- repository      # Repositorios Spring Data
-|-- security        # Configuración y servicios de seguridad
+|-- security        # ConfiguraciÃ³n y servicios de seguridad
 |-- service         # Interfaces de servicios
-|-- service/impl    # Implementación de lógica de negocio
+|-- service/impl    # ImplementaciÃ³n de lÃ³gica de negocio
 `-- validation      # Validadores de formularios
 ```
 
-Las plantillas Thymeleaf se encuentran en:
+El frontend React se encuentra en:
 
 ```text
-src/main/resources/templates
+frontend
 ```
 
-Los estilos y recursos estáticos se encuentran en:
 
-```text
-src/main/resources/static
-```
+En Docker, el build de React se copia dentro del jar como recursos estaticos para servir la SPA desde Spring Boot.
 
 ## Requisitos
 
@@ -71,14 +68,14 @@ Para ejecutar el proyecto en local:
 - JDK 17 o superior.
 - Maven o el wrapper incluido (`mvnw` / `mvnw.cmd`).
 - MySQL.
-- Tesseract OCR con datos de idioma español si se va a usar OCR.
+- Tesseract OCR con datos de idioma espaÃ±ol si se va a usar OCR.
 
 Para ejecutar con Docker:
 
 - Docker.
 - Docker Compose.
 
-## Configuración local
+## ConfiguraciÃ³n local
 
 El perfil de desarrollo utiliza MySQL en local. La URL por defecto apunta a la base de datos `gestor_documental`:
 
@@ -93,20 +90,20 @@ $env:DB_USER="root"
 $env:DB_PASS="tu_password"
 ```
 
-Si quieres crear un administrador automáticamente al arrancar con el perfil `dev`, define también:
+Si quieres crear un administrador automÃ¡ticamente al arrancar con el perfil `dev`, define tambiÃ©n:
 
 ```powershell
 $env:DEV_ADMIN_EMAIL="admin.local@example.com"
 $env:DEV_ADMIN_PASSWORD="cambia_este_valor"
 ```
 
-También puede configurarse la ruta de Tesseract:
+TambiÃ©n puede configurarse la ruta de Tesseract:
 
 ```powershell
 $env:TESSDATA_PATH="C:/Tesseract/Tesseract-OCR/tessdata"
 ```
 
-## Ejecución en local
+## EjecuciÃ³n en local
 
 En Windows:
 
@@ -120,13 +117,13 @@ En Linux/macOS:
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-La aplicación se levanta por defecto en:
+La aplicaciÃ³n se levanta por defecto en:
 
 ```text
 http://localhost:8080
 ```
 
-## Ejecución con Docker
+## EjecuciÃ³n con Docker
 
 1. Copiar el archivo de ejemplo de variables:
 
@@ -160,21 +157,21 @@ En el `docker-compose.yml` actual el puerto se expone solo en `127.0.0.1`, por l
 
 ## Variables de entorno principales
 
-| Variable | Descripción |
+| Variable | DescripciÃ³n |
 | --- | --- |
 | `SPRING_PROFILES_ACTIVE` | Perfil activo de Spring (`dev` o `prod`). |
 | `MYSQL_DATABASE` | Nombre de la base de datos MySQL. |
-| `MYSQL_USER` | Usuario de base de datos usado por la aplicación. |
-| `MYSQL_PASSWORD` | Contraseña del usuario de base de datos. |
-| `MYSQL_ROOT_PASSWORD` | Contraseña del usuario root de MySQL. |
+| `MYSQL_USER` | Usuario de base de datos usado por la aplicaciÃ³n. |
+| `MYSQL_PASSWORD` | ContraseÃ±a del usuario de base de datos. |
+| `MYSQL_ROOT_PASSWORD` | ContraseÃ±a del usuario root de MySQL. |
 | `APP_ADMIN_EMAIL` | Email del administrador inicial. |
-| `APP_ADMIN_PASSWORD` | Contraseña del administrador inicial. |
+| `APP_ADMIN_PASSWORD` | ContraseÃ±a del administrador inicial. |
 | `DEV_ADMIN_EMAIL` | Email opcional para crear un administrador en perfil `dev`. |
-| `DEV_ADMIN_PASSWORD` | Contraseña opcional para crear un administrador en perfil `dev`. |
+| `DEV_ADMIN_PASSWORD` | ContraseÃ±a opcional para crear un administrador en perfil `dev`. |
 | `UPLOAD_DIR` | Directorio donde se guardan los archivos subidos. |
 | `UPLOAD_ALLOWED_EXTENSIONS` | Extensiones permitidas para subida de documentos. |
-| `MAX_FILE_SIZE` | Tamaño máximo de archivo. |
-| `MAX_REQUEST_SIZE` | Tamaño máximo de petición multipart. |
+| `MAX_FILE_SIZE` | TamaÃ±o mÃ¡ximo de archivo. |
+| `MAX_REQUEST_SIZE` | TamaÃ±o mÃ¡ximo de peticiÃ³n multipart. |
 | `LOG_FILE` | Ruta del fichero de logs. |
 | `TESSERACT_DATAPATH` | Ruta al directorio `tessdata` de Tesseract. |
 | `TESSDATA_PATH` | Ruta alternativa usada por el perfil local para localizar `tessdata`. |
@@ -182,33 +179,33 @@ En el `docker-compose.yml` actual el puerto se expone solo en `127.0.0.1`, por l
 
 ## OCR y procesamiento documental
 
-El sistema utiliza Tess4J como integración Java con Tesseract OCR. Cuando se sube documentación escaneada, el servicio OCR puede extraer texto de las páginas y ayudar a identificar tipos documentales.
+El sistema utiliza Tess4J como integraciÃ³n Java con Tesseract OCR. Cuando se sube documentaciÃ³n escaneada, el servicio OCR puede extraer texto de las pÃ¡ginas y ayudar a identificar tipos documentales.
 
-Para el tratamiento de PDFs se utiliza Apache PDFBox. La aplicación permite trabajar con documentos completos y dividirlos en documentos más pequeños cuando se detectan bloques o páginas correspondientes a distintos tipos de documento.
+Para el tratamiento de PDFs se utiliza Apache PDFBox. La aplicaciÃ³n permite trabajar con documentos completos y dividirlos en documentos mÃ¡s pequeÃ±os cuando se detectan bloques o pÃ¡ginas correspondientes a distintos tipos de documento.
 
 Tipos documentales contemplados actualmente:
 
 - DNI
 - Contrato de compraventa
-- Permiso de circulación
-- Ficha técnica
+- Permiso de circulaciÃ³n
+- Ficha tÃ©cnica
 - Mandato
 - Factura
 - Expediente completo
-- Mandato de representación
+- Mandato de representaciÃ³n
 - Cambio de titularidad
-- Autorización Serafín
-- Huella de trámite
+- AutorizaciÃ³n SerafÃ­n
+- Huella de trÃ¡mite
 - Otros
 
 ## Seguridad y roles
 
-La aplicación distingue dos roles principales:
+La aplicaciÃ³n distingue dos roles principales:
 
 - `ADMIN`: gestiona clientes, usuarios, solicitudes, expedientes, documentos e incidencias.
-- `CLIENTE`: puede crear solicitudes, consultar sus expedientes y aportar documentación.
+- `CLIENTE`: puede crear solicitudes, consultar sus expedientes y aportar documentaciÃ³n.
 
-Las vistas y operaciones se filtran según el usuario autenticado. Los clientes solo deben acceder a la información asociada a su propio perfil.
+Las vistas y operaciones se filtran segÃºn el usuario autenticado. Los clientes solo deben acceder a la informaciÃ³n asociada a su propio perfil.
 
 ## Estados principales
 
@@ -229,12 +226,12 @@ Estados de expediente:
 - `ENVIADO_DGT`
 - `REVISANDO_INCIDENCIAS`
 
-## API y monitorización
+## API y monitorizaciÃ³n
 
 El proyecto incluye:
 
-- Spring Boot Actuator para endpoints de salud e información.
-- Springdoc OpenAPI UI para documentación de endpoints cuando esté habilitada.
+- Spring Boot Actuator para endpoints de salud e informaciÃ³n.
+- Springdoc OpenAPI UI para documentaciÃ³n de endpoints cuando estÃ© habilitada.
 
 Endpoints habituales:
 
@@ -245,10 +242,10 @@ Endpoints habituales:
 
 ## Notas de desarrollo
 
-- La lógica de negocio debe mantenerse en la capa de servicios.
+- La lÃ³gica de negocio debe mantenerse en la capa de servicios.
 - Los controladores deben limitarse a coordinar formularios, vistas y llamadas a servicios.
 - No deben incluirse credenciales reales en el repositorio.
-- Los archivos subidos y logs se montan como volúmenes en Docker:
+- Los archivos subidos y logs se montan como volÃºmenes en Docker:
 
 ```text
 ./uploads:/app/uploads

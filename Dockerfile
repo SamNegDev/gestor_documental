@@ -1,10 +1,18 @@
-# Dockerfile para desplegar el Gestor Documental con Java 17, Maven y Tesseract OCR.
+FROM node:22-bookworm-slim AS frontend-build
+WORKDIR /frontend
 
-FROM maven:3.9-eclipse-temurin-17 AS build
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend ./
+RUN npm run build
+
+FROM maven:3.9-eclipse-temurin-17 AS backend-build
 WORKDIR /build
 
 COPY pom.xml .
 COPY src ./src
+COPY --from=frontend-build /frontend/dist ./src/main/resources/static
 
 RUN mvn -DskipTests package
 
@@ -29,7 +37,7 @@ RUN mkdir -p /app/uploads /app/logs
 ENV TESSERACT_DATAPATH=/usr/share/tesseract-ocr/4.00/tessdata
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
 
-COPY --from=build /build/target/*.jar /app/app.jar
+COPY --from=backend-build /build/target/*.jar /app/app.jar
 
 EXPOSE 8080
 

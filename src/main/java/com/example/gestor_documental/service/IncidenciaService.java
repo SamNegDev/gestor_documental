@@ -16,4 +16,6 @@ public interface IncidenciaService {
     void solicitarRevisionSolicitud(Long solicitudId, Usuario cliente);
     
     void resolverIncidencia(Long incidenciaId, Usuario admin);
+
+    void reclamarIncidencia(Long incidenciaId, String observaciones, Usuario admin);
 }

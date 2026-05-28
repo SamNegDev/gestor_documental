@@ -6,5 +6,6 @@ import java.util.List;
 public interface PdfSplitService {
     byte[] extraerPaginas(byte[] pdfOriginal, List<Integer> paginas);
     byte[] eliminarPaginas(byte[] pdfOriginal, List<Integer> paginas);
+    byte[] unirDocumentos(List<byte[]> documentos);
     List<Integer> parseRangoPaginas(String rango, int totalPaginas);
 }

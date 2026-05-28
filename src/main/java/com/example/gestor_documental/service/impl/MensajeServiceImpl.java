@@ -41,6 +41,10 @@ public class MensajeServiceImpl implements MensajeService {
     @Override
     @Transactional
     public Mensaje añadirAExpediente(Long expedienteId, String contenido, Usuario autor) {
+        if (contenido == null || contenido.isBlank()) {
+            throw new IllegalArgumentException("El mensaje no puede estar vacio");
+        }
+
         Expediente expediente = expedienteRepository.findById(expedienteId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
 
@@ -49,7 +53,7 @@ public class MensajeServiceImpl implements MensajeService {
             throw new AccesoDenegadoException("No tienes permiso para añadir mensajes a este expediente");
         }
         mensaje.setExpediente(expediente);
-        mensaje.setContenido(contenido);
+        mensaje.setContenido(contenido.trim());
         mensaje.setAutor(autor);
 
         return mensajeRepository.save(mensaje);

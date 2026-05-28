@@ -13,6 +13,8 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long> {
 
     List<Documento> findByExpedienteId(Long expedienteId);
 
+    List<Documento> findByIncidenciaId(Long incidenciaId);
+
     List<Documento> findBySolicitudId(Long solicitudId);
 
     @EntityGraph(attributePaths = {

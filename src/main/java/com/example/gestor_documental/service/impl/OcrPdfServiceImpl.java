@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -49,12 +50,7 @@ public class OcrPdfServiceImpl implements OcrPdfService {
             List<Integer> paginasActuales = new ArrayList<>();
 
             for (int i = 0; i < totalPaginas; i++) {
-                BufferedImage imagen = renderer.renderImageWithDPI(
-                        i,ocrProperties.getDpi(),
-                        ImageType.GRAY
-                );
-
-                String textoPagina = extraerTexto(imagen);
+                String textoPagina = extraerTextoPagina(document, renderer, i);
                 TipoDocumento tipoDetectado = detectarTipoDocumento(textoPagina);
 
                 log.debug("OCR pagina {} de {} detectada como {}", i + 1, totalPaginas, tipoDetectado);
@@ -77,7 +73,14 @@ public class OcrPdfServiceImpl implements OcrPdfService {
                         paginasActuales.add(i);
                     }
                 } else {
-                    if (tipoActual == null) {
+                    if (tipoActual == null || tipoActual != TipoDocumento.OTROS) {
+                        if (!paginasActuales.isEmpty()) {
+                            resultado.add(new DocumentoDetectadoDto(
+                                    tipoActual,
+                                    new ArrayList<>(paginasActuales)
+                            ));
+                            paginasActuales.clear();
+                        }
                         tipoActual = TipoDocumento.OTROS;
                     }
                     paginasActuales.add(i);
@@ -106,6 +109,32 @@ public class OcrPdfServiceImpl implements OcrPdfService {
         }
     }
 
+    private String extraerTextoPagina(PDDocument document, PDFRenderer renderer, int pageIndex) throws IOException {
+        String textoEmbebido = extraerTextoEmbebido(document, pageIndex);
+        if (!textoEmbebido.isBlank()) {
+            return textoEmbebido;
+        }
+
+        BufferedImage imagen = renderer.renderImageWithDPI(
+                pageIndex,
+                ocrProperties.getDpi(),
+                ImageType.GRAY
+        );
+        return extraerTexto(imagen);
+    }
+
+    private String extraerTextoEmbebido(PDDocument document, int pageIndex) {
+        try {
+            PDFTextStripper stripper = new PDFTextStripper();
+            stripper.setStartPage(pageIndex + 1);
+            stripper.setEndPage(pageIndex + 1);
+            return normalizar(stripper.getText(document));
+        } catch (IOException e) {
+            log.debug("No se pudo extraer texto embebido de la pagina {}", pageIndex + 1, e);
+            return "";
+        }
+    }
+
 
     private String extraerTexto(BufferedImage imagen) {
         Path tempImage = null;
@@ -115,7 +144,7 @@ public class OcrPdfServiceImpl implements OcrPdfService {
             javax.imageio.ImageIO.write(imagen, "png", tempImage.toFile());
 
             ProcessBuilder processBuilder = new ProcessBuilder(
-                    "tesseract",
+                    ocrProperties.getTesseractPath(),
                     tempImage.toAbsolutePath().toString(),
                     "stdout",
                     "-l", ocrProperties.getLanguage(),
@@ -214,7 +243,7 @@ public class OcrPdfServiceImpl implements OcrPdfService {
                 t.contains("gestor administrativo") ||
                 t.contains("mandante") ||
                 t.contains("mandatario")) {
-            return TipoDocumento.MANDATO_REPRESENTACION;
+            return TipoDocumento.MANDATO;
         }
 
         // Ficha técnica

@@ -18,7 +18,13 @@ public interface DocumentoService {
 
     Documento obtenerDocumentoConPermiso(Long documentoId, Usuario usuario);
 
-    void guardarParaExpediente(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
+    Documento guardarParaExpediente(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
+
+    Documento guardarParaExpediente(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento, Long operacionId, Usuario usuario);
+
+    Documento guardarParaIncidencia(Long incidenciaId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
+
+    Documento vincularAIncidencia(Long incidenciaId, Long documentoId, Usuario usuario);
 
     void guardarParaSolicitud(Long solicitudId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
 
@@ -28,5 +34,19 @@ public interface DocumentoService {
 
     void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Usuario usuario);
 
+    void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Long operacionId, Usuario usuario);
+
+    int contarPaginasDocumento(Long id, Usuario usuario);
+
+    byte[] renderizarPaginaDocumento(Long id, int pagina, Usuario usuario);
+
+    void eliminarPaginasDocumento(Long id, String rangoPaginas, Usuario usuario);
+
+    void unirDocumentos(Long documentoPrincipalId, List<Long> documentoIds, TipoDocumento tipoDocumento, String nombreArchivo, Usuario usuario);
+
+    void unirDocumentos(Long documentoPrincipalId, List<Long> documentoIds, TipoDocumento tipoDocumento, String nombreArchivo, Long operacionId, Usuario usuario);
+
     void extraerPaginasDocumento(Long idOriginal, String rangoPaginas, TipoDocumento nuevoTipo, String nuevoNombre, Usuario usuario);
+
+    void extraerPaginasDocumento(Long idOriginal, String rangoPaginas, TipoDocumento nuevoTipo, String nuevoNombre, Long operacionId, Usuario usuario);
 }

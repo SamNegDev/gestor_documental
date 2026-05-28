@@ -1,0 +1,415 @@
+import { useCallback, useEffect, useState } from "react";
+import * as Tabs from "@radix-ui/react-tabs";
+import { useParams } from "react-router-dom";
+import { AlertCircle, CheckCircle2, Clock3, Download, Eye, FileText, History, Loader2, MessageCircle, Upload } from "lucide-react";
+import { getClienteExpediente, sendClienteExpedienteMessage, type ExpedienteCliente } from "../services/clienteExpedienteApi";
+import { uploadIncidentDocument } from "../services/expedienteDetailApi";
+import type { DocumentoExpediente, IncidenciaExpediente } from "../types/expedienteDetail.types";
+import { formatDateTime, humanizeEnum } from "../utils/formatters";
+import { ApiError } from "../../../shared/api/http";
+import "../styles/expedienteDetail.css";
+
+const CLIENT_CLOSING_DOCUMENTS = [
+  {
+    tipo: "COMPROBANTE_DGT",
+    title: "Comprobante DGT",
+    description: "Justificante final emitido por la DGT.",
+    agency: "DGT",
+    logoSrc: "/assets/logos/logo-dgt.png",
+    logoAlt: "Logotipo DGT",
+  },
+  {
+    tipo: "MODELO_620",
+    title: "Modelo 620",
+    description: "Modelo 620 presentado.",
+    agency: "Agencia Tributaria Canaria",
+    logoSrc: "/assets/logos/logo-atc.svg",
+    logoAlt: "Logotipo Agencia Tributaria Canaria",
+  },
+] as const;
+
+function clienteTone(estado: string) {
+  if (estado === "FINALIZADO") return "success";
+  if (estado === "INCIDENCIA") return "danger";
+  if (estado === "REVISANDO_INCIDENCIAS") return "warning";
+  return "info";
+}
+
+function friendlyPhase(expediente: ExpedienteCliente) {
+  if (expediente.estado === "FINALIZADO") return "Expediente finalizado";
+  if (expediente.estado === "INCIDENCIA") return "Pendiente de documentacion";
+  if (expediente.estado === "REVISANDO_INCIDENCIAS") return "Documentacion en revision";
+  if (expediente.estado === "ENVIADO_DGT") return "Enviado a DGT";
+  if (expediente.faseActual === "Cierre del expediente") return "Tramite listo para firmar";
+  return expediente.faseActual || "En tramitacion";
+}
+
+function clientHasClosingDocuments(documentos: DocumentoExpediente[]) {
+  return CLIENT_CLOSING_DOCUMENTS.every((item) =>
+    documentos.some((documento) => documento.tipo === item.tipo && documento.subido && documento.id),
+  );
+}
+
+function timelineSteps(expediente: ExpedienteCliente, closingDocumentsReady: boolean) {
+  const phase = friendlyPhase(expediente);
+  const currentIndex =
+    expediente.estado === "FINALIZADO" ? (closingDocumentsReady ? 4 : 3)
+      : expediente.estado === "ENVIADO_DGT" || phase.includes("firmar") ? 2
+        : expediente.estado === "INCIDENCIA" || expediente.estado === "REVISANDO_INCIDENCIAS" ? 1
+          : 1;
+
+  return [
+    { title: "Expediente abierto", description: "Hemos recibido la informacion inicial." },
+    { title: expediente.estado === "INCIDENCIA" ? "Incidencia" : expediente.estado === "REVISANDO_INCIDENCIAS" ? "Revision" : "Documentacion", description: expediente.estado === "REVISANDO_INCIDENCIAS" ? "Tu documento esta pendiente de revision." : "Revisamos o completamos la documentacion." },
+    { title: "Listo para firmar", description: "El tramite queda preparado para el siguiente paso." },
+    { title: "Finalizado", description: "El expediente queda cerrado." },
+  ].map((step, index) => ({
+    ...step,
+    state: index < currentIndex ? "done" : index === currentIndex ? "current" : "pending",
+  }));
+}
+
+function ClientClosingDocumentsPanel({ documentos }: { documentos: DocumentoExpediente[] }) {
+  const documentByType = new Map(
+    documentos
+      .filter((documento) => documento.subido && documento.id)
+      .map((documento) => [documento.tipo, documento]),
+  );
+  const available = CLIENT_CLOSING_DOCUMENTS.filter((item) => documentByType.has(item.tipo)).length;
+
+  return (
+    <section className="closure-docs-panel closure-docs-panel--client" aria-label="Documentos finales del expediente">
+      <div className="closure-docs-panel__heading">
+        <div>
+          <p className="eyebrow">Tramite finalizado</p>
+          <h3>Justificantes finales</h3>
+          <p>Acceso directo a los comprobantes oficiales del expediente.</p>
+        </div>
+        <span className={`closure-docs-status ${available === CLIENT_CLOSING_DOCUMENTS.length ? "closure-docs-status--ready" : "closure-docs-status--warning"}`}>
+          {available} de {CLIENT_CLOSING_DOCUMENTS.length} disponibles
+        </span>
+      </div>
+
+      <div className="closure-docs-grid">
+        {CLIENT_CLOSING_DOCUMENTS.map((item) => {
+          const documento = documentByType.get(item.tipo);
+          const ready = Boolean(documento?.id);
+          const fileName = documento?.nombreOriginal || documento?.nombre;
+
+          return (
+            <article className={`closure-doc-card ${ready ? "closure-doc-card--ready" : "closure-doc-card--missing"}`} key={item.tipo}>
+              <div className="closure-doc-card__identity">
+                <span className="closure-doc-card__logo">
+                  <img src={item.logoSrc} alt={item.logoAlt} loading="lazy" />
+                </span>
+                <span className="closure-doc-card__agency">{item.agency}</span>
+              </div>
+              <div className="closure-doc-card__body">
+                <strong>
+                  <FileText size={16} />
+                  {item.title}
+                </strong>
+                <p>{ready ? fileName : item.description}</p>
+                <small>{ready ? "Documento disponible" : "Pendiente de publicacion"}</small>
+              </div>
+              <div className="closure-doc-card__actions">
+                {ready && documento?.id ? (
+                  <>
+                    <a className="soft-button soft-button--compact" href={`/documentos/ver/${documento.id}`} target="_blank" rel="noreferrer">
+                      <Eye size={15} />
+                      Ver
+                    </a>
+                    <a className="primary-button primary-button--compact" href={`/documentos/descargar/${documento.id}`}>
+                      <Download size={15} />
+                      Descargar
+                    </a>
+                  </>
+                ) : (
+                  <span className="closure-doc-card__pending">Aun no disponible</span>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function ClienteExpedientePage() {
+  const { id } = useParams();
+  const [expediente, setExpediente] = useState<ExpedienteCliente | null>(null);
+  const [message, setMessage] = useState("");
+  const [uploadedIncidentIds, setUploadedIncidentIds] = useState<Set<number>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setExpediente(await getClienteExpediente(id));
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) {
+        setError("Sesion caducada. Inicia sesion para consultar el expediente.");
+      } else if (cause instanceof ApiError && cause.status === 403) {
+        setError("No tienes permiso para consultar este expediente.");
+      } else if (cause instanceof ApiError && cause.status === 404) {
+        setError("No hemos encontrado este expediente.");
+      } else if (cause instanceof ApiError && cause.details) {
+        setError(cause.details);
+      } else {
+        setError("No se pudo cargar el expediente.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleUploadIncidentDocument = async (incidencia: IncidenciaExpediente, archivo: File) => {
+    try {
+      await uploadIncidentDocument(incidencia.id, archivo);
+      setUploadedIncidentIds((current) => new Set(current).add(incidencia.id));
+      await load();
+    } catch {
+      alert("No se pudo subir el documento.");
+    }
+  };
+
+  const handleSendMessage = async () => {
+    const contenido = message.trim();
+    if (!id || !contenido) return;
+    try {
+      await sendClienteExpedienteMessage(id, contenido);
+      setMessage("");
+      await load();
+    } catch {
+      alert("No se pudo enviar el mensaje.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="exp-detail-state">
+        <Loader2 className="exp-detail-state__spinner" size={28} />
+        <strong>Cargando expediente</strong>
+        <span>Estamos recuperando el estado del expediente.</span>
+      </div>
+    );
+  }
+
+  if (error || !expediente) {
+    return (
+      <div className="exp-detail-state exp-detail-state--error">
+        <AlertCircle size={28} />
+        <strong>{error || "Expediente no encontrado"}</strong>
+        <div className="exp-detail-state__actions">
+          <button className="soft-button" onClick={() => void load()} type="button">
+            Reintentar
+          </button>
+          {error?.includes("Sesion") ? (
+            <a className="primary-button" href="/login">
+              Iniciar sesion
+            </a>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  const documentos = expediente.documentos ?? [];
+  const incidencias = expediente.incidencias ?? [];
+  const mensajes = expediente.mensajes ?? [];
+  const historial = expediente.historial ?? [];
+  const incidenciasActivas = incidencias.filter((incidencia) => !incidencia.resuelta);
+  const closingDocumentsReady = clientHasClosingDocuments(documentos);
+  const tone = clienteTone(expediente.estado);
+  const phase = friendlyPhase(expediente);
+  const steps = timelineSteps(expediente, closingDocumentsReady);
+
+  return (
+    <main className="client-expediente-page">
+      <section className={`client-status-hero client-status-hero--${tone}`}>
+        <div>
+          <p className="eyebrow">{expediente.referencia}</p>
+          <h2>{expediente.matricula || "Expediente sin matricula"}</h2>
+          <p>{expediente.tipoTramiteDescripcion || "Tramite en curso"}</p>
+        </div>
+        <div className="client-status-hero__state">
+          {tone === "success" ? <CheckCircle2 size={28} /> : <Clock3 size={28} />}
+          <strong>{humanizeEnum(expediente.estado)}</strong>
+          <span>{phase}</span>
+        </div>
+      </section>
+
+      <section className="client-state-panel">
+        <strong>{expediente.siguienteMensaje || "Estamos tramitando el expediente."}</strong>
+        <span>Inicio: {formatDateTime(expediente.fechaInicio)}</span>
+      </section>
+
+      {expediente.estado === "FINALIZADO" ? <ClientClosingDocumentsPanel documentos={documentos} /> : null}
+
+      <section className="client-timeline-panel">
+        <div className="exp-panel__heading">
+          <div>
+            <p className="eyebrow">Seguimiento</p>
+            <h3>{phase}</h3>
+          </div>
+        </div>
+        <ol className="client-timeline">
+          {steps.map((step, index) => (
+            <li className={`client-timeline-step client-timeline-step--${step.state}`} key={step.title}>
+              <span>{step.state === "done" ? <CheckCircle2 size={16} /> : index + 1}</span>
+              <div>
+                <strong>{step.title}</strong>
+                <small>{step.description}</small>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {incidenciasActivas.length > 0 ? (
+        <section className="client-incident-panel">
+          <div className="exp-panel__heading">
+            <div>
+              <p className="eyebrow">Accion requerida</p>
+              <h3>Incidencia pendiente</h3>
+            </div>
+          </div>
+          {incidenciasActivas.map((incidencia) => (
+            <article className="client-incident-card" key={incidencia.id}>
+              <div>
+                <strong>{humanizeEnum(incidencia.tipo)}</strong>
+                <p>{incidencia.observaciones || "Revisa la documentacion solicitada."}</p>
+                {expediente.estado === "REVISANDO_INCIDENCIAS" || uploadedIncidentIds.has(incidencia.id) || incidencia.pendienteRevisionCliente ? (
+                  <small className="client-upload-feedback">
+                    <CheckCircle2 size={15} />
+                    Documento recibido. Lo estamos revisando.
+                  </small>
+                ) : null}
+              </div>
+              {expediente.estado === "REVISANDO_INCIDENCIAS" || uploadedIncidentIds.has(incidencia.id) || incidencia.pendienteRevisionCliente ? null : (
+                <label className="primary-button primary-button--danger">
+                  <Upload size={16} />
+                  Aportar documento
+                  <input
+                    hidden
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      event.currentTarget.value = "";
+                      if (file) void handleUploadIncidentDocument(incidencia, file);
+                    }}
+                  />
+                </label>
+              )}
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      <section className="exp-panel">
+        <div className="exp-panel__heading">
+          <div>
+            <p className="eyebrow">Documentos</p>
+            <h3>Documentacion del expediente</h3>
+          </div>
+        </div>
+        <div className="documents-list">
+          {documentos.length === 0 ? (
+            <p className="exp-empty">Todavia no hay documentos disponibles.</p>
+          ) : (
+            documentos.map((documento) => (
+              <article className="document-row" key={documento.id || documento.nombre}>
+                <div className="pdf-icon">
+                  <FileText size={18} />
+                  <strong>PDF</strong>
+                </div>
+                <div className="document-row__body">
+                  <strong>{documento.nombreOriginal || documento.nombre}</strong>
+                  <span>{humanizeEnum(documento.tipo)}</span>
+                  <small>{formatDateTime(documento.fechaSubida)}</small>
+                </div>
+                <button
+                  className="soft-button soft-button--compact"
+                  disabled={!documento.id}
+                  onClick={() => documento.id && window.open(`/documentos/ver/${documento.id}`, "_blank", "noopener,noreferrer")}
+                  type="button"
+                >
+                  <Eye size={15} />
+                  Ver
+                </button>
+              </article>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="exp-panel exp-panel--secondary">
+        <Tabs.Root defaultValue="mensajes" className="secondary-tabs">
+          <Tabs.List className="secondary-tabs__list" aria-label="Comunicacion y seguimiento del expediente">
+            <Tabs.Trigger value="mensajes">
+              <MessageCircle size={16} />
+              Mensajes
+            </Tabs.Trigger>
+            <Tabs.Trigger value="historial">
+              <History size={16} />
+              Historial
+            </Tabs.Trigger>
+          </Tabs.List>
+
+          <Tabs.Content value="mensajes" className="secondary-tabs__content">
+            <div className="client-message-box">
+              <textarea
+                onChange={(event) => setMessage(event.target.value)}
+                placeholder="Escribe un mensaje"
+                rows={3}
+                value={message}
+              />
+              <button className="primary-button" disabled={!message.trim()} onClick={handleSendMessage} type="button">
+                <MessageCircle size={16} />
+                Enviar
+              </button>
+            </div>
+            <div className="timeline-list">
+              {mensajes.length === 0 ? (
+                <p className="exp-empty">No hay mensajes todavia.</p>
+              ) : (
+                mensajes.map((mensaje) => (
+                  <article className="timeline-item" key={mensaje.id}>
+                    <strong>{mensaje.autor || "Usuario"}</strong>
+                    <p>{mensaje.contenido}</p>
+                    <small>{formatDateTime(mensaje.fechaCreacion)}</small>
+                  </article>
+                ))
+              )}
+            </div>
+          </Tabs.Content>
+
+          <Tabs.Content value="historial" className="secondary-tabs__content">
+            <div className="timeline-list">
+              {historial.length === 0 ? (
+                <p className="exp-empty">No hay movimientos todavia.</p>
+              ) : (
+                historial.map((item) => (
+                  <article className="timeline-item" key={item.id}>
+                    <strong>{humanizeEnum(item.accion)}</strong>
+                    <p>{item.descripcion || "Movimiento registrado en el expediente."}</p>
+                    <small>{formatDateTime(item.fechaCambio)}</small>
+                  </article>
+                ))
+              )}
+            </div>
+          </Tabs.Content>
+        </Tabs.Root>
+      </section>
+    </main>
+  );
+}

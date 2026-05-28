@@ -2,8 +2,10 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.service.PdfSplitService;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -54,6 +56,24 @@ public class PdfSplitServiceImpl implements PdfSplitService {
 
         } catch (IOException e) {
             throw new RuntimeException("Error al eliminar páginas del PDF", e);
+        }
+    }
+
+    @Override
+    public byte[] unirDocumentos(List<byte[]> documentos) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            PDFMergerUtility merger = new PDFMergerUtility();
+            merger.setDestinationStream(baos);
+            for (byte[] contenido : documentos) {
+                if (contenido == null || contenido.length == 0) {
+                    continue;
+                }
+                merger.addSource(new ByteArrayInputStream(contenido));
+            }
+            merger.mergeDocuments(org.apache.pdfbox.io.MemoryUsageSetting.setupMainMemoryOnly());
+            return baos.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Error al unir documentos PDF", e);
         }
     }
 

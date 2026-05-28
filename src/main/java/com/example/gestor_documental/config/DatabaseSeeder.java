@@ -44,6 +44,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         if (tipoTramiteRepository.count() == 0) {
             List<TipoTramite> tiposTramite = Arrays.asList(
                     new TipoTramite(TipoTramiteEnum.TRASPASO, "Cambio de titularidad"),
+                    new TipoTramite(TipoTramiteEnum.BATECOM, "BATECOM"),
                     new TipoTramite(TipoTramiteEnum.ALTA, "Alta de vehículo"),
                     new TipoTramite(TipoTramiteEnum.BAJA, "Baja de vehículo"),
                     new TipoTramite(TipoTramiteEnum.DUPLICADO, "Duplicado de tarjeta ITV"),
@@ -51,6 +52,12 @@ public class DatabaseSeeder implements CommandLineRunner {
             tipoTramiteRepository.saveAll(tiposTramite);
             System.out.println("Base de datos inicializada: Se insertaron " + tiposTramite.size()
                     + " registros base para TipoTramite.");
+        }
+        boolean existeBatecom = tipoTramiteRepository.findAll().stream()
+                .anyMatch(tipo -> tipo.getNombre() == TipoTramiteEnum.BATECOM);
+        if (!existeBatecom) {
+            tipoTramiteRepository.save(new TipoTramite(TipoTramiteEnum.BATECOM, "BATECOM"));
+            System.out.println("Se inserto el nuevo TipoTramite: BATECOM");
         }
 
         // Add the new state if it hasn't been added yet

@@ -175,6 +175,10 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         incidenciaRepository.save(incidencia);
         
         if (incidencia.getExpediente() != null) {
+            if (incidenciaRepository.findByExpedienteIdAndResueltaFalse(incidencia.getExpediente().getId()).isEmpty()) {
+                incidencia.getExpediente().setEstadoExpediente(EstadoExpediente.EN_TRAMITE);
+                expedienteService.guardar(incidencia.getExpediente());
+            }
             historialCambioService.registrarCambioExpediente(
                     incidencia.getExpediente(), 
                     admin, 
@@ -189,5 +193,38 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                     "Se resolvió la incidencia: " + incidencia.getTipoIncidencia().getNombre().name()
             );
         }
+    }
+
+    @Override
+    @Transactional
+    public void reclamarIncidencia(Long incidenciaId, String observaciones, Usuario admin) {
+        if (admin.getRolUsuario() != com.example.gestor_documental.enums.RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo el administrador puede reclamar incidencias.");
+        }
+
+        Incidencia incidencia = incidenciaRepository.findById(incidenciaId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+
+        if (incidencia.isResuelta()) {
+            throw new OperacionInvalidaException("La incidencia ya esta resuelta.");
+        }
+        if (incidencia.getExpediente() == null) {
+            throw new OperacionInvalidaException("Esta incidencia no pertenece a un expediente.");
+        }
+
+        String nuevaObservacion = observaciones != null && !observaciones.isBlank()
+                ? observaciones
+                : "La documentacion aportada no resuelve la incidencia.";
+        incidencia.setObservaciones((incidencia.getObservaciones() != null ? incidencia.getObservaciones() + "\n\n" : "")
+                + "Reclamacion admin: " + nuevaObservacion);
+        incidenciaRepository.save(incidencia);
+
+        expedienteService.cambiarEstado(incidencia.getExpediente().getId(), EstadoExpediente.INCIDENCIA, admin);
+        historialCambioService.registrarCambioExpediente(
+                incidencia.getExpediente(),
+                admin,
+                "INCIDENCIA RECLAMADA",
+                nuevaObservacion
+        );
     }
 }

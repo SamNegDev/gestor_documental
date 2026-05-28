@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "app.ocr")
 public class OcrProperties {
+    private String tesseractPath = "tesseract";
     private String tessdataPath;
     private String language = "spa";
     private float dpi = 300;

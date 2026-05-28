@@ -2,6 +2,7 @@ package com.example.gestor_documental.security;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.nio.charset.StandardCharsets;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -18,19 +19,31 @@ public class CustomSuccessHandler implements AuthenticationSuccessHandler {
                                             HttpServletResponse response,
                                             Authentication authentication) throws IOException {
 
-        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
+        String targetUrl = resolveTargetUrl(authentication.getAuthorities());
 
+        if (request.getRequestURI().startsWith("/api/")) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+            response.setContentType("application/json");
+            response.getWriter().write("{\"redirect\":\"" + targetUrl + "\"}");
+            response.getWriter().flush();
+            return;
+        }
+
+        response.sendRedirect(targetUrl);
+    }
+
+    private String resolveTargetUrl(Collection<? extends GrantedAuthority> authorities) {
         for (GrantedAuthority auth : authorities) {
             if (auth.getAuthority().equals("ROLE_ADMIN")) {
-                    response.sendRedirect("/admin/dashboard");
-                    return;
-            } else if (auth.getAuthority().equals("ROLE_CLIENTE")) {
-                    response.sendRedirect("/cliente/dashboard");
-                    return;
+                return "/admin/dashboard";
+            }
+            if (auth.getAuthority().equals("ROLE_CLIENTE")) {
+                return "/cliente/dashboard";
             }
         }
 
-            response.sendRedirect("/login?error");
+        return "/login?error";
     }
 }
 
