@@ -1,5 +1,11 @@
 import { apiGet, apiPost, apiPostForm, apiPostJson, apiPutJson } from "../../../shared/api/http";
-import type { ExpedienteDetail, ExpedienteEditCatalogs, ExpedienteEditInput, TipoIncidencia } from "../types/expedienteDetail.types";
+import type {
+  ExpedienteDetail,
+  ExpedienteEditCatalogs,
+  ExpedienteEditInput,
+  InteresadoSearchResult,
+  TipoIncidencia,
+} from "../types/expedienteDetail.types";
 
 export function getExpedienteDetail(id: string | number): Promise<ExpedienteDetail> {
   return apiGet<ExpedienteDetail>(`/api/expedientes/${id}`);
@@ -15,6 +21,10 @@ export function updateExpediente(id: string | number, input: ExpedienteEditInput
 
 export function createExpediente(input: ExpedienteEditInput): Promise<{ id: number }> {
   return apiPostJson<{ id: number }>("/api/expedientes", input);
+}
+
+export function searchInteresados(query: string): Promise<InteresadoSearchResult[]> {
+  return apiGet<InteresadoSearchResult[]>(`/api/expedientes/interesados/buscar?q=${encodeURIComponent(query)}`);
 }
 
 const hitoApiCodes: Record<string, string> = {
@@ -44,6 +54,14 @@ export function openExpedienteIncident(expedienteId: string | number, tipoIncide
   return apiPostForm(`/api/expedientes/${expedienteId}/incidencia`, formData);
 }
 
+export function requestAdditionalInfo(expedienteId: string | number, contenido: string): Promise<void> {
+  return apiPostJson(`/api/expedientes/${expedienteId}/informacion-adicional`, { contenido });
+}
+
+export function resolveAdditionalInfo(expedienteId: string | number): Promise<void> {
+  return apiPost(`/api/expedientes/${expedienteId}/informacion-adicional/revisar`);
+}
+
 export function resolveIncident(incidenciaId: number): Promise<void> {
   return apiPost(`/api/incidencias/${incidenciaId}/resolver`);
 }
@@ -52,6 +70,10 @@ export function reclaimIncident(incidenciaId: number, observaciones: string): Pr
   const formData = new FormData();
   formData.append("observaciones", observaciones);
   return apiPostForm(`/api/incidencias/${incidenciaId}/reclamar`, formData);
+}
+
+export function answerIncident(incidenciaId: number, contenido: string): Promise<void> {
+  return apiPostJson(`/api/incidencias/${incidenciaId}/respuesta`, { contenido });
 }
 
 export function uploadIncidentDocument(incidenciaId: number, archivo: File, tipoDocumento = "DOCUMENTO_INCIDENCIA"): Promise<void> {

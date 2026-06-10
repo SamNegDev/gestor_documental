@@ -15,6 +15,7 @@ import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
 import com.example.gestor_documental.service.TipoTramiteService;
+import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +37,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
     @Override
     public List<Expediente> listarTodos() {
-        return expedienteRepository.findAllByOrderByFechaCreacionDesc();
+        return expedienteRepository.findAllOrderByFechaReferenciaDesc();
     }
 
     @Override
@@ -46,6 +47,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
     @Override
     public Expediente guardar(Expediente expediente) {
+        normalizarExpediente(expediente);
         return expedienteRepository.save(expediente);
     }
 
@@ -61,7 +63,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
     @Override
     public List<Expediente> listarPorClienteId(Long clienteId) {
-        return expedienteRepository.findByClienteIdOrderByFechaCreacionDesc(clienteId);
+        return expedienteRepository.findByClienteIdOrderByFechaReferenciaDesc(clienteId);
     }
 
     @Override
@@ -99,12 +101,12 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
     @Override
     public List<Expediente> listarUltimos() {
-        return expedienteRepository.findTop5ByOrderByFechaCreacionDesc();
+        return expedienteRepository.findTop5OrderByFechaReferenciaDesc();
     }
 
     @Override
     public List<Expediente> listarUltimosPorCliente(Cliente cliente) {
-        return expedienteRepository.findTop5ByClienteOrderByFechaCreacionDesc(cliente);
+        return expedienteRepository.findTop5ByClienteOrderByFechaReferenciaDesc(cliente);
     }
 
     @Override
@@ -125,10 +127,10 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         Interesado interesado = interesadoService.buscarInteresadoPorDNI(dto.getDni())
                 .orElseGet(() -> {
                     Interesado nuevoInteresado = new Interesado();
-                    nuevoInteresado.setNombre(dto.getNombre());
-                    nuevoInteresado.setDni(dto.getDni());
-                    nuevoInteresado.setTelefono(dto.getTelefono());
-                    nuevoInteresado.setDireccion(dto.getDireccion());
+                    nuevoInteresado.setNombre(TextNormalizer.upperOrNull(dto.getNombre()));
+                    nuevoInteresado.setDni(TextNormalizer.upperOrNull(dto.getDni()));
+                    nuevoInteresado.setTelefono(TextNormalizer.upperOrNull(dto.getTelefono()));
+                    nuevoInteresado.setDireccion(TextNormalizer.upperOrNull(dto.getDireccion()));
                     return interesadoService.guardar(nuevoInteresado);
                 });
 
@@ -302,6 +304,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         expediente.setTipoTramite(tipoTramite);
         expediente.setEstadoExpediente(EstadoExpediente.EN_TRAMITE);
         expediente.setCreadoPor(usuarioLogueado);
+        normalizarExpediente(expediente);
 
         Expediente expedienteGuardado = expedienteRepository.save(expediente);
 
@@ -360,8 +363,8 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
         expedienteBase.setCliente(cliente);
         expedienteBase.setTipoTramite(tipoTramite);
-        expedienteBase.setMatricula(expedienteActualizado.getMatricula());
-        expedienteBase.setObservaciones(expedienteActualizado.getObservaciones());
+        expedienteBase.setMatricula(TextNormalizer.upperOrNull(expedienteActualizado.getMatricula()));
+        expedienteBase.setObservaciones(TextNormalizer.upperOrNull(expedienteActualizado.getObservaciones()));
 
         // Limpiar asociaciones previas
         expedienteInteresadoRepository.deleteByExpedienteId(expedienteBase.getId());
@@ -393,5 +396,10 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                         : "Se modificaron los campos: " + String.join(", ", cambios));
 
         return expedienteGuardado;
+    }
+
+    private void normalizarExpediente(Expediente expediente) {
+        expediente.setMatricula(TextNormalizer.upperOrNull(expediente.getMatricula()));
+        expediente.setObservaciones(TextNormalizer.upperOrNull(expediente.getObservaciones()));
     }
 }

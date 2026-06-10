@@ -2,11 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Mail, Pencil, Plus, Trash2, UserRoundCheck, UsersRound } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
+import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { deleteUsuario, getUsuarios } from "../services/adminApi";
 import type { UsuarioAdmin } from "../types";
 
 export function UsuariosListPage() {
   const queryClient = useQueryClient();
+  const { confirm, dialog } = useConfirmDialog();
   const usuariosQuery = useQuery({
     queryKey: ["admin", "usuarios"],
     queryFn: getUsuarios,
@@ -53,14 +55,21 @@ export function UsuariosListPage() {
               <UsuarioCard
                 key={usuario.id}
                 usuario={usuario}
-                onDelete={() => {
-                  if (window.confirm(`Eliminar ${usuario.nombreCompleto}?`)) deleteMutation.mutate(usuario.id);
+                onDelete={async () => {
+                  const confirmed = await confirm({
+                    title: "Eliminar usuario",
+                    description: `Se eliminara ${usuario.nombreCompleto}. Esta operacion no se puede deshacer.`,
+                    confirmLabel: "Eliminar",
+                    tone: "danger",
+                  });
+                  if (confirmed) deleteMutation.mutate(usuario.id);
                 }}
               />
             ))}
           </div>
         ) : null}
       </section>
+      {dialog}
     </main>
   );
 }

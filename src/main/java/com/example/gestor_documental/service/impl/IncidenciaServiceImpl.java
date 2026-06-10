@@ -8,6 +8,7 @@ import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.service.*;
+import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
     private final SolicitudService solicitudService;
     private final TipoIncidenciaService tipoIncidenciaService;
     private final HistorialCambioService historialCambioService;
+    private final MensajeService mensajeService;
 
     @Override
     public List<Incidencia> listarPorExpediente(Long expedienteId) {
@@ -57,7 +59,8 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         TipoIncidencia tipo = tipoIncidenciaService.buscarPorId(tipoIncidenciaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Tipo de incidencia no encontrado"));
 
-        Incidencia incidencia = new Incidencia(tipo, expediente, observaciones, admin);
+        String observacionesNormalizadas = TextNormalizer.upperOrNull(observaciones);
+        Incidencia incidencia = new Incidencia(tipo, expediente, observacionesNormalizadas, admin);
         incidenciaRepository.save(incidencia);
 
         // Cambiamos el estado a INCIDENCIA automáticamente
@@ -67,7 +70,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                 expediente, 
                 admin, 
                 "INCIDENCIA", 
-                "Nueva incidencia: " + tipo.getNombre().name() + " - " + observaciones
+                "Nueva incidencia: " + tipo.getNombre().name() + " - " + observacionesNormalizadas
         );
 
         return incidencia;
@@ -95,7 +98,8 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         TipoIncidencia tipo = tipoIncidenciaService.buscarPorId(tipoIncidenciaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Tipo de incidencia no encontrado"));
 
-        Incidencia incidencia = new Incidencia(tipo, solicitud, observaciones, admin);
+        String observacionesNormalizadas = TextNormalizer.upperOrNull(observaciones);
+        Incidencia incidencia = new Incidencia(tipo, solicitud, observacionesNormalizadas, admin);
         incidenciaRepository.save(incidencia);
 
         solicitudService.cambiarEstadoSolicitud(solicitudId, EstadoSolicitud.PENDIENTE_DOCUMENTACION, admin);
@@ -104,7 +108,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                 solicitud, 
                 admin, 
                 "INCIDENCIA", 
-                "Nueva incidencia: " + tipo.getNombre().name() + " - " + observaciones
+                "Nueva incidencia: " + tipo.getNombre().name() + " - " + observacionesNormalizadas
         );
 
         return incidencia;
@@ -212,8 +216,8 @@ public class IncidenciaServiceImpl implements IncidenciaService {
             throw new OperacionInvalidaException("Esta incidencia no pertenece a un expediente.");
         }
 
-        String nuevaObservacion = observaciones != null && !observaciones.isBlank()
-                ? observaciones
+        String nuevaObservacion = TextNormalizer.upperOrNull(observaciones) != null
+                ? TextNormalizer.upperOrNull(observaciones)
                 : "La documentacion aportada no resuelve la incidencia.";
         incidencia.setObservaciones((incidencia.getObservaciones() != null ? incidencia.getObservaciones() + "\n\n" : "")
                 + "Reclamacion admin: " + nuevaObservacion);
@@ -225,6 +229,39 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                 admin,
                 "INCIDENCIA RECLAMADA",
                 nuevaObservacion
+        );
+    }
+
+    @Override
+    @Transactional
+    public void responderIncidenciaExpediente(Long incidenciaId, String respuesta, Usuario cliente) {
+        if (respuesta == null || respuesta.isBlank()) {
+            throw new IllegalArgumentException("La respuesta no puede estar vacia");
+        }
+
+        Incidencia incidencia = incidenciaRepository.findById(incidenciaId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        if (incidencia.isResuelta()) {
+            throw new OperacionInvalidaException("La incidencia ya esta resuelta.");
+        }
+        Expediente expediente = incidencia.getExpediente();
+        if (expediente == null) {
+            throw new OperacionInvalidaException("Esta incidencia no pertenece a un expediente.");
+        }
+        if (!expedienteService.tienePermisoExpediente(expediente, cliente)) {
+            throw new AccesoDenegadoException("No tienes permiso para responder a esta incidencia");
+        }
+
+        mensajeService.añadirAExpediente(expediente.getId(), respuesta, cliente);
+        if (expediente.getEstadoExpediente() == EstadoExpediente.INCIDENCIA) {
+            expediente.setEstadoExpediente(EstadoExpediente.REVISANDO_INCIDENCIAS);
+            expedienteService.guardar(expediente);
+        }
+        historialCambioService.registrarCambioExpediente(
+                expediente,
+                cliente,
+                "RESPUESTA INCIDENCIA",
+                "El cliente respondio a la solicitud de informacion."
         );
     }
 }

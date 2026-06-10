@@ -160,6 +160,10 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
         if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
             throw new OperacionInvalidaException("No se puede modificar un expediente finalizado");
         }
+        if (expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
+                || expediente.getEstadoExpediente() == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA) {
+            throw new OperacionInvalidaException("Hay una solicitud de informacion adicional pendiente antes de continuar.");
+        }
         if (!incidenciaRepository.findByExpedienteIdAndResueltaFalse(expediente.getId()).isEmpty()) {
             throw new OperacionInvalidaException("Hay incidencias activas antes de continuar.");
         }

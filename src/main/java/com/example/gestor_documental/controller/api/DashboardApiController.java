@@ -51,7 +51,9 @@ public class DashboardApiController {
 
     private DashboardResponse adminDashboard() {
         long enTramite = expedienteService.contarPorEstado(EstadoExpediente.EN_TRAMITE)
-                + expedienteService.contarPorEstado(EstadoExpediente.REVISANDO_INCIDENCIAS);
+                + expedienteService.contarPorEstado(EstadoExpediente.REVISANDO_INCIDENCIAS)
+                + expedienteService.contarPorEstado(EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL)
+                + expedienteService.contarPorEstado(EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA);
         long incidenciasExpedientes = expedienteService.contarPorEstado(EstadoExpediente.INCIDENCIA);
         long incidenciasSolicitudes = solicitudService.contarPorEstado(EstadoSolicitud.PENDIENTE_DOCUMENTACION);
 
@@ -76,7 +78,9 @@ public class DashboardApiController {
     private DashboardResponse clienteDashboard(Usuario usuario) {
         var cliente = usuario.getCliente();
         long enTramite = expedienteService.contarPorClienteYEstado(cliente, EstadoExpediente.EN_TRAMITE)
-                + expedienteService.contarPorClienteYEstado(cliente, EstadoExpediente.REVISANDO_INCIDENCIAS);
+                + expedienteService.contarPorClienteYEstado(cliente, EstadoExpediente.REVISANDO_INCIDENCIAS)
+                + expedienteService.contarPorClienteYEstado(cliente, EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL)
+                + expedienteService.contarPorClienteYEstado(cliente, EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA);
         long incidenciasExpedientes = expedienteService.contarPorClienteYEstado(cliente, EstadoExpediente.INCIDENCIA);
         long incidenciasSolicitudes = solicitudService.contarPorClienteYEstado(cliente, EstadoSolicitud.PENDIENTE_DOCUMENTACION);
 

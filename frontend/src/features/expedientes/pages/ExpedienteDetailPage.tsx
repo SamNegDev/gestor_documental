@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FileText, Loader2, Route, ShieldCheck, Upload, UserRound } from "lucide-react";
+import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FileText, Loader2, MessageCircle, Route, ShieldCheck, Upload, UserRound, X } from "lucide-react";
 import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteUploadPanel";
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
+import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
 import { DocumentRequirementsPanel } from "../components/DocumentRequirementsPanel";
 import { DocumentsPanel } from "../components/DocumentsPanel";
 import { ExpedienteHeader } from "../components/ExpedienteHeader";
@@ -23,6 +24,8 @@ import {
   linkIncidentDocument,
   openExpedienteIncident,
   reclaimIncident,
+  requestAdditionalInfo,
+  resolveAdditionalInfo,
   resolveIncident,
   sendExpedienteMessage,
   uploadIncidentDocument,
@@ -35,6 +38,8 @@ import {
   type CreateRequirementInput,
 } from "../services/requisitosApi";
 import { ApiError } from "../../../shared/api/http";
+import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
+import { uppercaseInput } from "../../../shared/utils/text";
 import type {
   DocumentoExpediente,
   ExpedienteDetail,
@@ -50,6 +55,7 @@ import "../styles/expedienteDetail.css";
 const CLOSING_DOCUMENTS = [
   {
     tipo: "COMPROBANTE_DGT",
+    aliases: ["COMPROBANTE_DGT", "HUELLA_TRAMITE"],
     title: "Comprobante DGT",
     description: "Justificante final emitido por la DGT.",
     agency: "DGT",
@@ -58,6 +64,7 @@ const CLOSING_DOCUMENTS = [
   },
   {
     tipo: "MODELO_620",
+    aliases: ["MODELO_620"],
     title: "Modelo 620",
     description: "Modelo 620 presentado.",
     agency: "Agencia Tributaria Canaria",
@@ -77,7 +84,7 @@ function formatShortDate(value?: string | null) {
 
 function hasClosingDocuments(documentos: DocumentoExpediente[]) {
   return CLOSING_DOCUMENTS.every((item) =>
-    documentos.some((documento) => documento.tipo === item.tipo && documento.subido && documento.id),
+    documentos.some((documento) => item.aliases.some((alias) => alias === documento.tipo) && documento.subido && documento.id),
   );
 }
 
@@ -96,6 +103,7 @@ function ProcessFlowPanel({ expediente }: { expediente: ExpedienteDetail }) {
   const isClosed = expediente.estado === "FINALIZADO" || expediente.estado === "RECHAZADO";
   const closingDocumentsReady = hasClosingDocuments(expediente.documentos);
   const hasIncident = expediente.estado === "INCIDENCIA" || expediente.estado === "REVISANDO_INCIDENCIAS";
+  const hasAdditionalInfo = expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
   const docsReady = expediente.hitos.some((hito) => hito.id === "documentacion-completa" && hito.completado);
   const managementReady = expediente.hitos.some((hito) => hito.id === "tramite-programa-gestion" && hito.completado);
   const model620Ready = expediente.hitos.some((hito) => hito.id === "modelo-620-presentado" && hito.completado);
@@ -111,8 +119,8 @@ function ProcessFlowPanel({ expediente }: { expediente: ExpedienteDetail }) {
     },
     {
       id: "preparacion",
-      title: hasIncident ? "Incidencia" : docsReady ? "Documentacion validada" : "Documentacion",
-      description: hasIncident ? "Subsanacion o revision pendiente." : docsReady ? "Preparado para los pasos de gestion." : "Revisando documentos base.",
+      title: hasIncident ? "Incidencia" : hasAdditionalInfo ? "Informacion" : docsReady ? "Documentacion validada" : "Documentacion",
+      description: hasIncident ? "Subsanacion o revision pendiente." : hasAdditionalInfo ? "Pendiente de respuesta o revision." : docsReady ? "Preparado para los pasos de gestion." : "Revisando documentos base.",
       state: docsReady || isClosed ? "Completado" : "Fase actual",
       tone: docsReady || isClosed ? "done" : "active",
     },
@@ -125,7 +133,7 @@ function ProcessFlowPanel({ expediente }: { expediente: ExpedienteDetail }) {
     },
     {
       id: "cierre",
-      title: hasIncident ? "Incidencia" : sentDgt ? "Enviado a DGT" : "Finalizado",
+      title: hasIncident ? "Incidencia" : hasAdditionalInfo ? "Informacion" : sentDgt ? "Enviado a DGT" : "Finalizado",
       description: isClosed && !closingDocumentsReady ? "Pendiente de comprobantes finales." : "Enviado a DGT, incidencia o finalizado.",
       state: isClosed ? (closingDocumentsReady ? "Completado" : "Pendiente comprobantes") : model620Ready ? "Fase actual" : "Pendiente",
       tone: isClosed ? (closingDocumentsReady ? "done" : "active") : model620Ready ? "active" : "pending",
@@ -230,9 +238,12 @@ function ClosingDocumentsPanel({
   onUploadClosingDocument: (tipoDocumento: string, archivo: File) => void;
 }) {
   const documentByType = new Map(
-    documentos
-      .filter((documento) => documento.subido && documento.id)
-      .map((documento) => [documento.tipo, documento]),
+    CLOSING_DOCUMENTS
+      .map((item) => [
+        item.tipo,
+        documentos.find((documento) => item.aliases.some((alias) => alias === documento.tipo) && documento.subido && documento.id),
+      ] as const)
+      .filter((entry): entry is readonly [typeof CLOSING_DOCUMENTS[number]["tipo"], DocumentoExpediente] => Boolean(entry[1])),
   );
   const missingDocuments = CLOSING_DOCUMENTS.filter((item) => !documentByType.has(item.tipo));
 
@@ -364,6 +375,63 @@ function OperationTabs({
   );
 }
 
+function AdditionalInfoDialog({
+  open,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (contenido: string) => void;
+}) {
+  const [contenido, setContenido] = useState("");
+
+  useEffect(() => {
+    if (open) setContenido("");
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div className="exp-modal" role="presentation">
+      <button className="exp-modal__backdrop" onClick={onClose} type="button" aria-label="Cerrar solicitud" />
+      <section aria-labelledby="additional-info-title" aria-modal="true" className="exp-modal__panel exp-modal__panel--narrow" role="dialog">
+        <div className="exp-modal__header">
+          <div>
+            <p className="eyebrow">Aviso al cliente</p>
+            <h3 id="additional-info-title">Solicitar informacion adicional</h3>
+          </div>
+          <button aria-label="Cerrar" className="icon-button" onClick={onClose} type="button">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="incident-form">
+          <label>
+            Informacion solicitada
+            <textarea
+              onChange={(event) => setContenido(uppercaseInput(event.target.value))}
+              placeholder="Ej. CONFIRMAR PRECIO DE VENTA DEL CONTRATO"
+              rows={4}
+              value={contenido}
+            />
+          </label>
+        </div>
+
+        <footer className="exp-modal__footer">
+          <button className="soft-button" onClick={onClose} type="button">
+            Cancelar
+          </button>
+          <button className="primary-button" disabled={!contenido.trim()} onClick={() => onSubmit(contenido.trim())} type="button">
+            <MessageCircle size={16} />
+            Enviar solicitud
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 export function ExpedienteDetailPage() {
   const { id } = useParams();
   const [expediente, setExpediente] = useState<ExpedienteDetail | null>(null);
@@ -374,10 +442,13 @@ export function ExpedienteDetailPage() {
   const [ocrReviewDocuments, setOcrReviewDocuments] = useState<DocumentoExpediente[]>([]);
   const [completeExpedienteProcessing, setCompleteExpedienteProcessing] = useState(false);
   const [incidentDialogOpen, setIncidentDialogOpen] = useState(false);
+  const [additionalInfoDialogOpen, setAdditionalInfoDialogOpen] = useState(false);
   const [incidentTypes, setIncidentTypes] = useState<TipoIncidencia[]>([]);
   const [incidentTypesLoading, setIncidentTypesLoading] = useState(false);
   const [resolvingIncident, setResolvingIncident] = useState<IncidenciaExpediente | null>(null);
   const [activeOperationId, setActiveOperationId] = useState<number | null>(null);
+  const [editingDocument, setEditingDocument] = useState<DocumentoExpediente | null>(null);
+  const { confirm, dialog } = useConfirmDialog();
 
   const loadExpediente = useCallback(() => {
     if (!id) return;
@@ -427,6 +498,17 @@ export function ExpedienteDetailPage() {
       return data;
     });
   }, [activeOperationId, id]);
+
+  const openIncidentDialog = () => {
+    setIncidentDialogOpen(true);
+    if (incidentTypes.length === 0) {
+      setIncidentTypesLoading(true);
+      getIncidentTypes()
+        .then(setIncidentTypes)
+        .catch(() => alert("No se pudieron cargar los tipos de incidencia."))
+        .finally(() => setIncidentTypesLoading(false));
+    }
+  };
 
   const handleUploadDocument = async (documento: DocumentoExpediente, archivo: File) => {
     if (!expediente) return;
@@ -505,15 +587,17 @@ export function ExpedienteDetailPage() {
     }
   };
 
-  const handleEditDocument = async (documento: DocumentoExpediente) => {
-    if (!documento.id) return;
-    const nuevoNombre = window.prompt("Nombre del archivo", documento.nombreOriginal || documento.nombre);
-    if (nuevoNombre === null) return;
-    const nuevoTipo = window.prompt("Tipo documental", documento.tipo);
-    if (nuevoTipo === null) return;
-
+  const handleEditDocument = async (input: DocumentEditSubmit) => {
+    if (!editingDocument?.id) return;
     try {
-      await updateDocument(documento.id, nuevoTipo.trim() || documento.tipo, nuevoNombre.trim() || undefined, documento.operacionId);
+      await updateDocument(
+        editingDocument.id,
+        input.tipoDocumento,
+        input.nombreArchivo,
+        input.operacionId,
+        input.nombreAutomatico,
+      );
+      setEditingDocument(null);
       const actualizado = await refreshExpediente();
       if (actualizado) {
         setOcrReviewDocuments((current) =>
@@ -528,12 +612,11 @@ export function ExpedienteDetailPage() {
   const handleSaveOcrDocument = async (
     documento: DocumentoExpediente,
     tipoDocumento: string,
-    nombreSinExtension: string,
     operacionId?: number | null,
   ) => {
     if (!documento.id) return;
     try {
-      await updateDocument(documento.id, tipoDocumento, nombreSinExtension, operacionId);
+      await updateDocument(documento.id, tipoDocumento, undefined, operacionId, true);
       const actualizado = await refreshExpediente();
       if (actualizado) {
         setOcrReviewDocuments((current) =>
@@ -587,13 +670,12 @@ export function ExpedienteDetailPage() {
     documento: DocumentoExpediente,
     rangoPaginas: string,
     tipoDocumento: string,
-    nombreSinExtension: string,
     operacionId?: number | null,
   ) => {
     if (!documento.id) return;
     try {
       const previousIds = new Set(expediente?.documentos.map((item) => item.id).filter(Boolean));
-      await extractDocumentPages(documento.id, rangoPaginas, tipoDocumento, nombreSinExtension, operacionId);
+      await extractDocumentPages(documento.id, rangoPaginas, tipoDocumento, undefined, operacionId);
       const actualizado = await refreshExpediente();
       if (actualizado) {
         setOcrReviewDocuments((current) => {
@@ -613,18 +695,38 @@ export function ExpedienteDetailPage() {
     if (!expediente) return;
     const actionType = accion?.tipo || hito.accion;
     const actionLabel = accion?.label || hito.accionLabel || hito.titulo;
+    if (
+      (expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA")
+      && actionType !== "RESOLVER_INFORMACION_ADICIONAL"
+    ) {
+      alert("Primero debe resolverse la solicitud de informacion adicional.");
+      return;
+    }
     if (actionType === "ABRIR_INCIDENCIA") {
-      setIncidentDialogOpen(true);
-      if (incidentTypes.length === 0) {
-        setIncidentTypesLoading(true);
-        getIncidentTypes()
-          .then(setIncidentTypes)
-          .catch(() => alert("No se pudieron cargar los tipos de incidencia."))
-          .finally(() => setIncidentTypesLoading(false));
+      openIncidentDialog();
+      return;
+    }
+    if (actionType === "RESOLVER_INFORMACION_ADICIONAL") {
+      const confirmed = await confirm({
+        title: "Marcar informacion revisada",
+        description: "El expediente volvera a estar en tramite para poder continuar.",
+        confirmLabel: "Marcar revisada",
+      });
+      if (!confirmed) return;
+      try {
+        await resolveAdditionalInfo(expediente.id);
+        await refreshExpediente();
+      } catch {
+        alert("No se pudo marcar la informacion como revisada.");
       }
       return;
     }
-    const confirmed = window.confirm(`Confirmar: ${actionLabel}`);
+    const confirmed = await confirm({
+      title: "Confirmar avance",
+      description: `Se ejecutara la accion: ${actionLabel}.`,
+      confirmLabel: "Avanzar",
+      tone: actionType === "FINALIZAR" ? "success" : "default",
+    });
     if (!confirmed) return;
     try {
       if (actionType === "FINALIZAR") {
@@ -646,6 +748,17 @@ export function ExpedienteDetailPage() {
       await refreshExpediente();
     } catch {
       alert("No se pudo abrir la incidencia.");
+    }
+  };
+
+  const handleRequestAdditionalInfo = async (contenido: string) => {
+    if (!expediente) return;
+    try {
+      await requestAdditionalInfo(expediente.id, contenido);
+      setAdditionalInfoDialogOpen(false);
+      await refreshExpediente();
+    } catch {
+      alert("No se pudo solicitar la informacion adicional.");
     }
   };
 
@@ -713,7 +826,12 @@ export function ExpedienteDetailPage() {
 
   const handleDeleteDocument = async (documento: DocumentoExpediente) => {
     if (!documento.id) return;
-    const confirmed = window.confirm(`¿Borrar ${documento.nombreOriginal || documento.nombre}?`);
+    const confirmed = await confirm({
+      title: "Borrar documento",
+      description: `Se eliminara ${documento.nombreOriginal || documento.nombre}. Esta operacion no se puede deshacer.`,
+      confirmLabel: "Borrar",
+      tone: "danger",
+    });
     if (!confirmed) return;
 
     try {
@@ -748,8 +866,14 @@ export function ExpedienteDetailPage() {
   const operaciones = expediente.operaciones ?? [];
   const activeOperation = operaciones.find((operacion) => operacion.id === activeOperationId) ?? operaciones[0] ?? null;
   const operationalHitos = activeOperation?.hitos?.length ? activeOperation.hitos : expediente.hitos;
+  const hasAdditionalInfoFlow =
+    expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
   const nextOperationalStep =
-    operationalHitos.find((hito) => hito.accion && !hito.completado && !hito.bloqueado) ?? expediente.siguientePaso;
+    hasAdditionalInfoFlow
+      ? expediente.siguientePaso
+      : operationalHitos.find((hito) => hito.accion && !hito.completado && !hito.bloqueado) ?? expediente.siguientePaso;
+  const hasActiveIncidents = expediente.incidencias.some((incidencia) => !incidencia.resuelta);
+  const canRequestAdditionalInfo = expediente.estado !== "FINALIZADO" && expediente.estado !== "RECHAZADO";
 
   return (
     <main className="exp-detail-page">
@@ -763,6 +887,24 @@ export function ExpedienteDetailPage() {
         <ClosingDocumentsPanel documentos={expediente.documentos} onUploadClosingDocument={handleUploadClosingDocument} />
       ) : null}
       <IncidentAlertPanel incidencias={expediente.incidencias} onResolveIncident={setResolvingIncident} />
+      {canRequestAdditionalInfo ? (
+        <section className="exp-quick-actions" aria-label="Acciones rapidas del expediente">
+          <div>
+            <p className="eyebrow">Comunicacion</p>
+            <strong>Solicitar confirmacion o informacion al cliente</strong>
+            <span>Abre un aviso intermedio y pausa el avance hasta que el cliente responda.</span>
+          </div>
+          <button
+            className="primary-button"
+            disabled={hasActiveIncidents || hasAdditionalInfoFlow}
+            onClick={() => setAdditionalInfoDialogOpen(true)}
+            type="button"
+          >
+            <MessageCircle size={16} />
+            Solicitar informacion
+          </button>
+        </section>
+      ) : null}
 
       <div className="exp-process-layout">
         <div className="exp-process-main">
@@ -796,7 +938,7 @@ export function ExpedienteDetailPage() {
           <DocumentsPanel
             documentos={expediente.documentos}
             onDeleteDocument={handleDeleteDocument}
-            onEditDocument={handleEditDocument}
+            onEditDocument={setEditingDocument}
             onOpenChecklist={() => setChecklistOpen(true)}
             onUploadDocument={handleUploadDocument}
           />
@@ -835,6 +977,11 @@ export function ExpedienteDetailPage() {
           </div>
         </div>
       ) : null}
+      <AdditionalInfoDialog
+        onClose={() => setAdditionalInfoDialogOpen(false)}
+        onSubmit={handleRequestAdditionalInfo}
+        open={additionalInfoDialogOpen}
+      />
       <IncidentCreateDialog
         loading={incidentTypesLoading}
         onClose={() => setIncidentDialogOpen(false)}
@@ -851,6 +998,13 @@ export function ExpedienteDetailPage() {
         onReclaim={handleReclaimIncident}
         onUploadDocument={handleUploadIncidentDocument}
       />
+      <DocumentEditDialog
+        documento={editingDocument}
+        operaciones={operaciones}
+        onClose={() => setEditingDocument(null)}
+        onSubmit={handleEditDocument}
+      />
+      {dialog}
     </main>
   );
 }

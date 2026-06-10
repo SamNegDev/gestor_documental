@@ -2,16 +2,18 @@ import { useCallback, useEffect, useState } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 import { useParams } from "react-router-dom";
 import { AlertCircle, CheckCircle2, Clock3, Download, Eye, FileText, History, Loader2, MessageCircle, Upload } from "lucide-react";
-import { getClienteExpediente, sendClienteExpedienteMessage, type ExpedienteCliente } from "../services/clienteExpedienteApi";
+import { answerAdditionalInfo, getClienteExpediente, sendClienteExpedienteMessage, type ExpedienteCliente } from "../services/clienteExpedienteApi";
 import { uploadIncidentDocument } from "../services/expedienteDetailApi";
 import type { DocumentoExpediente, IncidenciaExpediente } from "../types/expedienteDetail.types";
-import { formatDateTime, humanizeEnum } from "../utils/formatters";
+import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
+import { uppercaseInput } from "../../../shared/utils/text";
 import { ApiError } from "../../../shared/api/http";
 import "../styles/expedienteDetail.css";
 
 const CLIENT_CLOSING_DOCUMENTS = [
   {
     tipo: "COMPROBANTE_DGT",
+    aliases: ["COMPROBANTE_DGT", "HUELLA_TRAMITE"],
     title: "Comprobante DGT",
     description: "Justificante final emitido por la DGT.",
     agency: "DGT",
@@ -20,6 +22,7 @@ const CLIENT_CLOSING_DOCUMENTS = [
   },
   {
     tipo: "MODELO_620",
+    aliases: ["MODELO_620"],
     title: "Modelo 620",
     description: "Modelo 620 presentado.",
     agency: "Agencia Tributaria Canaria",
@@ -31,12 +34,14 @@ const CLIENT_CLOSING_DOCUMENTS = [
 function clienteTone(estado: string) {
   if (estado === "FINALIZADO") return "success";
   if (estado === "INCIDENCIA") return "danger";
-  if (estado === "REVISANDO_INCIDENCIAS") return "warning";
+  if (estado === "REVISANDO_INCIDENCIAS" || estado === "SOLICITADA_INFORMACION_ADICIONAL") return "warning";
   return "info";
 }
 
 function friendlyPhase(expediente: ExpedienteCliente) {
   if (expediente.estado === "FINALIZADO") return "Expediente finalizado";
+  if (expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL") return "Informacion solicitada";
+  if (expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA") return "Informacion en revision";
   if (expediente.estado === "INCIDENCIA") return "Pendiente de documentacion";
   if (expediente.estado === "REVISANDO_INCIDENCIAS") return "Documentacion en revision";
   if (expediente.estado === "ENVIADO_DGT") return "Enviado a DGT";
@@ -46,7 +51,7 @@ function friendlyPhase(expediente: ExpedienteCliente) {
 
 function clientHasClosingDocuments(documentos: DocumentoExpediente[]) {
   return CLIENT_CLOSING_DOCUMENTS.every((item) =>
-    documentos.some((documento) => documento.tipo === item.tipo && documento.subido && documento.id),
+    documentos.some((documento) => item.aliases.some((alias) => alias === documento.tipo) && documento.subido && documento.id),
   );
 }
 
@@ -55,12 +60,13 @@ function timelineSteps(expediente: ExpedienteCliente, closingDocumentsReady: boo
   const currentIndex =
     expediente.estado === "FINALIZADO" ? (closingDocumentsReady ? 4 : 3)
       : expediente.estado === "ENVIADO_DGT" || phase.includes("firmar") ? 2
-        : expediente.estado === "INCIDENCIA" || expediente.estado === "REVISANDO_INCIDENCIAS" ? 1
+        : expediente.estado === "INCIDENCIA" || expediente.estado === "REVISANDO_INCIDENCIAS"
+          || expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? 1
           : 1;
 
   return [
     { title: "Expediente abierto", description: "Hemos recibido la informacion inicial." },
-    { title: expediente.estado === "INCIDENCIA" ? "Incidencia" : expediente.estado === "REVISANDO_INCIDENCIAS" ? "Revision" : "Documentacion", description: expediente.estado === "REVISANDO_INCIDENCIAS" ? "Tu documento esta pendiente de revision." : "Revisamos o completamos la documentacion." },
+    { title: expediente.estado === "INCIDENCIA" ? "Incidencia" : expediente.estado === "REVISANDO_INCIDENCIAS" ? "Revision" : expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? "Informacion" : "Documentacion", description: expediente.estado === "REVISANDO_INCIDENCIAS" ? "Tu documento esta pendiente de revision." : expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" ? "Necesitamos una respuesta para continuar." : expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? "Tu respuesta esta pendiente de revision." : "Revisamos o completamos la documentacion." },
     { title: "Listo para firmar", description: "El tramite queda preparado para el siguiente paso." },
     { title: "Finalizado", description: "El expediente queda cerrado." },
   ].map((step, index) => ({
@@ -71,9 +77,12 @@ function timelineSteps(expediente: ExpedienteCliente, closingDocumentsReady: boo
 
 function ClientClosingDocumentsPanel({ documentos }: { documentos: DocumentoExpediente[] }) {
   const documentByType = new Map(
-    documentos
-      .filter((documento) => documento.subido && documento.id)
-      .map((documento) => [documento.tipo, documento]),
+    CLIENT_CLOSING_DOCUMENTS
+      .map((item) => [
+        item.tipo,
+        documentos.find((documento) => item.aliases.some((alias) => alias === documento.tipo) && documento.subido && documento.id),
+      ] as const)
+      .filter((entry): entry is readonly [typeof CLIENT_CLOSING_DOCUMENTS[number]["tipo"], DocumentoExpediente] => Boolean(entry[1])),
   );
   const available = CLIENT_CLOSING_DOCUMENTS.filter((item) => documentByType.has(item.tipo)).length;
 
@@ -140,6 +149,7 @@ export function ClienteExpedientePage() {
   const { id } = useParams();
   const [expediente, setExpediente] = useState<ExpedienteCliente | null>(null);
   const [message, setMessage] = useState("");
+  const [additionalInfoResponse, setAdditionalInfoResponse] = useState("");
   const [uploadedIncidentIds, setUploadedIncidentIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +188,18 @@ export function ClienteExpedientePage() {
       await load();
     } catch {
       alert("No se pudo subir el documento.");
+    }
+  };
+
+  const handleAnswerAdditionalInfo = async () => {
+    const contenido = additionalInfoResponse.trim();
+    if (!id || !contenido) return;
+    try {
+      await answerAdditionalInfo(id, contenido);
+      setAdditionalInfoResponse("");
+      await load();
+    } catch {
+      alert("No se pudo enviar la respuesta.");
     }
   };
 
@@ -231,6 +253,9 @@ export function ClienteExpedientePage() {
   const tone = clienteTone(expediente.estado);
   const phase = friendlyPhase(expediente);
   const steps = timelineSteps(expediente, closingDocumentsReady);
+  const informationRequested = expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL";
+  const informationReceived = expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
+  const latestAdminMessage = [...mensajes].reverse().find((mensaje) => mensaje.rolAutor === "ADMIN");
 
   return (
     <main className="client-expediente-page">
@@ -274,6 +299,48 @@ export function ClienteExpedientePage() {
         </ol>
       </section>
 
+      {informationRequested || informationReceived ? (
+        <section className="client-incident-panel">
+          <div className="exp-panel__heading">
+            <div>
+              <p className="eyebrow">Accion requerida</p>
+              <h3>{informationReceived ? "Informacion recibida" : "Informacion solicitada"}</h3>
+            </div>
+          </div>
+          <article className="client-incident-card">
+            <div>
+              <strong>{informationReceived ? "Respuesta enviada" : "Necesitamos tu respuesta"}</strong>
+              <p>{latestAdminMessage?.contenido || "Revisa la informacion solicitada para que podamos continuar con el expediente."}</p>
+              {informationReceived ? (
+                <small className="client-upload-feedback">
+                  <CheckCircle2 size={15} />
+                  Respuesta recibida. Lo estamos revisando.
+                </small>
+              ) : null}
+            </div>
+            {informationRequested ? (
+              <div className="client-incident-response">
+                <textarea
+                  onChange={(event) => setAdditionalInfoResponse(uppercaseInput(event.target.value))}
+                  placeholder="Escribe tu respuesta"
+                  rows={3}
+                  value={additionalInfoResponse}
+                />
+                <button
+                  className="primary-button"
+                  disabled={!additionalInfoResponse.trim()}
+                  onClick={() => void handleAnswerAdditionalInfo()}
+                  type="button"
+                >
+                  <MessageCircle size={16} />
+                  Enviar respuesta
+                </button>
+              </div>
+            ) : null}
+          </article>
+        </section>
+      ) : null}
+
       {incidenciasActivas.length > 0 ? (
         <section className="client-incident-panel">
           <div className="exp-panel__heading">
@@ -290,7 +357,7 @@ export function ClienteExpedientePage() {
                 {expediente.estado === "REVISANDO_INCIDENCIAS" || uploadedIncidentIds.has(incidencia.id) || incidencia.pendienteRevisionCliente ? (
                   <small className="client-upload-feedback">
                     <CheckCircle2 size={15} />
-                    Documento recibido. Lo estamos revisando.
+                    Respuesta recibida. Lo estamos revisando.
                   </small>
                 ) : null}
               </div>
@@ -334,7 +401,7 @@ export function ClienteExpedientePage() {
                 </div>
                 <div className="document-row__body">
                   <strong>{documento.nombreOriginal || documento.nombre}</strong>
-                  <span>{humanizeEnum(documento.tipo)}</span>
+                  <span>{formatDocumentType(documento.tipo)}</span>
                   <small>{formatDateTime(documento.fechaSubida)}</small>
                 </div>
                 <button
@@ -368,7 +435,7 @@ export function ClienteExpedientePage() {
           <Tabs.Content value="mensajes" className="secondary-tabs__content">
             <div className="client-message-box">
               <textarea
-                onChange={(event) => setMessage(event.target.value)}
+                onChange={(event) => setMessage(uppercaseInput(event.target.value))}
                 placeholder="Escribe un mensaje"
                 rows={3}
                 value={message}

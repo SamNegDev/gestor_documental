@@ -12,6 +12,8 @@ const statusClass: Record<ExpedienteStatusType, string> = {
   RECHAZADO: "exp-status--danger",
   ENVIADO_DGT: "exp-status--info",
   REVISANDO_INCIDENCIAS: "exp-status--warning",
+  SOLICITADA_INFORMACION_ADICIONAL: "exp-status--warning",
+  INFORMACION_ADICIONAL_RECIBIDA: "exp-status--info",
 };
 
 export function ExpedienteStatus({ status }: Props) {

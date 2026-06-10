@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlertCircle, ArrowLeft, FilePlus2, Loader2 } from "lucide-react";
 import { createExpediente, getExpedienteEditCatalogs } from "../services/expedienteDetailApi";
-import type { ExpedienteEditCatalogs, ExpedienteEditInput } from "../types/expedienteDetail.types";
+import type { ExpedienteEditCatalogs, ExpedienteEditInput, InteresadoSearchResult } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
 import { ApiError } from "../../../shared/api/http";
+import { cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
+import { InteresadoAutocomplete } from "../components/InteresadoAutocomplete";
 import "../styles/expedienteDetail.css";
 
 const ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
@@ -46,8 +48,7 @@ function buildBatecomPayload(form: ExpedienteEditInput): ExpedienteEditInput {
 }
 
 function cleanText(value?: string | null) {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
+  return cleanUpperText(value);
 }
 
 function buildPayload(form: ExpedienteEditInput): ExpedienteEditInput {
@@ -119,7 +120,7 @@ export function ExpedienteCreatePage() {
       if (field === "tipoTramiteId" && typeof value === "number" && !isBatecom(value) && current.interesados.length > 2) {
         return { ...current, [field]: value, interesados: current.interesados.slice(0, 2) };
       }
-      return { ...current, [field]: value };
+      return { ...current, [field]: typeof value === "string" ? uppercaseInput(value) : value };
     });
   };
 
@@ -127,7 +128,22 @@ export function ExpedienteCreatePage() {
     setForm((current) => {
       if (!current) return current;
       const interesados = [...current.interesados];
-      interesados[index] = { ...interesados[index], [field]: value };
+      interesados[index] = { ...interesados[index], [field]: uppercaseInput(value) };
+      return { ...current, interesados };
+    });
+  };
+
+  const selectInteresado = (index: number, interesado: InteresadoSearchResult) => {
+    setForm((current) => {
+      if (!current) return current;
+      const interesados = [...current.interesados];
+      interesados[index] = {
+        ...interesados[index],
+        nombre: uppercaseInput(interesado.nombre || ""),
+        dni: uppercaseInput(interesado.dni || ""),
+        telefono: uppercaseInput(interesado.telefono || ""),
+        direccion: uppercaseInput(interesado.direccion || ""),
+      };
       return { ...current, interesados };
     });
   };
@@ -257,14 +273,20 @@ export function ExpedienteCreatePage() {
             {form.interesados.map((interesado, index) => (
               <article className="edit-interesado-card" key={index}>
                 <strong>{isBatecom(form.tipoTramiteId) ? BATECOM_LABELS[index] : `Interesado ${index + 1}`}</strong>
-                <label>
-                  Nombre
-                  <input value={interesado.nombre || ""} onChange={(event) => updateInteresado(index, "nombre", event.target.value)} />
-                </label>
-                <label>
-                  DNI/NIF
-                  <input value={interesado.dni || ""} onChange={(event) => updateInteresado(index, "dni", event.target.value)} />
-                </label>
+                <InteresadoAutocomplete
+                  label="DNI/NIF"
+                  value={interesado.dni || ""}
+                  placeholder="Buscar por DNI/NIF"
+                  onChange={(value) => updateInteresado(index, "dni", value)}
+                  onSelect={(seleccionado) => selectInteresado(index, seleccionado)}
+                />
+                <InteresadoAutocomplete
+                  label="Nombre"
+                  value={interesado.nombre || ""}
+                  placeholder="Buscar por nombre"
+                  onChange={(value) => updateInteresado(index, "nombre", value)}
+                  onSelect={(seleccionado) => selectInteresado(index, seleccionado)}
+                />
                 <label>
                   Rol
                   <select

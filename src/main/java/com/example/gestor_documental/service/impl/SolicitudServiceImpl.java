@@ -17,6 +17,7 @@ import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
+import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,7 +38,7 @@ public class SolicitudServiceImpl implements SolicitudService {
 
     @Override
     public List<Solicitud> listarTodas() {
-        return solicitudRepository.findAllByOrderByFechaCreacionDesc();
+        return solicitudRepository.findAllOrderByFechaReferenciaDesc();
     }
 
     @Override
@@ -47,6 +48,7 @@ public class SolicitudServiceImpl implements SolicitudService {
 
     @Override
     public Solicitud guardar(Solicitud solicitud) {
+        normalizarSolicitud(solicitud);
         return solicitudRepository.save(solicitud);
     }
 
@@ -57,7 +59,7 @@ public class SolicitudServiceImpl implements SolicitudService {
 
     @Override
     public List<Solicitud> listarPorClienteId(Long clienteId) {
-        return solicitudRepository.findByClienteIdOrderByFechaCreacionDesc(clienteId);
+        return solicitudRepository.findByClienteIdOrderByFechaReferenciaDesc(clienteId);
     }
 
     @Override
@@ -94,12 +96,12 @@ public class SolicitudServiceImpl implements SolicitudService {
 
     @Override
     public List<Solicitud> listarUltimas() {
-        return solicitudRepository.findTop5ByOrderByFechaCreacionDesc();
+        return solicitudRepository.findTop5OrderByFechaReferenciaDesc();
     }
 
     @Override
     public List<Solicitud> listarUltimasPorCliente(Cliente cliente) {
-        return solicitudRepository.findTop5ByClienteOrderByFechaCreacionDesc(cliente);
+        return solicitudRepository.findTop5ByClienteOrderByFechaReferenciaDesc(cliente);
     }
 
 
@@ -117,6 +119,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setTipoTramite(tipoTramite);
         solicitud.setEstadoSolicitud(EstadoSolicitud.PENDIENTE_REVISION);
         solicitud.setCreadoPor(usuarioLogueado);
+        normalizarSolicitud(solicitud);
 
         Solicitud solicitudGuardada = solicitudRepository.save(solicitud);
         
@@ -224,9 +227,9 @@ public class SolicitudServiceImpl implements SolicitudService {
         expediente.setSolicitud(solicitud);
         expediente.setCliente(solicitud.getCliente());
         expediente.setTipoTramite(solicitud.getTipoTramite());
-        expediente.setMatricula(solicitud.getMatricula());
+        expediente.setMatricula(TextNormalizer.upperOrNull(solicitud.getMatricula()));
         expediente.setEstadoExpediente(EstadoExpediente.EN_TRAMITE);
-        expediente.setObservaciones(solicitud.getObservaciones());
+        expediente.setObservaciones(TextNormalizer.upperOrNull(solicitud.getObservaciones()));
         expediente.setCreadoPor(admin);
 
         Expediente expedienteGuardado = expedienteRepository.save(expediente);
@@ -368,23 +371,23 @@ public class SolicitudServiceImpl implements SolicitudService {
         Long tipoTramiteAnterior = solicitudBase.getTipoTramite() != null ? solicitudBase.getTipoTramite().getId() : null;
 
         solicitudBase.setTipoTramite(tipoTramite);
-        solicitudBase.setMatricula(solicitudActualizada.getMatricula());
+        solicitudBase.setMatricula(TextNormalizer.upperOrNull(solicitudActualizada.getMatricula()));
 
         solicitudBase.setInteresado1Rol(solicitudActualizada.getInteresado1Rol());
-        solicitudBase.setInteresado1Nombre(solicitudActualizada.getInteresado1Nombre());
-        solicitudBase.setInteresado1Apellidos(solicitudActualizada.getInteresado1Apellidos());
-        solicitudBase.setInteresado1Dni(solicitudActualizada.getInteresado1Dni());
-        solicitudBase.setInteresado1Telefono(solicitudActualizada.getInteresado1Telefono());
-        solicitudBase.setInteresado1Direccion(solicitudActualizada.getInteresado1Direccion());
+        solicitudBase.setInteresado1Nombre(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Nombre()));
+        solicitudBase.setInteresado1Apellidos(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Apellidos()));
+        solicitudBase.setInteresado1Dni(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Dni()));
+        solicitudBase.setInteresado1Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Telefono()));
+        solicitudBase.setInteresado1Direccion(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Direccion()));
 
         solicitudBase.setInteresado2Rol(solicitudActualizada.getInteresado2Rol());
-        solicitudBase.setInteresado2Nombre(solicitudActualizada.getInteresado2Nombre());
-        solicitudBase.setInteresado2Apellidos(solicitudActualizada.getInteresado2Apellidos());
-        solicitudBase.setInteresado2Dni(solicitudActualizada.getInteresado2Dni());
-        solicitudBase.setInteresado2Telefono(solicitudActualizada.getInteresado2Telefono());
-        solicitudBase.setInteresado2Direccion(solicitudActualizada.getInteresado2Direccion());
+        solicitudBase.setInteresado2Nombre(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Nombre()));
+        solicitudBase.setInteresado2Apellidos(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Apellidos()));
+        solicitudBase.setInteresado2Dni(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Dni()));
+        solicitudBase.setInteresado2Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Telefono()));
+        solicitudBase.setInteresado2Direccion(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Direccion()));
 
-        solicitudBase.setObservaciones(solicitudActualizada.getObservaciones());
+        solicitudBase.setObservaciones(TextNormalizer.upperOrNull(solicitudActualizada.getObservaciones()));
 
         java.util.List<String> cambios = new java.util.ArrayList<>();
         if (!java.util.Objects.equals(matriculaAnterior, solicitudActualizada.getMatricula())) {
@@ -404,6 +407,21 @@ public class SolicitudServiceImpl implements SolicitudService {
         );
 
         return solicitudGuardada;
+    }
+
+    private void normalizarSolicitud(Solicitud solicitud) {
+        solicitud.setMatricula(TextNormalizer.upperOrNull(solicitud.getMatricula()));
+        solicitud.setObservaciones(TextNormalizer.upperOrNull(solicitud.getObservaciones()));
+        solicitud.setInteresado1Nombre(TextNormalizer.upperOrNull(solicitud.getInteresado1Nombre()));
+        solicitud.setInteresado1Apellidos(TextNormalizer.upperOrNull(solicitud.getInteresado1Apellidos()));
+        solicitud.setInteresado1Dni(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()));
+        solicitud.setInteresado1Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado1Telefono()));
+        solicitud.setInteresado1Direccion(TextNormalizer.upperOrNull(solicitud.getInteresado1Direccion()));
+        solicitud.setInteresado2Nombre(TextNormalizer.upperOrNull(solicitud.getInteresado2Nombre()));
+        solicitud.setInteresado2Apellidos(TextNormalizer.upperOrNull(solicitud.getInteresado2Apellidos()));
+        solicitud.setInteresado2Dni(TextNormalizer.upperOrNull(solicitud.getInteresado2Dni()));
+        solicitud.setInteresado2Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado2Telefono()));
+        solicitud.setInteresado2Direccion(TextNormalizer.upperOrNull(solicitud.getInteresado2Direccion()));
     }
 }
 

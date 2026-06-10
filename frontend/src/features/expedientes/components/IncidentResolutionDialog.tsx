@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { CheckCircle2, Eye, RotateCcw, Upload, X } from "lucide-react";
 import type { DocumentoExpediente, IncidenciaExpediente } from "../types/expedienteDetail.types";
-import { formatDateTime, humanizeEnum } from "../utils/formatters";
+import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
+import { uppercaseInput } from "../../../shared/utils/text";
 
 type Props = {
   incidencia: IncidenciaExpediente | null;
@@ -75,7 +76,7 @@ export function IncidentResolutionDialog({
                 <article className="incident-document" key={documento.id || documento.nombre}>
                   <div>
                     <strong>{documento.nombreOriginal || documento.nombre}</strong>
-                    <small>{humanizeEnum(documento.tipo)} · {formatDateTime(documento.fechaSubida)}</small>
+                    <small>{formatDocumentType(documento.tipo)} · {formatDateTime(documento.fechaSubida)}</small>
                   </div>
                   <button
                     className="icon-button"
@@ -95,7 +96,7 @@ export function IncidentResolutionDialog({
                   <option value="">Vincular documento existente</option>
                   {documentosVinculables.map((documento) => (
                     <option key={documento.id || documento.nombre} value={documento.id || ""}>
-                      {documento.nombreOriginal || documento.nombre} · {humanizeEnum(documento.tipo)}
+                      {documento.nombreOriginal || documento.nombre} · {formatDocumentType(documento.tipo)}
                     </option>
                   ))}
                 </select>
@@ -117,7 +118,7 @@ export function IncidentResolutionDialog({
           <label>
             Motivo si se vuelve a reclamar
             <textarea
-              onChange={(event) => setObservaciones(event.target.value)}
+              onChange={(event) => setObservaciones(uppercaseInput(event.target.value))}
               placeholder="Indica por que la documentacion no resuelve la incidencia"
               rows={3}
               value={observaciones}

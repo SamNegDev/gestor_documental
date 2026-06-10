@@ -4,22 +4,19 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Building2, Save } from "lucide-react";
 import { createCliente, getCliente, updateCliente } from "../services/adminApi";
 import type { ClienteInput } from "../types";
+import { cleanLowerText, cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
 
 function emptyCliente(): ClienteInput {
   return { nif: "", nombre: "", email: "", telefono: "", direccion: "" };
 }
 
 function clean(input: ClienteInput): ClienteInput {
-  const cleanText = (value?: string | null) => {
-    const trimmed = value?.trim();
-    return trimmed ? trimmed : null;
-  };
   return {
-    nif: input.nif.trim().toUpperCase(),
-    nombre: input.nombre.trim(),
-    email: input.email.trim(),
-    telefono: cleanText(input.telefono),
-    direccion: cleanText(input.direccion),
+    nif: cleanUpperText(input.nif) || "",
+    nombre: cleanUpperText(input.nombre) || "",
+    email: cleanLowerText(input.email) || "",
+    telefono: cleanUpperText(input.telefono),
+    direccion: cleanUpperText(input.direccion),
   };
 }
 
@@ -36,7 +33,15 @@ export function ClienteFormPage() {
   });
 
   useEffect(() => {
-    if (clienteQuery.data) setForm(clienteQuery.data);
+    if (clienteQuery.data) {
+      setForm({
+        ...clienteQuery.data,
+        nif: uppercaseInput(clienteQuery.data.nif || ""),
+        nombre: uppercaseInput(clienteQuery.data.nombre || ""),
+        telefono: uppercaseInput(clienteQuery.data.telefono || ""),
+        direccion: uppercaseInput(clienteQuery.data.direccion || ""),
+      });
+    }
   }, [clienteQuery.data]);
 
   const saveMutation = useMutation({
@@ -76,11 +81,11 @@ export function ClienteFormPage() {
           <div className="edit-form-grid">
             <label>
               NIF/CIF
-              <input value={form.nif} maxLength={20} required onChange={(event) => setForm({ ...form, nif: event.target.value })} />
+              <input value={form.nif} maxLength={20} required onChange={(event) => setForm({ ...form, nif: uppercaseInput(event.target.value) })} />
             </label>
             <label>
               Nombre / razon social
-              <input value={form.nombre} maxLength={120} required onChange={(event) => setForm({ ...form, nombre: event.target.value })} />
+              <input value={form.nombre} maxLength={120} required onChange={(event) => setForm({ ...form, nombre: uppercaseInput(event.target.value) })} />
             </label>
             <label>
               Email
@@ -88,11 +93,11 @@ export function ClienteFormPage() {
             </label>
             <label>
               Telefono
-              <input value={form.telefono || ""} maxLength={20} onChange={(event) => setForm({ ...form, telefono: event.target.value })} />
+              <input value={form.telefono || ""} maxLength={20} onChange={(event) => setForm({ ...form, telefono: uppercaseInput(event.target.value) })} />
             </label>
             <label className="edit-form-grid__wide">
               Direccion
-              <input value={form.direccion || ""} maxLength={200} onChange={(event) => setForm({ ...form, direccion: event.target.value })} />
+              <input value={form.direccion || ""} maxLength={200} onChange={(event) => setForm({ ...form, direccion: uppercaseInput(event.target.value) })} />
             </label>
           </div>
         </section>

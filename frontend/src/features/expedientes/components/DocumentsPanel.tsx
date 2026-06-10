@@ -1,6 +1,6 @@
 import { Eye, FileText, Pencil, Trash2, Upload } from "lucide-react";
 import type { DocumentoExpediente } from "../types/expedienteDetail.types";
-import { formatDateTime, humanizeEnum } from "../utils/formatters";
+import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 
 type Props = {
   documentos: DocumentoExpediente[];
@@ -42,7 +42,7 @@ export function DocumentsPanel({ documentos, onOpenChecklist, onUploadDocument, 
             <div className="document-row__body">
               <strong>{documento.nombreOriginal || documento.nombre}</strong>
               <span>
-                {humanizeEnum(documento.tipo)}
+                {formatDocumentType(documento.tipo)}
                 {documento.operacionLabel ? ` · ${documento.operacionLabel}` : ""}
               </span>
               <small>

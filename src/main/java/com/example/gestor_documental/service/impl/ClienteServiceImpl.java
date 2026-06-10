@@ -3,6 +3,7 @@ package com.example.gestor_documental.service.impl;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.service.ClienteService;
+import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +28,11 @@ public class ClienteServiceImpl implements ClienteService {
 
     @Override
     public Cliente guardar(Cliente cliente) {
+        cliente.setNif(TextNormalizer.upperOrNull(cliente.getNif()));
+        cliente.setNombre(TextNormalizer.upperOrNull(cliente.getNombre()));
+        cliente.setEmail(TextNormalizer.lowerOrNull(cliente.getEmail()));
+        cliente.setTelefono(TextNormalizer.upperOrNull(cliente.getTelefono()));
+        cliente.setDireccion(TextNormalizer.upperOrNull(cliente.getDireccion()));
         return clienteRepository.save(cliente);
     }
 

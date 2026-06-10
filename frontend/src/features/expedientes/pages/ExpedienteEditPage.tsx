@@ -6,8 +6,10 @@ import {
   getExpedienteEditCatalogs,
   updateExpediente,
 } from "../services/expedienteDetailApi";
-import type { ExpedienteDetail, ExpedienteEditCatalogs, ExpedienteEditInput } from "../types/expedienteDetail.types";
+import type { ExpedienteDetail, ExpedienteEditCatalogs, ExpedienteEditInput, InteresadoSearchResult } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
+import { cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
+import { InteresadoAutocomplete } from "../components/InteresadoAutocomplete";
 import "../styles/expedienteDetail.css";
 
 const ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
@@ -54,10 +56,10 @@ function buildInitialForm(expediente: ExpedienteDetail): ExpedienteEditInput {
     const interesado = expediente.interesados[index];
     return interesado
       ? {
-          nombre: interesado.nombre || "",
-          dni: interesado.dni || "",
-          telefono: interesado.telefono || "",
-          direccion: interesado.direccion || "",
+          nombre: uppercaseInput(interesado.nombre || ""),
+          dni: uppercaseInput(interesado.dni || ""),
+          telefono: uppercaseInput(interesado.telefono || ""),
+          direccion: uppercaseInput(interesado.direccion || ""),
           rol: interesado.rol || "",
         }
       : emptyInteresado();
@@ -66,15 +68,14 @@ function buildInitialForm(expediente: ExpedienteDetail): ExpedienteEditInput {
   return {
     clienteId: expediente.cliente?.id || 0,
     tipoTramiteId: 0,
-    matricula: expediente.matricula || "",
-    observaciones: expediente.observaciones || "",
+    matricula: uppercaseInput(expediente.matricula || ""),
+    observaciones: uppercaseInput(expediente.observaciones || ""),
     interesados,
   };
 }
 
 function cleanText(value?: string | null) {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
+  return cleanUpperText(value);
 }
 
 function buildSavePayload(form: ExpedienteEditInput): ExpedienteEditInput {
@@ -142,7 +143,7 @@ export function ExpedienteEditPage() {
       if (field === "tipoTramiteId" && typeof value === "number" && !isBatecom(value) && current.interesados.length > 2) {
         return { ...current, [field]: value, interesados: current.interesados.slice(0, 2) };
       }
-      return { ...current, [field]: value };
+      return { ...current, [field]: typeof value === "string" ? uppercaseInput(value) : value };
     });
   };
 
@@ -150,7 +151,22 @@ export function ExpedienteEditPage() {
     setForm((current) => {
       if (!current) return current;
       const interesados = [...current.interesados];
-      interesados[index] = { ...interesados[index], [field]: value };
+      interesados[index] = { ...interesados[index], [field]: uppercaseInput(value) };
+      return { ...current, interesados };
+    });
+  };
+
+  const selectInteresado = (index: number, interesado: InteresadoSearchResult) => {
+    setForm((current) => {
+      if (!current) return current;
+      const interesados = [...current.interesados];
+      interesados[index] = {
+        ...interesados[index],
+        nombre: uppercaseInput(interesado.nombre || ""),
+        dni: uppercaseInput(interesado.dni || ""),
+        telefono: uppercaseInput(interesado.telefono || ""),
+        direccion: uppercaseInput(interesado.direccion || ""),
+      };
       return { ...current, interesados };
     });
   };
@@ -270,14 +286,20 @@ export function ExpedienteEditPage() {
             {form.interesados.map((interesado, index) => (
               <article className="edit-interesado-card" key={index}>
                 <strong>{isBatecom(form.tipoTramiteId) ? BATECOM_LABELS[index] : `Interesado ${index + 1}`}</strong>
-                <label>
-                  Nombre
-                  <input value={interesado.nombre || ""} onChange={(event) => updateInteresado(index, "nombre", event.target.value)} />
-                </label>
-                <label>
-                  DNI/NIF
-                  <input value={interesado.dni || ""} onChange={(event) => updateInteresado(index, "dni", event.target.value)} />
-                </label>
+                <InteresadoAutocomplete
+                  label="DNI/NIF"
+                  value={interesado.dni || ""}
+                  placeholder="Buscar por DNI/NIF"
+                  onChange={(value) => updateInteresado(index, "dni", value)}
+                  onSelect={(seleccionado) => selectInteresado(index, seleccionado)}
+                />
+                <InteresadoAutocomplete
+                  label="Nombre"
+                  value={interesado.nombre || ""}
+                  placeholder="Buscar por nombre"
+                  onChange={(value) => updateInteresado(index, "nombre", value)}
+                  onSelect={(seleccionado) => selectInteresado(index, seleccionado)}
+                />
                 <label>
                   Rol
                   <select

@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, FolderCheck, Loader2, MessageSquare, Pencil, Send, UserRound } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
+import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
+import { uppercaseInput } from "../../../shared/utils/text";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { CompleteExpedienteUploadPanel } from "../../expedientes/components/CompleteExpedienteUploadPanel";
 import { OcrReviewDialog } from "../../expedientes/components/OcrReviewDialog";
@@ -15,7 +17,7 @@ import {
   uploadSolicitudDocument,
 } from "../../expedientes/services/documentosApi";
 import type { DocumentoExpediente } from "../../expedientes/types/expedienteDetail.types";
-import { humanizeEnum } from "../../expedientes/utils/formatters";
+import { formatDocumentType } from "../../expedientes/utils/formatters";
 import "../../expedientes/styles/expedienteDetail.css";
 import {
   cambiarEstadoSolicitud,
@@ -34,6 +36,7 @@ export function SolicitudDetailPage() {
   const [ocrReviewOpen, setOcrReviewOpen] = useState(false);
   const [ocrReviewDocuments, setOcrReviewDocuments] = useState<DocumentoExpediente[]>([]);
   const [completeSolicitudProcessing, setCompleteSolicitudProcessing] = useState(false);
+  const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
 
   const solicitudQuery = useQuery({
@@ -91,7 +94,12 @@ export function SolicitudDetailPage() {
 
   const handleDeleteDocument = async (documento: DocumentoExpediente) => {
     if (!documento.id) return;
-    const confirmed = window.confirm(`Borrar ${documento.nombreOriginal || documento.nombre}?`);
+    const confirmed = await confirm({
+      title: "Borrar documento",
+      description: `Se eliminara ${documento.nombreOriginal || documento.nombre}. Esta operacion no se puede deshacer.`,
+      confirmLabel: "Borrar",
+      tone: "danger",
+    });
     if (!confirmed) return;
     try {
       await deleteDocument(documento.id);
@@ -102,10 +110,10 @@ export function SolicitudDetailPage() {
     }
   };
 
-  const handleSaveOcrDocument = async (documento: DocumentoExpediente, tipoDocumento: string, nombreSinExtension: string) => {
+  const handleSaveOcrDocument = async (documento: DocumentoExpediente, tipoDocumento: string) => {
     if (!documento.id) return;
     try {
-      await updateDocument(documento.id, tipoDocumento, nombreSinExtension);
+      await updateDocument(documento.id, tipoDocumento, undefined, undefined, true);
       const actualizada = await refreshSolicitud();
       if (actualizada) {
         setOcrReviewDocuments((current) =>
@@ -158,12 +166,11 @@ export function SolicitudDetailPage() {
     documento: DocumentoExpediente,
     rangoPaginas: string,
     tipoDocumento: string,
-    nombreSinExtension: string,
   ) => {
     if (!documento.id) return;
     try {
       const previousIds = new Set(solicitudQuery.data?.documentos.map((item) => item.id).filter(Boolean));
-      await extractDocumentPages(documento.id, rangoPaginas, tipoDocumento, nombreSinExtension);
+      await extractDocumentPages(documento.id, rangoPaginas, tipoDocumento);
       const actualizada = await refreshSolicitud();
       if (actualizada) {
         setOcrReviewDocuments((current) => {
@@ -292,7 +299,7 @@ export function SolicitudDetailPage() {
                 <FileText size={20} />
                 <div>
                   <strong>{documento.nombreOriginal || documento.nombre}</strong>
-                  <span>{humanizeEnum(documento.tipo)}</span>
+                  <span>{formatDocumentType(documento.tipo)}</span>
                 </div>
                 <small>{documento.fechaSubida || "Sin fecha"}</small>
                 <a className="soft-button soft-button--compact" href={`/documentos/ver/${documento.id}`} target="_blank" rel="noreferrer">
@@ -328,7 +335,7 @@ export function SolicitudDetailPage() {
               }
             }}
           >
-            <textarea value={mensaje} onChange={(event) => setMensaje(event.target.value)} placeholder="Escribe un mensaje..." rows={3} />
+            <textarea value={mensaje} onChange={(event) => setMensaje(uppercaseInput(event.target.value))} placeholder="Escribe un mensaje..." rows={3} />
             <button className="primary-button primary-button--compact" disabled={mensajeMutation.isPending || !mensaje.trim()}>
               <Send size={16} />
               Enviar
@@ -378,6 +385,7 @@ export function SolicitudDetailPage() {
           </div>
         </div>
       ) : null}
+      {dialog}
     </section>
   );
 }

@@ -15,11 +15,21 @@ export function uploadSolicitudDocument(solicitudId: number, tipoDocumento: stri
   return apiPostForm(`/api/solicitudes/${solicitudId}/documentos`, formData);
 }
 
-export function updateDocument(documentoId: number, tipoDocumento?: string, nombreArchivo?: string, operacionId?: number | null): Promise<void> {
+export function updateDocument(
+  documentoId: number,
+  tipoDocumento?: string,
+  nombreArchivo?: string,
+  operacionId?: number | null,
+  nombreAutomatico = false,
+): Promise<void> {
   const formData = new FormData();
   if (tipoDocumento) formData.append("tipoDocumento", tipoDocumento);
   if (nombreArchivo) formData.append("nombreArchivo", nombreArchivo);
-  if (operacionId) formData.append("operacionId", String(operacionId));
+  if (operacionId !== undefined) {
+    formData.append("actualizarOperacion", "true");
+    if (operacionId !== null) formData.append("operacionId", String(operacionId));
+  }
+  if (nombreAutomatico) formData.append("nombreAutomatico", "true");
   return apiPatchForm(`/api/documentos/${documentoId}`, formData);
 }
 
@@ -41,13 +51,13 @@ export function extractDocumentPages(
   documentoId: number,
   rangoPaginas: string,
   tipoDocumento: string,
-  nombreArchivo: string,
+  nombreArchivo?: string,
   operacionId?: number | null,
 ): Promise<void> {
   const formData = new FormData();
   formData.append("rangoPaginas", rangoPaginas);
   formData.append("tipoDocumento", tipoDocumento);
-  formData.append("nombreArchivo", nombreArchivo);
+  if (nombreArchivo) formData.append("nombreArchivo", nombreArchivo);
   if (operacionId) formData.append("operacionId", String(operacionId));
   return apiPostForm(`/api/documentos/${documentoId}/extraer`, formData);
 }

@@ -1,8 +1,10 @@
 import { Combine, CopyPlus, Eye, Pencil, Scissors, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
+import { uppercaseInput } from "../../../shared/utils/text";
 import { getDocumentPageInfo } from "../services/documentosApi";
 import type { DocumentoExpediente, OperacionExpediente } from "../types/expedienteDetail.types";
-import { humanizeEnum } from "../utils/formatters";
+import { formatDocumentType } from "../utils/formatters";
 
 const DOCUMENT_TYPES = [
   "DNI",
@@ -27,9 +29,9 @@ type Props = {
   onClose: () => void;
   onDeleteDocument: (documento: DocumentoExpediente) => void;
   onDeletePages: (documento: DocumentoExpediente, rangoPaginas: string) => Promise<void>;
-  onExtractPages: (documento: DocumentoExpediente, rangoPaginas: string, tipoDocumento: string, nombreSinExtension: string, operacionId?: number | null) => Promise<void>;
+  onExtractPages: (documento: DocumentoExpediente, rangoPaginas: string, tipoDocumento: string, operacionId?: number | null) => Promise<void>;
   onMergeDocuments: (documento: DocumentoExpediente, documentoIds: number[], tipoDocumento: string, nombreSinExtension: string, operacionId?: number | null) => Promise<void>;
-  onSaveDocument: (documento: DocumentoExpediente, tipoDocumento: string, nombreSinExtension: string, operacionId?: number | null) => void;
+  onSaveDocument: (documento: DocumentoExpediente, tipoDocumento: string, operacionId?: number | null) => void;
 };
 
 function nombreSinExtension(nombre: string) {
@@ -40,7 +42,6 @@ function nombreSinExtension(nombre: string) {
 export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, onDeleteDocument, onDeletePages, onExtractPages, onMergeDocuments, onSaveDocument }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editType, setEditType] = useState("");
-  const [editName, setEditName] = useState("");
   const [editOperationId, setEditOperationId] = useState("");
   const [previewVersion, setPreviewVersion] = useState(0);
   const [pageCounts, setPageCounts] = useState<Record<number, number>>({});
@@ -51,8 +52,8 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
   const [extractingId, setExtractingId] = useState<number | null>(null);
   const [selectedExtractPages, setSelectedExtractPages] = useState<number[]>([]);
   const [extractType, setExtractType] = useState("OTROS");
-  const [extractName, setExtractName] = useState("");
   const [extractOperationId, setExtractOperationId] = useState("");
+  const { confirm, dialog } = useConfirmDialog();
 
   useEffect(() => {
     if (!open) return;
@@ -70,13 +71,11 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
     if (!documento.id) return;
     setEditingId(documento.id);
     setEditType(documento.tipo);
-    setEditName(nombreSinExtension(documento.nombreOriginal || documento.nombre));
     setEditOperationId(documento.operacionId ? String(documento.operacionId) : "");
   };
 
   const saveEdit = (documento: DocumentoExpediente) => {
-    if (!editName.trim()) return;
-    onSaveDocument(documento, editType || documento.tipo, editName.trim(), editOperationId ? Number(editOperationId) : null);
+    onSaveDocument(documento, editType || documento.tipo, editOperationId ? Number(editOperationId) : null);
     setEditingId(null);
   };
 
@@ -102,7 +101,12 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
       alert("No se pueden eliminar todas las paginas del documento.");
       return;
     }
-    const confirmed = window.confirm(`Borrar pagina(s) ${selectedPages.join(", ")} de ${documento.nombreOriginal || documento.nombre}?`);
+    const confirmed = await confirm({
+      title: "Borrar paginas",
+      description: `Se eliminaran las paginas ${selectedPages.join(", ")} de ${documento.nombreOriginal || documento.nombre}.`,
+      confirmLabel: "Borrar paginas",
+      tone: "danger",
+    });
     if (!confirmed) return;
     await onDeletePages(documento, selectedPages.join(","));
     setCroppingId(null);
@@ -131,13 +135,17 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
       alert("Selecciona al menos un documento para juntar.");
       return;
     }
-    const confirmed = window.confirm(`Juntar ${selectedDocumentIds.length + 1} documentos en ${documento.nombreOriginal || documento.nombre}?`);
+    const confirmed = await confirm({
+      title: "Juntar documentos",
+      description: `Se uniran ${selectedDocumentIds.length + 1} documentos en ${documento.nombreOriginal || documento.nombre}.`,
+      confirmLabel: "Juntar",
+    });
     if (!confirmed) return;
     await onMergeDocuments(
       documento,
       selectedDocumentIds,
       documento.tipo,
-      nombreSinExtension(documento.nombreOriginal || documento.nombre),
+      uppercaseInput(nombreSinExtension(documento.nombreOriginal || documento.nombre)),
       documento.operacionId ?? null,
     );
     setMergingId(null);
@@ -150,7 +158,6 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
     setExtractingId(documento.id);
     setSelectedExtractPages([]);
     setExtractType(documento.tipo || "OTROS");
-    setExtractName(`${nombreSinExtension(documento.nombreOriginal || documento.nombre)}_separado`);
     setExtractOperationId(documento.operacionId ? String(documento.operacionId) : "");
   };
 
@@ -170,15 +177,10 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
       alert("No se pueden separar todas las paginas del documento.");
       return;
     }
-    if (!extractName.trim()) {
-      alert("Indica un nombre para el nuevo documento.");
-      return;
-    }
     await onExtractPages(
       documento,
       selectedExtractPages.join(","),
       extractType,
-      extractName.trim(),
       extractOperationId ? Number(extractOperationId) : null,
     );
     setExtractingId(null);
@@ -220,14 +222,10 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                         <select value={editType} onChange={(event) => setEditType(event.target.value)}>
                           {DOCUMENT_TYPES.map((type) => (
                             <option key={type} value={type}>
-                              {humanizeEnum(type)}
+                              {formatDocumentType(type)}
                             </option>
                           ))}
                         </select>
-                      </label>
-                      <label>
-                        Nombre de archivo
-                        <input value={editName} onChange={(event) => setEditName(event.target.value)} />
                       </label>
                       {operaciones.length > 1 ? (
                         <label>
@@ -242,12 +240,12 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                           </select>
                         </label>
                       ) : null}
-                      <small>La extension se conserva automaticamente.</small>
+                      <small>El nombre se generara automaticamente con el formato MATRICULA - TIPO DOCUMENTO.</small>
                     </div>
                   ) : (
                     <div>
                       <strong>{documento.nombreOriginal || documento.nombre}</strong>
-                      <span>{humanizeEnum(documento.tipo)}</span>
+                      <span>{formatDocumentType(documento.tipo)}</span>
                       {documento.operacionLabel ? <small>{documento.operacionLabel}</small> : null}
                       <small>Revisa que el tipo documental y las paginas separadas sean correctas.</small>
                     </div>
@@ -355,14 +353,10 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                         <select value={extractType} onChange={(event) => setExtractType(event.target.value)}>
                           {DOCUMENT_TYPES.map((type) => (
                             <option key={type} value={type}>
-                              {humanizeEnum(type)}
+                              {formatDocumentType(type)}
                             </option>
                           ))}
                         </select>
-                      </label>
-                      <label>
-                        Nombre del nuevo documento
-                        <input value={extractName} onChange={(event) => setExtractName(event.target.value)} />
                       </label>
                       {operaciones.length > 1 ? (
                         <label>
@@ -377,6 +371,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                           </select>
                         </label>
                       ) : null}
+                      <small>El nombre se generara automaticamente con el formato MATRICULA - TIPO DOCUMENTO.</small>
                     </div>
                     <div className="ocr-page-strip">
                       {Array.from({ length: pageCounts[documento.id] }, (_, index) => index + 1).map((pagina) => (
@@ -424,7 +419,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                             onClick={() => candidate.id && toggleDocument(candidate.id)}
                           >
                             <span>{candidate.nombreOriginal || candidate.nombre}</span>
-                            <small>{humanizeEnum(candidate.tipo)}</small>
+                            <small>{formatDocumentType(candidate.tipo)}</small>
                           </button>
                         ))}
                     </div>
@@ -443,6 +438,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
           </button>
         </div>
       </section>
+      {dialog}
     </div>
   );
 }

@@ -23,6 +23,14 @@ export interface ExpedienteListItem {
   fechaUltimaModificacion?: string | null;
   cliente?: ClienteResumen | null;
   modificadoPor?: UsuarioResumen | null;
+  siguientePasoTitulo?: string | null;
+  siguienteAccion?: {
+    tipo: string;
+    label?: string | null;
+    codigoHito?: string | null;
+    tono?: string | null;
+  } | null;
+  justificantesFinalesDisponibles?: boolean;
 }
 
 export interface SolicitudListItem {

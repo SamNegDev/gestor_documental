@@ -12,6 +12,7 @@ import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.MensajeService;
 import com.example.gestor_documental.service.SolicitudService;
+import com.example.gestor_documental.util.TextNormalizer;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -53,7 +54,7 @@ public class MensajeServiceImpl implements MensajeService {
             throw new AccesoDenegadoException("No tienes permiso para añadir mensajes a este expediente");
         }
         mensaje.setExpediente(expediente);
-        mensaje.setContenido(contenido.trim());
+        mensaje.setContenido(TextNormalizer.upperOrNull(contenido));
         mensaje.setAutor(autor);
 
         return mensajeRepository.save(mensaje);
@@ -70,7 +71,7 @@ public class MensajeServiceImpl implements MensajeService {
             throw new AccesoDenegadoException("No tienes permiso para añadir mensajes a esta solicitud");
         }
         mensaje.setSolicitud(solicitud);
-        mensaje.setContenido(contenido);
+        mensaje.setContenido(TextNormalizer.upperOrNull(contenido));
         mensaje.setAutor(autor);
 
         return mensajeRepository.save(mensaje);

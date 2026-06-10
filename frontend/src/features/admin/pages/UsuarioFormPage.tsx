@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save, UserRoundCheck } from "lucide-react";
 import { createUsuario, getUsuario, getUsuarioCatalogs, updateUsuario } from "../services/adminApi";
 import type { UsuarioInput } from "../types";
+import { cleanLowerText, cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
 
 function emptyUsuario(): UsuarioInput {
   return {
@@ -18,15 +19,15 @@ function emptyUsuario(): UsuarioInput {
 }
 
 function clean(input: UsuarioInput, isEdit: boolean): UsuarioInput {
-  const cleanText = (value?: string | null) => {
+  const cleanPassword = (value?: string | null) => {
     const trimmed = value?.trim();
     return trimmed ? trimmed : null;
   };
   return {
-    nombre: input.nombre.trim(),
-    apellidos: input.apellidos.trim(),
-    email: input.email.trim(),
-    password: isEdit ? cleanText(input.password) : input.password?.trim() || "",
+    nombre: cleanUpperText(input.nombre) || "",
+    apellidos: cleanUpperText(input.apellidos) || "",
+    email: cleanLowerText(input.email) || "",
+    password: isEdit ? cleanPassword(input.password) : input.password?.trim() || "",
     rolUsuario: input.rolUsuario,
     activo: input.activo,
     clienteId: input.rolUsuario === "CLIENTE" ? input.clienteId || null : null,
@@ -53,8 +54,8 @@ export function UsuarioFormPage() {
   useEffect(() => {
     if (usuarioQuery.data) {
       setForm({
-        nombre: usuarioQuery.data.nombre || "",
-        apellidos: usuarioQuery.data.apellidos || "",
+        nombre: uppercaseInput(usuarioQuery.data.nombre || ""),
+        apellidos: uppercaseInput(usuarioQuery.data.apellidos || ""),
         email: usuarioQuery.data.email || "",
         password: "",
         rolUsuario: usuarioQuery.data.rol || "CLIENTE",
@@ -111,11 +112,11 @@ export function UsuarioFormPage() {
           <div className="edit-form-grid">
             <label>
               Nombre
-              <input value={form.nombre} required onChange={(event) => setForm({ ...form, nombre: event.target.value })} />
+              <input value={form.nombre} required onChange={(event) => setForm({ ...form, nombre: uppercaseInput(event.target.value) })} />
             </label>
             <label>
               Apellidos
-              <input value={form.apellidos} required onChange={(event) => setForm({ ...form, apellidos: event.target.value })} />
+              <input value={form.apellidos} required onChange={(event) => setForm({ ...form, apellidos: uppercaseInput(event.target.value) })} />
             </label>
             <label>
               Email

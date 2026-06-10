@@ -4,7 +4,9 @@ export type ExpedienteStatus =
   | "FINALIZADO"
   | "RECHAZADO"
   | "ENVIADO_DGT"
-  | "REVISANDO_INCIDENCIAS";
+  | "REVISANDO_INCIDENCIAS"
+  | "SOLICITADA_INFORMACION_ADICIONAL"
+  | "INFORMACION_ADICIONAL_RECIBIDA";
 
 export type DocumentoEstado = "SUBIDO" | "PENDIENTE" | "POSTERIOR" | "INCIDENCIA";
 export type HitoEstado = "COMPLETADO" | "ACTUAL" | "BLOQUEADO" | "PENDIENTE";
@@ -39,6 +41,15 @@ export interface InteresadoExpediente {
   dni?: string;
   telefono?: string;
   direccion?: string;
+}
+
+export interface InteresadoSearchResult {
+  id: number;
+  nombre: string;
+  dni?: string | null;
+  telefono?: string | null;
+  direccion?: string | null;
+  tipoPersona?: string | null;
 }
 
 export interface DocumentoExpediente {

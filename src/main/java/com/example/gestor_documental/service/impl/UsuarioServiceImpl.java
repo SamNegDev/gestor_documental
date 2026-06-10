@@ -6,6 +6,7 @@ import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.UsuarioRepository;
 import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,7 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     public Usuario guardar(Usuario usuario) {
+        normalizarUsuario(usuario);
         return usuarioRepository.save(usuario);
     }
 
@@ -62,6 +64,7 @@ public class UsuarioServiceImpl implements UsuarioService {
             usuario.setPassword(passwordEncoder.encode(rawPassword.trim()));
         }
 
+        normalizarUsuario(usuario);
         return usuarioRepository.save(usuario);
     }
 
@@ -77,9 +80,9 @@ public class UsuarioServiceImpl implements UsuarioService {
             existente.setCliente(null);
         }
 
-        existente.setNombre(datosNuevos.getNombre());
-        existente.setApellidos(datosNuevos.getApellidos());
-        existente.setEmail(datosNuevos.getEmail());
+        existente.setNombre(TextNormalizer.upperOrNull(datosNuevos.getNombre()));
+        existente.setApellidos(TextNormalizer.upperOrNull(datosNuevos.getApellidos()));
+        existente.setEmail(TextNormalizer.lowerOrNull(datosNuevos.getEmail()));
         existente.setRolUsuario(datosNuevos.getRolUsuario());
         existente.setActivo(datosNuevos.isActivo());
 
@@ -88,6 +91,12 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
 
         return usuarioRepository.save(existente);
+    }
+
+    private void normalizarUsuario(Usuario usuario) {
+        usuario.setNombre(TextNormalizer.upperOrNull(usuario.getNombre()));
+        usuario.setApellidos(TextNormalizer.upperOrNull(usuario.getApellidos()));
+        usuario.setEmail(TextNormalizer.lowerOrNull(usuario.getEmail()));
     }
 
     @Override

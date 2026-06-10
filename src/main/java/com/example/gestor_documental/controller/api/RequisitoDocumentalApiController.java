@@ -6,6 +6,7 @@ import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
 import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -38,7 +39,7 @@ public class RequisitoDocumentalApiController {
         requisitoService.crearManual(
                 expedienteId,
                 tipoDocumento,
-                descripcion,
+                TextNormalizer.upperOrNull(descripcion),
                 interesadoId,
                 rolInteresado,
                 estadoInicial,
@@ -53,7 +54,7 @@ public class RequisitoDocumentalApiController {
             @RequestParam String motivo,
             Authentication authentication
     ) {
-        requisitoService.omitir(id, motivo, usuario(authentication));
+        requisitoService.omitir(id, TextNormalizer.upperOrNull(motivo), usuario(authentication));
         return ResponseEntity.noContent().build();
     }
 

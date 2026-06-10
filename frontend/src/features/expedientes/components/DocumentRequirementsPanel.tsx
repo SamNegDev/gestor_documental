@@ -1,7 +1,8 @@
 import { CheckCircle2, CircleDashed, FileText, Link2, Plus, Slash, Upload, X } from "lucide-react";
 import { useState } from "react";
 import type { DocumentoExpediente, InteresadoExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
-import { humanizeEnum } from "../utils/formatters";
+import { formatDocumentType, humanizeEnum } from "../utils/formatters";
+import { uppercaseInput } from "../../../shared/utils/text";
 
 type Props = {
   requisitos: RequisitoDocumental[];
@@ -57,12 +58,14 @@ export function DocumentRequirementsPanel({
   const [interesadoKey, setInteresadoKey] = useState("");
   const [linkingRequirement, setLinkingRequirement] = useState<RequisitoDocumental | null>(null);
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
+  const [omittingRequirement, setOmittingRequirement] = useState<RequisitoDocumental | null>(null);
+  const [omitReason, setOmitReason] = useState(OMIT_REASONS[0]);
   const requisitosPendientes = requisitos.filter((requisito) => requisito.estado === "REQUERIDO");
   const pendientes = requisitosPendientes.length;
   const documentosSubidos = documentos.filter((documento) => documento.id);
 
   const submitAdd = () => {
-    const descripcionLimpia = descripcion.trim();
+    const descripcionLimpia = uppercaseInput(descripcion.trim());
     if (!descripcionLimpia) return;
     const [interesadoId, rolInteresado] = interesadoKey ? interesadoKey.split(":") : [];
     onAddRequirement({
@@ -79,13 +82,15 @@ export function DocumentRequirementsPanel({
   };
 
   const omitRequirement = (requisito: RequisitoDocumental) => {
-    const selected = window.prompt(
-      `Motivo de omision:\n1. ${OMIT_REASONS[0]}\n2. ${OMIT_REASONS[1]}\nO escribe otro motivo.`,
-      OMIT_REASONS[0],
-    );
-    if (!selected) return;
-    const motivo = selected === "1" ? OMIT_REASONS[0] : selected === "2" ? OMIT_REASONS[1] : selected;
-    onOmitRequirement(requisito, motivo.trim());
+    setOmitReason(OMIT_REASONS[0]);
+    setOmittingRequirement(requisito);
+  };
+
+  const confirmOmitRequirement = () => {
+    if (!omittingRequirement || !omitReason.trim()) return;
+    onOmitRequirement(omittingRequirement, uppercaseInput(omitReason.trim()));
+    setOmittingRequirement(null);
+    setOmitReason(OMIT_REASONS[0]);
   };
 
   const linkDocument = (requisito: RequisitoDocumental) => {
@@ -124,14 +129,14 @@ export function DocumentRequirementsPanel({
           <select value={tipoDocumento} onChange={(event) => setTipoDocumento(event.target.value)}>
             {DOCUMENT_TYPES.map((type) => (
               <option key={type} value={type}>
-                {humanizeEnum(type)}
+                {formatDocumentType(type)}
               </option>
             ))}
           </select>
           <input
             value={descripcion}
             placeholder="Descripcion"
-            onChange={(event) => setDescripcion(event.target.value)}
+            onChange={(event) => setDescripcion(uppercaseInput(event.target.value))}
           />
           <select value={interesadoKey} onChange={(event) => setInteresadoKey(event.target.value)}>
             <option value="">Sin interesado</option>
@@ -160,7 +165,7 @@ export function DocumentRequirementsPanel({
             <div className="requirement-row__body">
               <strong>{requisito.descripcion}</strong>
               <small>
-                {humanizeEnum(requisito.tipoDocumento)}
+                {formatDocumentType(requisito.tipoDocumento)}
                 {requisito.interesadoNombre ? ` · ${requisito.interesadoNombre}` : ""}
                 {requisito.documentoNombre ? ` · ${requisito.documentoNombre}` : ""}
               </small>
@@ -217,7 +222,7 @@ export function DocumentRequirementsPanel({
             </div>
 
             <div className="requirement-link-summary">
-              <strong>{humanizeEnum(linkingRequirement.tipoDocumento)}</strong>
+              <strong>{formatDocumentType(linkingRequirement.tipoDocumento)}</strong>
               <span>
                 {linkingRequirement.interesadoNombre || "Sin interesado asociado"}
                 {linkingRequirement.rolInteresado ? ` · ${humanizeEnum(linkingRequirement.rolInteresado)}` : ""}
@@ -234,7 +239,7 @@ export function DocumentRequirementsPanel({
                 >
                   <FileText size={18} />
                   <span>{documento.nombreOriginal || documento.nombre}</span>
-                  <small>{humanizeEnum(documento.tipo)}{documento.subidoPor ? ` · ${documento.subidoPor}` : ""}</small>
+                  <small>{formatDocumentType(documento.tipo)}{documento.subidoPor ? ` · ${documento.subidoPor}` : ""}</small>
                 </button>
               ))}
             </div>
@@ -246,6 +251,69 @@ export function DocumentRequirementsPanel({
               <button className="primary-button" disabled={!selectedDocumentId} onClick={confirmLinkDocument} type="button">
                 <Link2 size={16} />
                 Vincular documento
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
+
+      {omittingRequirement ? (
+        <div className="exp-modal" role="presentation">
+          <button
+            className="exp-modal__backdrop"
+            onClick={() => setOmittingRequirement(null)}
+            type="button"
+            aria-label="Cerrar omision"
+          />
+          <section aria-labelledby="requirement-omit-title" aria-modal="true" className="exp-modal__panel exp-modal__panel--narrow" role="dialog">
+            <div className="exp-modal__header">
+              <div>
+                <p className="eyebrow">Omitir requisito</p>
+                <h3 id="requirement-omit-title">{omittingRequirement.descripcion}</h3>
+              </div>
+              <button aria-label="Cerrar" className="icon-button" onClick={() => setOmittingRequirement(null)} type="button">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="requirement-link-summary">
+              <strong>{formatDocumentType(omittingRequirement.tipoDocumento)}</strong>
+              <span>
+                {omittingRequirement.interesadoNombre || "Sin interesado asociado"}
+                {omittingRequirement.rolInteresado ? ` Â· ${humanizeEnum(omittingRequirement.rolInteresado)}` : ""}
+              </span>
+            </div>
+
+            <div className="requirement-omit-form">
+              <div className="requirement-omit-reasons" role="group" aria-label="Motivos frecuentes">
+                {OMIT_REASONS.map((reason) => (
+                  <button
+                    className={`requirement-omit-reason ${omitReason === reason ? "requirement-omit-reason--selected" : ""}`}
+                    key={reason}
+                    onClick={() => setOmitReason(reason)}
+                    type="button"
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+              <label>
+                Motivo
+                <textarea
+                  onChange={(event) => setOmitReason(uppercaseInput(event.target.value))}
+                  rows={3}
+                  value={omitReason}
+                />
+              </label>
+            </div>
+
+            <footer className="exp-modal__footer">
+              <button className="soft-button" onClick={() => setOmittingRequirement(null)} type="button">
+                Cancelar
+              </button>
+              <button className="primary-button primary-button--danger" disabled={!omitReason.trim()} onClick={confirmOmitRequirement} type="button">
+                <Slash size={16} />
+                Omitir requisito
               </button>
             </footer>
           </section>

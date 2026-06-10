@@ -30,6 +30,7 @@ import com.example.gestor_documental.service.MensajeService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.util.TextNormalizer;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -110,7 +111,7 @@ public class SolicitudApiController {
         DateRange dateRange = dateRange(periodo);
         if (dateRange != null) {
             solicitudes = solicitudes.stream()
-                    .filter(solicitud -> isWithinRange(solicitud.getFechaCreacion(), dateRange))
+                    .filter(solicitud -> isWithinRange(fechaReferencia(solicitud.getFechaCreacion(), solicitud.getFechaUltimaModificacion()), dateRange))
                     .toList();
         }
 
@@ -251,29 +252,21 @@ public class SolicitudApiController {
 
     private Solicitud mapSolicitudRequest(SolicitudUpsertRequest request) {
         Solicitud solicitud = new Solicitud();
-        solicitud.setMatricula(clean(request.getMatricula()));
-        solicitud.setObservaciones(clean(request.getObservaciones()));
+        solicitud.setMatricula(TextNormalizer.upperOrNull(request.getMatricula()));
+        solicitud.setObservaciones(TextNormalizer.upperOrNull(request.getObservaciones()));
         solicitud.setInteresado1Rol(request.getInteresado1Rol());
-        solicitud.setInteresado1Nombre(clean(request.getInteresado1Nombre()));
-        solicitud.setInteresado1Apellidos(clean(request.getInteresado1Apellidos()));
-        solicitud.setInteresado1Dni(clean(request.getInteresado1Dni()));
-        solicitud.setInteresado1Telefono(clean(request.getInteresado1Telefono()));
-        solicitud.setInteresado1Direccion(clean(request.getInteresado1Direccion()));
+        solicitud.setInteresado1Nombre(TextNormalizer.upperOrNull(request.getInteresado1Nombre()));
+        solicitud.setInteresado1Apellidos(TextNormalizer.upperOrNull(request.getInteresado1Apellidos()));
+        solicitud.setInteresado1Dni(TextNormalizer.upperOrNull(request.getInteresado1Dni()));
+        solicitud.setInteresado1Telefono(TextNormalizer.upperOrNull(request.getInteresado1Telefono()));
+        solicitud.setInteresado1Direccion(TextNormalizer.upperOrNull(request.getInteresado1Direccion()));
         solicitud.setInteresado2Rol(request.getInteresado2Rol());
-        solicitud.setInteresado2Nombre(clean(request.getInteresado2Nombre()));
-        solicitud.setInteresado2Apellidos(clean(request.getInteresado2Apellidos()));
-        solicitud.setInteresado2Dni(clean(request.getInteresado2Dni()));
-        solicitud.setInteresado2Telefono(clean(request.getInteresado2Telefono()));
-        solicitud.setInteresado2Direccion(clean(request.getInteresado2Direccion()));
+        solicitud.setInteresado2Nombre(TextNormalizer.upperOrNull(request.getInteresado2Nombre()));
+        solicitud.setInteresado2Apellidos(TextNormalizer.upperOrNull(request.getInteresado2Apellidos()));
+        solicitud.setInteresado2Dni(TextNormalizer.upperOrNull(request.getInteresado2Dni()));
+        solicitud.setInteresado2Telefono(TextNormalizer.upperOrNull(request.getInteresado2Telefono()));
+        solicitud.setInteresado2Direccion(TextNormalizer.upperOrNull(request.getInteresado2Direccion()));
         return solicitud;
-    }
-
-    private String clean(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private SolicitudListItemResponse mapSolicitudListItem(Solicitud solicitud) {
@@ -470,6 +463,10 @@ public class SolicitudApiController {
         boolean afterStart = !fecha.isBefore(range.start());
         boolean beforeEnd = range.end() == null || fecha.isBefore(range.end());
         return afterStart && beforeEnd;
+    }
+
+    private LocalDateTime fechaReferencia(LocalDateTime fechaCreacion, LocalDateTime fechaUltimaModificacion) {
+        return fechaUltimaModificacion != null ? fechaUltimaModificacion : fechaCreacion;
     }
 
     private record DateRange(LocalDateTime start, LocalDateTime end) {

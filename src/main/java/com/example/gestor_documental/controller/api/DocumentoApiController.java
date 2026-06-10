@@ -48,10 +48,12 @@ public class DocumentoApiController {
             @RequestParam(required = false) TipoDocumento tipoDocumento,
             @RequestParam(required = false) String nombreArchivo,
             @RequestParam(required = false) Long operacionId,
+            @RequestParam(required = false, defaultValue = "false") boolean actualizarOperacion,
+            @RequestParam(required = false, defaultValue = "false") boolean nombreAutomatico,
             Authentication authentication
     ) {
         Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
-        documentoService.actualizarDocumento(id, tipoDocumento, nombreArchivo, operacionId, usuarioLogueado);
+        documentoService.actualizarDocumento(id, tipoDocumento, nombreArchivo, operacionId, actualizarOperacion, nombreAutomatico, usuarioLogueado);
         return ResponseEntity.noContent().build();
     }
 
@@ -79,7 +81,7 @@ public class DocumentoApiController {
             @PathVariable Long id,
             @RequestParam String rangoPaginas,
             @RequestParam TipoDocumento tipoDocumento,
-            @RequestParam String nombreArchivo,
+            @RequestParam(required = false) String nombreArchivo,
             @RequestParam(required = false) Long operacionId,
             Authentication authentication
     ) {

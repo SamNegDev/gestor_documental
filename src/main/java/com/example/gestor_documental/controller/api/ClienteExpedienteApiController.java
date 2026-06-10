@@ -2,8 +2,14 @@ package com.example.gestor_documental.controller.api;
 
 import com.example.gestor_documental.dto.expediente.ExpedienteClienteResponse;
 import com.example.gestor_documental.dto.expediente.ExpedienteDetailResponse;
+import com.example.gestor_documental.enums.EstadoExpediente;
+import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.exception.OperacionInvalidaException;
+import com.example.gestor_documental.exception.RecursoNoEncontradoException;
+import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
+import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.MensajeService;
 import com.example.gestor_documental.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ClienteExpedienteApiController {
 
     private final ExpedienteDetalleApiService expedienteDetalleApiService;
+    private final ExpedienteService expedienteService;
     private final MensajeService mensajeService;
     private final UsuarioService usuarioService;
 
@@ -61,9 +68,39 @@ public class ClienteExpedienteApiController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/informacion-adicional/respuesta")
+    public ResponseEntity<Void> responderInformacionAdicional(
+            @PathVariable Long id,
+            @RequestParam(required = false) String contenido,
+            @RequestBody(required = false) java.util.Map<String, String> body,
+            Authentication authentication
+    ) {
+        Usuario cliente = usuarioService.buscarPorEmail(authentication.getName());
+        Expediente expediente = expedienteService.buscarPorId(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
+        if (!expedienteService.tienePermisoExpediente(expediente, cliente)) {
+            throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
+        }
+        if (expediente.getEstadoExpediente() != EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL) {
+            throw new OperacionInvalidaException("El expediente no tiene informacion adicional pendiente de respuesta.");
+        }
+
+        String contenidoFinal = contenido != null ? contenido : body != null ? body.get("contenido") : null;
+        mensajeService.a\u00f1adirAExpediente(id, contenidoFinal, cliente);
+        expediente.setEstadoExpediente(EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA);
+        expedienteService.guardar(expediente);
+        return ResponseEntity.noContent().build();
+    }
+
     private String mensajeEstado(ExpedienteDetailResponse detalle) {
         if ("FINALIZADO".equals(detalle.getEstado())) {
             return "El expediente esta finalizado.";
+        }
+        if ("SOLICITADA_INFORMACION_ADICIONAL".equals(detalle.getEstado())) {
+            return "Necesitamos que respondas a la informacion solicitada para continuar.";
+        }
+        if ("INFORMACION_ADICIONAL_RECIBIDA".equals(detalle.getEstado())) {
+            return "Hemos recibido tu respuesta y esta pendiente de revision.";
         }
         if ("INCIDENCIA".equals(detalle.getEstado())) {
             return "Necesitamos que revises una incidencia pendiente.";

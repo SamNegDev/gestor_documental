@@ -16,8 +16,19 @@ export function formatDateTime(value?: string | null): string {
 export function humanizeEnum(value?: string | null): string {
   if (!value) return "Sin definir";
 
+  const acronyms = new Set(["DNI", "NIF", "NIE", "CIF", "DGT", "OCR"]);
+
   return value
-    .toLowerCase()
-    .replaceAll("_", " ")
-    .replace(/^./, (letter) => letter.toUpperCase());
+    .split("_")
+    .filter(Boolean)
+    .map((part) => {
+      const upper = part.toUpperCase();
+      if (acronyms.has(upper) || /\d/.test(part)) return upper;
+      return part.toLowerCase().replace(/^./, (letter) => letter.toUpperCase());
+    })
+    .join(" ");
+}
+
+export function formatDocumentType(value?: string | null): string {
+  return value ? value.replaceAll("_", " ").toUpperCase() : "SIN DEFINIR";
 }

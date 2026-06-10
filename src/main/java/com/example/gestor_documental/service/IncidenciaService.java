@@ -18,4 +18,6 @@ public interface IncidenciaService {
     void resolverIncidencia(Long incidenciaId, Usuario admin);
 
     void reclamarIncidencia(Long incidenciaId, String observaciones, Usuario admin);
+
+    void responderIncidenciaExpediente(Long incidenciaId, String respuesta, Usuario cliente);
 }

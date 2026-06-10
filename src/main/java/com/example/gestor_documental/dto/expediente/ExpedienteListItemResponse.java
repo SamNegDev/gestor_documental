@@ -20,4 +20,7 @@ public class ExpedienteListItemResponse {
     private String fechaUltimaModificacion;
     private ClienteResumenResponse cliente;
     private UsuarioResumenResponse modificadoPor;
+    private String siguientePasoTitulo;
+    private HitoAccionResponse siguienteAccion;
+    private boolean justificantesFinalesDisponibles;
 }

@@ -22,6 +22,7 @@ import com.example.gestor_documental.repository.OperacionExpedienteRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.*;
+import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -358,7 +359,7 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     private Documento construirDocumentoBase(MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario)
             throws IOException {
-        String nombreOriginal = sanitizarNombreArchivo(archivo.getOriginalFilename());
+        String nombreOriginal = sanitizarNombreArchivo(TextNormalizer.upperOrNull(archivo.getOriginalFilename()));
         validarExtensionPermitida(nombreOriginal);
 
         if (nombreOriginal == null || nombreOriginal.isBlank()) {
@@ -393,7 +394,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             throw new OperacionInvalidaException("El archivo no tiene nombre válido");
         }
 
-        nombreArchivoOriginal = sanitizarNombreArchivo(nombreArchivoOriginal);
+        nombreArchivoOriginal = sanitizarNombreArchivo(TextNormalizer.upperOrNull(nombreArchivoOriginal));
         validarExtensionPermitida(nombreArchivoOriginal);
 
         String nombreUnico = UUID.randomUUID() + "_" + nombreArchivoOriginal;
@@ -488,21 +489,36 @@ public class DocumentoServiceImpl implements DocumentoService {
     @Override
     @Transactional
     public void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Long operacionId, Usuario usuario) {
+        actualizarDocumento(id, nuevoTipo, nuevoNombre, operacionId, false, usuario);
+    }
+
+    @Override
+    @Transactional
+    public void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Long operacionId, boolean nombreAutomatico, Usuario usuario) {
+        actualizarDocumento(id, nuevoTipo, nuevoNombre, operacionId, operacionId != null, nombreAutomatico, usuario);
+    }
+
+    @Override
+    @Transactional
+    public void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Long operacionId, boolean actualizarOperacion, boolean nombreAutomatico, Usuario usuario) {
         Documento documento = obtenerDocumentoConPermiso(id, usuario);
+        TipoDocumento tipoAnterior = documento.getTipoDocumento();
 
         if (nuevoTipo != null) {
             documento.setTipoDocumento(nuevoTipo);
         }
+        if (actualizarOperacion && documento.getExpediente() != null) {
+            documento.setOperacion(resolverOperacionExpediente(documento.getExpediente(), operacionId));
+        }
         if (nuevoNombre != null && !nuevoNombre.trim().isEmpty()) {
-            String nombreSanitizado = sanitizarNombreArchivo(nuevoNombre);
+            String nombreSanitizado = sanitizarNombreArchivo(TextNormalizer.upperOrNull(nuevoNombre));
             if (!nombreSanitizado.contains(".")) {
                 nombreSanitizado = nombreSanitizado + extensionDe(documento.getNombreArchivoOriginal());
             }
             validarExtensionPermitida(nombreSanitizado);
             documento.setNombreArchivoOriginal(nombreSanitizado);
-        }
-        if (documento.getExpediente() != null) {
-            documento.setOperacion(resolverOperacionExpediente(documento.getExpediente(), operacionId));
+        } else if (nombreAutomatico || (nuevoTipo != null && nuevoTipo != tipoAnterior)) {
+            documento.setNombreArchivoOriginal(generarNombreAutomatico(documento));
         }
 
         documentoRepository.save(documento);
@@ -519,11 +535,42 @@ public class DocumentoServiceImpl implements DocumentoService {
         return nombreArchivo.substring(index);
     }
 
+    private String generarNombreAutomatico(Documento documento) {
+        String extension = extensionDe(documento.getNombreArchivoOriginal()).toUpperCase(java.util.Locale.ROOT);
+        java.util.List<String> partes = new java.util.ArrayList<>();
+        if (documento.getExpediente() != null && documento.getExpediente().getMatricula() != null
+                && !documento.getExpediente().getMatricula().isBlank()) {
+            partes.add(documento.getExpediente().getMatricula());
+        } else if (documento.getSolicitud() != null && documento.getSolicitud().getMatricula() != null
+                && !documento.getSolicitud().getMatricula().isBlank()) {
+            partes.add(documento.getSolicitud().getMatricula());
+        } else if (documento.getIncidencia() != null) {
+            partes.add("INCIDENCIA " + documento.getIncidencia().getId());
+        }
+        partes.add(documento.getTipoDocumento() != null ? documento.getTipoDocumento().name().replace('_', ' ') : "DOCUMENTO");
+        if (documento.getOperacion() != null && documento.getOperacion().getTipo() != null) {
+            partes.add(documento.getOperacion().getTipo().name().replace('_', ' '));
+        }
+
+        return sanitizarNombreArchivo(String.join(" - ", partes) + extension);
+    }
+
+    private String generarNombreAutomatico(Documento documentoOriginal, TipoDocumento nuevoTipo, OperacionExpediente operacion) {
+        Documento documento = new Documento();
+        documento.setNombreArchivoOriginal(documentoOriginal.getNombreArchivoOriginal());
+        documento.setTipoDocumento(nuevoTipo != null ? nuevoTipo : documentoOriginal.getTipoDocumento());
+        documento.setExpediente(documentoOriginal.getExpediente());
+        documento.setSolicitud(documentoOriginal.getSolicitud());
+        documento.setIncidencia(documentoOriginal.getIncidencia());
+        documento.setOperacion(operacion);
+        return generarNombreAutomatico(documento);
+    }
+
     private String asegurarExtension(String nombreArchivo, String nombreReferencia) {
         if (nombreArchivo == null || nombreArchivo.isBlank()) {
             return "documento_extraido" + extensionDe(nombreReferencia);
         }
-        String nombreSanitizado = sanitizarNombreArchivo(nombreArchivo);
+        String nombreSanitizado = sanitizarNombreArchivo(TextNormalizer.upperOrNull(nombreArchivo));
         if (!nombreSanitizado.contains(".")) {
             nombreSanitizado = nombreSanitizado + extensionDe(nombreReferencia);
         }
@@ -616,13 +663,17 @@ public class DocumentoServiceImpl implements DocumentoService {
 
             // Sobrescribir el archivo original para que no tenga las páginas extraídas
             // (evita duplicidad)
-            String nombreNuevo = asegurarExtension(nuevoNombre, documentoOriginal.getNombreArchivoOriginal());
-
             if (documentoOriginal.getExpediente() != null) {
                 OperacionExpediente operacion = resolverOperacionExpediente(documentoOriginal.getExpediente(), operacionId);
+                String nombreNuevo = nuevoNombre != null && !nuevoNombre.isBlank()
+                        ? asegurarExtension(nuevoNombre, documentoOriginal.getNombreArchivoOriginal())
+                        : generarNombreAutomatico(documentoOriginal, nuevoTipo, operacion);
                 guardarDocumentoGeneradoParaExpediente(
                         documentoOriginal.getExpediente(), pdfExtraido, nuevoTipo, usuario, nombreNuevo, operacion, false);
             } else if (documentoOriginal.getSolicitud() != null) {
+                String nombreNuevo = nuevoNombre != null && !nuevoNombre.isBlank()
+                        ? asegurarExtension(nuevoNombre, documentoOriginal.getNombreArchivoOriginal())
+                        : generarNombreAutomatico(documentoOriginal, nuevoTipo, null);
                 guardarDocumentoGeneradoParaSolicitud(
                         documentoOriginal.getSolicitud(), pdfExtraido, nuevoTipo, usuario, nombreNuevo, false);
             }
@@ -709,7 +760,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                 principal.setTipoDocumento(tipoDocumento);
             }
             if (nombreArchivo != null && !nombreArchivo.isBlank()) {
-                String nombreSanitizado = sanitizarNombreArchivo(nombreArchivo);
+                String nombreSanitizado = sanitizarNombreArchivo(TextNormalizer.upperOrNull(nombreArchivo));
                 if (!nombreSanitizado.contains(".")) {
                     nombreSanitizado = nombreSanitizado + extensionDe(principal.getNombreArchivoOriginal());
                 }

@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Mail, Pencil, Phone, Plus, Trash2, UsersRound } from "lucide-react";
+import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { deleteCliente, getClientes } from "../services/adminApi";
 import type { ClienteAdmin } from "../types";
 
 export function ClientesListPage() {
   const queryClient = useQueryClient();
+  const { confirm, dialog } = useConfirmDialog();
   const clientesQuery = useQuery({
     queryKey: ["admin", "clientes"],
     queryFn: getClientes,
@@ -52,14 +54,21 @@ export function ClientesListPage() {
               <ClienteCard
                 cliente={cliente}
                 key={cliente.id}
-                onDelete={() => {
-                  if (window.confirm(`Eliminar ${cliente.nombre}?`)) deleteMutation.mutate(cliente.id);
+                onDelete={async () => {
+                  const confirmed = await confirm({
+                    title: "Eliminar cliente",
+                    description: `Se eliminara ${cliente.nombre}. Si tiene registros asociados, el sistema bloqueara la operacion.`,
+                    confirmLabel: "Eliminar",
+                    tone: "danger",
+                  });
+                  if (confirmed) deleteMutation.mutate(cliente.id);
                 }}
               />
             ))}
           </div>
         ) : null}
       </section>
+      {dialog}
     </main>
   );
 }

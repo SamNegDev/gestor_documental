@@ -377,6 +377,90 @@ select {
   color: var(--danger);
 }
 
+.confirm-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.confirm-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: oklch(12% 0.02 232 / 0.48);
+  cursor: default;
+}
+
+.confirm-dialog__panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  width: min(520px, 100%);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 24px 70px oklch(18% 0.03 232 / 0.22);
+}
+
+.confirm-dialog__icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 14px;
+  background: oklch(92% 0.045 232);
+  color: var(--brand);
+}
+
+.confirm-dialog__panel--danger .confirm-dialog__icon {
+  background: oklch(94% 0.045 27);
+  color: var(--danger);
+}
+
+.confirm-dialog__panel--success .confirm-dialog__icon {
+  background: oklch(94% 0.055 154);
+  color: var(--success);
+}
+
+.confirm-dialog__content {
+  min-width: 0;
+}
+
+.confirm-dialog__heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.confirm-dialog h3 {
+  margin: 1px 0 8px;
+  color: var(--ink-strong);
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.confirm-dialog p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 720;
+  line-height: 1.5;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 18px;
+}
+
 .content {
   padding: 28px 34px 44px;
 }
@@ -1321,6 +1405,40 @@ select {
   opacity: 0.82;
 }
 
+.bulk-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(135deg, oklch(97% 0.018 232), oklch(99% 0.004 92));
+}
+
+.bulk-actions-bar strong,
+.bulk-actions-bar span {
+  display: block;
+}
+
+.bulk-actions-bar strong {
+  color: var(--ink-strong);
+  font-size: 0.96rem;
+}
+
+.bulk-actions-bar span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.bulk-actions-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .records-table-scroll {
   overflow-x: auto;
 }
@@ -1374,6 +1492,19 @@ input.records-table-filter {
   min-width: 112px;
 }
 
+.records-table .records-col-select {
+  width: 46px;
+  padding-left: 14px;
+  padding-right: 8px;
+  text-align: center;
+}
+
+.records-table input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--brand);
+}
+
 .records-table .records-col-id {
   width: 64px;
   padding-left: 18px;
@@ -1418,6 +1549,11 @@ input.records-table-filter {
 
 .records-table tbody tr:hover {
   background: oklch(97% 0.012 92);
+}
+
+.records-table tbody tr.records-row--selected {
+  background: oklch(96% 0.018 232);
+  box-shadow: inset 3px 0 0 var(--brand);
 }
 
 .records-table strong,
@@ -1824,7 +1960,7 @@ input.records-table-filter {
 
 .dashboard-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) 128px 154px 72px;
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
@@ -1852,12 +1988,24 @@ input.records-table-filter {
 }
 
 .dashboard-mini-plate {
-  justify-self: start;
+  width: 100%;
+  justify-self: stretch;
 }
 
 .dashboard-row > .muted-text {
-  min-width: 104px;
+  width: 100%;
   text-align: center;
+}
+
+.dashboard-row > .status-badge {
+  width: 100%;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.dashboard-row > .soft-button {
+  width: 100%;
+  justify-content: center;
 }
 
 .request-form-grid {
@@ -2139,13 +2287,20 @@ input.records-table-filter {
   .records-header,
   .records-header__actions,
   .list-filters-actions,
-  .records-panel__heading {
+  .records-panel__heading,
+  .bulk-actions-bar {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .bulk-actions-bar__actions {
+    justify-content: stretch;
+  }
+
   .records-count,
   .records-header__actions .primary-button,
+  .bulk-actions-bar__actions .primary-button,
+  .bulk-actions-bar__actions .soft-button,
   .list-filters-actions .primary-button,
   .list-filters-actions .soft-button {
     width: 100%;

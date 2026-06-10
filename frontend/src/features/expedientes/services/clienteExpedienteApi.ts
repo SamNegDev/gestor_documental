@@ -31,3 +31,7 @@ export async function getClienteExpediente(id: string | number): Promise<Expedie
 export function sendClienteExpedienteMessage(expedienteId: string | number, contenido: string): Promise<void> {
   return apiPostJson(`/api/cliente/expedientes/${expedienteId}/mensajes`, { contenido });
 }
+
+export function answerAdditionalInfo(expedienteId: string | number, contenido: string): Promise<void> {
+  return apiPostJson(`/api/cliente/expedientes/${expedienteId}/informacion-adicional/respuesta`, { contenido });
+}

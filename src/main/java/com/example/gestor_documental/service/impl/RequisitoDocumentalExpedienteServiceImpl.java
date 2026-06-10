@@ -172,7 +172,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             }
 
             documentos.stream()
-                    .filter(documento -> documento.getTipoDocumento() == requisito.getTipoDocumento())
+                    .filter(documento -> documentoCubreRequisito(documento, requisito))
                     .findFirst()
                     .ifPresent(documento -> {
                         requisito.setDocumento(documento);
@@ -205,7 +205,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         }
 
         if (tramite == TipoTramiteEnum.TRASPASO || tramite == TipoTramiteEnum.BATECOM) {
-            crearGlobalSiNoExiste(expediente, TipoDocumento.CONTRATO_COMPRAVENTA, "Contrato de compraventa", EstadoRequisitoDocumental.REQUERIDO, usuario);
+            crearGlobalSiNoExiste(expediente, TipoDocumento.CONTRATO_COMPRAVENTA, "Contrato de compraventa o factura de venta", EstadoRequisitoDocumental.REQUERIDO, usuario);
         }
 
         crearGlobalSiNoExiste(expediente, TipoDocumento.MANDATO, "Mandato o autorizacion de gestion", EstadoRequisitoDocumental.REQUERIDO, usuario);
@@ -308,15 +308,26 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             Usuario usuario
     ) {
         requisitoRepository.findByExpedienteIdAndTipoDocumentoAndInteresadoIsNullAndRolInteresadoIsNull(expediente.getId(), tipoDocumento)
-                .orElseGet(() -> requisitoRepository.save(nuevoRequisito(
-                        expediente,
-                        tipoDocumento,
-                        descripcion,
-                        estado,
-                        null,
-                        null,
-                        usuario
-                )));
+                .ifPresentOrElse(
+                        requisito -> actualizarDescripcionRegla(requisito, descripcion),
+                        () -> requisitoRepository.save(nuevoRequisito(
+                                expediente,
+                                tipoDocumento,
+                                descripcion,
+                                estado,
+                                null,
+                                null,
+                                usuario
+                        ))
+                );
+    }
+
+    private boolean documentoCubreRequisito(Documento documento, RequisitoDocumentalExpediente requisito) {
+        if (documento.getTipoDocumento() == requisito.getTipoDocumento()) {
+            return true;
+        }
+        return requisito.getTipoDocumento() == TipoDocumento.CONTRATO_COMPRAVENTA
+                && documento.getTipoDocumento() == TipoDocumento.FACTURA;
     }
 
     private void eliminarModelo620Automatico(Expediente expediente) {

@@ -246,8 +246,8 @@ function EmptyRow({ text }: { icon: string; text: string }) {
 function statusTone(status?: string | null) {
   if (status === "FINALIZADO" || status === "CONVERTIDA") return "success";
   if (status === "INCIDENCIA" || status === "PENDIENTE_DOCUMENTACION" || status === "RECHAZADO") return "danger";
-  if (status === "REVISANDO_INCIDENCIAS" || status === "ENVIADO_DGT") return "info";
-  if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION") return "warning";
+  if (status === "REVISANDO_INCIDENCIAS" || status === "ENVIADO_DGT" || status === "INFORMACION_ADICIONAL_RECIBIDA") return "info";
+  if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION" || status === "SOLICITADA_INFORMACION_ADICIONAL") return "warning";
   return "neutral";
 }
 

@@ -11,6 +11,7 @@ import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.util.TextNormalizer;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
@@ -166,27 +167,19 @@ public class AdminManagementApiController {
         return value == null || value.trim().isEmpty();
     }
 
-    private String clean(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
     private Cliente mapCliente(ClienteUpsertRequest request, Cliente cliente) {
-        cliente.setNif(clean(request.getNif()));
-        cliente.setNombre(clean(request.getNombre()));
-        cliente.setEmail(clean(request.getEmail()));
-        cliente.setDireccion(clean(request.getDireccion()));
-        cliente.setTelefono(clean(request.getTelefono()));
+        cliente.setNif(TextNormalizer.upperOrNull(request.getNif()));
+        cliente.setNombre(TextNormalizer.upperOrNull(request.getNombre()));
+        cliente.setEmail(TextNormalizer.lowerOrNull(request.getEmail()));
+        cliente.setDireccion(TextNormalizer.upperOrNull(request.getDireccion()));
+        cliente.setTelefono(TextNormalizer.upperOrNull(request.getTelefono()));
         return cliente;
     }
 
     private Usuario mapUsuario(UsuarioUpsertRequest request, Usuario usuario) {
-        usuario.setNombre(clean(request.getNombre()));
-        usuario.setApellidos(clean(request.getApellidos()));
-        usuario.setEmail(clean(request.getEmail()));
+        usuario.setNombre(TextNormalizer.upperOrNull(request.getNombre()));
+        usuario.setApellidos(TextNormalizer.upperOrNull(request.getApellidos()));
+        usuario.setEmail(TextNormalizer.lowerOrNull(request.getEmail()));
         usuario.setRolUsuario(request.getRolUsuario());
         usuario.setActivo(request.isActivo());
         return usuario;

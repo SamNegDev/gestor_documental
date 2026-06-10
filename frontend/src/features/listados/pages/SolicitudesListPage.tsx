@@ -9,6 +9,7 @@ import { ListFiltersBar } from "../components/ListFiltersBar";
 import { ListPageChrome } from "../components/ListPageChrome";
 import type { ListCatalogs, ListFilters, SolicitudListItem } from "../types";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
+import { uppercaseInput } from "../../../shared/utils/text";
 
 export function SolicitudesListPage() {
   const { user } = useOutletContext<AppOutletContext>();
@@ -160,7 +161,7 @@ function SolicitudesTable({
               <input
                 className="records-table-filter"
                 value={filters.matricula || ""}
-                onChange={(event) => nextFilter("matricula", event.target.value)}
+                onChange={(event) => nextFilter("matricula", uppercaseInput(event.target.value))}
                 placeholder="Buscar"
               />
             </th>
@@ -175,7 +176,7 @@ function SolicitudesTable({
                 ))}
               </select>
             </th>
-            <th className="records-col-date">Creacion</th>
+            <th className="records-col-date">Ultima actividad</th>
             {showClient ? <th className="records-col-change">Ultimo cambio</th> : null}
             <th className="records-col-actions">Acciones</th>
           </tr>
@@ -209,7 +210,7 @@ function SolicitudesTable({
               <td className="records-col-status">
                 <StatusBadge tone={statusTone(solicitud.estado)}>{formatEnum(solicitud.estado)}</StatusBadge>
               </td>
-              <td className="records-col-date">{solicitud.fechaCreacion || "Sin fecha"}</td>
+              <td className="records-col-date">{fechaReferencia(solicitud) || "Sin fecha"}</td>
               {showClient ? (
                 <td className="records-col-change">
                   <span>{solicitud.fechaUltimaModificacion || "Sin cambios"}</span>
@@ -292,6 +293,10 @@ function statusTone(status?: string | null) {
   if (status === "REVISANDO_INCIDENCIAS" || status === "ENVIADO_DGT") return "info";
   if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION") return "warning";
   return "neutral";
+}
+
+function fechaReferencia(item: { fechaCreacion?: string | null; fechaUltimaModificacion?: string | null }) {
+  return item.fechaUltimaModificacion || item.fechaCreacion;
 }
 
 function formatEnum(value?: string | null) {

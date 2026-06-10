@@ -3,8 +3,11 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, FilePlus2, Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
 import { uploadSolicitudDocument } from "../../expedientes/services/documentosApi";
-import { humanizeEnum } from "../../expedientes/utils/formatters";
+import { InteresadoAutocomplete } from "../../expedientes/components/InteresadoAutocomplete";
+import { formatDocumentType, humanizeEnum } from "../../expedientes/utils/formatters";
+import { cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
 import { createSolicitud, getSolicitudDetail, getSolicitudListCatalogs, updateSolicitud } from "../services/listadosApi";
+import type { InteresadoSearchResult } from "../../expedientes/types/expedienteDetail.types";
 import type { SolicitudDetail, SolicitudUpsertInput } from "../types";
 import "../../expedientes/styles/expedienteDetail.css";
 
@@ -58,44 +61,40 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
   const interesado2 = solicitud.interesados[1];
   return {
     tipoTramiteId: 0,
-    matricula: solicitud.matricula || "",
-    observaciones: solicitud.observaciones || "",
+    matricula: uppercaseInput(solicitud.matricula || ""),
+    observaciones: uppercaseInput(solicitud.observaciones || ""),
     interesado1Rol: interesado1?.rol || "",
-    interesado1Nombre: interesado1?.nombre || "",
-    interesado1Apellidos: interesado1?.apellidos || "",
-    interesado1Dni: interesado1?.dni || "",
-    interesado1Telefono: interesado1?.telefono || "",
-    interesado1Direccion: interesado1?.direccion || "",
+    interesado1Nombre: uppercaseInput(interesado1?.nombre || ""),
+    interesado1Apellidos: uppercaseInput(interesado1?.apellidos || ""),
+    interesado1Dni: uppercaseInput(interesado1?.dni || ""),
+    interesado1Telefono: uppercaseInput(interesado1?.telefono || ""),
+    interesado1Direccion: uppercaseInput(interesado1?.direccion || ""),
     interesado2Rol: interesado2?.rol || "",
-    interesado2Nombre: interesado2?.nombre || "",
-    interesado2Apellidos: interesado2?.apellidos || "",
-    interesado2Dni: interesado2?.dni || "",
-    interesado2Telefono: interesado2?.telefono || "",
-    interesado2Direccion: interesado2?.direccion || "",
+    interesado2Nombre: uppercaseInput(interesado2?.nombre || ""),
+    interesado2Apellidos: uppercaseInput(interesado2?.apellidos || ""),
+    interesado2Dni: uppercaseInput(interesado2?.dni || ""),
+    interesado2Telefono: uppercaseInput(interesado2?.telefono || ""),
+    interesado2Direccion: uppercaseInput(interesado2?.direccion || ""),
   };
 }
 
 function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
-  const clean = (value?: string | null) => {
-    const trimmed = value?.trim();
-    return trimmed ? trimmed : null;
-  };
   return {
     ...form,
-    matricula: form.matricula.trim().toUpperCase(),
-    observaciones: clean(form.observaciones),
-    interesado1Rol: clean(form.interesado1Rol),
-    interesado1Nombre: clean(form.interesado1Nombre),
-    interesado1Apellidos: clean(form.interesado1Apellidos),
-    interesado1Dni: clean(form.interesado1Dni),
-    interesado1Telefono: clean(form.interesado1Telefono),
-    interesado1Direccion: clean(form.interesado1Direccion),
-    interesado2Rol: clean(form.interesado2Rol),
-    interesado2Nombre: clean(form.interesado2Nombre),
-    interesado2Apellidos: clean(form.interesado2Apellidos),
-    interesado2Dni: clean(form.interesado2Dni),
-    interesado2Telefono: clean(form.interesado2Telefono),
-    interesado2Direccion: clean(form.interesado2Direccion),
+    matricula: cleanUpperText(form.matricula) || "",
+    observaciones: cleanUpperText(form.observaciones),
+    interesado1Rol: cleanUpperText(form.interesado1Rol),
+    interesado1Nombre: cleanUpperText(form.interesado1Nombre),
+    interesado1Apellidos: cleanUpperText(form.interesado1Apellidos),
+    interesado1Dni: cleanUpperText(form.interesado1Dni),
+    interesado1Telefono: cleanUpperText(form.interesado1Telefono),
+    interesado1Direccion: cleanUpperText(form.interesado1Direccion),
+    interesado2Rol: cleanUpperText(form.interesado2Rol),
+    interesado2Nombre: cleanUpperText(form.interesado2Nombre),
+    interesado2Apellidos: cleanUpperText(form.interesado2Apellidos),
+    interesado2Dni: cleanUpperText(form.interesado2Dni),
+    interesado2Telefono: cleanUpperText(form.interesado2Telefono),
+    interesado2Direccion: cleanUpperText(form.interesado2Direccion),
   };
 }
 
@@ -211,11 +210,11 @@ export function SolicitudFormPage() {
             </label>
             <label>
               Matricula
-              <input value={form.matricula} onChange={(event) => setForm({ ...form, matricula: event.target.value })} required />
+              <input value={form.matricula} onChange={(event) => setForm({ ...form, matricula: uppercaseInput(event.target.value) })} required />
             </label>
             <label className="edit-form-grid__wide">
               Observaciones
-              <textarea rows={4} value={form.observaciones || ""} onChange={(event) => setForm({ ...form, observaciones: event.target.value })} />
+              <textarea rows={4} value={form.observaciones || ""} onChange={(event) => setForm({ ...form, observaciones: uppercaseInput(event.target.value) })} />
             </label>
           </div>
         </section>
@@ -259,7 +258,7 @@ export function SolicitudFormPage() {
                   >
                     {DOCUMENT_TYPES.map((type) => (
                       <option key={type} value={type}>
-                        {humanizeEnum(type)}
+                        {formatDocumentType(type)}
                       </option>
                     ))}
                   </select>
@@ -310,8 +309,43 @@ function InteresadoFields({
 }) {
   const prefix = `interesado${index}` as "interesado1" | "interesado2";
   const field = (name: string) => `${prefix}${name}` as keyof SolicitudUpsertInput;
+  const applyInteresado = (interesado: InteresadoSearchResult) => {
+    onChange({
+      ...form,
+      [field("Nombre")]: uppercaseInput(interesado.nombre || ""),
+      [field("Dni")]: uppercaseInput(interesado.dni || ""),
+      [field("Telefono")]: uppercaseInput(interesado.telefono || ""),
+      [field("Direccion")]: uppercaseInput(interesado.direccion || ""),
+    });
+  };
+
   return (
     <div className="edit-form-grid">
+      <InteresadoAutocomplete
+        label="DNI/NIF"
+        value={(form[field("Dni")] as string) || ""}
+        placeholder="Buscar por DNI/NIF"
+        onChange={(value) => onChange({ ...form, [field("Dni")]: value })}
+        onSelect={applyInteresado}
+      />
+      {form[field("Dni")] ? (
+        <label>
+          Nombre
+          <input value={(form[field("Nombre")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Nombre")]: uppercaseInput(event.target.value) })} />
+        </label>
+      ) : (
+        <InteresadoAutocomplete
+          label="Nombre"
+          value={(form[field("Nombre")] as string) || ""}
+          placeholder="Buscar por nombre"
+          onChange={(value) => onChange({ ...form, [field("Nombre")]: value })}
+          onSelect={applyInteresado}
+        />
+      )}
+      <label>
+        Apellidos
+        <input value={(form[field("Apellidos")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Apellidos")]: uppercaseInput(event.target.value) })} />
+      </label>
       <label>
         Rol
         <select value={(form[field("Rol")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Rol")]: event.target.value })}>
@@ -324,24 +358,12 @@ function InteresadoFields({
         </select>
       </label>
       <label>
-        Nombre
-        <input value={(form[field("Nombre")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Nombre")]: event.target.value })} />
-      </label>
-      <label>
-        Apellidos
-        <input value={(form[field("Apellidos")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Apellidos")]: event.target.value })} />
-      </label>
-      <label>
-        DNI/NIF
-        <input value={(form[field("Dni")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Dni")]: event.target.value })} />
-      </label>
-      <label>
         Telefono
-        <input value={(form[field("Telefono")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Telefono")]: event.target.value })} />
+        <input value={(form[field("Telefono")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Telefono")]: uppercaseInput(event.target.value) })} />
       </label>
       <label className="edit-form-grid__wide">
         Direccion
-        <input value={(form[field("Direccion")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Direccion")]: event.target.value })} />
+        <input value={(form[field("Direccion")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Direccion")]: uppercaseInput(event.target.value) })} />
       </label>
     </div>
   );

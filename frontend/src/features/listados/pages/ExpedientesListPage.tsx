@@ -1,20 +1,25 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useOutletContext, useSearchParams } from "react-router-dom";
-import { Eye, FilePlus2, FolderOpen } from "lucide-react";
+import { CheckCircle2, Download, Eye, FilePlus2, FolderOpen } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { ApiError } from "../../../shared/api/http";
-import { getExpedienteListCatalogs, getExpedientes } from "../services/listadosApi";
+import { bulkAdvanceExpedientes, bulkFinalDocumentsUrl, getExpedienteListCatalogs, getExpedientes } from "../services/listadosApi";
 import { ListFiltersBar } from "../components/ListFiltersBar";
 import { ListPageChrome } from "../components/ListPageChrome";
 import type { ExpedienteListItem, ListCatalogs, ListFilters } from "../types";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
+import { uppercaseInput } from "../../../shared/utils/text";
+import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 
 export function ExpedientesListPage() {
   const { user } = useOutletContext<AppOutletContext>();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const [appliedFilters, setAppliedFilters] = useState<ListFilters>(() => readFilters(searchParams));
   const [draftFilters, setDraftFilters] = useState<ListFilters>(() => readFilters(searchParams));
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
 
   const catalogsQuery = useQuery({
@@ -30,9 +35,55 @@ export function ExpedientesListPage() {
 
   function applyFilters(filters: ListFilters) {
     setAppliedFilters(filters);
+    setSelectedIds(new Set());
   }
 
   const expedientes = expedientesQuery.data ?? [];
+  const selectedExpedientes = expedientes.filter((expediente) => selectedIds.has(expediente.id));
+
+  async function handleBulkAdvance() {
+    const firstAction = selectedExpedientes[0]?.siguienteAccion;
+    if (!firstAction) return;
+    const samePoint = selectedExpedientes.every((expediente) => sameBulkAction(expediente.siguienteAccion, firstAction));
+    if (!samePoint) {
+      alert("Selecciona expedientes que esten exactamente en el mismo punto.");
+      return;
+    }
+    const confirmed = await confirm({
+      title: "Avance masivo",
+      description: `Se aplicara "${firstAction.label || formatEnum(firstAction.tipo)}" a ${selectedExpedientes.length} expedientes.`,
+      confirmLabel: "Avanzar",
+      tone: "success",
+    });
+    if (!confirmed) return;
+    try {
+      await bulkAdvanceExpedientes({
+        expedienteIds: selectedExpedientes.map((expediente) => expediente.id),
+        accion: firstAction.tipo,
+        codigoHito: firstAction.codigoHito,
+      });
+      setSelectedIds(new Set());
+      await queryClient.invalidateQueries({ queryKey: ["expedientes"] });
+    } catch (cause) {
+      alert(cause instanceof Error ? cause.message : "No se pudo aplicar el avance masivo.");
+    }
+  }
+
+  async function handleDownloadFinalDocuments() {
+    const invalid = selectedExpedientes.some((expediente) => !expediente.justificantesFinalesDisponibles);
+    if (invalid) {
+      alert("Todos los expedientes seleccionados deben estar finalizados y tener justificante DGT y MODELO 620.");
+      return;
+    }
+    const confirmed = await confirm({
+      title: "Descargar justificantes",
+      description: `Se descargara un ZIP con justificante DGT y MODELO 620 de ${selectedExpedientes.length} expedientes.`,
+      confirmLabel: "Descargar ZIP",
+      tone: "default",
+    });
+    if (!confirmed) return;
+    window.location.href = bulkFinalDocumentsUrl(selectedExpedientes.map((expediente) => expediente.id));
+  }
 
   return (
     <ListPageChrome
@@ -72,6 +123,15 @@ export function ExpedientesListPage() {
           </div>
         </div>
 
+        {isAdmin && selectedExpedientes.length > 0 ? (
+          <BulkActionsBar
+            selected={selectedExpedientes}
+            onAdvance={handleBulkAdvance}
+            onClear={() => setSelectedIds(new Set())}
+            onDownloadFinalDocuments={handleDownloadFinalDocuments}
+          />
+        ) : null}
+
         {expedientesQuery.error ? <ErrorState error={expedientesQuery.error} /> : null}
         {expedientesQuery.isLoading ? <ListSkeleton /> : null}
         {!expedientesQuery.isLoading && !expedientesQuery.error ? (
@@ -80,14 +140,17 @@ export function ExpedientesListPage() {
             catalogs={catalogsQuery.data}
             filters={draftFilters}
             isAdmin={isAdmin}
+            selectedIds={selectedIds}
             showClient={isAdmin}
             onFilterChange={(nextFilters) => {
               setDraftFilters(nextFilters);
               applyFilters(nextFilters);
             }}
+            onSelectionChange={setSelectedIds}
           />
         ) : null}
       </div>
+      {dialog}
     </ListPageChrome>
   );
 }
@@ -97,18 +160,46 @@ function ExpedientesTable({
   catalogs,
   filters,
   isAdmin,
+  selectedIds,
   showClient,
   onFilterChange,
+  onSelectionChange,
 }: {
   expedientes: ExpedienteListItem[];
   catalogs?: ListCatalogs;
   filters: ListFilters;
   isAdmin: boolean;
+  selectedIds: Set<number>;
   showClient: boolean;
   onFilterChange: (filters: ListFilters) => void;
+  onSelectionChange: (ids: Set<number>) => void;
 }) {
   function nextFilter(key: keyof ListFilters, value: string) {
     onFilterChange({ ...filters, [key]: value });
+  }
+
+  const allVisibleSelected = expedientes.length > 0 && expedientes.every((expediente) => selectedIds.has(expediente.id));
+
+  function toggleAllVisible(checked: boolean) {
+    const next = new Set(selectedIds);
+    expedientes.forEach((expediente) => {
+      if (checked) {
+        next.add(expediente.id);
+      } else {
+        next.delete(expediente.id);
+      }
+    });
+    onSelectionChange(next);
+  }
+
+  function toggleOne(id: number, checked: boolean) {
+    const next = new Set(selectedIds);
+    if (checked) {
+      next.add(id);
+    } else {
+      next.delete(id);
+    }
+    onSelectionChange(next);
   }
 
   return (
@@ -116,6 +207,16 @@ function ExpedientesTable({
       <table className="records-table">
         <thead>
           <tr>
+            {isAdmin ? (
+              <th className="records-col-select">
+                <input
+                  aria-label="Seleccionar expedientes visibles"
+                  checked={allVisibleSelected}
+                  onChange={(event) => toggleAllVisible(event.target.checked)}
+                  type="checkbox"
+                />
+              </th>
+            ) : null}
             <th className="records-col-id">
               <span>N.</span>
             </th>
@@ -156,7 +257,7 @@ function ExpedientesTable({
               <input
                 className="records-table-filter"
                 value={filters.matricula || ""}
-                onChange={(event) => nextFilter("matricula", event.target.value)}
+                onChange={(event) => nextFilter("matricula", uppercaseInput(event.target.value))}
                 placeholder="Buscar"
               />
             </th>
@@ -171,7 +272,7 @@ function ExpedientesTable({
                 ))}
               </select>
             </th>
-            <th className="records-col-date">Creacion</th>
+            <th className="records-col-date">Ultima actividad</th>
             {showClient ? <th className="records-col-change">Ultimo cambio</th> : null}
             <th className="records-col-actions">Acciones</th>
           </tr>
@@ -179,19 +280,29 @@ function ExpedientesTable({
         <tbody>
           {expedientes.length === 0 ? (
             <tr>
-              <td colSpan={showClient ? 8 : 6}>
+              <td colSpan={(showClient ? 8 : 6) + (isAdmin ? 1 : 0)}>
                 <EmptyState title="No hay expedientes con estos filtros" copy="Cambia el periodo o borra parte de la matricula para ampliar la busqueda." />
               </td>
             </tr>
           ) : null}
           {expedientes.map((expediente) => (
-            <tr key={expediente.id}>
+            <tr className={selectedIds.has(expediente.id) ? "records-row--selected" : ""} key={expediente.id}>
+              {isAdmin ? (
+                <td className="records-col-select">
+                  <input
+                    aria-label={`Seleccionar expediente ${expediente.id}`}
+                    checked={selectedIds.has(expediente.id)}
+                    onChange={(event) => toggleOne(expediente.id, event.target.checked)}
+                    type="checkbox"
+                  />
+                </td>
+              ) : null}
               <td className="records-col-id">
                 <span className="record-id">{expediente.id}</span>
               </td>
               <td className="records-col-kind">
                 <strong>{expediente.tipoTramite || "Sin tipo"}</strong>
-                <small>Expediente administrativo</small>
+                <small>{expediente.siguientePasoTitulo || "Expediente administrativo"}</small>
               </td>
               {showClient ? (
                 <td className="records-col-client">
@@ -205,7 +316,7 @@ function ExpedientesTable({
               <td className="records-col-status">
                 <StatusBadge tone={statusTone(expediente.estado)}>{formatEnum(expediente.estado)}</StatusBadge>
               </td>
-              <td className="records-col-date">{expediente.fechaCreacion || "Sin fecha"}</td>
+              <td className="records-col-date">{fechaReferencia(expediente) || "Sin fecha"}</td>
               {showClient ? (
                 <td className="records-col-change">
                   <span>{expediente.fechaUltimaModificacion || "Sin cambios"}</span>
@@ -224,6 +335,56 @@ function ExpedientesTable({
       </table>
     </div>
   );
+}
+
+function BulkActionsBar({
+  selected,
+  onAdvance,
+  onClear,
+  onDownloadFinalDocuments,
+}: {
+  selected: ExpedienteListItem[];
+  onAdvance: () => void;
+  onClear: () => void;
+  onDownloadFinalDocuments: () => void;
+}) {
+  const firstAction = selected[0]?.siguienteAccion;
+  const samePoint = Boolean(firstAction) && selected.every((expediente) => sameBulkAction(expediente.siguienteAccion, firstAction));
+  const allFinalDocs = selected.length > 0 && selected.every((expediente) => expediente.justificantesFinalesDisponibles);
+
+  return (
+    <div className="bulk-actions-bar">
+      <div>
+        <strong>{selected.length} seleccionados</strong>
+        <span>
+          {samePoint
+            ? `Siguiente accion: ${firstAction?.label || formatEnum(firstAction?.tipo)}`
+            : "Selecciona expedientes en el mismo punto para avanzar en lote"}
+        </span>
+      </div>
+      <div className="bulk-actions-bar__actions">
+        <button className="soft-button soft-button--compact" onClick={onClear} type="button">
+          Limpiar
+        </button>
+        <button className="soft-button soft-button--compact" disabled={!allFinalDocs} onClick={onDownloadFinalDocuments} type="button">
+          <Download size={15} />
+          Justificantes
+        </button>
+        <button className="primary-button primary-button--compact" disabled={!samePoint} onClick={onAdvance} type="button">
+          <CheckCircle2 size={15} />
+          Avanzar lote
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function sameBulkAction(
+  current?: ExpedienteListItem["siguienteAccion"],
+  expected?: ExpedienteListItem["siguienteAccion"],
+) {
+  if (!current || !expected) return false;
+  return current.tipo === expected.tipo && (current.codigoHito || "") === (expected.codigoHito || "");
 }
 
 function readFilters(searchParams: URLSearchParams): ListFilters {
@@ -278,9 +439,13 @@ function ListSkeleton() {
 function statusTone(status?: string | null) {
   if (status === "FINALIZADO" || status === "CONVERTIDA") return "success";
   if (status === "INCIDENCIA" || status === "PENDIENTE_DOCUMENTACION") return "danger";
-  if (status === "REVISANDO_INCIDENCIAS" || status === "ENVIADO_DGT") return "info";
-  if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION") return "warning";
+  if (status === "REVISANDO_INCIDENCIAS" || status === "ENVIADO_DGT" || status === "INFORMACION_ADICIONAL_RECIBIDA") return "info";
+  if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION" || status === "SOLICITADA_INFORMACION_ADICIONAL") return "warning";
   return "neutral";
+}
+
+function fechaReferencia(item: { fechaCreacion?: string | null; fechaUltimaModificacion?: string | null }) {
+  return item.fechaUltimaModificacion || item.fechaCreacion;
 }
 
 function formatEnum(value?: string | null) {

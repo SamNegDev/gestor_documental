@@ -148,6 +148,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         boolean finalizado = expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO;
         boolean conIncidencia = expediente.getEstadoExpediente() == EstadoExpediente.INCIDENCIA
                 || expediente.getEstadoExpediente() == EstadoExpediente.REVISANDO_INCIDENCIAS;
+        boolean informacionSolicitada = expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL;
+        boolean informacionRecibida = expediente.getEstadoExpediente() == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA;
         boolean requisitosInicialesPendientes = !documentacionBaseCompleta;
         boolean modelo620Subido = tiposSubidos.contains(TipoDocumento.MODELO_620)
                 || hitosPersistidos.containsKey(CodigoHitoExpediente.MODELO_620_PRESENTADO);
@@ -156,7 +158,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 || expediente.getEstadoExpediente() == EstadoExpediente.ENVIADO_DGT
                 || hitosPersistidos.containsKey(CodigoHitoExpediente.ENVIADO_DGT);
         return new EstadoDetalle(tiposSubidos, documentacionBaseCompleta, expedienteCompletoSubido, modelo620Subido,
-                requisitosInicialesPendientes, finalizado, conIncidencia, tramiteSubido, enviadoDgt, hitosPersistidos);
+                requisitosInicialesPendientes, finalizado, conIncidencia, informacionSolicitada, informacionRecibida,
+                tramiteSubido, enviadoDgt, hitosPersistidos);
     }
 
     private String calcularFaseActual(Expediente expediente, EstadoDetalle estadoDetalle) {
@@ -166,6 +169,12 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         if (expediente.getEstadoExpediente() == EstadoExpediente.INCIDENCIA
                 || expediente.getEstadoExpediente() == EstadoExpediente.REVISANDO_INCIDENCIAS) {
             return "Incidencias";
+        }
+        if (expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL) {
+            return "Solicitada informacion adicional";
+        }
+        if (expediente.getEstadoExpediente() == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA) {
+            return "Informacion adicional recibida";
         }
         if (!estadoDetalle.documentacionBaseCompleta()) {
             return estadoDetalle.expedienteCompletoSubido()
@@ -492,6 +501,32 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                     .bloqueado(false)
                     .build();
         }
+        if (estadoDetalle.informacionSolicitada()) {
+            return HitoExpedienteResponse.builder()
+                    .id("informacion-adicional-solicitada")
+                    .titulo("Esperando respuesta del cliente")
+                    .descripcion("Se ha solicitado informacion adicional al cliente.")
+                    .estado("ACTUAL")
+                    .tipo("INFORMACION_ADICIONAL")
+                    .nota("El expediente queda pausado hasta recibir la respuesta del cliente.")
+                    .completado(false)
+                    .bloqueado(false)
+                    .build();
+        }
+        if (estadoDetalle.informacionRecibida()) {
+            return HitoExpedienteResponse.builder()
+                    .id("informacion-adicional-recibida")
+                    .titulo("Revisar informacion recibida")
+                    .descripcion("El cliente ya ha respondido a la informacion solicitada.")
+                    .estado("ACTUAL")
+                    .tipo("INFORMACION_ADICIONAL")
+                    .nota("Revisa la respuesta y marca la informacion como revisada para continuar.")
+                    .accion("RESOLVER_INFORMACION_ADICIONAL")
+                    .accionLabel("Marcar revisada")
+                    .completado(false)
+                    .bloqueado(false)
+                    .build();
+        }
         if (estadoDetalle.requisitosInicialesPendientes()) {
             return HitoExpedienteResponse.builder()
                     .id("completar-checklist-documental")
@@ -685,6 +720,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
             boolean requisitosInicialesPendientes,
             boolean finalizado,
             boolean conIncidencia,
+            boolean informacionSolicitada,
+            boolean informacionRecibida,
             boolean tramiteSubido,
             boolean enviadoDgt,
             Map<CodigoHitoExpediente, HitoExpediente> hitosPersistidos

@@ -10,7 +10,13 @@ type Props = {
 };
 
 export function ExpedienteHeader({ expediente }: Props) {
-  const interesadoPrincipal = expediente.interesados[0];
+  const comprador = expediente.interesados.find((interesado) => interesado.rol === "COMPRADOR");
+  const titular = expediente.interesados.find((interesado) => interesado.rol === "TITULAR");
+  const interesadoPrincipal = comprador || titular || expediente.interesados[0];
+  const rolPrincipal = comprador ? "Comprador" : titular ? "Titular" : interesadoPrincipal ? "Interesado" : "";
+  const interesadoTexto = interesadoPrincipal
+    ? `${rolPrincipal}: ${interesadoPrincipal.dni || "SIN DNI"} - ${interesadoPrincipal.nombre || "SIN NOMBRE"}`
+    : "Sin comprador asignado";
 
   return (
     <section className="exp-header">
@@ -31,7 +37,7 @@ export function ExpedienteHeader({ expediente }: Props) {
             </span>
             <span>
               <UserRound size={16} />
-              {interesadoPrincipal?.nombre || expediente.cliente?.nombre || "Sin interesado principal"}
+              {interesadoTexto}
             </span>
           </div>
         </div>

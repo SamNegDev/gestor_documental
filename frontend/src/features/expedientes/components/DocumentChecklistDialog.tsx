@@ -1,6 +1,6 @@
 import { CheckCircle2, CircleDashed, FileText, X } from "lucide-react";
 import type { DocumentoExpediente } from "../types/expedienteDetail.types";
-import { humanizeEnum } from "../utils/formatters";
+import { formatDocumentType, humanizeEnum } from "../utils/formatters";
 
 type Props = {
   open: boolean;
@@ -34,7 +34,7 @@ export function DocumentChecklistDialog({ open, documentos, onClose }: Props) {
               </div>
               <div>
                 <strong>{documento.nombreOriginal || documento.nombre}</strong>
-                <span>{humanizeEnum(documento.tipo)}</span>
+                <span>{formatDocumentType(documento.tipo)}</span>
               </div>
               <small>
                 {documento.subido ? <CheckCircle2 size={16} /> : <CircleDashed size={16} />}

@@ -36,6 +36,10 @@ public interface DocumentoService {
 
     void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Long operacionId, Usuario usuario);
 
+    void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Long operacionId, boolean nombreAutomatico, Usuario usuario);
+
+    void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Long operacionId, boolean actualizarOperacion, boolean nombreAutomatico, Usuario usuario);
+
     int contarPaginasDocumento(Long id, Usuario usuario);
 
     byte[] renderizarPaginaDocumento(Long id, int pagina, Usuario usuario);
