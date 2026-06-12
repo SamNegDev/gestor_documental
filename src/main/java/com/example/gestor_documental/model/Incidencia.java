@@ -54,6 +54,21 @@ public class Incidencia {
     @Column(length = 500)
     private String observaciones;
 
+    @Column(nullable = false)
+    private int contadorAvisos = 0;
+
+    private LocalDateTime fechaUltimoAviso;
+    private LocalDateTime proximoAviso;
+
+    @Column(nullable = false)
+    private boolean seguimientoArchivado = false;
+
+    private LocalDateTime fechaArchivoSeguimiento;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "seguimiento_archivado_por_usuario_id")
+    private Usuario seguimientoArchivadoPor;
+
     public Incidencia(TipoIncidencia tipoIncidencia, Expediente expediente, String observaciones, Usuario creadoPor) {
         this.tipoIncidencia = tipoIncidencia;
         this.expediente = expediente;

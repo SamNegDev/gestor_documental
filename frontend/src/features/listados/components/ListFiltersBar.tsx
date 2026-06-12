@@ -25,12 +25,15 @@ export function ListFiltersBar({
         <label>
           <span>Periodo</span>
           <select value={filters.periodo || "ESTE_MES"} onChange={(event) => onChange({ ...filters, periodo: event.target.value })}>
+            <option value="ULTIMA_SEMANA">Ultima semana</option>
             <option value="ESTE_MES">Este mes</option>
             <option value="ULTIMOS_3_MESES">Ultimos 3 meses</option>
             <option value="ESTE_ANIO">Este año</option>
             <option value="TODO">Todo el historico</option>
+            <option value="PERSONALIZADO">Rango personalizado</option>
           </select>
         </label>
+        {filters.periodo === "PERSONALIZADO" ? <CustomDateRange filters={filters} onChange={onChange} /> : null}
         {additionalFilter}
       </div>
     );
@@ -47,13 +50,20 @@ export function ListFiltersBar({
         <label>
           <span>Periodo</span>
           <select value={filters.periodo || "ESTE_MES"} onChange={(event) => onChange({ ...filters, periodo: event.target.value })}>
+            <option value="ULTIMA_SEMANA">Ultima semana</option>
             <option value="ESTE_MES">Este mes</option>
             <option value="ULTIMOS_3_MESES">Ultimos 3 meses</option>
             <option value="ESTE_ANIO">Este año</option>
             <option value="TODO">Todo el historico</option>
+            <option value="PERSONALIZADO">Rango personalizado</option>
           </select>
         </label>
       </div>
+      {filters.periodo === "PERSONALIZADO" ? <CustomDateRange filters={filters} onChange={onChange} /> : null}
     </div>
   );
+}
+
+function CustomDateRange({ filters, onChange }: { filters: ListFilters; onChange: (filters: ListFilters) => void }) {
+  return <div className="custom-date-range"><label><span>Desde</span><input type="date" value={filters.fechaDesde || ""} onChange={(event) => onChange({ ...filters, fechaDesde: event.target.value })} /></label><label><span>Hasta</span><input type="date" value={filters.fechaHasta || ""} onChange={(event) => onChange({ ...filters, fechaHasta: event.target.value })} /></label></div>;
 }

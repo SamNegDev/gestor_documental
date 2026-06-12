@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { FilePlus2, FolderOpen, Inbox, LayoutDashboard, LogOut, UserRoundCheck, UsersRound } from "lucide-react";
+import { BellRing, CarFront, FilePlus2, FolderOpen, Inbox, LayoutDashboard, LogOut, UserRound, UserRoundCheck, UsersRound } from "lucide-react";
 import { SidebarLink } from "./SidebarLink";
 import { Tooltip } from "../../shared/ui/Tooltip";
 import { getSessionUser, type SessionUser } from "../../shared/api/sessionApi";
 import { logout } from "../../shared/api/authApi";
 import { ApiError } from "../../shared/api/http";
+import { useQuery } from "@tanstack/react-query";
+import { getTareasResumen } from "../../features/tareas/services/tareasApi";
+import { GlobalSearch } from "../../features/busqueda/components/GlobalSearch";
 
 export type AppOutletContext = {
   sessionLoading: boolean;
@@ -14,6 +17,9 @@ export type AppOutletContext = {
 
 function pageTitle(pathname: string) {
   if (pathname.includes("/dashboard")) return "Dashboard";
+  if (pathname === "/admin/tareas") return "Bandeja de tareas";
+  if (pathname === "/admin/seguimiento-clientes") return "Seguimiento de clientes";
+  if (pathname === "/cliente/tareas") return "Mis tareas";
   if (pathname === "/admin/clientes") return "Clientes";
   if (pathname.includes("/admin/clientes/nuevo")) return "Nuevo cliente";
   if (pathname.includes("/admin/clientes/")) return "Editar cliente";
@@ -22,6 +28,8 @@ function pageTitle(pathname: string) {
   if (pathname.includes("/admin/usuarios/")) return "Editar usuario";
   if (pathname === "/expedientes") return "Expedientes";
   if (pathname === "/solicitudes") return "Solicitudes";
+  if (pathname.startsWith("/interesados")) return pathname === "/interesados" ? "Interesados" : "Ficha del interesado";
+  if (pathname.startsWith("/vehiculos")) return pathname === "/vehiculos" ? "Vehiculos" : "Ficha del vehiculo";
   if (pathname.includes("/cliente/solicitudes/") && pathname.endsWith("/editar")) return "Editar solicitud";
   if (pathname.includes("/cliente/solicitudes/nuevo")) return "Nueva solicitud";
   if (pathname.includes("/solicitudes/")) return "Detalle de solicitud";
@@ -62,6 +70,7 @@ export function AppLayout() {
   const isClientRoute = location.pathname.startsWith("/cliente/") || user?.rol === "CLIENTE";
   const title = useMemo(() => pageTitle(location.pathname), [location.pathname]);
   const roleLabel = user?.rol === "CLIENTE" ? "Cliente" : user?.rol === "ADMIN" ? "Administrador" : "Sesion";
+  const tareasResumen = useQuery({ queryKey: ["tareas", "resumen", "menu", user?.rol], queryFn: getTareasResumen, enabled: Boolean(user), refetchInterval: 60000 });
 
   const handleLogout = async () => {
     await logout().catch(() => undefined);
@@ -73,7 +82,7 @@ export function AppLayout() {
       <aside className="sidebar" aria-label="Navegacion principal">
         <div className="sidebar__brand">
           <img className="brand-mark brand-mark--image" src="/assets/logos/casado-negrin-symbol.jpg" alt="Casado Negrin Gestoria" />
-          <div>
+          <div className="topbar__title">
             <strong>Casado Negrin</strong>
             <span>Gestion documental</span>
           </div>
@@ -83,15 +92,22 @@ export function AppLayout() {
           {isClientRoute || user?.rol === "CLIENTE" ? (
             <>
               <SidebarLink to="/cliente/dashboard" icon={LayoutDashboard} label="Dashboard" />
+              <SidebarLink to="/cliente/tareas" icon={Inbox} label="Mis tareas" badge={tareasResumen.data?.total} />
               <SidebarLink to="/expedientes" icon={FolderOpen} label="Mis expedientes" />
               <SidebarLink to="/solicitudes" icon={Inbox} label="Solicitudes" />
+              <SidebarLink to="/interesados" icon={UserRound} label="Interesados" />
+              <SidebarLink to="/vehiculos" icon={CarFront} label="Vehiculos" />
             </>
           ) : (
             <>
               <SidebarLink to="/admin/dashboard" icon={LayoutDashboard} label="Dashboard" />
+              <SidebarLink to="/admin/tareas" icon={Inbox} label="Tareas" badge={tareasResumen.data?.total} />
+              <SidebarLink to="/admin/seguimiento-clientes" icon={BellRing} label="Seguimiento clientes" />
               <SidebarLink to="/expedientes" icon={FolderOpen} label="Expedientes" />
               <SidebarLink to="/expedientes/nuevo" icon={FilePlus2} label="Nuevo expediente" />
               <SidebarLink to="/solicitudes" icon={Inbox} label="Solicitudes" />
+              <SidebarLink to="/interesados" icon={UserRound} label="Interesados" />
+              <SidebarLink to="/vehiculos" icon={CarFront} label="Vehiculos" />
               <SidebarLink to="/admin/clientes" icon={UsersRound} label="Clientes" />
               <SidebarLink to="/admin/usuarios" icon={UserRoundCheck} label="Usuarios" />
             </>
@@ -105,6 +121,7 @@ export function AppLayout() {
             <p className="eyebrow">{isClientRoute ? "Portal cliente" : "Gestion interna"}</p>
             <h1>{title}</h1>
           </div>
+          <GlobalSearch />
           <div className="topbar__user">
             <div>
               <strong>{user?.nombreCompleto || (sessionExpired ? "Sesion caducada" : "Usuario")}</strong>

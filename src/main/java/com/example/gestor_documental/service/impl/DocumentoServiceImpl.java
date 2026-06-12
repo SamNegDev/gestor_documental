@@ -218,7 +218,8 @@ public class DocumentoServiceImpl implements DocumentoService {
     }
 
     private void marcarIncidenciaEnRevisionSiProcede(Expediente expediente, Usuario usuario) {
-        if (expediente.getEstadoExpediente() != EstadoExpediente.INCIDENCIA) {
+        if (expediente.getEstadoExpediente() != EstadoExpediente.INCIDENCIA
+                && expediente.getEstadoExpediente() != EstadoExpediente.PENDIENTE_DOCUMENTACION) {
             return;
         }
         expediente.setEstadoExpediente(EstadoExpediente.REVISANDO_INCIDENCIAS);

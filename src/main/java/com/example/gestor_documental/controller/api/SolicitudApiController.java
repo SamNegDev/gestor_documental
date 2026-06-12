@@ -1,5 +1,7 @@
 package com.example.gestor_documental.controller.api;
 
+import com.example.gestor_documental.dto.PagedResponse;
+
 import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.HistorialExpedienteResponse;
@@ -72,13 +74,17 @@ public class SolicitudApiController {
     private final MensajeService mensajeService;
 
     @GetMapping
-    public List<SolicitudListItemResponse> listarSolicitudes(
+    public PagedResponse<SolicitudListItemResponse> listarSolicitudes(
             Authentication authentication,
             @RequestParam(required = false) EstadoSolicitud estado,
             @RequestParam(required = false) Long tipoTramiteId,
             @RequestParam(required = false) String matricula,
             @RequestParam(required = false) Long clienteId,
             @RequestParam(required = false, defaultValue = "ESTE_MES") String periodo
+            , @RequestParam(required = false) LocalDate fechaDesde
+            , @RequestParam(required = false) LocalDate fechaHasta
+            , @RequestParam(required = false, defaultValue = "0") int pagina
+            , @RequestParam(required = false, defaultValue = "25") int tamanio
     ) {
         Usuario usuarioLogueado = usuario(authentication);
         List<Solicitud> solicitudes;
@@ -112,14 +118,14 @@ public class SolicitudApiController {
                     .filter(solicitud -> solicitud.getMatricula() != null && solicitud.getMatricula().toLowerCase().contains(busqueda))
                     .toList();
         }
-        DateRange dateRange = dateRange(periodo);
+        DateRange dateRange = dateRange(periodo, fechaDesde, fechaHasta);
         if (dateRange != null) {
             solicitudes = solicitudes.stream()
                     .filter(solicitud -> isWithinRange(fechaReferencia(solicitud.getFechaCreacion(), solicitud.getFechaUltimaModificacion()), dateRange))
                     .toList();
         }
 
-        return solicitudes.stream().map(this::mapSolicitudListItem).toList();
+        return PagedResponse.of(solicitudes.stream().map(this::mapSolicitudListItem).toList(), pagina, tamanio);
     }
 
     @GetMapping("/catalogos-listado")
@@ -483,12 +489,16 @@ public class SolicitudApiController {
         return !nombreCompleto.isEmpty() ? nombreCompleto : usuario.getEmail();
     }
 
-    private DateRange dateRange(String periodo) {
+    private DateRange dateRange(String periodo, LocalDate fechaDesde, LocalDate fechaHasta) {
         LocalDate today = LocalDate.now();
         return switch (periodo != null ? periodo : "ESTE_MES") {
+            case "ULTIMA_SEMANA" -> new DateRange(today.minusDays(6).atStartOfDay(), today.plusDays(1).atStartOfDay());
             case "ULTIMOS_3_MESES" -> new DateRange(today.minusMonths(3).atStartOfDay(), null);
             case "ESTE_ANIO" -> new DateRange(today.withDayOfYear(1).atStartOfDay(), null);
             case "TODO" -> null;
+            case "PERSONALIZADO" -> fechaDesde != null && fechaHasta != null && !fechaDesde.isAfter(fechaHasta)
+                    ? new DateRange(fechaDesde.atStartOfDay(), fechaHasta.plusDays(1).atStartOfDay())
+                    : new DateRange(today.plusYears(100).atStartOfDay(), today.plusYears(100).atStartOfDay());
             default -> new DateRange(today.withDayOfMonth(1).atStartOfDay(), null);
         };
     }

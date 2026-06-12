@@ -20,6 +20,7 @@ export interface ExpedienteListItem {
   matricula?: string | null;
   tipoTramite?: string | null;
   estado?: string | null;
+  incidenciasActivas?: string[];
   fechaCreacion?: string | null;
   fechaUltimaModificacion?: string | null;
   cliente?: ClienteResumen | null;
@@ -35,6 +36,15 @@ export interface ExpedienteListItem {
     tono?: string | null;
   } | null;
   justificantesFinalesDisponibles?: boolean;
+  justificantesFinalesPendientes?: string[];
+}
+
+export interface PagedResponse<T> {
+  contenido: T[];
+  pagina: number;
+  tamanio: number;
+  totalElementos: number;
+  totalPaginas: number;
 }
 
 export interface SolicitudListItem {
@@ -123,4 +133,8 @@ export interface ListFilters {
   matricula?: string;
   interesado?: string;
   periodo?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  pagina?: string;
+  tamanio?: string;
 }

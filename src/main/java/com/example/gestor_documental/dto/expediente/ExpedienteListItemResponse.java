@@ -19,6 +19,8 @@ public class ExpedienteListItemResponse {
     private String matricula;
     private String tipoTramite;
     private String estado;
+    @Builder.Default
+    private List<String> incidenciasActivas = new ArrayList<>();
     private String fechaCreacion;
     private String fechaUltimaModificacion;
     private ClienteResumenResponse cliente;
@@ -30,4 +32,6 @@ public class ExpedienteListItemResponse {
     private String siguientePasoDetalle;
     private HitoAccionResponse siguienteAccion;
     private boolean justificantesFinalesDisponibles;
+    @Builder.Default
+    private List<String> justificantesFinalesPendientes = new ArrayList<>();
 }

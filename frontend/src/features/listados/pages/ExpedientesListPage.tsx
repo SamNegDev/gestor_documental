@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useOutletContext, useSearchParams } from "react-router-dom";
-import { CheckCircle2, Download, Eye, FilePlus2, FolderOpen, Search, UserRoundCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, Eye, FilePlus2, FolderOpen, Search, UserRoundCheck } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { ApiError } from "../../../shared/api/http";
 import { bulkAdvanceExpedientes, bulkFinalDocumentsUrl, getExpedienteListCatalogs, getExpedientes } from "../services/listadosApi";
@@ -13,6 +13,7 @@ import { uppercaseInput } from "../../../shared/utils/text";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { searchInteresados } from "../../expedientes/services/expedienteDetailApi";
 import type { InteresadoSearchResult } from "../../expedientes/types/expedienteDetail.types";
+import { PaginationBar } from "../components/PaginationBar";
 
 export function ExpedientesListPage() {
   const { user } = useOutletContext<AppOutletContext>();
@@ -36,11 +37,12 @@ export function ExpedientesListPage() {
   });
 
   function applyFilters(filters: ListFilters) {
-    setAppliedFilters(filters);
+    setAppliedFilters({ ...filters, pagina: filters.pagina || "0", tamanio: filters.tamanio || "25" });
     setSelectedIds(new Set());
   }
 
-  const expedientes = expedientesQuery.data ?? [];
+  const pageData = expedientesQuery.data;
+  const expedientes = pageData?.contenido ?? [];
   const selectedExpedientes = expedientes.filter((expediente) => selectedIds.has(expediente.id));
 
   async function handleBulkAdvance() {
@@ -92,7 +94,7 @@ export function ExpedientesListPage() {
       eyebrow={isAdmin ? "Gestion interna" : "Portal cliente"}
       title={isAdmin ? "Expedientes" : "Mis expedientes"}
       summary={isAdmin ? "Supervisa expedientes por cliente, estado, tramite y matricula." : "Consulta el avance de tus tramites y accede al detalle documental."}
-      count={`${expedientes.length} ${expedientes.length === 1 ? "expediente" : "expedientes"}`}
+      count={`${pageData?.totalElementos ?? 0} ${(pageData?.totalElementos ?? 0) === 1 ? "expediente" : "expedientes"}`}
       action={
         isAdmin ? (
           <Link className="primary-button primary-button--compact" to="/expedientes/nuevo">
@@ -165,6 +167,7 @@ export function ExpedientesListPage() {
             onSelectionChange={setSelectedIds}
           />
         ) : null}
+        <PaginationBar page={pageData?.pagina ?? 0} totalPages={pageData?.totalPaginas ?? 0} totalItems={pageData?.totalElementos ?? 0} pageSize={pageData?.tamanio ?? 25} onPageChange={(pagina) => applyFilters({ ...draftFilters, pagina: String(pagina) })} onPageSizeChange={(tamanio) => applyFilters({ ...draftFilters, pagina: "0", tamanio: String(tamanio) })} />
       </div>
       {dialog}
     </ListPageChrome>
@@ -334,7 +337,24 @@ function ExpedientesTable({
                 <PhaseSummary expediente={expediente} />
               </td>
               <td className="records-col-status" title={formatEnum(expediente.estado)}>
-                <StatusBadge tone={statusTone(expediente.estado)}>{formatStatusLabel(expediente.estado)}</StatusBadge>
+                <div className="records-status-summary">
+                  <StatusBadge tone={statusTone(expediente.estado)}>{formatStatusLabel(expediente.estado)}</StatusBadge>
+                  {expediente.incidenciasActivas?.length ? (
+                    <small className="records-active-incidents" title={expediente.incidenciasActivas.map(formatEnum).join(", ")}>
+                      {expediente.incidenciasActivas.map(formatEnum).join(" · ")}
+                    </small>
+                  ) : null}
+                  {expediente.justificantesFinalesPendientes?.length ? (
+                    <div className="records-final-doc-warnings" aria-label="Justificantes finales pendientes">
+                      {expediente.justificantesFinalesPendientes.map((tipo) => (
+                        <span key={tipo} title={`Falta justificante ${tipo}`}>
+                          <AlertTriangle size={14} />
+                          <small>{tipo}</small>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </td>
               {showClient ? (
                 <td className="records-col-change">
@@ -420,6 +440,10 @@ function readFilters(searchParams: URLSearchParams): ListFilters {
     clienteId: searchParams.get("clienteId") || "",
     matricula: searchParams.get("matricula") || "",
     interesado: searchParams.get("interesado") || "",
+    fechaDesde: searchParams.get("fechaDesde") || "",
+    fechaHasta: searchParams.get("fechaHasta") || "",
+    pagina: searchParams.get("pagina") || "0",
+    tamanio: searchParams.get("tamanio") || "25",
   };
 }
 

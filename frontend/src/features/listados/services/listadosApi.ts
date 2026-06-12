@@ -1,5 +1,5 @@
 import { apiGet, apiPostJson, apiPutJson } from "../../../shared/api/http";
-import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, SolicitudDetail, SolicitudListItem, SolicitudUpsertInput } from "../types";
+import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, SolicitudDetail, SolicitudListItem, SolicitudUpsertInput } from "../types";
 
 function buildQuery(filters: ListFilters) {
   const params = new URLSearchParams();
@@ -15,7 +15,7 @@ function buildQuery(filters: ListFilters) {
 }
 
 export function getExpedientes(filters: ListFilters) {
-  return apiGet<ExpedienteListItem[]>(`/api/expedientes${buildQuery(filters)}`);
+  return apiGet<PagedResponse<ExpedienteListItem>>(`/api/expedientes${buildQuery(filters)}`);
 }
 
 export function getExpedienteListCatalogs() {
@@ -33,7 +33,7 @@ export function bulkFinalDocumentsUrl(expedienteIds: number[]) {
 }
 
 export function getSolicitudes(filters: ListFilters) {
-  return apiGet<SolicitudListItem[]>(`/api/solicitudes${buildQuery(filters)}`);
+  return apiGet<PagedResponse<SolicitudListItem>>(`/api/solicitudes${buildQuery(filters)}`);
 }
 
 export function getSolicitudListCatalogs() {

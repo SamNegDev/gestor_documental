@@ -36,4 +36,16 @@ public interface InteresadoRepository extends JpaRepository<Interesado, Long> {
             Pageable pageable
     );
 
+    @Query("""
+            select distinct i from Interesado i
+            left join ExpedienteInteresado ei on ei.interesado = i
+            left join ei.expediente e
+            where (:clienteId is null or e.cliente.id = :clienteId)
+              and (upper(coalesce(i.dni, '')) like :texto or upper(coalesce(i.nombre, '')) like :texto)
+            order by i.nombre asc
+            """)
+    List<Interesado> buscarGlobal(@Param("clienteId") Long clienteId,
+                                  @Param("texto") String texto,
+                                  Pageable pageable);
+
 }

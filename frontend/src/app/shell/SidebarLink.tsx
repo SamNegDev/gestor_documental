@@ -6,9 +6,10 @@ type SidebarLinkProps = {
   icon: LucideIcon;
   label: string;
   external?: boolean;
+  badge?: number;
 };
 
-export function SidebarLink({ to, icon: Icon, label, external = false }: SidebarLinkProps) {
+export function SidebarLink({ to, icon: Icon, label, external = false, badge }: SidebarLinkProps) {
   if (external) {
     return (
       <a href={to} className="sidebar-link">
@@ -22,6 +23,7 @@ export function SidebarLink({ to, icon: Icon, label, external = false }: Sidebar
     <NavLink to={to} className={({ isActive }) => `sidebar-link ${isActive ? "is-active" : ""}`}>
       <Icon size={18} />
       <span>{label}</span>
+      {badge ? <strong className="sidebar-link__badge">{badge > 99 ? "99+" : badge}</strong> : null}
     </NavLink>
   );
 }

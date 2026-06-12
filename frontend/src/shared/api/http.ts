@@ -21,7 +21,10 @@ async function buildApiError(response: Response, method: string, path: string): 
       details = body.message || body.error;
     } else {
       const text = await response.text();
-      details = text.trim() || undefined;
+      const normalized = text.trim();
+      details = normalized && !/^<!doctype html/i.test(normalized) && !/^<html/i.test(normalized)
+        ? normalized
+        : undefined;
     }
   } catch {
     details = undefined;

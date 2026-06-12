@@ -2,14 +2,21 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoSolicitud;
+import com.example.gestor_documental.enums.CodigoHitoExpediente;
+import com.example.gestor_documental.enums.TipoIncidenciaEnum;
+import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaPreviewResponse;
+import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaResponse;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.IncidenciaRepository;
+import com.example.gestor_documental.repository.HitoExpedienteRepository;
+import com.example.gestor_documental.repository.AvisoIncidenciaRepository;
 import com.example.gestor_documental.service.*;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,11 +28,19 @@ import java.util.List;
 public class IncidenciaServiceImpl implements IncidenciaService {
 
     private final IncidenciaRepository incidenciaRepository;
+    private final HitoExpedienteRepository hitoExpedienteRepository;
+    private final AvisoIncidenciaRepository avisoIncidenciaRepository;
     private final ExpedienteService expedienteService;
     private final SolicitudService solicitudService;
     private final TipoIncidenciaService tipoIncidenciaService;
     private final HistorialCambioService historialCambioService;
     private final MensajeService mensajeService;
+    private final CorreoService correoService;
+
+    @Value("${app.mail.enabled:false}")
+    private boolean mailEnabled;
+    @Value("${app.public-url:http://127.0.0.1:5173}")
+    private String publicUrl;
 
     @Override
     public List<Incidencia> listarPorExpediente(Long expedienteId) {
@@ -64,7 +79,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         incidenciaRepository.save(incidencia);
 
         // Cambiamos el estado a INCIDENCIA automáticamente
-        expedienteService.cambiarEstado(expedienteId, EstadoExpediente.INCIDENCIA, admin);
+        expedienteService.cambiarEstado(expedienteId, estadoParaTipo(tipo), admin);
         
         historialCambioService.registrarCambioExpediente(
                 expediente, 
@@ -174,13 +189,15 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         }
 
         incidencia.setResuelta(true);
+        incidencia.setProximoAviso(null);
+        incidencia.setSeguimientoArchivado(false);
         incidencia.setFechaResolucion(LocalDateTime.now());
         incidencia.setResueltoPor(admin);
         incidenciaRepository.save(incidencia);
         
         if (incidencia.getExpediente() != null) {
             if (incidenciaRepository.findByExpedienteIdAndResueltaFalse(incidencia.getExpediente().getId()).isEmpty()) {
-                incidencia.getExpediente().setEstadoExpediente(EstadoExpediente.EN_TRAMITE);
+                incidencia.getExpediente().setEstadoExpediente(estadoTrasResolverIncidencias(incidencia.getExpediente()));
                 expedienteService.guardar(incidencia.getExpediente());
             }
             historialCambioService.registrarCambioExpediente(
@@ -223,7 +240,11 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                 + "Reclamacion admin: " + nuevaObservacion);
         incidenciaRepository.save(incidencia);
 
-        expedienteService.cambiarEstado(incidencia.getExpediente().getId(), EstadoExpediente.INCIDENCIA, admin);
+        expedienteService.cambiarEstado(
+                incidencia.getExpediente().getId(),
+                estadoParaTipo(incidencia.getTipoIncidencia()),
+                admin
+        );
         historialCambioService.registrarCambioExpediente(
                 incidencia.getExpediente(),
                 admin,
@@ -253,6 +274,9 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         }
 
         mensajeService.añadirAExpediente(expediente.getId(), respuesta, cliente);
+        incidencia.setProximoAviso(null);
+        incidencia.setSeguimientoArchivado(false);
+        incidenciaRepository.save(incidencia);
         if (expediente.getEstadoExpediente() == EstadoExpediente.INCIDENCIA) {
             expediente.setEstadoExpediente(EstadoExpediente.REVISANDO_INCIDENCIAS);
             expedienteService.guardar(expediente);
@@ -263,5 +287,123 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                 "RESPUESTA INCIDENCIA",
                 "El cliente respondio a la solicitud de informacion."
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public NotificacionIncidenciaPreviewResponse previsualizarNotificacion(Long incidenciaId, Usuario admin) {
+        validarAdmin(admin);
+        Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        validarSeguimiento(incidencia);
+        int numero = incidencia.getContadorAvisos() + 1;
+        return new NotificacionIncidenciaPreviewResponse(
+                incidencia.getId(),
+                correoCliente(incidencia),
+                asuntoPorDefecto(incidencia, numero),
+                mensajePorDefecto(incidencia, numero),
+                numero,
+                mailEnabled
+        );
+    }
+
+    @Override
+    @Transactional
+    public NotificacionIncidenciaResponse notificarCliente(Long incidenciaId, String asunto, String mensaje, Usuario admin) {
+        validarAdmin(admin);
+        Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        validarSeguimiento(incidencia);
+        int numero = incidencia.getContadorAvisos() + 1;
+        if (numero > 5) throw new OperacionInvalidaException("Se ha alcanzado el maximo de avisos. Archiva el seguimiento.");
+        String asuntoFinal = asunto != null && !asunto.isBlank() ? asunto.trim() : asuntoPorDefecto(incidencia, numero);
+        String texto = mensaje != null && !mensaje.isBlank() ? mensaje.trim() : mensajePorDefecto(incidencia, numero);
+        String destinatario = correoCliente(incidencia);
+        CorreoService.ResultadoCorreo resultado = correoService.enviar(destinatario, asuntoFinal, texto);
+        AvisoIncidencia aviso = new AvisoIncidencia();
+        aviso.setIncidencia(incidencia); aviso.setNumeroAviso(numero); aviso.setEnviadoPor(admin); aviso.setMensaje(texto);
+        aviso.setDestinatario(destinatario); aviso.setAsunto(asuntoFinal);
+        aviso.setEstadoEnvio(resultado.exito() ? resultado.simulado() ? "SIMULADO" : "ENVIADO" : "ERROR");
+        aviso.setErrorEnvio(resultado.error());
+        avisoIncidenciaRepository.save(aviso);
+        if (!resultado.exito()) return new NotificacionIncidenciaResponse(false, false, resultado.error());
+        LocalDateTime ahora = LocalDateTime.now(); incidencia.setContadorAvisos(numero); incidencia.setFechaUltimoAviso(ahora); incidencia.setProximoAviso(siguienteVencimiento(ahora, numero)); incidencia.setSeguimientoArchivado(false); incidencia.setFechaArchivoSeguimiento(null); incidencia.setSeguimientoArchivadoPor(null); incidenciaRepository.save(incidencia);
+        mensajeService.añadirAExpediente(incidencia.getExpediente().getId(), texto, admin);
+        historialCambioService.registrarCambioExpediente(incidencia.getExpediente(), admin, "AVISO INCIDENCIA", "Aviso " + numero + (resultado.simulado() ? " simulado." : " enviado al cliente."));
+        return new NotificacionIncidenciaResponse(true, resultado.simulado(), resultado.simulado() ? "Envio simulado correctamente." : "Correo enviado correctamente.");
+    }
+
+    @Override @Transactional
+    public void archivarSeguimiento(Long incidenciaId, Usuario admin) {
+        validarAdmin(admin); Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        if (incidencia.isResuelta()) throw new OperacionInvalidaException("La incidencia ya esta resuelta");
+        incidencia.setSeguimientoArchivado(true); incidencia.setFechaArchivoSeguimiento(LocalDateTime.now()); incidencia.setSeguimientoArchivadoPor(admin); incidencia.setProximoAviso(null); incidenciaRepository.save(incidencia);
+    }
+
+    @Override @Transactional
+    public void reactivarSeguimiento(Long incidenciaId, Usuario admin) {
+        validarAdmin(admin); Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        incidencia.setSeguimientoArchivado(false); incidencia.setFechaArchivoSeguimiento(null); incidencia.setSeguimientoArchivadoPor(null); incidencia.setProximoAviso(LocalDateTime.now()); incidenciaRepository.save(incidencia);
+    }
+
+    private LocalDateTime siguienteVencimiento(LocalDateTime fecha, int numeroAviso) {
+        return switch (numeroAviso) { case 1, 2, 3 -> fecha.plusWeeks(1); case 4 -> fecha.plusMonths(1); case 5 -> fecha.plusMonths(2); default -> null; };
+    }
+
+    private void validarAdmin(Usuario usuario) {
+        if (usuario == null || usuario.getRolUsuario() != com.example.gestor_documental.enums.RolUsuario.ADMIN) throw new AccesoDenegadoException("Solo el administrador puede gestionar avisos");
+    }
+
+    private void validarSeguimiento(Incidencia incidencia) {
+        if (incidencia.isResuelta() || incidencia.getExpediente() == null
+                || incidencia.getExpediente().getEstadoExpediente() == EstadoExpediente.FINALIZADO
+                || incidencia.getExpediente().getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
+            throw new OperacionInvalidaException("La incidencia ya no admite seguimiento");
+        }
+    }
+
+    private String correoCliente(Incidencia incidencia) {
+        if (incidencia.getExpediente().getCliente() == null
+                || incidencia.getExpediente().getCliente().getEmail() == null
+                || incidencia.getExpediente().getCliente().getEmail().isBlank()) {
+            throw new OperacionInvalidaException("El cliente no tiene un correo configurado.");
+        }
+        return incidencia.getExpediente().getCliente().getEmail();
+    }
+
+    private String asuntoPorDefecto(Incidencia incidencia, int numeroAviso) {
+        String matricula = incidencia.getExpediente().getMatricula() != null ? incidencia.getExpediente().getMatricula() : "EXPEDIENTE " + incidencia.getExpediente().getId();
+        return (numeroAviso == 1 ? "Informacion pendiente" : "Recordatorio de informacion pendiente") + " - " + matricula;
+    }
+
+    private String mensajePorDefecto(Incidencia incidencia, int numeroAviso) {
+        String matricula = incidencia.getExpediente().getMatricula() != null ? incidencia.getExpediente().getMatricula() : "EXPEDIENTE " + incidencia.getExpediente().getId();
+        String tipo = incidencia.getTipoIncidencia() != null && incidencia.getTipoIncidencia().getNombre() != null
+                ? incidencia.getTipoIncidencia().getNombre().name().replace('_', ' ')
+                : "INFORMACION PENDIENTE";
+        String detalle = incidencia.getObservaciones() != null && !incidencia.getObservaciones().isBlank() ? incidencia.getObservaciones() : "Consulta el detalle en el portal.";
+        String base = publicUrl != null ? publicUrl.replaceAll("/$", "") : "";
+        return "Hola,\n\n"
+                + (numeroAviso == 1 ? "Necesitamos tu respuesta para continuar con el tramite." : "Te recordamos que seguimos pendientes de tu respuesta para continuar con el tramite.")
+                + "\n\nExpediente: " + matricula
+                + "\nMotivo: " + tipo
+                + "\nDetalle: " + detalle
+                + "\n\nAccede al portal: " + base + "/expedientes/" + incidencia.getExpediente().getId()
+                + "\n\nGracias,\nGestoria CN";
+    }
+
+    private EstadoExpediente estadoParaTipo(TipoIncidencia tipo) {
+        return tipo != null && tipo.getNombre() == TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION
+                ? EstadoExpediente.PENDIENTE_DOCUMENTACION
+                : EstadoExpediente.INCIDENCIA;
+    }
+
+    private EstadoExpediente estadoTrasResolverIncidencias(Expediente expediente) {
+        boolean enviadoDgt = hitoExpedienteRepository.existsByExpedienteIdAndCodigo(
+                expediente.getId(),
+                CodigoHitoExpediente.ENVIADO_DGT
+        ) || hitoExpedienteRepository.existsByExpedienteIdAndCodigo(
+                expediente.getId(),
+                CodigoHitoExpediente.COM_ENVIADO_DGT
+        );
+        return enviadoDgt ? EstadoExpediente.ENVIADO_DGT : EstadoExpediente.EN_TRAMITE;
     }
 }

@@ -10,6 +10,7 @@ import { ListPageChrome } from "../components/ListPageChrome";
 import type { ListCatalogs, ListFilters, SolicitudListItem } from "../types";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { uppercaseInput } from "../../../shared/utils/text";
+import { PaginationBar } from "../components/PaginationBar";
 
 export function SolicitudesListPage() {
   const { user } = useOutletContext<AppOutletContext>();
@@ -30,10 +31,11 @@ export function SolicitudesListPage() {
   });
 
   function applyFilters(filters: ListFilters) {
-    setAppliedFilters(filters);
+    setAppliedFilters({ ...filters, pagina: filters.pagina || "0", tamanio: filters.tamanio || "25" });
   }
 
-  const solicitudes = solicitudesQuery.data ?? [];
+  const pageData = solicitudesQuery.data;
+  const solicitudes = pageData?.contenido ?? [];
 
   return (
     <ListPageChrome
@@ -44,7 +46,7 @@ export function SolicitudesListPage() {
           ? "Revisa peticiones de clientes, valida documentacion y convierte solicitudes listas."
           : "Consulta tus peticiones y crea nuevas solicitudes cuando necesites iniciar un tramite."
       }
-      count={`${solicitudes.length} ${solicitudes.length === 1 ? "solicitud" : "solicitudes"}`}
+      count={`${pageData?.totalElementos ?? 0} ${(pageData?.totalElementos ?? 0) === 1 ? "solicitud" : "solicitudes"}`}
       action={
         !isAdmin ? (
           <Link className="primary-button primary-button--compact" to="/cliente/solicitudes/nuevo">
@@ -93,6 +95,7 @@ export function SolicitudesListPage() {
             }}
           />
         ) : null}
+        <PaginationBar page={pageData?.pagina ?? 0} totalPages={pageData?.totalPaginas ?? 0} totalItems={pageData?.totalElementos ?? 0} pageSize={pageData?.tamanio ?? 25} onPageChange={(pagina) => applyFilters({ ...draftFilters, pagina: String(pagina) })} onPageSizeChange={(tamanio) => applyFilters({ ...draftFilters, pagina: "0", tamanio: String(tamanio) })} />
       </div>
     </ListPageChrome>
   );
@@ -250,6 +253,10 @@ function SolicitudesTable({
 function readFilters(searchParams: URLSearchParams): ListFilters {
   return {
     periodo: searchParams.get("periodo") || "ESTE_MES",
+    fechaDesde: searchParams.get("fechaDesde") || "",
+    fechaHasta: searchParams.get("fechaHasta") || "",
+    pagina: searchParams.get("pagina") || "0",
+    tamanio: searchParams.get("tamanio") || "25",
     estado: searchParams.get("estado") || "",
     tipoTramiteId: searchParams.get("tipoTramiteId") || "",
     clienteId: searchParams.get("clienteId") || "",

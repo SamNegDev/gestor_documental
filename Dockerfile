@@ -30,6 +30,7 @@ RUN apt-get update \
         liblept5 \
         poppler-utils \
         ghostscript \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /app/uploads /app/logs

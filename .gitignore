@@ -44,6 +44,7 @@ application-local.properties
 # Logs adicionales
 logs/
 *.log
+backups/
 
 # Archivos del sistema
 .DS_Store

@@ -16,6 +16,12 @@ import { SolicitudFormPage } from "../features/listados/pages/SolicitudFormPage"
 import { SolicitudesListPage } from "../features/listados/pages/SolicitudesListPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { RequireRole } from "./shell/RequireRole";
+import { InteresadosRegistroPage } from "../features/registro/pages/InteresadosRegistroPage";
+import { InteresadoRegistroDetailPage } from "../features/registro/pages/InteresadoRegistroDetailPage";
+import { VehiculosRegistroPage } from "../features/registro/pages/VehiculosRegistroPage";
+import { VehiculoRegistroDetailPage } from "../features/registro/pages/VehiculoRegistroDetailPage";
+import { TareasPage } from "../features/tareas/pages/TareasPage";
+import { SeguimientoClientesPage } from "../features/seguimiento/pages/SeguimientoClientesPage";
 
 
 export const router = createBrowserRouter([
@@ -30,6 +36,9 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/expedientes" replace /> },
       { path: "admin/dashboard", element: <RequireRole allow={["ADMIN"]}><DashboardPage /></RequireRole> },
+      { path: "admin/tareas", element: <RequireRole allow={["ADMIN"]}><TareasPage /></RequireRole> },
+      { path: "admin/seguimiento-clientes", element: <RequireRole allow={["ADMIN"]}><SeguimientoClientesPage /></RequireRole> },
+      { path: "cliente/tareas", element: <RequireRole allow={["CLIENTE"]}><TareasPage /></RequireRole> },
       { path: "admin/clientes", element: <RequireRole allow={["ADMIN"]}><ClientesListPage /></RequireRole> },
       { path: "admin/clientes/nuevo", element: <RequireRole allow={["ADMIN"]}><ClienteFormPage /></RequireRole> },
       { path: "admin/clientes/:id/editar", element: <RequireRole allow={["ADMIN"]}><ClienteFormPage /></RequireRole> },
@@ -45,6 +54,10 @@ export const router = createBrowserRouter([
       { path: "cliente/expedientes/:id", element: <RequireRole allow={["CLIENTE"]}><ClienteExpedientePage /></RequireRole> },
       { path: "solicitudes", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><SolicitudesListPage /></RequireRole> },
       { path: "solicitudes/:id", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><SolicitudDetailPage /></RequireRole> },
+      { path: "interesados", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><InteresadosRegistroPage /></RequireRole> },
+      { path: "interesados/:id", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><InteresadoRegistroDetailPage /></RequireRole> },
+      { path: "vehiculos", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><VehiculosRegistroPage /></RequireRole> },
+      { path: "vehiculos/:matricula", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><VehiculoRegistroDetailPage /></RequireRole> },
       { path: "cliente/solicitudes/nuevo", element: <RequireRole allow={["CLIENTE"]}><SolicitudFormPage /></RequireRole> },
       { path: "cliente/solicitudes/:id/editar", element: <RequireRole allow={["CLIENTE"]}><SolicitudFormPage /></RequireRole> },
       { path: "acceso-denegado", element: <AppErrorPage kind="denied" /> },

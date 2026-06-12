@@ -1,6 +1,7 @@
 package com.example.gestor_documental.controller.api;
 
 import com.example.gestor_documental.dto.InteresadoFormDto;
+import com.example.gestor_documental.dto.PagedResponse;
 import com.example.gestor_documental.dto.expediente.AccionMasivaExpedienteRequest;
 import com.example.gestor_documental.dto.expediente.AccionMasivaExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.ActualizarExpedienteRequest;
@@ -90,7 +91,7 @@ public class ExpedienteApiController {
     private String uploadDir;
 
     @GetMapping
-    public List<ExpedienteListItemResponse> listarExpedientes(
+    public PagedResponse<ExpedienteListItemResponse> listarExpedientes(
             Authentication authentication,
             @RequestParam(required = false) EstadoExpediente estado,
             @RequestParam(required = false) Long tipoTramiteId,
@@ -98,6 +99,10 @@ public class ExpedienteApiController {
             @RequestParam(required = false) String interesado,
             @RequestParam(required = false) Long clienteId,
             @RequestParam(required = false, defaultValue = "ESTE_MES") String periodo
+            , @RequestParam(required = false) LocalDate fechaDesde
+            , @RequestParam(required = false) LocalDate fechaHasta
+            , @RequestParam(required = false, defaultValue = "0") int pagina
+            , @RequestParam(required = false, defaultValue = "25") int tamanio
     ) {
         Usuario usuarioLogueado = usuario(authentication);
         List<Expediente> expedientes;
@@ -139,14 +144,18 @@ public class ExpedienteApiController {
                     .filter(expediente -> expedientesCoincidentes.contains(expediente.getId()))
                     .toList();
         }
-        DateRange dateRange = dateRange(periodo);
+        DateRange dateRange = dateRange(periodo, fechaDesde, fechaHasta);
         if (dateRange != null) {
             expedientes = expedientes.stream()
                     .filter(expediente -> isWithinRange(fechaReferencia(expediente.getFechaCreacion(), expediente.getFechaUltimaModificacion()), dateRange))
                     .toList();
         }
 
-        return expedientes.stream().map(expediente -> mapExpedienteListItem(expediente, usuarioLogueado)).toList();
+        return PagedResponse.of(
+                expedientes.stream().map(expediente -> mapExpedienteListItem(expediente, usuarioLogueado)).toList(),
+                pagina,
+                tamanio
+        );
     }
 
     @GetMapping("/catalogos-listado")
@@ -515,6 +524,12 @@ public class ExpedienteApiController {
                         ? expediente.getTipoTramite().getNombre().name()
                         : null)
                 .estado(expediente.getEstadoExpediente() != null ? expediente.getEstadoExpediente().name() : null)
+                .incidenciasActivas(detalle.getIncidencias().stream()
+                        .filter(incidencia -> !incidencia.isResuelta())
+                        .map(incidencia -> incidencia.getTipo())
+                        .filter(tipo -> tipo != null && !tipo.isBlank())
+                        .distinct()
+                        .toList())
                 .fechaCreacion(formatDate(expediente.getFechaCreacion()))
                 .fechaUltimaModificacion(formatDate(expediente.getFechaUltimaModificacion()))
                 .cliente(expediente.getCliente() != null
@@ -535,6 +550,7 @@ public class ExpedienteApiController {
                         : null)
                 .siguienteAccion(siguienteAccion)
                 .justificantesFinalesDisponibles(tieneJustificantesFinales(expediente.getId(), detalle.getEstado()))
+                .justificantesFinalesPendientes(justificantesFinalesPendientes(expediente.getId(), detalle.getEstado()))
                 .build();
     }
 
@@ -618,6 +634,21 @@ public class ExpedienteApiController {
                 && documentos.stream().anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.MODELO_620);
     }
 
+    private List<String> justificantesFinalesPendientes(Long expedienteId, String estado) {
+        if (!"FINALIZADO".equals(estado)) {
+            return List.of();
+        }
+        List<Documento> documentos = documentoRepository.findByExpedienteId(expedienteId);
+        List<String> pendientes = new java.util.ArrayList<>();
+        if (documentos.stream().noneMatch(this::esJustificanteDgt)) {
+            pendientes.add("DGT");
+        }
+        if (documentos.stream().noneMatch(documento -> documento.getTipoDocumento() == TipoDocumento.MODELO_620)) {
+            pendientes.add("620");
+        }
+        return pendientes;
+    }
+
     private boolean esJustificanteDgt(Documento documento) {
         return documento.getTipoDocumento() == TipoDocumento.HUELLA_TRAMITE
                 || documento.getTipoDocumento() == TipoDocumento.COMPROBANTE_DGT;
@@ -654,12 +685,16 @@ public class ExpedienteApiController {
         return fecha != null ? fecha.format(DATE_TIME_FORMATTER) : null;
     }
 
-    private DateRange dateRange(String periodo) {
+    private DateRange dateRange(String periodo, LocalDate fechaDesde, LocalDate fechaHasta) {
         LocalDate today = LocalDate.now();
         return switch (periodo != null ? periodo : "ESTE_MES") {
+            case "ULTIMA_SEMANA" -> new DateRange(today.minusDays(6).atStartOfDay(), today.plusDays(1).atStartOfDay());
             case "ULTIMOS_3_MESES" -> new DateRange(today.minusMonths(3).atStartOfDay(), null);
             case "ESTE_ANIO" -> new DateRange(today.withDayOfYear(1).atStartOfDay(), null);
             case "TODO" -> null;
+            case "PERSONALIZADO" -> fechaDesde != null && fechaHasta != null && !fechaDesde.isAfter(fechaHasta)
+                    ? new DateRange(fechaDesde.atStartOfDay(), fechaHasta.plusDays(1).atStartOfDay())
+                    : new DateRange(today.plusYears(100).atStartOfDay(), today.plusYears(100).atStartOfDay());
             default -> new DateRange(today.withDayOfMonth(1).atStartOfDay(), null);
         };
     }
