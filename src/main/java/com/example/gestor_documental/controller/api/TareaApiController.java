@@ -74,7 +74,7 @@ public class TareaApiController {
     private List<TareaResponse> calcularTareas(Usuario usuario) {
         List<TareaResponse> tareas = new ArrayList<>();
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
-            incidenciaRepository.findAll().stream()
+            incidenciaRepository.findAllWithDetails().stream()
                     .filter(i -> !i.isResuelta() && !i.isSeguimientoArchivado() && i.getExpediente() != null)
                     .filter(i -> i.getExpediente().getEstadoExpediente() != EstadoExpediente.FINALIZADO && i.getExpediente().getEstadoExpediente() != EstadoExpediente.RECHAZADO)
                     .filter(i -> i.getContadorAvisos() == 0 || i.getProximoAviso() != null && !i.getProximoAviso().isAfter(LocalDateTime.now()))

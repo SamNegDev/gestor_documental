@@ -42,7 +42,7 @@ public class SeguimientoClienteApiController {
             Authentication authentication) {
         requireAdmin(authentication);
         boolean archivadas = "ARCHIVADAS".equals(vista);
-        List<SeguimientoIncidenciaResponse> items = incidenciaRepository.findAll().stream()
+        List<SeguimientoIncidenciaResponse> items = incidenciaRepository.findAllWithDetails().stream()
                 .filter(incidencia -> !incidencia.isResuelta() && incidencia.getExpediente() != null)
                 .filter(incidencia -> incidencia.getExpediente().getEstadoExpediente() != EstadoExpediente.FINALIZADO
                         && incidencia.getExpediente().getEstadoExpediente() != EstadoExpediente.RECHAZADO)
