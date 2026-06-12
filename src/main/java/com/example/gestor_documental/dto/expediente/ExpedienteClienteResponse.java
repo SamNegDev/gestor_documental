@@ -28,6 +28,9 @@ public class ExpedienteClienteResponse {
     private List<DocumentoExpedienteResponse> documentos = new ArrayList<>();
 
     @Builder.Default
+    private List<RequisitoDocumentalResponse> requisitosDocumentales = new ArrayList<>();
+
+    @Builder.Default
     private List<IncidenciaExpedienteResponse> incidencias = new ArrayList<>();
 
     @Builder.Default

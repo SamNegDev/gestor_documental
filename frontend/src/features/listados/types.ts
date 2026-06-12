@@ -3,6 +3,7 @@ import type {
   DocumentoExpediente,
   HistorialExpediente,
   IncidenciaExpediente,
+  InteresadoExpediente,
   MensajeExpediente,
   TipoTramiteResumen,
   UsuarioResumen,
@@ -23,7 +24,10 @@ export interface ExpedienteListItem {
   fechaUltimaModificacion?: string | null;
   cliente?: ClienteResumen | null;
   modificadoPor?: UsuarioResumen | null;
+  interesados: InteresadoExpediente[];
+  faseActual?: string | null;
   siguientePasoTitulo?: string | null;
+  siguientePasoDetalle?: string | null;
   siguienteAccion?: {
     tipo: string;
     label?: string | null;
@@ -43,6 +47,8 @@ export interface SolicitudListItem {
   cliente?: ClienteResumen | null;
   modificadoPor?: UsuarioResumen | null;
   expedienteId?: number | null;
+  interesados: InteresadoSolicitud[];
+  situacionDocumental?: string | null;
 }
 
 export interface InteresadoSolicitud {
@@ -115,5 +121,6 @@ export interface ListFilters {
   tipoTramiteId?: string;
   clienteId?: string;
   matricula?: string;
+  interesado?: string;
   periodo?: string;
 }

@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, FilePlus2, Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
-import { uploadSolicitudDocument } from "../../expedientes/services/documentosApi";
+import { ArrowLeft, FilePlus2, Loader2, Save } from "lucide-react";
 import { InteresadoAutocomplete } from "../../expedientes/components/InteresadoAutocomplete";
-import { formatDocumentType, humanizeEnum } from "../../expedientes/utils/formatters";
+import { humanizeEnum } from "../../expedientes/utils/formatters";
 import { cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
 import { createSolicitud, getSolicitudDetail, getSolicitudListCatalogs, updateSolicitud } from "../services/listadosApi";
 import type { InteresadoSearchResult } from "../../expedientes/types/expedienteDetail.types";
@@ -12,30 +11,6 @@ import type { SolicitudDetail, SolicitudUpsertInput } from "../types";
 import "../../expedientes/styles/expedienteDetail.css";
 
 const ROLES = ["COMPRADOR", "VENDEDOR", "TITULAR"];
-const DOCUMENT_TYPES = [
-  "DNI",
-  "CIF",
-  "CONTRATO_COMPRAVENTA",
-  "PERMISO_CIRCULACION",
-  "FICHA_TECNICA",
-  "MANDATO",
-  "FACTURA",
-  "EXPEDIENTE_COMPLETO",
-  "OTROS",
-  "CAMBIO_TITULARIDAD",
-  "AUTORIZACION_SERAFIN",
-  "HUELLA_TRAMITE",
-  "COMPROBANTE_DGT",
-  "MODELO_620",
-  "DOCUMENTO_INCIDENCIA",
-];
-
-type DocumentDraft = {
-  id: string;
-  tipoDocumento: string;
-  archivo: File | null;
-};
-
 function emptyForm(): SolicitudUpsertInput {
   return {
     tipoTramiteId: 0,
@@ -103,7 +78,6 @@ export function SolicitudFormPage() {
   const navigate = useNavigate();
   const isEdit = Boolean(id);
   const [form, setForm] = useState<SolicitudUpsertInput>(emptyForm);
-  const [documents, setDocuments] = useState<DocumentDraft[]>([{ id: crypto.randomUUID(), tipoDocumento: "OTROS", archivo: null }]);
 
   const catalogsQuery = useQuery({
     queryKey: ["solicitudes", "catalogos-listado"],
@@ -136,10 +110,6 @@ export function SolicitudFormPage() {
         return { id: Number(id) };
       }
       const creada = await createSolicitud(cleanPayload(form));
-      const validDocuments = documents.filter((documento) => documento.archivo);
-      for (const documento of validDocuments) {
-        await uploadSolicitudDocument(creada.id, documento.tipoDocumento || "OTROS", documento.archivo!);
-      }
       return creada;
     },
     onSuccess: (solicitud) => navigate(`/solicitudes/${solicitud.id}`),
@@ -231,66 +201,13 @@ export function SolicitudFormPage() {
           </section>
         ))}
 
-        {!isEdit ? (
-          <section className="panel request-form-documents">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Documentacion</p>
-                <h2>Archivos iniciales</h2>
-              </div>
-              <button
-                className="soft-button soft-button--compact"
-                type="button"
-                onClick={() => setDocuments((current) => [...current, { id: crypto.randomUUID(), tipoDocumento: "OTROS", archivo: null }])}
-              >
-                <Plus size={16} />
-                Anadir
-              </button>
-            </div>
-            <div className="request-document-drafts">
-              {documents.map((documento) => (
-                <article className="request-document-draft" key={documento.id}>
-                  <select
-                    value={documento.tipoDocumento}
-                    onChange={(event) =>
-                      setDocuments((current) => current.map((item) => (item.id === documento.id ? { ...item, tipoDocumento: event.target.value } : item)))
-                    }
-                  >
-                    {DOCUMENT_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {formatDocumentType(type)}
-                      </option>
-                    ))}
-                  </select>
-                  <label className="document-file-picker">
-                    <Upload size={16} />
-                    <span>{documento.archivo?.name || "Seleccionar archivo"}</span>
-                    <input
-                      hidden
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(event) => {
-                        const file = event.currentTarget.files?.[0] || null;
-                        setDocuments((current) => current.map((item) => (item.id === documento.id ? { ...item, archivo: file } : item)));
-                      }}
-                    />
-                  </label>
-                  <button className="icon-button icon-button--danger" type="button" onClick={() => setDocuments((current) => current.filter((item) => item.id !== documento.id))}>
-                    <Trash2 size={16} />
-                  </button>
-                </article>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
         <div className="request-form-actions">
           <Link className="soft-button" to={isEdit && id ? `/solicitudes/${id}` : "/solicitudes"}>
             Cancelar
           </Link>
           <button className="primary-button" disabled={submitMutation.isPending} type="submit">
             <Save size={16} />
-            {submitMutation.isPending ? "Guardando" : "Guardar solicitud"}
+            {submitMutation.isPending ? "Guardando" : isEdit ? "Guardar cambios" : "Crear solicitud"}
           </button>
         </div>
       </form>

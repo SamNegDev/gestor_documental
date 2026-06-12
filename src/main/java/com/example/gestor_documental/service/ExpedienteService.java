@@ -58,6 +58,16 @@ public interface ExpedienteService {
 
     void cambiarEstado(Long id, EstadoExpediente nuevoEstado, Usuario usuarioLogueado);
 
+    void solicitarInformacionAdicional(Long id, Usuario usuarioLogueado);
+
+    void marcarInformacionAdicionalRecibida(Long id, Usuario usuarioLogueado);
+
+    void resolverInformacionAdicional(Long id, Usuario usuarioLogueado);
+
+    void marcarPendienteDocumentacion(Long id, Usuario usuarioLogueado);
+
+    void reanudarTrasDocumentacion(Long id, Usuario usuarioLogueado);
+
     Expediente actualizarExpediente(Long id, Expediente expedienteActualizado, Usuario usuarioLogueado, Long clienteId, Long tipoTramiteId, InteresadoFormDto interesado1, InteresadoFormDto interesado2);
 
     Expediente actualizarExpediente(Long id, Expediente expedienteActualizado, Usuario usuarioLogueado, Long clienteId, Long tipoTramiteId, List<InteresadoFormDto> interesados);

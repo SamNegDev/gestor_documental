@@ -1,5 +1,5 @@
 import { apiGet, apiPostJson } from "../../../shared/api/http";
-import type { DocumentoExpediente, HistorialExpediente, IncidenciaExpediente, MensajeExpediente } from "../types/expedienteDetail.types";
+import type { DocumentoExpediente, HistorialExpediente, IncidenciaExpediente, MensajeExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 
 export interface ExpedienteCliente {
   id: number;
@@ -11,6 +11,7 @@ export interface ExpedienteCliente {
   fechaInicio?: string | null;
   siguienteMensaje?: string | null;
   documentos: DocumentoExpediente[];
+  requisitosDocumentales: RequisitoDocumental[];
   incidencias: IncidenciaExpediente[];
   mensajes: MensajeExpediente[];
   historial: HistorialExpediente[];
@@ -22,6 +23,7 @@ export async function getClienteExpediente(id: string | number): Promise<Expedie
   return {
     ...expediente,
     documentos: expediente.documentos ?? [],
+    requisitosDocumentales: expediente.requisitosDocumentales ?? [],
     incidencias: expediente.incidencias ?? [],
     mensajes: expediente.mensajes ?? [],
     historial: expediente.historial ?? [],

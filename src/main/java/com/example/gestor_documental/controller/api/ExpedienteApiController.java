@@ -23,6 +23,7 @@ import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
@@ -77,6 +78,7 @@ public class ExpedienteApiController {
     private final ExpedienteService expedienteService;
     private final HitoExpedienteService hitoExpedienteService;
     private final DocumentoRepository documentoRepository;
+    private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
     private final InteresadoRepository interesadoRepository;
     private final MensajeService mensajeService;
     private final ClienteService clienteService;
@@ -93,6 +95,7 @@ public class ExpedienteApiController {
             @RequestParam(required = false) EstadoExpediente estado,
             @RequestParam(required = false) Long tipoTramiteId,
             @RequestParam(required = false) String matricula,
+            @RequestParam(required = false) String interesado,
             @RequestParam(required = false) Long clienteId,
             @RequestParam(required = false, defaultValue = "ESTE_MES") String periodo
     ) {
@@ -126,6 +129,14 @@ public class ExpedienteApiController {
             String busqueda = matricula.trim().toLowerCase();
             expedientes = expedientes.stream()
                     .filter(expediente -> expediente.getMatricula() != null && expediente.getMatricula().toLowerCase().contains(busqueda))
+                    .toList();
+        }
+        if (interesado != null && !interesado.trim().isEmpty()) {
+            Set<Long> expedientesCoincidentes = new java.util.HashSet<>(
+                    expedienteInteresadoRepository.buscarExpedienteIdsPorInteresado(interesado.trim())
+            );
+            expedientes = expedientes.stream()
+                    .filter(expediente -> expedientesCoincidentes.contains(expediente.getId()))
                     .toList();
         }
         DateRange dateRange = dateRange(periodo);
@@ -421,8 +432,8 @@ public class ExpedienteApiController {
     ) {
         Usuario admin = requireAdmin(authentication);
         String contenidoFinal = contenido != null ? contenido : body != null ? body.get("contenido") : null;
+        expedienteService.solicitarInformacionAdicional(id, admin);
         mensajeService.a\u00f1adirAExpediente(id, contenidoFinal, admin);
-        expedienteService.cambiarEstado(id, EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL, admin);
         return ResponseEntity.noContent().build();
     }
 
@@ -431,7 +442,7 @@ public class ExpedienteApiController {
             @PathVariable Long id,
             Authentication authentication
     ) {
-        expedienteService.cambiarEstado(id, EstadoExpediente.EN_TRAMITE, requireAdmin(authentication));
+        expedienteService.resolverInformacionAdicional(id, requireAdmin(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -516,10 +527,19 @@ public class ExpedienteApiController {
                                 .build()
                         : null)
                 .modificadoPor(mapUsuario(expediente.getModificadoPor()))
+                .interesados(detalle.getInteresados())
+                .faseActual(detalle.getFaseActual())
                 .siguientePasoTitulo(detalle.getSiguientePaso() != null ? detalle.getSiguientePaso().getTitulo() : null)
+                .siguientePasoDetalle(detalle.getSiguientePaso() != null
+                        ? primerTextoDisponible(detalle.getSiguientePaso().getNota(), detalle.getSiguientePaso().getDescripcion())
+                        : null)
                 .siguienteAccion(siguienteAccion)
                 .justificantesFinalesDisponibles(tieneJustificantesFinales(expediente.getId(), detalle.getEstado()))
                 .build();
+    }
+
+    private String primerTextoDisponible(String principal, String alternativa) {
+        return principal != null && !principal.isBlank() ? principal : alternativa;
     }
 
     private HitoAccionResponse accionPrincipal(HitoExpedienteResponse siguientePaso) {

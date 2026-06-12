@@ -2,7 +2,7 @@ import { apiPatchForm, apiPostForm } from "../../../shared/api/http";
 
 export type CreateRequirementInput = {
   tipoDocumento: string;
-  descripcion: string;
+  descripcion?: string;
   interesadoId?: number | null;
   rolInteresado?: string | null;
   estadoInicial: "REQUERIDO" | "POSTERIOR";
@@ -11,7 +11,7 @@ export type CreateRequirementInput = {
 export function createRequirement(expedienteId: number, input: CreateRequirementInput): Promise<void> {
   const formData = new FormData();
   formData.append("tipoDocumento", input.tipoDocumento);
-  formData.append("descripcion", input.descripcion);
+  if (input.descripcion?.trim()) formData.append("descripcion", input.descripcion.trim());
   formData.append("estadoInicial", input.estadoInicial);
   if (input.interesadoId) formData.append("interesadoId", String(input.interesadoId));
   if (input.rolInteresado) formData.append("rolInteresado", input.rolInteresado);

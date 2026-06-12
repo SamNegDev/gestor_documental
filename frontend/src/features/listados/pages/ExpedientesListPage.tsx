@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useOutletContext, useSearchParams } from "react-router-dom";
-import { CheckCircle2, Download, Eye, FilePlus2, FolderOpen } from "lucide-react";
+import { CheckCircle2, Download, Eye, FilePlus2, FolderOpen, Search, UserRoundCheck } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { ApiError } from "../../../shared/api/http";
 import { bulkAdvanceExpedientes, bulkFinalDocumentsUrl, getExpedienteListCatalogs, getExpedientes } from "../services/listadosApi";
@@ -11,6 +11,8 @@ import type { ExpedienteListItem, ListCatalogs, ListFilters } from "../types";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { uppercaseInput } from "../../../shared/utils/text";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
+import { searchInteresados } from "../../expedientes/services/expedienteDetailApi";
+import type { InteresadoSearchResult } from "../../expedientes/types/expedienteDetail.types";
 
 export function ExpedientesListPage() {
   const { user } = useOutletContext<AppOutletContext>();
@@ -101,6 +103,20 @@ export function ExpedientesListPage() {
       }
     >
       <ListFiltersBar
+        compact
+        additionalFilter={
+          <label className="list-period-toolbar__search">
+            <span>Interesado</span>
+            <InteresadoListFilter
+              value={draftFilters.interesado || ""}
+              onChange={(value) => {
+                const nextFilters = { ...draftFilters, interesado: value };
+                setDraftFilters(nextFilters);
+                applyFilters(nextFilters);
+              }}
+            />
+          </label>
+        }
         catalogs={catalogsQuery.data}
         filters={draftFilters}
         showClientFilter={isAdmin}
@@ -115,7 +131,7 @@ export function ExpedientesListPage() {
         }}
       />
 
-      <div className="records-panel">
+      <div className="records-panel records-panel--ledger">
         <div className="records-panel__heading">
           <div>
             <h3>Expedientes encontrados</h3>
@@ -179,6 +195,7 @@ function ExpedientesTable({
   }
 
   const allVisibleSelected = expedientes.length > 0 && expedientes.every((expediente) => selectedIds.has(expediente.id));
+  const columnCount = 6 + (showClient ? 1 : 0) + (isAdmin ? 1 : 0) + (!showClient ? 1 : 0);
 
   function toggleAllVisible(checked: boolean) {
     const next = new Set(selectedIds);
@@ -204,7 +221,7 @@ function ExpedientesTable({
 
   return (
     <div className="records-table-scroll">
-      <table className="records-table">
+      <table className={`records-table records-table--expedientes${!showClient ? " records-table--client-expedientes" : ""}`}>
         <thead>
           <tr>
             {isAdmin ? (
@@ -217,9 +234,6 @@ function ExpedientesTable({
                 />
               </th>
             ) : null}
-            <th className="records-col-id">
-              <span>N.</span>
-            </th>
             <th className="records-col-kind">
               <span>Expediente</span>
               <select
@@ -261,6 +275,8 @@ function ExpedientesTable({
                 placeholder="Buscar"
               />
             </th>
+            {!showClient ? <th className="records-col-interested">Interesados</th> : null}
+            <th className="records-col-phase">Fase actual</th>
             <th className="records-col-status">
               <span>Estado</span>
               <select className="records-table-filter" value={filters.estado || ""} onChange={(event) => nextFilter("estado", event.target.value)}>
@@ -272,16 +288,15 @@ function ExpedientesTable({
                 ))}
               </select>
             </th>
-            <th className="records-col-date">Ultima actividad</th>
-            {showClient ? <th className="records-col-change">Ultimo cambio</th> : null}
-            <th className="records-col-actions">Acciones</th>
+            {showClient ? <th className="records-col-change">Ultima modificacion</th> : <th className="records-col-date">Ultima actividad</th>}
+            <th aria-label="Acciones" className="records-col-actions" />
           </tr>
         </thead>
         <tbody>
           {expedientes.length === 0 ? (
             <tr>
-              <td colSpan={(showClient ? 8 : 6) + (isAdmin ? 1 : 0)}>
-                <EmptyState title="No hay expedientes con estos filtros" copy="Cambia el periodo o borra parte de la matricula para ampliar la busqueda." />
+              <td colSpan={columnCount}>
+                <EmptyState title="No hay expedientes con estos filtros" copy="Cambia el periodo o revisa la matricula o el interesado buscado." />
               </td>
             </tr>
           ) : null}
@@ -297,12 +312,9 @@ function ExpedientesTable({
                   />
                 </td>
               ) : null}
-              <td className="records-col-id">
-                <span className="record-id">{expediente.id}</span>
-              </td>
               <td className="records-col-kind">
-                <strong>{expediente.tipoTramite || "Sin tipo"}</strong>
-                <small>{expediente.siguientePasoTitulo || "Expediente administrativo"}</small>
+                <strong className="records-expediente-id">EXP-{expediente.id}</strong>
+                <small>{expediente.tipoTramite || "Sin tipo"}</small>
               </td>
               {showClient ? (
                 <td className="records-col-client">
@@ -313,20 +325,33 @@ function ExpedientesTable({
               <td className="records-col-plate">
                 <MiniPlate value={expediente.matricula} />
               </td>
-              <td className="records-col-status">
-                <StatusBadge tone={statusTone(expediente.estado)}>{formatEnum(expediente.estado)}</StatusBadge>
-              </td>
-              <td className="records-col-date">{fechaReferencia(expediente) || "Sin fecha"}</td>
-              {showClient ? (
-                <td className="records-col-change">
-                  <span>{expediente.fechaUltimaModificacion || "Sin cambios"}</span>
-                  <small>{expediente.modificadoPor?.nombreCompleto || "Sin cambios"}</small>
+              {!showClient ? (
+                <td className="records-col-interested">
+                  <InterestedParties interesados={expediente.interesados} />
                 </td>
               ) : null}
+              <td className="records-col-phase">
+                <PhaseSummary expediente={expediente} />
+              </td>
+              <td className="records-col-status" title={formatEnum(expediente.estado)}>
+                <StatusBadge tone={statusTone(expediente.estado)}>{formatStatusLabel(expediente.estado)}</StatusBadge>
+              </td>
+              {showClient ? (
+                <td className="records-col-change">
+                  <span>{fechaReferencia(expediente) || "Sin cambios"}</span>
+                  <small>{expediente.modificadoPor?.nombreCompleto || "Sin cambios"}</small>
+                </td>
+              ) : (
+                <td className="records-col-date">{fechaReferencia(expediente) || "Sin fecha"}</td>
+              )}
               <td className="records-col-actions">
-                <Link className="soft-button soft-button--compact" to={isAdmin ? `/expedientes/${expediente.id}` : `/cliente/expedientes/${expediente.id}`}>
+                <Link
+                  aria-label={`Ver detalle del expediente ${expediente.id}`}
+                  className="icon-button"
+                  title={showClient ? "Ver detalle" : "Ver estado"}
+                  to={isAdmin ? `/expedientes/${expediente.id}` : `/cliente/expedientes/${expediente.id}`}
+                >
                   <Eye size={16} />
-                  {showClient ? "Ver detalle" : "Ver estado"}
                 </Link>
               </td>
             </tr>
@@ -394,19 +419,126 @@ function readFilters(searchParams: URLSearchParams): ListFilters {
     tipoTramiteId: searchParams.get("tipoTramiteId") || "",
     clienteId: searchParams.get("clienteId") || "",
     matricula: searchParams.get("matricula") || "",
+    interesado: searchParams.get("interesado") || "",
   };
+}
+
+function InteresadoListFilter({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [results, setResults] = useState<InteresadoSearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const query = value.trim();
+
+  useEffect(() => {
+    if (!open || query.length < 2) {
+      setResults([]);
+      return;
+    }
+    let active = true;
+    const timeout = window.setTimeout(() => {
+      setLoading(true);
+      searchInteresados(query)
+        .then((items) => active && setResults(items))
+        .catch(() => active && setResults([]))
+        .finally(() => active && setLoading(false));
+    }, 220);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [open, query]);
+
+  useEffect(() => {
+    const close = (event: PointerEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, []);
+
+  return (
+    <div className="records-interested-filter" ref={wrapperRef}>
+      <Search size={14} />
+      <input
+        className="records-table-filter"
+        onChange={(event) => {
+          onChange(uppercaseInput(event.target.value));
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="DNI o nombre"
+        value={value}
+      />
+      {open && query.length >= 2 ? (
+        <div className="records-interested-filter__menu">
+          {loading ? <span>Buscando...</span> : null}
+          {!loading && results.length === 0 ? <span>Sin coincidencias</span> : null}
+          {results.map((interesado) => (
+            <button
+              key={interesado.id}
+              onClick={() => {
+                onChange(interesado.dni || interesado.nombre || "");
+                setOpen(false);
+              }}
+              type="button"
+            >
+              <UserRoundCheck size={15} />
+              <span>
+                <strong>{interesado.nombre || "SIN NOMBRE"}</strong>
+                <small>{interesado.dni || "SIN DNI"}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PhaseSummary({ expediente }: { expediente: ExpedienteListItem }) {
+  return <span className="records-phase-title">{expediente.faseActual || "Fase sin definir"}</span>;
+}
+
+function InterestedParties({ interesados }: { interesados?: ExpedienteListItem["interesados"] }) {
+  if (!interesados?.length) return <span className="muted-text">Sin interesados</span>;
+  const ordered = interesados
+    .map((interesado, index) => ({ interesado, index }))
+    .sort((a, b) => interestedRolePriority(a.interesado.rol) - interestedRolePriority(b.interesado.rol) || a.index - b.index)
+    .map(({ interesado }) => interesado);
+  const visible = ordered.slice(0, 2);
+  return (
+    <div className="records-interested-list">
+      {visible.map((interesado) => (
+        <span key={`${interesado.id}-${interesado.rol || "sin-rol"}`}>
+          <strong>{interesado.nombre || "Sin nombre"}</strong>
+          <small>{[interesado.dni, interesado.rol ? formatEnum(interesado.rol) : null].filter(Boolean).join(" · ")}</small>
+        </span>
+      ))}
+      {ordered.length > visible.length ? <em>+{ordered.length - visible.length} mas</em> : null}
+    </div>
+  );
+}
+
+function interestedRolePriority(role?: string | null) {
+  switch (role) {
+    case "COMPRAVENTA":
+      return 0;
+    case "COMPRADOR":
+    case "TITULAR":
+      return 1;
+    case "VENDEDOR":
+      return 2;
+    default:
+      return 3;
+  }
 }
 
 function MiniPlate({ value }: { value?: string | null }) {
   if (!value) {
     return <span className="muted-text">Sin matricula</span>;
   }
-  return (
-    <span className="mini-plate-react">
-      <span>E</span>
-      <strong>{value}</strong>
-    </span>
-  );
+  return <strong className="records-plate-value">{value}</strong>;
 }
 
 function ErrorState({ error }: { error: unknown }) {
@@ -438,9 +570,9 @@ function ListSkeleton() {
 
 function statusTone(status?: string | null) {
   if (status === "FINALIZADO" || status === "CONVERTIDA") return "success";
-  if (status === "INCIDENCIA" || status === "PENDIENTE_DOCUMENTACION") return "danger";
+  if (status === "INCIDENCIA" || status === "PENDIENTE_DOCUMENTACION" || status === "SOLICITADA_INFORMACION_ADICIONAL") return "danger";
   if (status === "REVISANDO_INCIDENCIAS" || status === "ENVIADO_DGT" || status === "INFORMACION_ADICIONAL_RECIBIDA") return "info";
-  if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION" || status === "SOLICITADA_INFORMACION_ADICIONAL") return "warning";
+  if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION") return "warning";
   return "neutral";
 }
 
@@ -450,4 +582,25 @@ function fechaReferencia(item: { fechaCreacion?: string | null; fechaUltimaModif
 
 function formatEnum(value?: string | null) {
   return value ? value.replaceAll("_", " ") : "Sin estado";
+}
+
+function formatStatusLabel(value?: string | null) {
+  switch (value) {
+    case "EN_TRAMITE":
+      return "EN TRAMITE";
+    case "SOLICITADA_INFORMACION_ADICIONAL":
+      return "PENDIENTE DE RESPUESTA";
+    case "PENDIENTE_DOCUMENTACION":
+      return "PENDIENTE DOCUMENTACION";
+    case "INFORMACION_ADICIONAL_RECIBIDA":
+      return "INFORMACION RECIBIDA";
+    case "REVISANDO_INCIDENCIAS":
+      return "REVISANDO INCIDENCIAS";
+    case "ENVIADO_DGT":
+      return "ENVIADO DGT";
+    case "FINALIZADO":
+      return "FINALIZADO";
+    default:
+      return formatEnum(value);
+  }
 }

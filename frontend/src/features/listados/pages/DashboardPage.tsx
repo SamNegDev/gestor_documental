@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { Link, useLocation, useOutletContext } from "react-router-dom";
-import { AlertCircle, ClipboardCheck, FilePlus2, FolderOpen, Inbox, Loader2, Plus, TrendingUp } from "lucide-react";
+import { AlertCircle, ArrowRight, CircleCheck, ClipboardCheck, Clock3, FilePlus2, FolderOpen, Inbox, Loader2, Plus, ShieldAlert } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { getDashboard } from "../services/listadosApi";
@@ -37,7 +38,7 @@ export function DashboardPage() {
   const data = dashboardQuery.data;
   return (
     <main className="dashboard-page">
-      <section className="dashboard-hero">
+      <section className="dashboard-hero dashboard-hero--ledger">
         <div>
           <p className="eyebrow">{isAdmin ? "Gestion interna" : "Portal cliente"}</p>
           <h2>{isAdmin ? "Resumen operativo" : "Tu actividad"}</h2>
@@ -59,10 +60,10 @@ export function DashboardPage() {
       </section>
 
       <section className="dashboard-metrics">
-        <MetricCard title="En tramite" value={data.metrics.enTramite} tone="warning" />
-        <MetricCard title="Pendiente revision" value={data.metrics.pendienteRevision} tone="info" />
-        <MetricCard title="Con incidencias" value={data.metrics.totalIncidencias} tone="danger" />
-        <MetricCard title="Finalizados" value={data.metrics.finalizados} tone="success" />
+        <MetricCard icon={<Clock3 size={17} />} title="En tramite" value={data.metrics.enTramite} tone="warning" />
+        <MetricCard icon={<ClipboardCheck size={17} />} title="Pendiente de revision" value={data.metrics.pendienteRevision} tone="info" />
+        <MetricCard icon={<ShieldAlert size={17} />} title="Con incidencias" value={data.metrics.totalIncidencias} tone="danger" />
+        <MetricCard icon={<CircleCheck size={17} />} title="Finalizados" value={data.metrics.finalizados} tone="success" />
       </section>
 
       <section className="dashboard-grid">
@@ -94,11 +95,11 @@ export function DashboardPage() {
   );
 }
 
-function MetricCard({ title, value, tone }: { title: string; value: number; tone: string }) {
+function MetricCard({ title, value, tone, icon }: { title: string; value: number; tone: string; icon: ReactNode }) {
   return (
     <article className={`dashboard-metric dashboard-metric--${tone}`}>
-      <TrendingUp size={18} />
-      <span>{title}</span>
+      <span className="dashboard-metric__icon">{icon}</span>
+      <span className="dashboard-metric__label">{title}</span>
       <strong>{value}</strong>
     </article>
   );
@@ -114,7 +115,7 @@ function ProgressPanel({
   items: Array<{ label: string; value: number; tone: string }>;
 }) {
   return (
-    <section className="panel dashboard-progress-panel">
+    <section className="panel dashboard-progress-panel dashboard-progress-panel--ledger">
       <div className="panel-heading">
         <h2>{title}</h2>
         <span className="records-count">{total} total</span>
@@ -141,16 +142,22 @@ function ProgressPanel({
 
 function LatestExpedientes({ data, isAdmin }: { data: DashboardData; isAdmin: boolean }) {
   return (
-    <section className="records-panel">
+    <section className="records-panel dashboard-records-panel">
       <div className="records-panel__heading">
         <div>
           <h3>{isAdmin ? "Ultimos expedientes" : "Tus ultimos expedientes"}</h3>
           <span>{data.ultimosExpedientes.length} recientes</span>
         </div>
-        <Link className="soft-button soft-button--compact" to="/expedientes">
+        <Link className="soft-button soft-button--compact" to={isAdmin ? "/expedientes" : "/cliente/expedientes"}>
           <FolderOpen size={16} />
           Ver todos
         </Link>
+      </div>
+      <div className="dashboard-list__header" aria-hidden="true">
+        <span>Expediente</span>
+        <span>Matricula</span>
+        <span>Estado</span>
+        <span />
       </div>
       <div className="dashboard-list">
         {data.ultimosExpedientes.length === 0 ? <EmptyRow icon="expediente" text="No hay expedientes disponibles." /> : null}
@@ -164,16 +171,22 @@ function LatestExpedientes({ data, isAdmin }: { data: DashboardData; isAdmin: bo
 
 function LatestSolicitudes({ data, isAdmin }: { data: DashboardData; isAdmin: boolean }) {
   return (
-    <section className="records-panel">
+    <section className="records-panel dashboard-records-panel">
       <div className="records-panel__heading">
         <div>
           <h3>{isAdmin ? "Ultimas solicitudes" : "Tus ultimas solicitudes"}</h3>
           <span>{data.ultimasSolicitudes.length} recientes</span>
         </div>
-        <Link className="soft-button soft-button--compact" to="/solicitudes">
+        <Link className="soft-button soft-button--compact" to={isAdmin ? "/solicitudes" : "/cliente/solicitudes"}>
           <Inbox size={16} />
           Ver todas
         </Link>
+      </div>
+      <div className="dashboard-list__header" aria-hidden="true">
+        <span>Solicitud</span>
+        <span>Matricula</span>
+        <span>Estado</span>
+        <span />
       </div>
       <div className="dashboard-list">
         {data.ultimasSolicitudes.length === 0 ? <EmptyRow icon="solicitud" text="No hay solicitudes disponibles." /> : null}
@@ -193,9 +206,9 @@ function ExpedienteRow({ expediente, isAdmin }: { expediente: ExpedienteListItem
         <span>{isAdmin ? expediente.tipoTramite || "Sin tipo de tramite" : expediente.fechaCreacion || "Sin fecha"}</span>
       </div>
       <MiniPlate value={expediente.matricula} />
-      <StatusBadge tone={statusTone(expediente.estado)}>{formatEnum(expediente.estado)}</StatusBadge>
-      <Link className="soft-button soft-button--compact" to={isAdmin ? `/expedientes/${expediente.id}` : `/cliente/expedientes/${expediente.id}`}>
-        Ver
+      <StatusBadge tone={statusTone(expediente.estado)}>{formatDashboardStatus(expediente.estado)}</StatusBadge>
+      <Link aria-label="Ver expediente" className="icon-button" title="Ver expediente" to={isAdmin ? `/expedientes/${expediente.id}` : `/cliente/expedientes/${expediente.id}`}>
+        <ArrowRight size={16} />
       </Link>
     </article>
   );
@@ -214,9 +227,9 @@ function SolicitudRow({ solicitud, isAdmin }: { solicitud: SolicitudListItem; is
         <span>{isAdmin ? solicitud.tipoTramite || "Sin tipo de tramite" : solicitud.fechaCreacion || "Sin fecha"}</span>
       </div>
       <MiniPlate value={solicitud.matricula} />
-      <StatusBadge tone={statusTone(solicitud.estado)}>{formatEnum(solicitud.estado)}</StatusBadge>
-      <Link className="soft-button soft-button--compact" to={target}>
-        Ver
+      <StatusBadge tone={statusTone(solicitud.estado)}>{formatDashboardStatus(solicitud.estado)}</StatusBadge>
+      <Link aria-label="Ver solicitud" className="icon-button" title="Ver solicitud" to={target}>
+        <ArrowRight size={16} />
       </Link>
     </article>
   );
@@ -245,12 +258,31 @@ function EmptyRow({ text }: { icon: string; text: string }) {
 
 function statusTone(status?: string | null) {
   if (status === "FINALIZADO" || status === "CONVERTIDA") return "success";
-  if (status === "INCIDENCIA" || status === "PENDIENTE_DOCUMENTACION" || status === "RECHAZADO") return "danger";
+  if (status === "INCIDENCIA" || status === "RECHAZADO" || status === "PENDIENTE_DOCUMENTACION" || status === "SOLICITADA_INFORMACION_ADICIONAL") return "danger";
   if (status === "REVISANDO_INCIDENCIAS" || status === "ENVIADO_DGT" || status === "INFORMACION_ADICIONAL_RECIBIDA") return "info";
-  if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION" || status === "SOLICITADA_INFORMACION_ADICIONAL") return "warning";
+  if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION") return "warning";
   return "neutral";
 }
 
 function formatEnum(value?: string | null) {
   return value ? value.replaceAll("_", " ") : "Sin estado";
+}
+
+function formatDashboardStatus(value?: string | null) {
+  switch (value) {
+    case "SOLICITADA_INFORMACION_ADICIONAL":
+      return "PENDIENTE DE RESPUESTA";
+    case "PENDIENTE_DOCUMENTACION":
+      return "PENDIENTE DOCUMENTACION";
+    case "INFORMACION_ADICIONAL_RECIBIDA":
+      return "INFORMACION RECIBIDA";
+    case "REVISANDO_INCIDENCIAS":
+      return "REVISANDO DOCUMENTACION";
+    case "PENDIENTE_REVISION":
+      return "PENDIENTE DE REVISION";
+    case "ENVIADO_DGT":
+      return "ENVIADO DGT";
+    default:
+      return formatEnum(value);
+  }
 }

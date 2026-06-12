@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, FolderCheck, Loader2, MessageSquare, Pencil, Send, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Circle, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, Send, UserRound } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { uppercaseInput } from "../../../shared/utils/text";
@@ -197,6 +197,7 @@ export function SolicitudDetailPage() {
   const solicitud = solicitudQuery.data;
   const isClosed = solicitud.estado === "CONVERTIDA" || solicitud.estado === "RECHAZADO";
   const interesadosVisibles = solicitud.interesados.filter(hasInteresadoData);
+  const documentosOrientativosPendientes = getInformativeMissingDocuments(solicitud);
 
   return (
     <section className="request-page">
@@ -238,13 +239,39 @@ export function SolicitudDetailPage() {
 
       {!isAdmin ? <ClientStatusCallout solicitud={solicitud} expedientePath={isAdmin ? undefined : "/cliente/expedientes"} /> : null}
 
-      {isAdmin && !isClosed ? (
-        <CompleteExpedienteUploadPanel
-          onUploadCompleteExpediente={handleUploadCompleteSolicitud}
-          processing={completeSolicitudProcessing}
-          title="Subir solicitud completa"
-          description="Sube un PDF completo y el sistema intentara separar automaticamente los documentos detectados."
-        />
+      {!isClosed ? (
+        <>
+          <CompleteExpedienteUploadPanel
+            onUploadCompleteExpediente={handleUploadCompleteSolicitud}
+            processing={completeSolicitudProcessing}
+            title="Aportar documentacion completa"
+            description="Sube el PDF completo de la solicitud y el sistema intentara separar automaticamente los documentos detectados."
+          />
+          <section className="request-document-guide" aria-label="Documentacion orientativa pendiente">
+            <div className="request-document-guide__heading">
+              <Info size={18} />
+              <div>
+                <strong>Documentacion orientativa</strong>
+                <span>Esta lista es informativa y no bloquea la solicitud.</span>
+              </div>
+            </div>
+            {documentosOrientativosPendientes.length > 0 ? (
+              <ul>
+                {documentosOrientativosPendientes.map((documento) => (
+                  <li key={documento}>
+                    <Circle size={9} />
+                    <span>{documento}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="request-document-guide__complete">
+                <CheckCircle2 size={16} />
+                No se detectan documentos basicos pendientes.
+              </p>
+            )}
+          </section>
+        </>
       ) : null}
 
       <div className="request-grid">
@@ -520,4 +547,30 @@ function hasInteresadoData(interesado: { nombre?: string | null; apellidos?: str
   return [interesado.nombre, interesado.apellidos, interesado.rol, interesado.dni, interesado.telefono, interesado.direccion].some(
     (value) => value && value.trim() !== "",
   );
+}
+
+function getInformativeMissingDocuments(solicitud: SolicitudDetail) {
+  const uploadedTypes = new Set(solicitud.documentos.map((documento) => documento.tipo));
+  const missing: string[] = [];
+  const relevantInterested = solicitud.interesados.filter((interesado) => {
+    if (solicitud.tipoTramite === "TRASPASO" || solicitud.tipoTramite === "BATECOM") {
+      return interesado.rol === "COMPRADOR" || interesado.rol === "VENDEDOR" || interesado.rol === "COMPRAVENTA";
+    }
+    return interesado.rol === "TITULAR";
+  });
+
+  if (relevantInterested.length > 0 && !uploadedTypes.has("DNI") && !uploadedTypes.has("CIF")) {
+    missing.push("DNI o CIF de los interesados");
+  }
+  if (
+    (solicitud.tipoTramite === "TRASPASO" || solicitud.tipoTramite === "BATECOM")
+    && !uploadedTypes.has("CONTRATO_COMPRAVENTA")
+    && !uploadedTypes.has("FACTURA")
+  ) {
+    missing.push("Contrato de compraventa o factura de venta");
+  }
+  if (!uploadedTypes.has("MANDATO") && !uploadedTypes.has("MANDATO_REPRESENTACION")) {
+    missing.push("Mandato o autorizacion de gestion");
+  }
+  return missing;
 }

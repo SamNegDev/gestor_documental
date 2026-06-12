@@ -35,6 +35,10 @@ public class Expediente {
     @Column(nullable = false, length = 100)
     private EstadoExpediente estadoExpediente;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 100)
+    private EstadoExpediente estadoPrevioPausa;
+
     @Column (length = 10)
     @Size(max=10, message = "La matricula debe tener 10 caracteres")
     private String matricula;

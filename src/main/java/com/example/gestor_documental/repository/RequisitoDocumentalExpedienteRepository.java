@@ -13,7 +13,7 @@ public interface RequisitoDocumentalExpedienteRepository extends JpaRepository<R
 
     List<RequisitoDocumentalExpediente> findByDocumentoId(Long documentoId);
 
-    Optional<RequisitoDocumentalExpediente> findByExpedienteIdAndTipoDocumentoAndInteresadoIdAndRolInteresado(
+    Optional<RequisitoDocumentalExpediente> findFirstByExpedienteIdAndTipoDocumentoAndInteresadoIdAndRolInteresadoOrderByIdAsc(
             Long expedienteId,
             TipoDocumento tipoDocumento,
             Long interesadoId,
@@ -26,7 +26,7 @@ public interface RequisitoDocumentalExpedienteRepository extends JpaRepository<R
             RolInteresado rolInteresado
     );
 
-    Optional<RequisitoDocumentalExpediente> findByExpedienteIdAndTipoDocumentoAndInteresadoIsNullAndRolInteresadoIsNull(
+    Optional<RequisitoDocumentalExpediente> findFirstByExpedienteIdAndTipoDocumentoAndInteresadoIsNullAndRolInteresadoIsNullOrderByIdAsc(
             Long expedienteId,
             TipoDocumento tipoDocumento
     );

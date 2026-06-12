@@ -73,14 +73,20 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         RequisitoDocumentalExpediente requisito = nuevoRequisito(
                 expediente,
                 tipoDocumento,
-                descripcion,
+                descripcion != null && !descripcion.isBlank()
+                        ? descripcion
+                        : "APORTAR " + tipoDocumento.name().replace('_', ' '),
                 estado,
                 interesado,
                 interesado != null ? rolInteresado : null,
                 usuario
         );
         requisito.setOrigen(OrigenRequisitoDocumental.MANUAL);
-        return requisitoRepository.save(requisito);
+        RequisitoDocumentalExpediente guardado = requisitoRepository.save(requisito);
+        if (estado == EstadoRequisitoDocumental.REQUERIDO) {
+            expedienteService.marcarPendienteDocumentacion(expedienteId, usuario);
+        }
+        return guardado;
     }
 
     @Override
@@ -92,7 +98,9 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         requisito.setDocumento(null);
         requisito.setFechaResolucion(LocalDateTime.now());
         requisito.setResueltoPor(usuario);
-        return requisitoRepository.save(requisito);
+        RequisitoDocumentalExpediente guardado = requisitoRepository.save(requisito);
+        expedienteService.reanudarTrasDocumentacion(requisito.getExpediente().getId(), usuario);
+        return guardado;
     }
 
     @Override
@@ -104,7 +112,9 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         requisito.setMotivoOmision(null);
         requisito.setFechaResolucion(null);
         requisito.setResueltoPor(null);
-        return requisitoRepository.save(requisito);
+        RequisitoDocumentalExpediente guardado = requisitoRepository.save(requisito);
+        expedienteService.marcarPendienteDocumentacion(requisito.getExpediente().getId(), usuario);
+        return guardado;
     }
 
     @Override
@@ -160,7 +170,9 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         requisito.setMotivoOmision(null);
         requisito.setFechaResolucion(LocalDateTime.now());
         requisito.setResueltoPor(usuario);
-        return requisitoRepository.save(requisito);
+        RequisitoDocumentalExpediente guardado = requisitoRepository.save(requisito);
+        expedienteService.reanudarTrasDocumentacion(requisito.getExpediente().getId(), usuario);
+        return guardado;
     }
 
     private void reconciliarConDocumentos(Expediente expediente, List<Documento> documentos, Usuario usuario) {
@@ -182,6 +194,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                         requisitoRepository.save(requisito);
                     });
         }
+        expedienteService.reanudarTrasDocumentacion(expediente.getId(), usuario);
     }
 
     private void generarRequisitosBase(Expediente expediente, List<ExpedienteInteresado> interesados, Usuario usuario) {
@@ -274,7 +287,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             String descripcion,
             Usuario usuario
     ) {
-        requisitoRepository.findByExpedienteIdAndTipoDocumentoAndInteresadoIdAndRolInteresado(
+        requisitoRepository.findFirstByExpedienteIdAndTipoDocumentoAndInteresadoIdAndRolInteresadoOrderByIdAsc(
                 expediente.getId(),
                 tipoDocumento,
                 interesado.getId(),
@@ -307,7 +320,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             EstadoRequisitoDocumental estado,
             Usuario usuario
     ) {
-        requisitoRepository.findByExpedienteIdAndTipoDocumentoAndInteresadoIsNullAndRolInteresadoIsNull(expediente.getId(), tipoDocumento)
+        requisitoRepository.findFirstByExpedienteIdAndTipoDocumentoAndInteresadoIsNullAndRolInteresadoIsNullOrderByIdAsc(expediente.getId(), tipoDocumento)
                 .ifPresentOrElse(
                         requisito -> actualizarDescripcionRegla(requisito, descripcion),
                         () -> requisitoRepository.save(nuevoRequisito(
@@ -331,7 +344,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     }
 
     private void eliminarModelo620Automatico(Expediente expediente) {
-        requisitoRepository.findByExpedienteIdAndTipoDocumentoAndInteresadoIsNullAndRolInteresadoIsNull(
+        requisitoRepository.findFirstByExpedienteIdAndTipoDocumentoAndInteresadoIsNullAndRolInteresadoIsNullOrderByIdAsc(
                         expediente.getId(),
                         TipoDocumento.MODELO_620
                 )

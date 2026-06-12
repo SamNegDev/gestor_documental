@@ -19,6 +19,7 @@ export function InteresadoAutocomplete({ label, value, placeholder, onChange, on
   const [error, setError] = useState(false);
   const wrapperRef = useRef<HTMLLabelElement | null>(null);
   const query = value?.trim() || "";
+  const showMenu = open && query.length >= 2 && (loading || (!error && results.length > 0));
 
   useEffect(() => {
     if (!open || query.length < 2) {
@@ -74,20 +75,21 @@ export function InteresadoAutocomplete({ label, value, placeholder, onChange, on
           value={value || ""}
           placeholder={placeholder}
           onFocus={() => setOpen(true)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setOpen(false);
+            }
+          }}
           onChange={(event) => {
             onChange(uppercaseInput(event.target.value));
             setOpen(true);
           }}
         />
       </span>
-      {open && query.length >= 2 ? (
+      {showMenu ? (
         <div className="interesado-autocomplete__menu">
           {loading ? <span className="interesado-autocomplete__state">Buscando interesados...</span> : null}
-          {error ? <span className="interesado-autocomplete__state">No se pudo buscar ahora.</span> : null}
-          {!loading && !error && results.length === 0 ? (
-            <span className="interesado-autocomplete__state">Sin coincidencias guardadas.</span>
-          ) : null}
-          {results.map((interesado) => (
+          {!loading && !error ? results.map((interesado) => (
             <button key={interesado.id} type="button" onClick={() => select(interesado)}>
               <UserRoundCheck size={16} />
               <span>
@@ -97,7 +99,7 @@ export function InteresadoAutocomplete({ label, value, placeholder, onChange, on
                 </small>
               </span>
             </button>
-          ))}
+          )) : null}
         </div>
       ) : null}
     </label>

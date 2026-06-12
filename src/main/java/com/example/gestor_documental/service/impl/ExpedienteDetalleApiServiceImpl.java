@@ -148,6 +148,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         boolean finalizado = expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO;
         boolean conIncidencia = expediente.getEstadoExpediente() == EstadoExpediente.INCIDENCIA
                 || expediente.getEstadoExpediente() == EstadoExpediente.REVISANDO_INCIDENCIAS;
+        boolean documentacionSolicitada = expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION;
         boolean informacionSolicitada = expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL;
         boolean informacionRecibida = expediente.getEstadoExpediente() == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA;
         boolean requisitosInicialesPendientes = !documentacionBaseCompleta;
@@ -158,7 +159,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 || expediente.getEstadoExpediente() == EstadoExpediente.ENVIADO_DGT
                 || hitosPersistidos.containsKey(CodigoHitoExpediente.ENVIADO_DGT);
         return new EstadoDetalle(tiposSubidos, documentacionBaseCompleta, expedienteCompletoSubido, modelo620Subido,
-                requisitosInicialesPendientes, finalizado, conIncidencia, informacionSolicitada, informacionRecibida,
+                requisitosInicialesPendientes, finalizado, conIncidencia, documentacionSolicitada, informacionSolicitada, informacionRecibida,
                 tramiteSubido, enviadoDgt, hitosPersistidos);
     }
 
@@ -170,6 +171,9 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 || expediente.getEstadoExpediente() == EstadoExpediente.REVISANDO_INCIDENCIAS) {
             return "Incidencias";
         }
+        if (expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION) {
+            return "Pendiente de documentacion";
+        }
         if (expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL) {
             return "Solicitada informacion adicional";
         }
@@ -178,19 +182,19 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         }
         if (!estadoDetalle.documentacionBaseCompleta()) {
             return estadoDetalle.expedienteCompletoSubido()
-                    ? "Expediente completo pendiente de revision"
-                    : "Documentacion pendiente";
+                    ? "Comprobacion de documentacion del expediente completo"
+                    : "Comprobacion de documentacion";
         }
         if (!estadoDetalle.tramiteSubido()) {
-            return "Listo para subir al programa de gestion";
+            return "Pendiente de subir a programa de gestion";
         }
         if (!estadoDetalle.modelo620Subido()) {
-            return "Pendiente de Modelo 620";
+            return "Tramite subido, a la espera de pasar el impuesto 620";
         }
         if (!estadoDetalle.enviadoDgt()) {
-            return "Tramite listo para firmar";
+            return "Impuesto 620 presentado, pendiente de enviar a DGT";
         }
-        return "Pendiente de cierre";
+        return "Tramite enviado a DGT, pendiente de cierre";
     }
 
     private List<HitoExpedienteResponse> calcularHitos(Expediente expediente, EstadoDetalle estadoDetalle) {
@@ -206,7 +210,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
 
         hitos.add(HitoExpedienteResponse.builder()
                 .id("solicitud-revisada")
-                .titulo("Solicitud revisada y convertida en expediente")
+                .titulo("Tramite creado")
                 .descripcion("Se completa automaticamente al crear el expediente desde una solicitud validada o al crear el expediente manualmente.")
                 .estado("COMPLETADO")
                 .tipo("AUTOMATICO")
@@ -218,7 +222,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
 
         hitos.add(HitoExpedienteResponse.builder()
                 .id("documentacion-completa")
-                .titulo("Documentacion completa")
+                .titulo(documentacionLista ? "Documentacion comprobada" : "Comprobacion de documentacion")
                 .descripcion("Se completa cuando todos los documentos base requeridos estan subidos o el expediente ya esta cerrado.")
                 .estado(documentacionLista ? "COMPLETADO" : "ACTUAL")
                 .tipo("AUTOMATICO")
@@ -229,7 +233,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
 
         hitos.add(HitoExpedienteResponse.builder()
                 .id("tramite-programa-gestion")
-                .titulo("Tramite subido en programa gestion")
+                .titulo(tramiteSubido ? "Tramite subido al programa de gestion" : "Pendiente de subir a programa de gestion")
                 .descripcion("Confirmacion de que el expediente ya se ha cargado en el programa de gestion.")
                 .estado(tramiteSubido ? "COMPLETADO" : documentacionLista ? "ACTUAL" : "BLOQUEADO")
                 .tipo("MANUAL")
@@ -246,7 +250,11 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
 
         hitos.add(HitoExpedienteResponse.builder()
                 .id("modelo-620-presentado")
-                .titulo("Modelo 620 presentado")
+                .titulo(modelo620Completado
+                        ? "Impuesto 620 presentado"
+                        : tramiteSubido
+                                ? "Tramite subido, pendiente de pasar el impuesto 620"
+                                : "Pendiente de pasar el impuesto 620")
                 .descripcion("Documento de fase posterior, despues de subir el tramite en el programa de gestion.")
                 .estado(modelo620Completado ? "COMPLETADO" : tramiteSubido ? "ACTUAL" : "BLOQUEADO")
                 .tipo("MANUAL")
@@ -341,7 +349,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .build());
         hitos.add(HitoExpedienteResponse.builder()
                 .id(tipoOperacion.name().toLowerCase() + "-tramite")
-                .titulo("Tramite subido en programa gestion")
+                .titulo(tramite ? "Tramite subido al programa de gestion" : "Pendiente de subir a programa de gestion")
                 .descripcion("Confirmacion de carga de esta operacion en el programa de gestion.")
                 .estado(tramite ? "COMPLETADO" : bloqueada ? "BLOQUEADO" : "ACTUAL")
                 .tipo("MANUAL")
@@ -361,7 +369,11 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .build());
         hitos.add(HitoExpedienteResponse.builder()
                 .id(tipoOperacion.name().toLowerCase() + "-modelo-620")
-                .titulo("Modelo 620 presentado")
+                .titulo(modelo
+                        ? "Impuesto 620 presentado"
+                        : tramite
+                                ? "Tramite subido, pendiente de pasar el impuesto 620"
+                                : "Pendiente de pasar el impuesto 620")
                 .descripcion("Documento fiscal posterior a la carga en programa.")
                 .estado(modelo ? "COMPLETADO" : tramite ? "ACTUAL" : "BLOQUEADO")
                 .tipo("MANUAL")
@@ -508,7 +520,9 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                     .descripcion("Se ha solicitado informacion adicional al cliente.")
                     .estado("ACTUAL")
                     .tipo("INFORMACION_ADICIONAL")
-                    .nota("El expediente queda pausado hasta recibir la respuesta del cliente.")
+                    .nota("El cliente puede responder en la plataforma o el administrador resolver la solicitud directamente.")
+                    .accion("RESOLVER_INFORMACION_ADICIONAL")
+                    .accionLabel("Resolver solicitud")
                     .completado(false)
                     .bloqueado(false)
                     .build();
@@ -523,6 +537,18 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                     .nota("Revisa la respuesta y marca la informacion como revisada para continuar.")
                     .accion("RESOLVER_INFORMACION_ADICIONAL")
                     .accionLabel("Marcar revisada")
+                    .completado(false)
+                    .bloqueado(false)
+                    .build();
+        }
+        if (estadoDetalle.documentacionSolicitada()) {
+            return HitoExpedienteResponse.builder()
+                    .id("documentacion-solicitada")
+                    .titulo("Esperando documentacion del cliente")
+                    .descripcion("El expediente queda pausado hasta completar los requisitos documentales solicitados.")
+                    .estado("ACTUAL")
+                    .tipo("DOCUMENTACION")
+                    .nota("El cliente puede aportar cada documento desde su expediente.")
                     .completado(false)
                     .bloqueado(false)
                     .build();
@@ -720,6 +746,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
             boolean requisitosInicialesPendientes,
             boolean finalizado,
             boolean conIncidencia,
+            boolean documentacionSolicitada,
             boolean informacionSolicitada,
             boolean informacionRecibida,
             boolean tramiteSubido,

@@ -12,7 +12,8 @@ const statusClass: Record<ExpedienteStatusType, string> = {
   RECHAZADO: "exp-status--danger",
   ENVIADO_DGT: "exp-status--info",
   REVISANDO_INCIDENCIAS: "exp-status--warning",
-  SOLICITADA_INFORMACION_ADICIONAL: "exp-status--warning",
+  PENDIENTE_DOCUMENTACION: "exp-status--danger",
+  SOLICITADA_INFORMACION_ADICIONAL: "exp-status--danger",
   INFORMACION_ADICIONAL_RECIBIDA: "exp-status--info",
 };
 

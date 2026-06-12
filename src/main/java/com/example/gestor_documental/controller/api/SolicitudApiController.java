@@ -13,8 +13,10 @@ import com.example.gestor_documental.dto.expediente.SolicitudListItemResponse;
 import com.example.gestor_documental.dto.expediente.TipoTramiteResumenResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
 import com.example.gestor_documental.enums.EstadoSolicitud;
+import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.HistorialCambio;
@@ -36,6 +38,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -270,6 +274,7 @@ public class SolicitudApiController {
     }
 
     private SolicitudListItemResponse mapSolicitudListItem(Solicitud solicitud) {
+        List<Documento> documentos = documentoService.listarPorSolicitud(solicitud.getId());
         return SolicitudListItemResponse.builder()
                 .id(solicitud.getId())
                 .matricula(solicitud.getMatricula())
@@ -290,7 +295,39 @@ public class SolicitudApiController {
                         : null)
                 .modificadoPor(mapUsuario(solicitud.getModificadoPor()))
                 .expedienteId(solicitud.getExpediente() != null ? solicitud.getExpediente().getId() : null)
+                .interesados(mapInteresados(solicitud))
+                .situacionDocumental(situacionDocumental(solicitud, documentos))
                 .build();
+    }
+
+    private String situacionDocumental(Solicitud solicitud, List<Documento> documentos) {
+        if (documentos.isEmpty()) return "SIN DOCUMENTACION";
+        int pendientes = contarDocumentosBasicosPendientes(solicitud, documentos);
+        if (pendientes > 0) return pendientes == 1 ? "FALTA 1 DOCUMENTO" : "FALTAN " + pendientes + " DOCUMENTOS";
+        return "DOCUMENTACION COMPLETA";
+    }
+
+    private int contarDocumentosBasicosPendientes(Solicitud solicitud, List<Documento> documentos) {
+        Set<TipoDocumento> tipos = documentos.stream().map(Documento::getTipoDocumento).collect(Collectors.toSet());
+        int pendientes = 0;
+        boolean tramiteVenta = solicitud.getTipoTramite() != null
+                && (solicitud.getTipoTramite().getNombre() == TipoTramiteEnum.TRASPASO
+                || solicitud.getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM);
+        boolean tieneInteresadoAplicable = tramiteVenta
+                ? esRolVenta(solicitud.getInteresado1Rol()) || esRolVenta(solicitud.getInteresado2Rol())
+                : solicitud.getInteresado1Rol() == RolInteresado.TITULAR
+                || solicitud.getInteresado2Rol() == RolInteresado.TITULAR;
+
+        if (tieneInteresadoAplicable && !tipos.contains(TipoDocumento.DNI) && !tipos.contains(TipoDocumento.CIF)) pendientes++;
+        if (tramiteVenta && !tipos.contains(TipoDocumento.CONTRATO_COMPRAVENTA) && !tipos.contains(TipoDocumento.FACTURA)) pendientes++;
+        if (!tipos.contains(TipoDocumento.MANDATO) && !tipos.contains(TipoDocumento.MANDATO_REPRESENTACION)) pendientes++;
+        return pendientes;
+    }
+
+    private boolean esRolVenta(RolInteresado rol) {
+        return rol == RolInteresado.COMPRADOR
+                || rol == RolInteresado.VENDEDOR
+                || rol == RolInteresado.COMPRAVENTA;
     }
 
     private UsuarioResumenResponse mapUsuario(Usuario usuario) {

@@ -4,7 +4,8 @@ import { useParams } from "react-router-dom";
 import { AlertCircle, CheckCircle2, Clock3, Download, Eye, FileText, History, Loader2, MessageCircle, Upload } from "lucide-react";
 import { answerAdditionalInfo, getClienteExpediente, sendClienteExpedienteMessage, type ExpedienteCliente } from "../services/clienteExpedienteApi";
 import { uploadIncidentDocument } from "../services/expedienteDetailApi";
-import type { DocumentoExpediente, IncidenciaExpediente } from "../types/expedienteDetail.types";
+import { uploadRequirementDocument } from "../services/requisitosApi";
+import type { DocumentoExpediente, IncidenciaExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 import { uppercaseInput } from "../../../shared/utils/text";
 import { ApiError } from "../../../shared/api/http";
@@ -33,8 +34,8 @@ const CLIENT_CLOSING_DOCUMENTS = [
 
 function clienteTone(estado: string) {
   if (estado === "FINALIZADO") return "success";
-  if (estado === "INCIDENCIA") return "danger";
-  if (estado === "REVISANDO_INCIDENCIAS" || estado === "SOLICITADA_INFORMACION_ADICIONAL") return "warning";
+  if (estado === "INCIDENCIA" || estado === "SOLICITADA_INFORMACION_ADICIONAL" || estado === "PENDIENTE_DOCUMENTACION") return "danger";
+  if (estado === "REVISANDO_INCIDENCIAS") return "warning";
   return "info";
 }
 
@@ -42,6 +43,7 @@ function friendlyPhase(expediente: ExpedienteCliente) {
   if (expediente.estado === "FINALIZADO") return "Expediente finalizado";
   if (expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL") return "Informacion solicitada";
   if (expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA") return "Informacion en revision";
+  if (expediente.estado === "PENDIENTE_DOCUMENTACION") return "Pendiente de documentacion";
   if (expediente.estado === "INCIDENCIA") return "Pendiente de documentacion";
   if (expediente.estado === "REVISANDO_INCIDENCIAS") return "Documentacion en revision";
   if (expediente.estado === "ENVIADO_DGT") return "Enviado a DGT";
@@ -61,12 +63,13 @@ function timelineSteps(expediente: ExpedienteCliente, closingDocumentsReady: boo
     expediente.estado === "FINALIZADO" ? (closingDocumentsReady ? 4 : 3)
       : expediente.estado === "ENVIADO_DGT" || phase.includes("firmar") ? 2
         : expediente.estado === "INCIDENCIA" || expediente.estado === "REVISANDO_INCIDENCIAS"
+          || expediente.estado === "PENDIENTE_DOCUMENTACION"
           || expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? 1
           : 1;
 
   return [
     { title: "Expediente abierto", description: "Hemos recibido la informacion inicial." },
-    { title: expediente.estado === "INCIDENCIA" ? "Incidencia" : expediente.estado === "REVISANDO_INCIDENCIAS" ? "Revision" : expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? "Informacion" : "Documentacion", description: expediente.estado === "REVISANDO_INCIDENCIAS" ? "Tu documento esta pendiente de revision." : expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" ? "Necesitamos una respuesta para continuar." : expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? "Tu respuesta esta pendiente de revision." : "Revisamos o completamos la documentacion." },
+    { title: expediente.estado === "INCIDENCIA" ? "Incidencia" : expediente.estado === "REVISANDO_INCIDENCIAS" ? "Revision" : expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? "Informacion" : "Documentacion", description: expediente.estado === "REVISANDO_INCIDENCIAS" ? "Tu documento esta pendiente de revision." : expediente.estado === "PENDIENTE_DOCUMENTACION" ? "Necesitamos que aportes los documentos solicitados." : expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" ? "Necesitamos una respuesta para continuar." : expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? "Tu respuesta esta pendiente de revision." : "Revisamos o completamos la documentacion." },
     { title: "Listo para firmar", description: "El tramite queda preparado para el siguiente paso." },
     { title: "Finalizado", description: "El expediente queda cerrado." },
   ].map((step, index) => ({
@@ -145,6 +148,58 @@ function ClientClosingDocumentsPanel({ documentos }: { documentos: DocumentoExpe
   );
 }
 
+function ClientDocumentRequirementsPanel({
+  requisitos,
+  onUpload,
+}: {
+  requisitos: RequisitoDocumental[];
+  onUpload: (requisito: RequisitoDocumental, archivo: File) => void;
+}) {
+  if (requisitos.length === 0) return null;
+
+  return (
+    <section className="client-requirements-panel" aria-label="Documentacion solicitada">
+      <div className="exp-panel__heading">
+        <div>
+          <p className="eyebrow">Accion requerida</p>
+          <h3>Documentacion pendiente</h3>
+        </div>
+        <span className="exp-panel__counter">{requisitos.length}</span>
+      </div>
+      <div className="client-requirements-list">
+        {requisitos.map((requisito) => (
+          <article className="client-requirement-row" key={requisito.id}>
+            <span className="client-requirement-row__icon">
+              <FileText size={18} />
+            </span>
+            <div>
+              <strong>{requisito.descripcion}</strong>
+              <small>
+                {formatDocumentType(requisito.tipoDocumento)}
+                {requisito.interesadoNombre ? ` · ${requisito.interesadoNombre}` : ""}
+              </small>
+            </div>
+            <label className="primary-button primary-button--compact">
+              <Upload size={15} />
+              Aportar
+              <input
+                hidden
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  event.currentTarget.value = "";
+                  if (file) onUpload(requisito, file);
+                }}
+              />
+            </label>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function ClienteExpedientePage() {
   const { id } = useParams();
   const [expediente, setExpediente] = useState<ExpedienteCliente | null>(null);
@@ -188,6 +243,15 @@ export function ClienteExpedientePage() {
       await load();
     } catch {
       alert("No se pudo subir el documento.");
+    }
+  };
+
+  const handleUploadRequirement = async (requisito: RequisitoDocumental, archivo: File) => {
+    try {
+      await uploadRequirementDocument(requisito.id, archivo);
+      await load();
+    } catch {
+      alert("No se pudo aportar el documento solicitado.");
     }
   };
 
@@ -245,6 +309,7 @@ export function ClienteExpedientePage() {
   }
 
   const documentos = expediente.documentos ?? [];
+  const requisitos = expediente.requisitosDocumentales ?? [];
   const incidencias = expediente.incidencias ?? [];
   const mensajes = expediente.mensajes ?? [];
   const historial = expediente.historial ?? [];
@@ -276,6 +341,8 @@ export function ClienteExpedientePage() {
         <strong>{expediente.siguienteMensaje || "Estamos tramitando el expediente."}</strong>
         <span>Inicio: {formatDateTime(expediente.fechaInicio)}</span>
       </section>
+
+      <ClientDocumentRequirementsPanel requisitos={requisitos} onUpload={handleUploadRequirement} />
 
       {expediente.estado === "FINALIZADO" ? <ClientClosingDocumentsPanel documentos={documentos} /> : null}
 

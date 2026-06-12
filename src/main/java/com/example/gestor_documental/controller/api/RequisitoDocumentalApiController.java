@@ -30,7 +30,7 @@ public class RequisitoDocumentalApiController {
     public ResponseEntity<Void> crearRequisito(
             @PathVariable Long expedienteId,
             @RequestParam TipoDocumento tipoDocumento,
-            @RequestParam String descripcion,
+            @RequestParam(required = false) String descripcion,
             @RequestParam(required = false) Long interesadoId,
             @RequestParam(required = false) RolInteresado rolInteresado,
             @RequestParam(defaultValue = "REQUERIDO") EstadoRequisitoDocumental estadoInicial,

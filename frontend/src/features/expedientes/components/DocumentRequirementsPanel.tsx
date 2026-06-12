@@ -1,5 +1,5 @@
 import { CheckCircle2, CircleDashed, FileText, Link2, Plus, Slash, Upload, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DocumentoExpediente, InteresadoExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 import { formatDocumentType, humanizeEnum } from "../utils/formatters";
 import { uppercaseInput } from "../../../shared/utils/text";
@@ -18,6 +18,7 @@ type Props = {
   onLinkRequirementDocument: (requisito: RequisitoDocumental, documentoId: number) => void;
   onOmitRequirement: (requisito: RequisitoDocumental, motivo: string) => void;
   onUploadRequirement: (requisito: RequisitoDocumental, archivo: File) => void;
+  openRequestSignal?: number;
 };
 
 const DOCUMENT_TYPES = [
@@ -50,6 +51,7 @@ export function DocumentRequirementsPanel({
   onLinkRequirementDocument,
   onOmitRequirement,
   onUploadRequirement,
+  openRequestSignal = 0,
 }: Props) {
   const [adding, setAdding] = useState(false);
   const [tipoDocumento, setTipoDocumento] = useState("DNI");
@@ -64,9 +66,21 @@ export function DocumentRequirementsPanel({
   const pendientes = requisitosPendientes.length;
   const documentosSubidos = documentos.filter((documento) => documento.id);
 
+  useEffect(() => {
+    if (openRequestSignal <= 0) return;
+    setAdding(true);
+  }, [openRequestSignal]);
+
+  const closeAdd = () => {
+    setAdding(false);
+    setTipoDocumento("DNI");
+    setDescripcion("");
+    setInteresadoKey("");
+    setEstadoInicial("REQUERIDO");
+  };
+
   const submitAdd = () => {
     const descripcionLimpia = uppercaseInput(descripcion.trim());
-    if (!descripcionLimpia) return;
     const [interesadoId, rolInteresado] = interesadoKey ? interesadoKey.split(":") : [];
     onAddRequirement({
       tipoDocumento,
@@ -75,10 +89,7 @@ export function DocumentRequirementsPanel({
       rolInteresado: rolInteresado || null,
       estadoInicial,
     });
-    setDescripcion("");
-    setInteresadoKey("");
-    setEstadoInicial("REQUERIDO");
-    setAdding(false);
+    closeAdd();
   };
 
   const omitRequirement = (requisito: RequisitoDocumental) => {
@@ -117,45 +128,13 @@ export function DocumentRequirementsPanel({
           <h3>Requisitos documentales</h3>
         </div>
         <div className="requirement-heading-actions">
-          <button className="soft-button soft-button--compact" type="button" onClick={() => setAdding((value) => !value)}>
+          <button className="soft-button soft-button--compact" type="button" onClick={() => setAdding(true)}>
             <Plus size={15} />
             Añadir
           </button>
           <span className="exp-panel__counter">{pendientes}</span>
         </div>
       </div>
-      {adding ? (
-        <div className="requirement-form">
-          <select value={tipoDocumento} onChange={(event) => setTipoDocumento(event.target.value)}>
-            {DOCUMENT_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {formatDocumentType(type)}
-              </option>
-            ))}
-          </select>
-          <input
-            value={descripcion}
-            placeholder="Descripcion"
-            onChange={(event) => setDescripcion(uppercaseInput(event.target.value))}
-          />
-          <select value={interesadoKey} onChange={(event) => setInteresadoKey(event.target.value)}>
-            <option value="">Sin interesado</option>
-            {interesados.map((interesado) => (
-              <option key={`${interesado.id}:${interesado.rol ?? ""}`} value={`${interesado.id}:${interesado.rol ?? ""}`}>
-                {interesado.nombre} {interesado.rol ? `- ${humanizeEnum(interesado.rol)}` : ""}
-              </option>
-            ))}
-          </select>
-          <select value={estadoInicial} onChange={(event) => setEstadoInicial(event.target.value as "REQUERIDO" | "POSTERIOR")}>
-            <option value="REQUERIDO">Requerido</option>
-            <option value="POSTERIOR">Posterior</option>
-          </select>
-          <button className="primary-button" type="button" onClick={submitAdd}>
-            Guardar
-          </button>
-        </div>
-      ) : null}
-
       <div className="requirements-list">
         {requisitosPendientes.map((requisito) => (
           <article className={`requirement-row requirement-row--${requisito.estado.toLowerCase()}`} key={requisito.id}>
@@ -200,6 +179,73 @@ export function DocumentRequirementsPanel({
         <p className="exp-empty">
           <FileText size={16} /> No hay documentos pendientes de aportar.
         </p>
+      ) : null}
+
+      {adding ? (
+        <div className="exp-modal" role="presentation">
+          <button className="exp-modal__backdrop" onClick={closeAdd} type="button" aria-label="Cerrar solicitud de documentacion" />
+          <section aria-labelledby="requirement-create-title" aria-modal="true" className="exp-modal__panel exp-modal__panel--narrow" role="dialog">
+            <div className="exp-modal__header">
+              <div>
+                <p className="eyebrow">Nueva solicitud</p>
+                <h3 id="requirement-create-title">Solicitar documentación</h3>
+              </div>
+              <button aria-label="Cerrar" className="icon-button" onClick={closeAdd} type="button">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="requirement-create-form">
+              <label>
+                Tipo de documento
+                <select autoFocus value={tipoDocumento} onChange={(event) => setTipoDocumento(event.target.value)}>
+                  {DOCUMENT_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {formatDocumentType(type)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Interesado
+                <select value={interesadoKey} onChange={(event) => setInteresadoKey(event.target.value)}>
+                  <option value="">Sin interesado asociado</option>
+                  {interesados.map((interesado) => (
+                    <option key={`${interesado.id}:${interesado.rol ?? ""}`} value={`${interesado.id}:${interesado.rol ?? ""}`}>
+                      {interesado.nombre} {interesado.rol ? `- ${humanizeEnum(interesado.rol)}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Momento del requisito
+                <select value={estadoInicial} onChange={(event) => setEstadoInicial(event.target.value as "REQUERIDO" | "POSTERIOR")}>
+                  <option value="REQUERIDO">Necesario ahora</option>
+                  <option value="POSTERIOR">Necesario más adelante</option>
+                </select>
+              </label>
+              <label className="requirement-create-form__comment">
+                <span className="requirement-create-form__label">Comentario <small>Opcional</small></span>
+                <textarea
+                  value={descripcion}
+                  placeholder="Añade una indicación concreta para el cliente"
+                  rows={3}
+                  onChange={(event) => setDescripcion(uppercaseInput(event.target.value))}
+                />
+              </label>
+            </div>
+
+            <footer className="exp-modal__footer">
+              <button className="soft-button" onClick={closeAdd} type="button">
+                Cancelar
+              </button>
+              <button className="primary-button" type="button" onClick={submitAdd}>
+                <Plus size={16} />
+                Crear requisito
+              </button>
+            </footer>
+          </section>
+        </div>
       ) : null}
 
       {linkingRequirement ? (

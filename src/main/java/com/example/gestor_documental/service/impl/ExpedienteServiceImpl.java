@@ -10,6 +10,7 @@ import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
+import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
@@ -33,6 +34,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     private final ClienteService clienteService;
     private final TipoTramiteService tipoTramiteService;
     private final IncidenciaRepository incidenciaRepository;
+    private final RequisitoDocumentalExpedienteRepository requisitoDocumentalRepository;
     private final HistorialCambioService historialCambioService;
 
     @Override
@@ -202,6 +204,128 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 usuarioLogueado,
                 "CAMBIO ESTADO",
                 "El estado cambió de '" + estadoAnterior.name() + "' a '" + nuevoEstado.name() + "'");
+    }
+
+    @Override
+    @Transactional
+    public void solicitarInformacionAdicional(Long id, Usuario usuarioLogueado) {
+        Expediente expediente = obtenerParaPausa(id, usuarioLogueado, true);
+        validarExpedienteAbierto(expediente);
+        if (expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION) {
+            throw new OperacionInvalidaException("Primero debe resolverse la documentacion pendiente.");
+        }
+        pausar(expediente, EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL, usuarioLogueado,
+                "SOLICITUD INFORMACION", "Se solicito informacion adicional al cliente.");
+    }
+
+    @Override
+    @Transactional
+    public void marcarInformacionAdicionalRecibida(Long id, Usuario usuarioLogueado) {
+        Expediente expediente = obtenerParaPausa(id, usuarioLogueado, false);
+        if (expediente.getEstadoExpediente() != EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL) {
+            throw new OperacionInvalidaException("El expediente no tiene informacion adicional pendiente de respuesta.");
+        }
+        actualizarEstadoPausa(expediente, EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA, usuarioLogueado,
+                "INFORMACION RECIBIDA", "El cliente aporto la informacion adicional solicitada.");
+    }
+
+    @Override
+    @Transactional
+    public void resolverInformacionAdicional(Long id, Usuario usuarioLogueado) {
+        Expediente expediente = obtenerParaPausa(id, usuarioLogueado, true);
+        if (expediente.getEstadoExpediente() != EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
+                && expediente.getEstadoExpediente() != EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA) {
+            throw new OperacionInvalidaException("El expediente no tiene una solicitud de informacion pendiente.");
+        }
+
+        EstadoExpediente estadoDestino = hayRequisitosPendientes(expediente.getId())
+                ? EstadoExpediente.PENDIENTE_DOCUMENTACION
+                : estadoReanudacion(expediente);
+        reanudar(expediente, estadoDestino, usuarioLogueado, "INFORMACION RESUELTA",
+                "La solicitud de informacion adicional se resolvio y el expediente retoma su tramitacion.");
+    }
+
+    @Override
+    @Transactional
+    public void marcarPendienteDocumentacion(Long id, Usuario usuarioLogueado) {
+        Expediente expediente = obtenerParaPausa(id, usuarioLogueado, true);
+        validarExpedienteAbierto(expediente);
+        if (expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
+                || expediente.getEstadoExpediente() == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA) {
+            return;
+        }
+        pausar(expediente, EstadoExpediente.PENDIENTE_DOCUMENTACION, usuarioLogueado,
+                "DOCUMENTACION SOLICITADA", "El expediente queda pendiente de nueva documentacion.");
+    }
+
+    @Override
+    @Transactional
+    public void reanudarTrasDocumentacion(Long id, Usuario usuarioLogueado) {
+        Expediente expediente = obtenerParaPausa(id, usuarioLogueado, false);
+        if (expediente.getEstadoExpediente() != EstadoExpediente.PENDIENTE_DOCUMENTACION
+                || hayRequisitosPendientes(expediente.getId())) {
+            return;
+        }
+        reanudar(expediente, estadoReanudacion(expediente), usuarioLogueado, "DOCUMENTACION COMPLETADA",
+                "Se completaron los requisitos documentales y el expediente retoma su tramitacion.");
+    }
+
+    private Expediente obtenerParaPausa(Long id, Usuario usuario, boolean soloAdmin) {
+        Expediente expediente = expedienteRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
+        if (!tienePermisoExpediente(expediente, usuario)) {
+            throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
+        }
+        if (soloAdmin && usuario.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo el administrador puede realizar esta operacion.");
+        }
+        return expediente;
+    }
+
+    private void validarExpedienteAbierto(Expediente expediente) {
+        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
+                || expediente.getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
+            throw new OperacionInvalidaException("No se puede pausar un expediente cerrado");
+        }
+    }
+
+    private void pausar(Expediente expediente, EstadoExpediente estadoPausa, Usuario usuario, String accion, String descripcion) {
+        if (expediente.getEstadoExpediente() == estadoPausa) {
+            return;
+        }
+        expediente.setEstadoPrevioPausa(expediente.getEstadoExpediente());
+        actualizarEstadoPausa(expediente, estadoPausa, usuario, accion, descripcion);
+    }
+
+    private void actualizarEstadoPausa(Expediente expediente, EstadoExpediente estado, Usuario usuario, String accion, String descripcion) {
+        expediente.setEstadoExpediente(estado);
+        expedienteRepository.save(expediente);
+        historialCambioService.registrarCambioExpediente(expediente, usuario, accion, descripcion);
+    }
+
+    private void reanudar(Expediente expediente, EstadoExpediente estado, Usuario usuario, String accion, String descripcion) {
+        expediente.setEstadoExpediente(estado);
+        if (estado != EstadoExpediente.PENDIENTE_DOCUMENTACION) {
+            expediente.setEstadoPrevioPausa(null);
+        }
+        expedienteRepository.save(expediente);
+        historialCambioService.registrarCambioExpediente(expediente, usuario, accion, descripcion);
+    }
+
+    private EstadoExpediente estadoReanudacion(Expediente expediente) {
+        EstadoExpediente previo = expediente.getEstadoPrevioPausa();
+        if (previo == null
+                || previo == EstadoExpediente.PENDIENTE_DOCUMENTACION
+                || previo == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
+                || previo == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA) {
+            return EstadoExpediente.EN_TRAMITE;
+        }
+        return previo;
+    }
+
+    private boolean hayRequisitosPendientes(Long expedienteId) {
+        return requisitoDocumentalRepository.findByExpedienteIdOrderByIdAsc(expedienteId).stream()
+                .anyMatch(requisito -> requisito.getEstado() == com.example.gestor_documental.enums.EstadoRequisitoDocumental.REQUERIDO);
     }
 
     private boolean interesadoValido(InteresadoFormDto dto) {

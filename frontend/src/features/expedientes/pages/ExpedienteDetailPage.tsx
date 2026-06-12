@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FileText, Loader2, MessageCircle, Route, ShieldCheck, Upload, UserRound, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FilePlus2, FileText, Loader2, MessageCircle, Route, ShieldCheck, Upload, UserRound, X } from "lucide-react";
 import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteUploadPanel";
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
 import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
@@ -104,39 +104,55 @@ function ProcessFlowPanel({ expediente }: { expediente: ExpedienteDetail }) {
   const closingDocumentsReady = hasClosingDocuments(expediente.documentos);
   const hasIncident = expediente.estado === "INCIDENCIA" || expediente.estado === "REVISANDO_INCIDENCIAS";
   const hasAdditionalInfo = expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
+  const hasPendingDocumentation = expediente.estado === "PENDIENTE_DOCUMENTACION";
   const docsReady = expediente.hitos.some((hito) => hito.id === "documentacion-completa" && hito.completado);
   const managementReady = expediente.hitos.some((hito) => hito.id === "tramite-programa-gestion" && hito.completado);
   const model620Ready = expediente.hitos.some((hito) => hito.id === "modelo-620-presentado" && hito.completado);
   const sentDgt = expediente.estado === "ENVIADO_DGT" || expediente.hitos.some((hito) => hito.id === "finalizado-incidencia" && hito.titulo === "Enviado a DGT");
+  const processPaused = hasIncident || hasAdditionalInfo || hasPendingDocumentation;
 
   const stages = [
     {
       id: "inicio",
-      title: "Expediente creado",
-      description: "Solicitud revisada y expediente abierto.",
+      title: "Tramite creado",
+      description: "Solicitud revisada y tramite abierto.",
       state: "Completado",
       tone: "done",
     },
     {
       id: "preparacion",
-      title: hasIncident ? "Incidencia" : hasAdditionalInfo ? "Informacion" : docsReady ? "Documentacion validada" : "Documentacion",
-      description: hasIncident ? "Subsanacion o revision pendiente." : hasAdditionalInfo ? "Pendiente de respuesta o revision." : docsReady ? "Preparado para los pasos de gestion." : "Revisando documentos base.",
-      state: docsReady || isClosed ? "Completado" : "Fase actual",
-      tone: docsReady || isClosed ? "done" : "active",
+      title: hasIncident ? "Incidencia" : hasAdditionalInfo ? "Informacion" : hasPendingDocumentation ? "Documentacion solicitada" : docsReady ? "Documentacion comprobada" : "Comprobacion de documentacion",
+      description: hasIncident ? "Subsanacion o revision pendiente." : hasAdditionalInfo ? "Pendiente de respuesta o revision." : hasPendingDocumentation ? "Esperando los documentos requeridos." : docsReady ? "Documentacion base comprobada." : "Revisando documentos base.",
+      state: processPaused ? "Fase actual" : docsReady || isClosed ? "Completado" : "Fase actual",
+      tone: processPaused ? "active" : docsReady || isClosed ? "done" : "active",
     },
     {
-      id: "gestion",
-      title: model620Ready ? "Modelo 620 presentado" : managementReady ? "Modelo 620" : "Programa gestion",
-      description: model620Ready ? "Preparado para el cierre." : managementReady ? "Pendiente de presentacion." : "Carga operativa del expediente.",
-      state: model620Ready || isClosed ? "Completado" : docsReady ? "Fase actual" : "Pendiente",
-      tone: model620Ready || isClosed ? "done" : docsReady ? "active" : "pending",
+      id: "programa-gestion",
+      title: managementReady ? "Tramite subido" : "Pendiente de subir",
+      description: managementReady ? "Cargado en el programa de gestion." : "Pendiente de subir al programa de gestion.",
+      state: managementReady || isClosed ? "Completado" : docsReady && !processPaused ? "Fase actual" : "Pendiente",
+      tone: managementReady || isClosed ? "done" : docsReady && !processPaused ? "active" : "pending",
+    },
+    {
+      id: "impuesto-620",
+      title: model620Ready ? "Impuesto 620 presentado" : "Pendiente de pasar impuesto 620",
+      description: model620Ready ? "Presentacion fiscal completada." : "A la espera de pasar el impuesto 620.",
+      state: model620Ready || isClosed ? "Completado" : managementReady && !processPaused ? "Fase actual" : "Pendiente",
+      tone: model620Ready || isClosed ? "done" : managementReady && !processPaused ? "active" : "pending",
+    },
+    {
+      id: "envio-dgt",
+      title: sentDgt ? "Tramite enviado a DGT" : "Pendiente de enviar a DGT",
+      description: sentDgt ? "Envio a la DGT completado." : "El envio se habilita tras presentar el impuesto 620.",
+      state: sentDgt || isClosed ? "Completado" : model620Ready && !processPaused ? "Fase actual" : "Pendiente",
+      tone: sentDgt || isClosed ? "done" : model620Ready && !processPaused ? "active" : "pending",
     },
     {
       id: "cierre",
-      title: hasIncident ? "Incidencia" : hasAdditionalInfo ? "Informacion" : sentDgt ? "Enviado a DGT" : "Finalizado",
-      description: isClosed && !closingDocumentsReady ? "Pendiente de comprobantes finales." : "Enviado a DGT, incidencia o finalizado.",
-      state: isClosed ? (closingDocumentsReady ? "Completado" : "Pendiente comprobantes") : model620Ready ? "Fase actual" : "Pendiente",
-      tone: isClosed ? (closingDocumentsReady ? "done" : "active") : model620Ready ? "active" : "pending",
+      title: isClosed ? "Tramite finalizado" : "Pendiente de cierre",
+      description: isClosed && !closingDocumentsReady ? "Pendiente de comprobantes finales." : "Cierre administrativo del tramite.",
+      state: isClosed ? (closingDocumentsReady ? "Completado" : "Pendiente comprobantes") : sentDgt && !processPaused ? "Fase actual" : "Pendiente",
+      tone: isClosed ? (closingDocumentsReady ? "done" : "active") : sentDgt && !processPaused ? "active" : "pending",
     },
   ];
 
@@ -149,7 +165,7 @@ function ProcessFlowPanel({ expediente }: { expediente: ExpedienteDetail }) {
         </div>
         <span className="exp-phase-chip">
           <Route size={15} />
-          {isClosed ? "Cerrado" : "En curso"}
+          {isClosed ? "Cerrado" : processPaused ? "Pausado" : "En curso"}
         </span>
       </div>
 
@@ -443,6 +459,7 @@ export function ExpedienteDetailPage() {
   const [completeExpedienteProcessing, setCompleteExpedienteProcessing] = useState(false);
   const [incidentDialogOpen, setIncidentDialogOpen] = useState(false);
   const [additionalInfoDialogOpen, setAdditionalInfoDialogOpen] = useState(false);
+  const [requirementOpenSignal, setRequirementOpenSignal] = useState(0);
   const [incidentTypes, setIncidentTypes] = useState<TipoIncidencia[]>([]);
   const [incidentTypesLoading, setIncidentTypesLoading] = useState(false);
   const [resolvingIncident, setResolvingIncident] = useState<IncidenciaExpediente | null>(null);
@@ -707,10 +724,13 @@ export function ExpedienteDetailPage() {
       return;
     }
     if (actionType === "RESOLVER_INFORMACION_ADICIONAL") {
+      const awaitingClient = expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL";
       const confirmed = await confirm({
-        title: "Marcar informacion revisada",
-        description: "El expediente volvera a estar en tramite para poder continuar.",
-        confirmLabel: "Marcar revisada",
+        title: awaitingClient ? "Resolver solicitud de informacion" : "Marcar informacion revisada",
+        description: awaitingClient
+          ? "Confirma que la informacion se ha obtenido por otra via. El expediente retomara el punto anterior."
+          : "La informacion quedara revisada y el expediente retomara el punto anterior.",
+        confirmLabel: awaitingClient ? "Resolver solicitud" : "Marcar revisada",
       });
       if (!confirmed) return;
       try {
@@ -868,6 +888,7 @@ export function ExpedienteDetailPage() {
   const operationalHitos = activeOperation?.hitos?.length ? activeOperation.hitos : expediente.hitos;
   const hasAdditionalInfoFlow =
     expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
+  const hasDocumentationRequest = expediente.estado === "PENDIENTE_DOCUMENTACION";
   const nextOperationalStep =
     hasAdditionalInfoFlow
       ? expediente.siguientePaso
@@ -890,19 +911,30 @@ export function ExpedienteDetailPage() {
       {canRequestAdditionalInfo ? (
         <section className="exp-quick-actions" aria-label="Acciones rapidas del expediente">
           <div>
-            <p className="eyebrow">Comunicacion</p>
-            <strong>Solicitar confirmacion o informacion al cliente</strong>
-            <span>Abre un aviso intermedio y pausa el avance hasta que el cliente responda.</span>
+            <p className="eyebrow">Acciones con el cliente</p>
+            <strong>Solicitar informacion o documentacion</strong>
+            <span>Elige si necesitas una respuesta o un documento concreto para continuar.</span>
           </div>
-          <button
-            className="primary-button"
-            disabled={hasActiveIncidents || hasAdditionalInfoFlow}
-            onClick={() => setAdditionalInfoDialogOpen(true)}
-            type="button"
-          >
-            <MessageCircle size={16} />
-            Solicitar informacion
-          </button>
+          <div className="exp-quick-actions__buttons">
+            <button
+              className="soft-button"
+              disabled={hasActiveIncidents || hasAdditionalInfoFlow}
+              onClick={() => setRequirementOpenSignal((value) => value + 1)}
+              type="button"
+            >
+              <FilePlus2 size={16} />
+              Solicitar documentacion
+            </button>
+            <button
+              className="primary-button"
+              disabled={hasActiveIncidents || hasAdditionalInfoFlow || hasDocumentationRequest}
+              onClick={() => setAdditionalInfoDialogOpen(true)}
+              type="button"
+            >
+              <MessageCircle size={16} />
+              Solicitar informacion
+            </button>
+          </div>
         </section>
       ) : null}
 
@@ -929,6 +961,7 @@ export function ExpedienteDetailPage() {
           <DocumentRequirementsPanel
             documentos={expediente.documentos}
             interesados={expediente.interesados}
+            openRequestSignal={requirementOpenSignal}
             requisitos={expediente.requisitosDocumentales}
             onAddRequirement={handleAddRequirement}
             onLinkRequirementDocument={handleLinkRequirementDocument}

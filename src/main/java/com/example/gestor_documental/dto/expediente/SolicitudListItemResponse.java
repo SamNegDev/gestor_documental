@@ -6,6 +6,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Getter
 @Setter
 @Builder
@@ -21,4 +24,7 @@ public class SolicitudListItemResponse {
     private ClienteResumenResponse cliente;
     private UsuarioResumenResponse modificadoPor;
     private Long expedienteId;
+    private String situacionDocumental;
+    @Builder.Default
+    private List<InteresadoSolicitudResponse> interesados = new ArrayList<>();
 }

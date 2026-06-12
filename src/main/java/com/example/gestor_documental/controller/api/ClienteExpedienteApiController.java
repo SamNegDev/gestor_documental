@@ -50,6 +50,9 @@ public class ClienteExpedienteApiController {
                 .documentos(detalle.getDocumentos().stream()
                         .filter(documento -> documento.isSubido())
                         .toList())
+                .requisitosDocumentales(detalle.getRequisitosDocumentales().stream()
+                        .filter(requisito -> "REQUERIDO".equals(requisito.getEstado()))
+                        .toList())
                 .incidencias(detalle.getIncidencias())
                 .mensajes(detalle.getMensajes())
                 .historial(detalle.getHistorial())
@@ -87,8 +90,7 @@ public class ClienteExpedienteApiController {
 
         String contenidoFinal = contenido != null ? contenido : body != null ? body.get("contenido") : null;
         mensajeService.a\u00f1adirAExpediente(id, contenidoFinal, cliente);
-        expediente.setEstadoExpediente(EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA);
-        expedienteService.guardar(expediente);
+        expedienteService.marcarInformacionAdicionalRecibida(id, cliente);
         return ResponseEntity.noContent().build();
     }
 
@@ -101,6 +103,9 @@ public class ClienteExpedienteApiController {
         }
         if ("INFORMACION_ADICIONAL_RECIBIDA".equals(detalle.getEstado())) {
             return "Hemos recibido tu respuesta y esta pendiente de revision.";
+        }
+        if ("PENDIENTE_DOCUMENTACION".equals(detalle.getEstado())) {
+            return "Necesitamos que aportes la documentacion solicitada para continuar.";
         }
         if ("INCIDENCIA".equals(detalle.getEstado())) {
             return "Necesitamos que revises una incidencia pendiente.";

@@ -164,6 +164,9 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
                 || expediente.getEstadoExpediente() == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA) {
             throw new OperacionInvalidaException("Hay una solicitud de informacion adicional pendiente antes de continuar.");
         }
+        if (expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION) {
+            throw new OperacionInvalidaException("Hay documentacion solicitada pendiente antes de continuar.");
+        }
         if (!incidenciaRepository.findByExpedienteIdAndResueltaFalse(expediente.getId()).isEmpty()) {
             throw new OperacionInvalidaException("Hay incidencias activas antes de continuar.");
         }
