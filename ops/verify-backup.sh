@@ -59,13 +59,15 @@ docker run -d --rm \
   "$MYSQL_VERIFY_IMAGE" >/dev/null
 
 for _ in $(seq 1 60); do
-  if docker exec "$CONTAINER_NAME" mysqladmin ping -h localhost -uroot -p"$VERIFY_PASSWORD" --silent >/dev/null 2>&1; then
+  if docker exec "$CONTAINER_NAME" sh -c \
+    'mysql -N -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SELECT 1"' >/dev/null 2>&1; then
     break
   fi
   sleep 2
 done
 
-if ! docker exec "$CONTAINER_NAME" mysqladmin ping -h localhost -uroot -p"$VERIFY_PASSWORD" --silent >/dev/null 2>&1; then
+if ! docker exec "$CONTAINER_NAME" sh -c \
+  'mysql -N -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SELECT 1"' >/dev/null 2>&1; then
   echo "El MySQL temporal no ha arrancado a tiempo." >&2
   exit 1
 fi
