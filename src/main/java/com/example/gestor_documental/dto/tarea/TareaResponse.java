@@ -12,6 +12,7 @@ public class TareaResponse {
     private String prioridad;
     private String titulo;
     private String detalle;
+    private String contexto;
     private String entidad;
     private Long entidadId;
     private String matricula;

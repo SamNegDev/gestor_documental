@@ -19,7 +19,7 @@ export async function login(username: string, password: string): Promise<string>
   });
 
   if (!response.ok) {
-    let message = "Email o contrasena incorrectos.";
+    let message = "Email o contraseña incorrectos.";
     try {
       const body = await response.json() as { message?: string };
       message = body.message || message;

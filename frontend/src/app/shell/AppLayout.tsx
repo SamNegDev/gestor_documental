@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { BellRing, CarFront, FilePlus2, FolderOpen, Inbox, LayoutDashboard, LogOut, UserRound, UserRoundCheck, UsersRound } from "lucide-react";
+import { BellRing, CarFront, FilePlus2, FolderOpen, Inbox, LayoutDashboard, LogOut, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
 import { SidebarLink } from "./SidebarLink";
 import { Tooltip } from "../../shared/ui/Tooltip";
 import { getSessionUser, type SessionUser } from "../../shared/api/sessionApi";
@@ -40,11 +40,49 @@ function pageTitle(pathname: string) {
   return "Detalle de expediente";
 }
 
+type MenuItemConfig = {
+  id: string;
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  badge?: number;
+};
+
+const adminMenuItems: MenuItemConfig[] = [
+  { id: "dashboard", to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { id: "tareas", to: "/admin/tareas", icon: Inbox, label: "Tareas" },
+  { id: "seguimiento", to: "/admin/seguimiento-clientes", icon: BellRing, label: "Seguimiento clientes" },
+  { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Expedientes" },
+  { id: "nuevo-expediente", to: "/expedientes/nuevo", icon: FilePlus2, label: "Nuevo expediente" },
+  { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },
+  { id: "interesados", to: "/interesados", icon: UserRound, label: "Interesados" },
+  { id: "vehiculos", to: "/vehiculos", icon: CarFront, label: "Vehiculos" },
+  { id: "clientes", to: "/admin/clientes", icon: UsersRound, label: "Clientes" },
+  { id: "usuarios", to: "/admin/usuarios", icon: UserRoundCheck, label: "Usuarios" },
+];
+
+const clientMenuItems: MenuItemConfig[] = [
+  { id: "dashboard", to: "/cliente/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { id: "tareas", to: "/cliente/tareas", icon: Inbox, label: "Mis tareas" },
+  { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Mis expedientes" },
+  { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },
+  { id: "interesados", to: "/interesados", icon: UserRound, label: "Interesados" },
+  { id: "vehiculos", to: "/vehiculos", icon: CarFront, label: "Vehiculos" },
+];
+
+const fixedMenuItems = new Set(["dashboard", "tareas"]);
+
+function menuStorageKey(user: SessionUser | null) {
+  return user ? `gestor.menu.${user.id}.${user.rol || "USER"}` : "gestor.menu.guest";
+}
+
 export function AppLayout() {
   const location = useLocation();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [menuSettingsOpen, setMenuSettingsOpen] = useState(false);
+  const [hiddenMenuItems, setHiddenMenuItems] = useState<string[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -70,7 +108,7 @@ export function AppLayout() {
 
   const isClientRoute = location.pathname.startsWith("/cliente/") || user?.rol === "CLIENTE";
   const title = useMemo(() => pageTitle(location.pathname), [location.pathname]);
-  const roleLabel = user?.rol === "CLIENTE" ? "Cliente" : user?.rol === "ADMIN" ? "Administrador" : "Sesion";
+  const roleLabel = user?.rol === "CLIENTE" ? "Cliente" : user?.rol === "ADMIN" ? "Administrador" : "Sesión";
   const clientBrandImage = user?.cliente?.logoPrincipalUrl || user?.cliente?.logoCompactoUrl;
   const tareasResumen = useQuery({
     queryKey: ["tareas", "resumen", "menu", user?.rol],
@@ -80,6 +118,28 @@ export function AppLayout() {
     refetchOnMount: "always",
     refetchOnWindowFocus: "always",
   });
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const saved = window.localStorage.getItem(menuStorageKey(user));
+      setHiddenMenuItems(saved ? JSON.parse(saved) as string[] : []);
+    } catch {
+      setHiddenMenuItems([]);
+    }
+  }, [user]);
+
+  const baseMenuItems = user?.rol === "CLIENTE" || isClientRoute ? clientMenuItems : adminMenuItems;
+  const menuItems = baseMenuItems.map((item) => ({
+    ...item,
+    badge: item.id === "tareas" ? tareasResumen.data?.total : undefined,
+  }));
+  const visibleMenuItems = menuItems.filter((item) => !hiddenMenuItems.includes(item.id));
+  const toggleMenuItem = (id: string) => {
+    if (!user || fixedMenuItems.has(id)) return;
+    const next = hiddenMenuItems.includes(id) ? hiddenMenuItems.filter((item) => item !== id) : [...hiddenMenuItems, id];
+    setHiddenMenuItems(next);
+    window.localStorage.setItem(menuStorageKey(user), JSON.stringify(next));
+  };
 
   const handleLogout = async () => {
     await logout().catch(() => undefined);
@@ -97,51 +157,47 @@ export function AppLayout() {
               <span className="brand-mark sidebar-client-initials" aria-hidden="true">{clientInitials(user.cliente?.nombre)}</span>
             )
           ) : (
-            <img className="brand-mark brand-mark--image" src="/assets/logos/casado-negrin-symbol.jpg" alt="Casado Negrin Gestoria" />
+            <img className="brand-mark brand-mark--image" src="/assets/logos/casado-negrin-symbol.jpg" alt="Casado Negrín Gestoría" />
           )}
           <div className="topbar__title">
-            <strong>{user?.rol === "CLIENTE" ? user.cliente?.nombre || "Portal cliente" : "Casado Negrin"}</strong>
-            <span>{user?.rol === "CLIENTE" ? "Portal documental" : "Gestion documental"}</span>
+            <strong>{user?.rol === "CLIENTE" ? user.cliente?.nombre || "Portal cliente" : "Casado Negrín"}</strong>
+            <span>{user?.rol === "CLIENTE" ? "Portal documental" : "Gestión documental"}</span>
           </div>
         </div>
 
         <nav className="sidebar__nav">
-          {isClientRoute || user?.rol === "CLIENTE" ? (
-            <>
-              <SidebarLink to="/cliente/dashboard" icon={LayoutDashboard} label="Dashboard" />
-              <SidebarLink to="/cliente/tareas" icon={Inbox} label="Mis tareas" badge={tareasResumen.data?.total} />
-              <SidebarLink to="/expedientes" icon={FolderOpen} label="Mis expedientes" />
-              <SidebarLink to="/solicitudes" icon={Inbox} label="Solicitudes" />
-              <SidebarLink to="/interesados" icon={UserRound} label="Interesados" />
-              <SidebarLink to="/vehiculos" icon={CarFront} label="Vehiculos" />
-            </>
-          ) : (
-            <>
-              <SidebarLink to="/admin/dashboard" icon={LayoutDashboard} label="Dashboard" />
-              <SidebarLink to="/admin/tareas" icon={Inbox} label="Tareas" badge={tareasResumen.data?.total} />
-              <SidebarLink to="/admin/seguimiento-clientes" icon={BellRing} label="Seguimiento clientes" />
-              <SidebarLink to="/expedientes" icon={FolderOpen} label="Expedientes" />
-              <SidebarLink to="/expedientes/nuevo" icon={FilePlus2} label="Nuevo expediente" />
-              <SidebarLink to="/solicitudes" icon={Inbox} label="Solicitudes" />
-              <SidebarLink to="/interesados" icon={UserRound} label="Interesados" />
-              <SidebarLink to="/vehiculos" icon={CarFront} label="Vehiculos" />
-              <SidebarLink to="/admin/clientes" icon={UsersRound} label="Clientes" />
-              <SidebarLink to="/admin/usuarios" icon={UserRoundCheck} label="Usuarios" />
-            </>
-          )}
+          {visibleMenuItems.map((item) => <SidebarLink key={item.id} to={item.to} icon={item.icon} label={item.label} badge={item.badge} />)}
         </nav>
+        {user ? (
+          <div className="sidebar-menu-settings">
+            <button className="sidebar-menu-settings__trigger" onClick={() => setMenuSettingsOpen((open) => !open)} type="button">
+              <Settings2 size={15} />
+              Personalizar menu
+            </button>
+            {menuSettingsOpen ? (
+              <div className="sidebar-menu-settings__panel">
+                {menuItems.map((item) => (
+                  <label key={item.id}>
+                    <input checked={!hiddenMenuItems.includes(item.id)} disabled={fixedMenuItems.has(item.id)} onChange={() => toggleMenuItem(item.id)} type="checkbox" />
+                    <span>{item.label}</span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </aside>
 
       <div className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">{isClientRoute ? "Portal cliente" : "Gestion interna"}</p>
+            <p className="eyebrow">{isClientRoute ? "Portal cliente" : "Gestión interna"}</p>
             <h1>{title}</h1>
           </div>
           <GlobalSearch />
           <div className="topbar__user">
             <div>
-              <strong>{user?.nombreCompleto || (sessionExpired ? "Sesion caducada" : "Usuario")}</strong>
+              <strong>{user?.nombreCompleto || (sessionExpired ? "Sesión caducada" : "Usuario")}</strong>
               <span>{roleLabel}</span>
             </div>
             <Tooltip label="Cerrar sesion">

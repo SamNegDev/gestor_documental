@@ -46,6 +46,7 @@ public class ClienteExpedienteApiController {
                 .estado(detalle.getEstado())
                 .faseActual(detalle.getFaseActual())
                 .fechaInicio(detalle.getFechaInicio())
+                .solicitudId(detalle.getSolicitudId())
                 .siguienteMensaje(mensajeEstado(detalle))
                 .cliente(detalle.getCliente())
                 .documentos(detalle.getDocumentos().stream()

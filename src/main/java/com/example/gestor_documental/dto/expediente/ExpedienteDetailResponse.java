@@ -25,6 +25,7 @@ public class ExpedienteDetailResponse {
     private String fechaInicio;
     private String fechaUltimaModificacion;
     private String observaciones;
+    private Long solicitudId;
     private HitoExpedienteResponse siguientePaso;
 
     private ClienteResumenResponse cliente;

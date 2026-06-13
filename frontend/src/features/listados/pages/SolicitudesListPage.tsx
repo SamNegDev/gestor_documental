@@ -39,7 +39,7 @@ export function SolicitudesListPage() {
 
   return (
     <ListPageChrome
-      eyebrow={isAdmin ? "Gestion interna" : "Portal cliente"}
+      eyebrow={isAdmin ? "Gestión interna" : "Portal cliente"}
       title={isAdmin ? "Solicitudes" : "Mis solicitudes"}
       summary={
         isAdmin
@@ -232,15 +232,9 @@ function SolicitudesTable({
                 <td className="records-col-date">{fechaReferencia(solicitud) || "Sin fecha"}</td>
               )}
               <td className="records-col-actions">
-                {solicitud.expedienteId ? (
-                  <Link aria-label="Ver expediente" className="icon-button" title="Ver expediente" to={isAdmin ? `/expedientes/${solicitud.expedienteId}` : `/cliente/expedientes/${solicitud.expedienteId}`}>
-                    <ArrowRight size={16} />
-                  </Link>
-                ) : (
-                  <Link aria-label="Ver solicitud" className="icon-button" title="Ver solicitud" to={`/solicitudes/${solicitud.id}`}>
-                    <ArrowRight size={16} />
-                  </Link>
-                )}
+                <Link aria-label="Ver solicitud" className="icon-button" title="Ver solicitud" to={`/solicitudes/${solicitud.id}`}>
+                  <ArrowRight size={16} />
+                </Link>
               </td>
             </tr>
           ))}
@@ -299,7 +293,7 @@ function interestedRolePriority(role?: string | null) {
 }
 
 function nextSolicitudAction(solicitud: SolicitudListItem, isAdmin: boolean) {
-  if (solicitud.expedienteId || solicitud.estado === "CONVERTIDA") return "Consultar expediente";
+  if (solicitud.expedienteId || solicitud.estado === "CONVERTIDA") return "Sin acciones pendientes";
   if (solicitud.situacionDocumental === "SIN DOCUMENTACION" || solicitud.situacionDocumental?.startsWith("FALTA")) {
     return isAdmin ? "Esperar documentacion" : "Aportar documentacion";
   }

@@ -47,7 +47,7 @@ export function DashboardPage() {
     <main className="dashboard-page">
       <section className="dashboard-hero dashboard-hero--ledger">
         <div>
-          <p className="eyebrow">{isAdmin ? "Gestion interna" : "Portal cliente"}</p>
+          <p className="eyebrow">{isAdmin ? "Gestión interna" : "Portal cliente"}</p>
           <h2>{isAdmin ? "Resumen operativo" : "Tu actividad"}</h2>
           <p>{isAdmin ? "Actividad reciente, bloqueos y accesos rapidos para la gestoria." : "Estado de tus solicitudes y expedientes abiertos."}</p>
         </div>
@@ -232,11 +232,7 @@ function ExpedienteRow({ expediente, isAdmin }: { expediente: ExpedienteListItem
 }
 
 function SolicitudRow({ solicitud, isAdmin }: { solicitud: SolicitudListItem; isAdmin: boolean }) {
-  const target = solicitud.expedienteId
-    ? isAdmin
-      ? `/expedientes/${solicitud.expedienteId}`
-      : `/cliente/expedientes/${solicitud.expedienteId}`
-    : `/solicitudes/${solicitud.id}`;
+  const target = `/solicitudes/${solicitud.id}`;
   return (
     <article className="dashboard-row">
       <div>

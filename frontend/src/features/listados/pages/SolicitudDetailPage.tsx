@@ -231,6 +231,12 @@ export function SolicitudDetailPage() {
         </div>
         <div className="request-hero__actions">
           <StatusBadge tone={statusTone(solicitud.estado)}>{formatEnum(solicitud.estado)}</StatusBadge>
+          {isAdmin && solicitud.expedienteId ? (
+            <Link className="soft-button soft-button--compact" to={`/expedientes/${solicitud.expedienteId}`}>
+              <FolderCheck size={16} />
+              Ver expediente
+            </Link>
+          ) : null}
           <Link className="soft-button soft-button--compact" to="/solicitudes">
             <ArrowLeft size={16} />
             Volver

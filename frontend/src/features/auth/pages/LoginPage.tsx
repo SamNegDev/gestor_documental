@@ -8,10 +8,10 @@ import "../../expedientes/styles/expedienteDetail.css";
 function useLoginMessage() {
   return useMemo(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.has("logout")) return { tone: "success", text: "Sesion cerrada correctamente." };
-    if (params.has("expired")) return { tone: "warning", text: "La sesion ha caducado. Inicia sesion de nuevo." };
-    if (params.has("denied")) return { tone: "warning", text: "Inicia sesion con un usuario autorizado." };
-    if (params.has("error")) return { tone: "danger", text: "Email o contrasena incorrectos." };
+    if (params.has("logout")) return { tone: "success", text: "Sesión cerrada correctamente." };
+    if (params.has("expired")) return { tone: "warning", text: "La sesión ha caducado. Inicia sesión de nuevo." };
+    if (params.has("denied")) return { tone: "warning", text: "Inicia sesión con un usuario autorizado." };
+    if (params.has("error")) return { tone: "danger", text: "Email o contraseña incorrectos." };
     return null;
   }, []);
 }
@@ -31,7 +31,7 @@ export function LoginPage() {
       const target = await login(username.trim(), password);
       window.location.href = target || "/admin/dashboard";
     } catch (cause) {
-      const text = cause instanceof ApiError && cause.details ? cause.details : "No se pudo iniciar sesion.";
+      const text = cause instanceof ApiError && cause.details ? cause.details : "No se pudo iniciar sesión.";
       setMessage({ tone: "danger", text });
       setPending(false);
     }
@@ -41,13 +41,13 @@ export function LoginPage() {
     <main className="login-screen">
       <section className="login-panel" aria-labelledby="login-title">
         <div className="login-panel__brand">
-          <img className="login-panel__logo" src="/assets/logos/casado-negrin-logo.png" alt="Casado Negrin Gestoria" />
+          <img className="login-panel__logo" src="/assets/logos/casado-negrin-logo.png" alt="Casado Negrín Gestoría" />
         </div>
 
         <div className="login-panel__heading">
           <p className="eyebrow">Portal privado</p>
           <h1 id="login-title">Accede a tus expedientes</h1>
-          <p>Gestion interna y portal cliente en una unica entrada segura.</p>
+          <p>Gestión interna y portal cliente en una única entrada segura.</p>
         </div>
 
         {message ? (
@@ -76,7 +76,7 @@ export function LoginPage() {
           </label>
 
           <label>
-            <span>Contrasena</span>
+            <span>Contraseña</span>
             <div className="login-input">
               <LockKeyhole size={18} />
               <input

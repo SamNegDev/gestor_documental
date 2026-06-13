@@ -76,7 +76,7 @@ export function UsuarioFormPage() {
       if (!form.nombre.trim() || !form.apellidos.trim() || !form.email.trim() || !form.rolUsuario) {
         throw new Error("Nombre, apellidos, email y rol son obligatorios.");
       }
-      if (!isEdit && !form.password?.trim()) throw new Error("La contrasena es obligatoria al crear un usuario.");
+      if (!isEdit && !form.password?.trim()) throw new Error("La contraseña es obligatoria al crear un usuario.");
       if (form.rolUsuario === "CLIENTE" && !form.clienteId) throw new Error("Selecciona un cliente para el usuario.");
       if (isEdit && id) {
         await updateUsuario(id, clean(form, true));
@@ -128,7 +128,7 @@ export function UsuarioFormPage() {
                 value={form.password || ""}
                 required={!isEdit}
                 type="password"
-                placeholder={isEdit ? "Dejar en blanco para mantener actual" : "Introduce la contrasena"}
+                placeholder={isEdit ? "Dejar en blanco para mantener actual" : "Introduce la contraseña"}
                 onChange={(event) => setForm({ ...form, password: event.target.value })}
               />
             </label>

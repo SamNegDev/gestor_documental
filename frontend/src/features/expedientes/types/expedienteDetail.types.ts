@@ -233,6 +233,7 @@ export interface ExpedienteDetail {
   fechaInicio?: string | null;
   fechaUltimaModificacion?: string | null;
   observaciones?: string | null;
+  solicitudId?: number | null;
   siguientePaso?: HitoExpediente | null;
   cliente?: ClienteResumen | null;
   creadoPor?: UsuarioResumen | null;

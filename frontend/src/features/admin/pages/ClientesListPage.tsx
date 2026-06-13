@@ -25,7 +25,7 @@ export function ClientesListPage() {
     <main className="records-page admin-page">
       <div className="records-header">
         <div>
-          <p className="eyebrow">Gestion interna</p>
+          <p className="eyebrow">Gestión interna</p>
           <h2>Clientes</h2>
           <p>Empresas y particulares vinculados a solicitudes, expedientes y usuarios.</p>
         </div>

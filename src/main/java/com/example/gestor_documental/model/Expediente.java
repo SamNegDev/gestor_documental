@@ -43,6 +43,10 @@ public class Expediente {
     @Size(max=10, message = "La matricula debe tener 10 caracteres")
     private String matricula;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "vehiculo_id")
+    private Vehiculo vehiculo;
+
     @Column (length = 200)
     private String observaciones;
 

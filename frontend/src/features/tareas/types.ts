@@ -2,6 +2,7 @@ import type { PagedResponse } from "../listados/types";
 
 export interface Tarea {
   id: string; tipo: string; ambito: "GESTION" | "SEGUIMIENTO" | "CLIENTE"; prioridad: "ALTA" | "MEDIA" | "BAJA"; titulo: string; detalle: string;
+  contexto?: string | null;
   entidad: string; entidadId: number; matricula?: string | null; cliente?: string | null;
   fechaReferencia?: string | null; diasPendiente: number; enlace: string;
 }

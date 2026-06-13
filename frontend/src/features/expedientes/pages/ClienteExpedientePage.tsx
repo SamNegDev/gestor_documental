@@ -53,16 +53,10 @@ function friendlyPhase(expediente: ExpedienteCliente) {
   return expediente.faseActual || "En tramitacion";
 }
 
-function clientHasClosingDocuments(documentos: DocumentoExpediente[]) {
-  return CLIENT_CLOSING_DOCUMENTS.every((item) =>
-    documentos.some((documento) => item.aliases.some((alias) => alias === documento.tipo) && documento.subido && documento.id),
-  );
-}
-
-function timelineSteps(expediente: ExpedienteCliente, closingDocumentsReady: boolean) {
+function timelineSteps(expediente: ExpedienteCliente) {
   const phase = friendlyPhase(expediente);
   const currentIndex =
-    expediente.estado === "FINALIZADO" ? (closingDocumentsReady ? 4 : 3)
+    expediente.estado === "FINALIZADO" ? 4
       : expediente.estado === "ENVIADO_DGT" || phase.includes("firmar") ? 2
         : expediente.estado === "INCIDENCIA" || expediente.estado === "REVISANDO_INCIDENCIAS"
           || expediente.estado === "PENDIENTE_DOCUMENTACION"
@@ -229,7 +223,7 @@ export function ClienteExpedientePage() {
       setExpediente(await getClienteExpediente(id));
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
-        setError("Sesion caducada. Inicia sesion para consultar el expediente.");
+        setError("Sesión caducada. Inicia sesión para consultar el expediente.");
       } else if (cause instanceof ApiError && cause.status === 403) {
         setError("No tienes permiso para consultar este expediente.");
       } else if (cause instanceof ApiError && cause.status === 404) {
@@ -314,7 +308,7 @@ export function ClienteExpedientePage() {
           <button className="soft-button" onClick={() => void load()} type="button">
             Reintentar
           </button>
-          {error?.includes("Sesion") ? (
+          {error?.includes("Sesión") ? (
             <a className="primary-button" href="/login">
               Iniciar sesion
             </a>
@@ -330,20 +324,27 @@ export function ClienteExpedientePage() {
   const mensajes = expediente.mensajes ?? [];
   const historial = expediente.historial ?? [];
   const incidenciasActivas = incidencias.filter((incidencia) => !incidencia.resuelta);
-  const closingDocumentsReady = clientHasClosingDocuments(documentos);
   const tone = clienteTone(expediente.estado);
   const phase = friendlyPhase(expediente);
-  const steps = timelineSteps(expediente, closingDocumentsReady);
+  const steps = timelineSteps(expediente);
   const informationRequested = expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL";
   const informationReceived = expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
   const latestAdminMessage = [...mensajes].reverse().find((mensaje) => mensaje.rolAutor === "ADMIN");
 
   return (
     <main className="client-expediente-page">
-      <Link className="registry-back" to="/expedientes">
-        <ArrowLeft size={16} />
-        Volver a expedientes
-      </Link>
+      <div className="client-expediente-nav">
+        <Link className="registry-back" to="/expedientes">
+          <ArrowLeft size={16} />
+          Volver a expedientes
+        </Link>
+        {expediente.solicitudId ? (
+          <Link className="soft-button soft-button--compact" to={`/solicitudes/${expediente.solicitudId}`}>
+            <FileText size={15} />
+            Solicitud de origen
+          </Link>
+        ) : null}
+      </div>
       <section className={`client-status-hero client-status-hero--${tone}`}>
         <div className="client-status-hero__identity">
           <div className="client-status-hero__brand" aria-hidden="true">
@@ -521,7 +522,7 @@ export function ClienteExpedientePage() {
 
       <section className="exp-panel exp-panel--secondary">
         <Tabs.Root defaultValue="mensajes" className="secondary-tabs">
-          <Tabs.List className="secondary-tabs__list" aria-label="Comunicacion y seguimiento del expediente">
+          <Tabs.List className="secondary-tabs__list" aria-label="Comunicación y seguimiento del expediente">
             <Tabs.Trigger value="mensajes">
               <MessageCircle size={16} />
               Mensajes

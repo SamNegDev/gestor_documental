@@ -93,7 +93,7 @@ export function ExpedienteCreatePage() {
       setForm(emptyForm(catalogos));
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
-        setError("Sesion caducada. Inicia sesion para crear expedientes.");
+        setError("Sesión caducada. Inicia sesión para crear expedientes.");
       } else if (cause instanceof ApiError && cause.status === 403) {
         setError("No tienes permiso para crear expedientes.");
       } else {
@@ -193,7 +193,7 @@ export function ExpedienteCreatePage() {
           <button className="soft-button" onClick={() => void load()} type="button">
             Reintentar
           </button>
-          {error?.includes("Sesion") ? (
+          {error?.includes("Sesión") ? (
             <a className="primary-button" href="/login">
               Iniciar sesion
             </a>

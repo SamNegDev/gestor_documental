@@ -467,6 +467,35 @@
   min-width: 0;
 }
 
+.exp-header__vehicle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.exp-header__vehicle-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--brand-deep);
+  text-decoration: none;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.exp-header__vehicle-button:hover,
+.exp-header__vehicle-button:focus-visible {
+  border-color: var(--brand);
+  background: oklch(97% 0.018 190);
+  color: var(--brand);
+  outline: none;
+}
+
 .exp-header__title h2 {
   margin: 3px 0 8px;
   color: var(--ink-strong);
@@ -1920,6 +1949,20 @@
   gap: 14px;
 }
 
+.client-expediente-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .client-expediente-nav {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .client-expediente-page > * {
   min-width: 0;
 }
@@ -2050,9 +2093,9 @@
 }
 
 .client-timeline-step--current {
-  border-color: oklch(66% 0.12 232);
-  background: linear-gradient(135deg, oklch(97% 0.018 232), oklch(99% 0.004 92));
-  box-shadow: inset 3px 0 0 var(--brand), 0 8px 18px oklch(45% 0.07 232 / 0.1);
+  border-color: oklch(72% 0.09 232);
+  background: oklch(98% 0.012 232);
+  box-shadow: 0 4px 12px oklch(45% 0.07 232 / 0.08);
 }
 
 .client-timeline-step--current > span {

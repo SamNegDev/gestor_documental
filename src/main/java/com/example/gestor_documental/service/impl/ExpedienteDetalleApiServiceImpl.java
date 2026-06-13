@@ -119,6 +119,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .fechaInicio(formatearFecha(expediente.getFechaCreacion()))
                 .fechaUltimaModificacion(formatearFecha(expediente.getFechaUltimaModificacion()))
                 .observaciones(expediente.getObservaciones())
+                .solicitudId(expediente.getSolicitud() != null ? expediente.getSolicitud().getId() : null)
                 .siguientePaso(calcularSiguientePaso(estadoDetalle, hitos))
                 .cliente(mapCliente(expediente.getCliente()))
                 .creadoPor(mapUsuario(expediente.getCreadoPor()))

@@ -498,7 +498,7 @@ export function ExpedienteDetailPage() {
       .catch((cause) => {
         if (!mounted) return;
         if (cause instanceof ApiError && cause.status === 401) {
-          setError("Sesion caducada. Inicia sesion para cargar el expediente.");
+          setError("Sesión caducada. Inicia sesión para cargar el expediente.");
           return;
         }
         if (cause instanceof ApiError && cause.status === 403) {
@@ -855,8 +855,6 @@ export function ExpedienteDetailPage() {
       alert("No se pudo enviar el mensaje.");
     }
   };
-
-
 
   const handleDeleteDocument = async (documento: DocumentoExpediente) => {
     if (!documento.id) return;

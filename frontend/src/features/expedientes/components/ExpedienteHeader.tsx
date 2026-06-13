@@ -1,4 +1,4 @@
-import { ArrowLeft, Building2, CalendarDays, Eye, FileText, Pencil, UserRound } from "lucide-react";
+import { ArrowLeft, Building2, CalendarDays, CarFront, Eye, FileText, Pencil, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { ExpedienteDetail } from "../types/expedienteDetail.types";
 import { formatDateTime, humanizeEnum } from "../utils/formatters";
@@ -25,7 +25,19 @@ export function ExpedienteHeader({ expediente }: Props) {
         <Link aria-label="Volver al listado de expedientes" className="exp-header__back" title="Volver a expedientes" to="/expedientes">
           <ArrowLeft size={18} />
         </Link>
-        <LicensePlate value={expediente.matricula} />
+        <div className="exp-header__vehicle">
+          <LicensePlate value={expediente.matricula} />
+          {expediente.matricula ? (
+            <Link
+              aria-label="Ver ficha del vehículo"
+              className="exp-header__vehicle-button"
+              title="Ver ficha del vehículo"
+              to={`/vehiculos/${encodeURIComponent(expediente.matricula)}`}
+            >
+              <CarFront size={17} />
+            </Link>
+          ) : null}
+        </div>
 
         <div className="exp-header__title">
           <p className="eyebrow">{expediente.referencia}</p>
@@ -65,6 +77,12 @@ export function ExpedienteHeader({ expediente }: Props) {
           <Pencil size={15} />
           Editar expediente
         </Link>
+        {expediente.solicitudId ? (
+          <Link className="soft-button soft-button--compact" to={`/solicitudes/${expediente.solicitudId}`}>
+            <FileText size={15} />
+            Solicitud de origen
+          </Link>
+        ) : null}
         <Link className="soft-button soft-button--compact" to={`/cliente/expedientes/${expediente.id}`}>
           <Eye size={15} />
           Vista cliente

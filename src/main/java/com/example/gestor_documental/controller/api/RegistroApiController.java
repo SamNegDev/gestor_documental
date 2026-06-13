@@ -3,6 +3,7 @@ package com.example.gestor_documental.controller.api;
 import com.example.gestor_documental.dto.registro.InteresadoRegistroResponse;
 import com.example.gestor_documental.dto.registro.TramiteRegistroResponse;
 import com.example.gestor_documental.dto.registro.VehiculoRegistroResponse;
+import com.example.gestor_documental.dto.registro.VehiculoUpdateRequest;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
@@ -10,15 +11,20 @@ import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.Vehiculo;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.service.VehiculoService;
+import com.example.gestor_documental.repository.VehiculoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -43,6 +49,8 @@ public class RegistroApiController {
     private final InteresadoRepository interesadoRepository;
     private final ExpedienteRepository expedienteRepository;
     private final ExpedienteInteresadoRepository relacionRepository;
+    private final VehiculoRepository vehiculoRepository;
+    private final VehiculoService vehiculoService;
 
     @GetMapping("/interesados")
     public List<InteresadoRegistroResponse> listarInteresados(
@@ -97,10 +105,10 @@ public class RegistroApiController {
         Usuario usuario = usuario(authentication);
         String query = normalizar(q);
         Map<String, List<Expediente>> porMatricula = expedientesVisibles(usuario, periodo, fechaDesde, fechaHasta).stream()
-                .filter(expediente -> normalizar(expediente.getMatricula()) != null)
-                .filter(expediente -> query == null || contiene(expediente.getMatricula(), query))
+                .filter(expediente -> matriculaRegistro(expediente) != null)
+                .filter(expediente -> query == null || contiene(matriculaRegistro(expediente), query))
                 .collect(java.util.stream.Collectors.groupingBy(
-                        expediente -> normalizar(expediente.getMatricula()),
+                        this::matriculaRegistro,
                         LinkedHashMap::new,
                         java.util.stream.Collectors.toList()
                 ));
@@ -115,12 +123,23 @@ public class RegistroApiController {
         Usuario usuario = usuario(authentication);
         String matriculaNormalizada = normalizar(matricula);
         List<Expediente> expedientes = expedientesVisibles(usuario).stream()
-                .filter(expediente -> matriculaNormalizada != null && matriculaNormalizada.equals(normalizar(expediente.getMatricula())))
+                .filter(expediente -> matriculaNormalizada != null && matriculaNormalizada.equals(matriculaRegistro(expediente)))
                 .toList();
         if (expedientes.isEmpty()) {
             throw new RecursoNoEncontradoException("Vehiculo no encontrado");
         }
         return mapVehiculo(matriculaNormalizada, expedientes, usuario);
+    }
+
+    @PutMapping("/vehiculos/{matricula}")
+    public void actualizarVehiculo(@PathVariable String matricula,
+                                   @RequestBody VehiculoUpdateRequest request,
+                                   Authentication authentication) {
+        Usuario usuario = usuario(authentication);
+        if (usuario.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo el administrador puede editar la ficha del vehiculo");
+        }
+        vehiculoService.actualizarPorMatricula(matricula, request);
     }
 
     private InteresadoRegistroResponse mapInteresado(Interesado interesado, List<ExpedienteInteresado> relaciones) {
@@ -138,6 +157,7 @@ public class RegistroApiController {
     }
 
     private VehiculoRegistroResponse mapVehiculo(String matricula, List<Expediente> expedientes, Usuario usuario) {
+        Vehiculo vehiculo = vehiculoRepository.findByMatricula(matricula).orElse(null);
         List<TramiteRegistroResponse> tramites = expedientes.stream().map(expediente -> mapTramite(expediente, null))
                 .sorted(Comparator.comparing(TramiteRegistroResponse::getFechaUltimaModificacion, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
@@ -147,7 +167,17 @@ public class RegistroApiController {
                 .filter(java.util.Objects::nonNull)
                 .map(interesado -> interesado.getDni() + " - " + interesado.getNombre())
                 .distinct().toList();
-        return VehiculoRegistroResponse.builder().matricula(matricula).totalTramites(tramites.size())
+        return VehiculoRegistroResponse.builder()
+                .id(vehiculo != null ? vehiculo.getId() : null)
+                .matricula(vehiculo != null ? vehiculo.getMatricula() : matricula)
+                .bastidor(vehiculo != null ? vehiculo.getBastidor() : null)
+                .marca(vehiculo != null ? vehiculo.getMarca() : null)
+                .modelo(vehiculo != null ? vehiculo.getModelo() : null)
+                .fechaPrimeraMatriculacion(vehiculo != null && vehiculo.getFechaPrimeraMatriculacion() != null
+                        ? vehiculo.getFechaPrimeraMatriculacion().toString()
+                        : null)
+                .observaciones(vehiculo != null ? vehiculo.getObservaciones() : null)
+                .totalTramites(tramites.size())
                 .ultimaActividad(tramites.isEmpty() ? null : tramites.get(0).getFechaUltimaModificacion())
                 .interesados(interesados).tramites(tramites).build();
     }
@@ -195,6 +225,12 @@ public class RegistroApiController {
     }
 
     private String formatear(LocalDateTime fecha) { return fecha != null ? fecha.format(DATE_FORMAT) : null; }
+    private String matriculaRegistro(Expediente expediente) {
+        if (expediente.getVehiculo() != null && expediente.getVehiculo().getMatricula() != null) {
+            return expediente.getVehiculo().getMatricula();
+        }
+        return normalizar(expediente.getMatricula());
+    }
     private DateRange dateRange(String periodo, LocalDate fechaDesde, LocalDate fechaHasta) {
         LocalDate today = LocalDate.now();
         return switch (periodo != null ? periodo : "ESTE_MES") {

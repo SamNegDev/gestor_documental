@@ -91,7 +91,7 @@ export function ExpedientesListPage() {
 
   return (
     <ListPageChrome
-      eyebrow={isAdmin ? "Gestion interna" : "Portal cliente"}
+      eyebrow={isAdmin ? "Gestión interna" : "Portal cliente"}
       title={isAdmin ? "Expedientes" : "Mis expedientes"}
       summary={isAdmin ? "Supervisa expedientes por cliente, estado, tramite y matricula." : "Consulta el avance de tus tramites y accede al detalle documental."}
       count={`${pageData?.totalElementos ?? 0} ${(pageData?.totalElementos ?? 0) === 1 ? "expediente" : "expedientes"}`}
@@ -612,9 +612,11 @@ function ListSkeleton() {
 
 function statusTone(status?: string | null) {
   if (status === "FINALIZADO" || status === "CONVERTIDA") return "success";
-  if (status === "INCIDENCIA" || status === "PENDIENTE_DOCUMENTACION" || status === "SOLICITADA_INFORMACION_ADICIONAL") return "danger";
+  if (status === "INCIDENCIA") return "danger";
+  if (status === "PENDIENTE_DOCUMENTACION") return "warning";
   if (status === "REVISANDO_INCIDENCIAS" || status === "ENVIADO_DGT" || status === "INFORMACION_ADICIONAL_RECIBIDA") return "info";
-  if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION") return "warning";
+  if (status === "SOLICITADA_INFORMACION_ADICIONAL") return "info";
+  if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION") return "neutral";
   return "neutral";
 }
 

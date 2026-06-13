@@ -38,17 +38,19 @@ public class SeguimientoClienteApiController {
     @GetMapping
     public PagedResponse<SeguimientoIncidenciaResponse> listar(@RequestParam(defaultValue = "PENDIENTES") String vista,
             @RequestParam(required = false) Long clienteId, @RequestParam(required = false) Integer anio,
+            @RequestParam(required = false) String accion,
             @RequestParam(defaultValue = "0") int pagina, @RequestParam(defaultValue = "25") int tamanio,
             Authentication authentication) {
         requireAdmin(authentication);
         boolean archivadas = "ARCHIVADAS".equals(vista);
+        LocalDateTime ahora = LocalDateTime.now();
         List<SeguimientoIncidenciaResponse> items = incidenciaRepository.findAllWithDetails().stream()
                 .filter(incidencia -> !incidencia.isResuelta() && incidencia.getExpediente() != null)
                 .filter(incidencia -> incidencia.getExpediente().getEstadoExpediente() != EstadoExpediente.FINALIZADO
                         && incidencia.getExpediente().getEstadoExpediente() != EstadoExpediente.RECHAZADO)
                 .filter(incidencia -> incidencia.isSeguimientoArchivado() == archivadas)
-                .filter(incidencia -> archivadas || incidencia.getContadorAvisos() > 0
-                        && incidencia.getProximoAviso() != null && incidencia.getProximoAviso().isAfter(LocalDateTime.now()))
+                .filter(incidencia -> archivadas || estaEnSeguimiento(incidencia))
+                .filter(incidencia -> filtraAccion(incidencia, accion, ahora))
                 .filter(incidencia -> clienteId == null || incidencia.getExpediente().getCliente() != null && clienteId.equals(incidencia.getExpediente().getCliente().getId()))
                 .filter(incidencia -> anio == null || incidencia.getExpediente().getFechaCreacion() != null && incidencia.getExpediente().getFechaCreacion().getYear() == anio)
                 .map(this::map)
@@ -82,6 +84,15 @@ public class SeguimientoClienteApiController {
                 .proximoAviso(format(incidencia.getProximoAviso())).pendienteNotificacion(incidencia.getContadorAvisos() == 0 || incidencia.getProximoAviso() != null && !incidencia.getProximoAviso().isAfter(LocalDateTime.now()))
                 .archivada(incidencia.isSeguimientoArchivado()).fechaArchivo(format(incidencia.getFechaArchivoSeguimiento()))
                 .anioExpediente(incidencia.getExpediente().getFechaCreacion() != null ? incidencia.getExpediente().getFechaCreacion().getYear() : 0).build();
+    }
+    private boolean estaEnSeguimiento(Incidencia incidencia) {
+        return incidencia.getContadorAvisos() > 0;
+    }
+    private boolean filtraAccion(Incidencia incidencia, String accion, LocalDateTime ahora) {
+        if (accion == null || accion.isBlank() || "TODAS".equals(accion) || incidencia.isSeguimientoArchivado()) return true;
+        if ("RECORDATORIO_VENCIDO".equals(accion)) return incidencia.getContadorAvisos() > 0
+                && incidencia.getProximoAviso() != null && !incidencia.getProximoAviso().isAfter(ahora);
+        return true;
     }
     private Usuario requireAdmin(Authentication auth) { Usuario u = usuarioService.buscarPorEmail(auth.getName()); if (u == null || u.getRolUsuario() != RolUsuario.ADMIN) throw new AccesoDenegadoException("Solo el administrador puede consultar el seguimiento"); return u; }
     private String format(LocalDateTime fecha) { return fecha != null ? fecha.format(FORMAT) : null; }

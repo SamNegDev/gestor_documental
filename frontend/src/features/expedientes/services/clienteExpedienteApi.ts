@@ -9,6 +9,7 @@ export interface ExpedienteCliente {
   estado: string;
   faseActual?: string | null;
   fechaInicio?: string | null;
+  solicitudId?: number | null;
   siguienteMensaje?: string | null;
   cliente?: ClienteResumen | null;
   documentos: DocumentoExpediente[];

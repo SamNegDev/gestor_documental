@@ -1,5 +1,5 @@
-import { apiGet } from "../../../shared/api/http";
-import type { InteresadoRegistro, VehiculoRegistro } from "../types";
+import { apiGet, apiPutJson } from "../../../shared/api/http";
+import type { InteresadoRegistro, VehiculoRegistro, VehiculoRegistroUpdateInput } from "../types";
 
 function query(value: string, periodo: string, fechaDesde = "", fechaHasta = "") {
   const params = new URLSearchParams({ periodo });
@@ -13,3 +13,4 @@ export const getInteresadosRegistro = (search = "", periodo = "ESTE_MES", fechaD
 export const getInteresadoRegistro = (id: string | number) => apiGet<InteresadoRegistro>(`/api/registro/interesados/${id}`);
 export const getVehiculosRegistro = (search = "", periodo = "ESTE_MES", fechaDesde = "", fechaHasta = "") => apiGet<VehiculoRegistro[]>(`/api/registro/vehiculos${query(search, periodo, fechaDesde, fechaHasta)}`);
 export const getVehiculoRegistro = (matricula: string) => apiGet<VehiculoRegistro>(`/api/registro/vehiculos/${encodeURIComponent(matricula)}`);
+export const updateVehiculoRegistro = (matricula: string, input: VehiculoRegistroUpdateInput) => apiPutJson(`/api/registro/vehiculos/${encodeURIComponent(matricula)}`, input);

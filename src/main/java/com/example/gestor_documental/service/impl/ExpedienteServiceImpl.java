@@ -16,6 +16,7 @@ import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
 import com.example.gestor_documental.service.TipoTramiteService;
+import com.example.gestor_documental.service.VehiculoService;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     private final IncidenciaRepository incidenciaRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoDocumentalRepository;
     private final HistorialCambioService historialCambioService;
+    private final VehiculoService vehiculoService;
 
     @Override
     public List<Expediente> listarTodos() {
@@ -525,5 +527,6 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     private void normalizarExpediente(Expediente expediente) {
         expediente.setMatricula(TextNormalizer.upperOrNull(expediente.getMatricula()));
         expediente.setObservaciones(TextNormalizer.upperOrNull(expediente.getObservaciones()));
+        expediente.setVehiculo(vehiculoService.obtenerOCrearPorMatricula(expediente.getMatricula()));
     }
 }

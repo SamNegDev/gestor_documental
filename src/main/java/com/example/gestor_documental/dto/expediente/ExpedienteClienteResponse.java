@@ -22,6 +22,7 @@ public class ExpedienteClienteResponse {
     private String estado;
     private String faseActual;
     private String fechaInicio;
+    private Long solicitudId;
     private String siguienteMensaje;
     private ClienteResumenResponse cliente;
 

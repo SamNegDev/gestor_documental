@@ -54,6 +54,14 @@ public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
     List<Expediente> findTop5ByClienteOrderByFechaReferenciaDesc(Cliente cliente);
 
     @Query("""
+            select e from Expediente e
+            where e.vehiculo is null
+              and e.matricula is not null
+              and trim(e.matricula) <> ''
+            """)
+    List<Expediente> findPendientesVincularVehiculo();
+
+    @Query("""
             select distinct e from Expediente e
             left join ExpedienteInteresado ei on ei.expediente = e
             left join ei.interesado i

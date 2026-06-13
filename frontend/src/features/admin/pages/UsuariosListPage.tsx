@@ -26,7 +26,7 @@ export function UsuariosListPage() {
     <main className="records-page admin-page">
       <div className="records-header">
         <div>
-          <p className="eyebrow">Gestion interna</p>
+          <p className="eyebrow">Gestión interna</p>
           <h2>Usuarios</h2>
           <p>Accesos del equipo interno y usuarios cliente asociados a cada cuenta.</p>
         </div>
