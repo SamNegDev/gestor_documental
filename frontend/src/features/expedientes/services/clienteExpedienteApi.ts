@@ -1,5 +1,5 @@
 import { apiGet, apiPostJson } from "../../../shared/api/http";
-import type { DocumentoExpediente, HistorialExpediente, IncidenciaExpediente, MensajeExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
+import type { ClienteResumen, DocumentoExpediente, HistorialExpediente, IncidenciaExpediente, MensajeExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 
 export interface ExpedienteCliente {
   id: number;
@@ -10,6 +10,7 @@ export interface ExpedienteCliente {
   faseActual?: string | null;
   fechaInicio?: string | null;
   siguienteMensaje?: string | null;
+  cliente?: ClienteResumen | null;
   documentos: DocumentoExpediente[];
   requisitosDocumentales: RequisitoDocumental[];
   incidencias: IncidenciaExpediente[];

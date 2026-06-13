@@ -152,6 +152,30 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     @Override
     @Transactional
+    public Documento guardarGeneradoParaExpediente(Long expedienteId, byte[] contenido, TipoDocumento tipoDocumento,
+            String nombreArchivoOriginal, String descripcion, Usuario usuario) {
+        if (contenido == null || contenido.length == 0) {
+            throw new OperacionInvalidaException("El documento generado esta vacio");
+        }
+        Expediente expediente = expedienteRepository.findById(expedienteId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
+        if (!expedienteService.tienePermisoExpediente(expediente, usuario)) {
+            throw new AccesoDenegadoException("No tienes permiso para generar documentos en este expediente");
+        }
+        try {
+            Documento documento = construirDocumentoBase(contenido, nombreArchivoOriginal, tipoDocumento, usuario);
+            documento.setDescripcionArchivo(descripcion);
+            documento.setExpediente(expediente);
+            documentoRepository.save(documento);
+            registrarCargaDocumentoExpediente(expediente, documento, usuario);
+            return documento;
+        } catch (IOException exception) {
+            throw new RuntimeException("No se pudo guardar el documento generado", exception);
+        }
+    }
+
+    @Override
+    @Transactional
     public Documento guardarParaIncidencia(Long incidenciaId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario) {
         if (archivo == null || archivo.isEmpty()) {
             return null;

@@ -1,5 +1,5 @@
 import { apiGet, apiPostJson, apiPutJson } from "../../../shared/api/http";
-import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, SolicitudDetail, SolicitudListItem, SolicitudUpsertInput } from "../types";
+import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudDetail, SolicitudListItem, SolicitudUpsertInput } from "../types";
 
 function buildQuery(filters: ListFilters) {
   const params = new URLSearchParams();
@@ -66,4 +66,12 @@ export function enviarMensajeSolicitud(id: number, contenido: string) {
 
 export function getDashboard() {
   return apiGet<DashboardData>("/api/dashboard");
+}
+
+export function getProductivity(filters: Pick<ListFilters, "periodo" | "fechaDesde" | "fechaHasta">) {
+  const params = new URLSearchParams();
+  params.set("periodo", filters.periodo || "ESTE_MES");
+  if (filters.fechaDesde) params.set("fechaDesde", filters.fechaDesde);
+  if (filters.fechaHasta) params.set("fechaHasta", filters.fechaHasta);
+  return apiGet<ProductivityData>(`/api/dashboard/productividad?${params.toString()}`);
 }

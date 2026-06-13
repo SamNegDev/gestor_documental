@@ -7,6 +7,8 @@ export interface ClienteAdmin {
   email: string;
   direccion?: string | null;
   telefono?: string | null;
+  logoPrincipalUrl?: string | null;
+  logoCompactoUrl?: string | null;
 }
 
 export interface ClienteInput {

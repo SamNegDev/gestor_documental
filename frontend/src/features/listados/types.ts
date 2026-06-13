@@ -138,3 +138,32 @@ export interface ListFilters {
   pagina?: string;
   tamanio?: string;
 }
+
+export interface ProductivitySeriesItem {
+  etiqueta: string;
+  creados: number;
+  finalizados: number;
+}
+
+export interface ProductivityBreakdownItem {
+  codigo: string;
+  etiqueta: string;
+  total: number;
+  valorMedio: number;
+}
+
+export interface ProductivityData {
+  periodo: string;
+  fechaDesde: string;
+  fechaHasta: string;
+  expedientesCreados: number;
+  expedientesFinalizados: number;
+  tiempoMedioDias: number;
+  expedientesEnCurso: number;
+  incidenciasActivas: number;
+  expedientesConDocumentacionPendiente: number;
+  evolucion: ProductivitySeriesItem[];
+  tiemposPorTramite: ProductivityBreakdownItem[];
+  volumenPorCliente: ProductivityBreakdownItem[];
+  cuellosBotella: ProductivityBreakdownItem[];
+}

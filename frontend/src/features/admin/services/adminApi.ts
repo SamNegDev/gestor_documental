@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPostJson, apiPutJson } from "../../../shared/api/http";
+import { apiDelete, apiGet, apiPostForm, apiPostJson, apiPutJson } from "../../../shared/api/http";
 import type { ClienteAdmin, ClienteInput, UsuarioAdmin, UsuarioCatalogs, UsuarioInput } from "../types";
 
 export function getClientes() {
@@ -19,6 +19,16 @@ export function updateCliente(id: string | number, input: ClienteInput) {
 
 export function deleteCliente(id: number) {
   return apiDelete(`/api/admin/clientes/${id}`);
+}
+
+export function uploadClienteLogo(id: string | number, tipo: "principal" | "compacto", archivo: File) {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  return apiPostForm(`/api/admin/clientes/${id}/logos/${tipo}`, formData);
+}
+
+export function deleteClienteLogo(id: string | number, tipo: "principal" | "compacto") {
+  return apiDelete(`/api/admin/clientes/${id}/logos/${tipo}`);
 }
 
 export function getUsuarios() {

@@ -26,6 +26,8 @@ export interface ClienteResumen {
   nif?: string;
   email?: string;
   telefono?: string;
+  logoPrincipalUrl?: string | null;
+  logoCompactoUrl?: string | null;
 }
 
 export interface UsuarioResumen {
@@ -170,6 +172,54 @@ export interface MensajeExpediente {
   rolAutor?: string | null;
   fechaCreacion?: string;
   contenido: string;
+}
+
+export interface PlantillaDocumento {
+  codigo: string;
+  nombre: string;
+  descripcion: string;
+  tipoDocumento: string;
+}
+
+export interface PlantillaInteresado {
+  interesadoId: number;
+  nombre: string;
+  dni: string;
+  rol?: string | null;
+  direccion?: string | null;
+}
+
+export interface PlantillaCampo {
+  codigo: string;
+  etiqueta: string;
+  valor: string;
+  requerido: boolean;
+  tipo: "INTERESADO" | "TEXT" | "TEXTAREA" | "DATE" | "NUMBER" | string;
+  ayuda?: string | null;
+}
+
+export interface PlantillasExpediente {
+  referencia: string;
+  matricula: string;
+  tipoTramite: string;
+  cliente: string;
+  plantillas: PlantillaDocumento[];
+  interesados: PlantillaInteresado[];
+}
+
+export interface PlantillaPreview {
+  codigo: string;
+  nombre: string;
+  nombreArchivo: string;
+  tipoDocumento: string;
+  campos: PlantillaCampo[];
+  avisos: string[];
+}
+
+export interface DocumentoGenerado {
+  documentoId: number;
+  nombreArchivo: string;
+  tipoDocumento: string;
 }
 
 export interface ExpedienteDetail {

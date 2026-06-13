@@ -9,6 +9,7 @@ import { ApiError } from "../../shared/api/http";
 import { useQuery } from "@tanstack/react-query";
 import { getTareasResumen } from "../../features/tareas/services/tareasApi";
 import { GlobalSearch } from "../../features/busqueda/components/GlobalSearch";
+import { clientInitials } from "../../shared/utils/clientBranding";
 
 export type AppOutletContext = {
   sessionLoading: boolean;
@@ -70,7 +71,15 @@ export function AppLayout() {
   const isClientRoute = location.pathname.startsWith("/cliente/") || user?.rol === "CLIENTE";
   const title = useMemo(() => pageTitle(location.pathname), [location.pathname]);
   const roleLabel = user?.rol === "CLIENTE" ? "Cliente" : user?.rol === "ADMIN" ? "Administrador" : "Sesion";
-  const tareasResumen = useQuery({ queryKey: ["tareas", "resumen", "menu", user?.rol], queryFn: getTareasResumen, enabled: Boolean(user), refetchInterval: 60000 });
+  const clientBrandImage = user?.cliente?.logoPrincipalUrl || user?.cliente?.logoCompactoUrl;
+  const tareasResumen = useQuery({
+    queryKey: ["tareas", "resumen", "menu", user?.rol],
+    queryFn: getTareasResumen,
+    enabled: Boolean(user),
+    refetchInterval: 30000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+  });
 
   const handleLogout = async () => {
     await logout().catch(() => undefined);
@@ -80,11 +89,19 @@ export function AppLayout() {
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="Navegacion principal">
-        <div className="sidebar__brand">
-          <img className="brand-mark brand-mark--image" src="/assets/logos/casado-negrin-symbol.jpg" alt="Casado Negrin Gestoria" />
+        <div className={`sidebar__brand ${user?.rol === "CLIENTE" ? "sidebar__brand--client" : ""}`}>
+          {user?.rol === "CLIENTE" ? (
+            clientBrandImage ? (
+              <img className="sidebar-client-logo" src={clientBrandImage} alt={`Logo de ${user.cliente?.nombre || "cliente"}`} />
+            ) : (
+              <span className="brand-mark sidebar-client-initials" aria-hidden="true">{clientInitials(user.cliente?.nombre)}</span>
+            )
+          ) : (
+            <img className="brand-mark brand-mark--image" src="/assets/logos/casado-negrin-symbol.jpg" alt="Casado Negrin Gestoria" />
+          )}
           <div className="topbar__title">
-            <strong>Casado Negrin</strong>
-            <span>Gestion documental</span>
+            <strong>{user?.rol === "CLIENTE" ? user.cliente?.nombre || "Portal cliente" : "Casado Negrin"}</strong>
+            <span>{user?.rol === "CLIENTE" ? "Portal documental" : "Gestion documental"}</span>
           </div>
         </div>
 

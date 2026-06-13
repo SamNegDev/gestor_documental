@@ -37,6 +37,12 @@ public class Cliente {
     @Column(length = 20)
     private String telefono;
 
+    @Column(name = "logo_principal_path", length = 500)
+    private String logoPrincipalPath;
+
+    @Column(name = "logo_compacto_path", length = 500)
+    private String logoCompactoPath;
+
     @OneToMany(mappedBy = "cliente", fetch = FetchType.LAZY)
     private List<Usuario> usuarios = new ArrayList<>();
 

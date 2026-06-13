@@ -47,15 +47,27 @@ export function SolicitudDetailPage() {
 
   const convertirMutation = useMutation({
     mutationFn: (solicitudId: number) => convertirSolicitud(solicitudId),
-    onSuccess: (expediente) => {
-      queryClient.invalidateQueries({ queryKey: ["solicitudes"] });
+    onSuccess: async (expediente) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
+        queryClient.invalidateQueries({ queryKey: ["expedientes"] }),
+        queryClient.invalidateQueries({ queryKey: ["tareas"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["registro"] }),
+      ]);
       navigate(`/expedientes/${expediente.id}`);
     },
   });
 
   const estadoMutation = useMutation({
     mutationFn: ({ solicitudId, estado }: { solicitudId: number; estado: string }) => cambiarEstadoSolicitud(solicitudId, estado),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["solicitudes", "detalle", id] }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
+        queryClient.invalidateQueries({ queryKey: ["tareas"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
+    },
   });
 
   const mensajeMutation = useMutation({
@@ -68,6 +80,11 @@ export function SolicitudDetailPage() {
 
   const refreshSolicitud = async () => {
     const result = await solicitudQuery.refetch();
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
+      queryClient.invalidateQueries({ queryKey: ["tareas"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+    ]);
     return result.data;
   };
 

@@ -1,9 +1,10 @@
-import { CalendarDays, Eye, FileText, Pencil, UserRound } from "lucide-react";
+import { ArrowLeft, Building2, CalendarDays, Eye, FileText, Pencil, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { ExpedienteDetail } from "../types/expedienteDetail.types";
 import { formatDateTime, humanizeEnum } from "../utils/formatters";
 import { ExpedienteStatus } from "./ExpedienteStatus";
 import { LicensePlate } from "./LicensePlate";
+import { clientInitials } from "../../../shared/utils/clientBranding";
 
 type Props = {
   expediente: ExpedienteDetail;
@@ -21,12 +22,25 @@ export function ExpedienteHeader({ expediente }: Props) {
   return (
     <section className="exp-header">
       <div className="exp-header__main">
+        <Link aria-label="Volver al listado de expedientes" className="exp-header__back" title="Volver a expedientes" to="/expedientes">
+          <ArrowLeft size={18} />
+        </Link>
         <LicensePlate value={expediente.matricula} />
 
         <div className="exp-header__title">
           <p className="eyebrow">{expediente.referencia}</p>
           <h2>{humanizeEnum(expediente.tipoTramiteDescripcion || expediente.tipoTramite)}</h2>
           <div className="exp-header__meta">
+            <span className="exp-header__client">
+              <span className="exp-header__client-mark" aria-hidden="true">
+                {expediente.cliente?.logoCompactoUrl ? (
+                  <img src={expediente.cliente.logoCompactoUrl} alt="" />
+                ) : expediente.cliente ? clientInitials(expediente.cliente.nombre) : <Building2 size={16} />}
+              </span>
+              <strong>Cliente:</strong>
+              {expediente.cliente?.nombre || "Sin cliente asignado"}
+              {expediente.cliente?.nif ? <small>· {expediente.cliente.nif}</small> : null}
+            </span>
             <span>
               <FileText size={16} />
               {expediente.tipoTramite ? humanizeEnum(expediente.tipoTramite) : "Trámite sin definir"}

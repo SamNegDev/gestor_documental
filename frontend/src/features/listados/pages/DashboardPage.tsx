@@ -1,20 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useLocation, useOutletContext } from "react-router-dom";
-import { AlertCircle, ArrowRight, CircleCheck, ClipboardCheck, Clock3, FilePlus2, FolderOpen, Inbox, Loader2, Plus, ShieldAlert } from "lucide-react";
+import { Activity, AlertCircle, ArrowRight, BriefcaseBusiness, CalendarRange, CircleCheck, ClipboardCheck, Clock3, FilePlus2, FileWarning, FolderOpen, Inbox, Loader2, Plus, ShieldAlert, TimerReset } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
-import { getDashboard } from "../services/listadosApi";
-import type { DashboardData, ExpedienteListItem, SolicitudListItem } from "../types";
+import { getDashboard, getProductivity } from "../services/listadosApi";
+import type { DashboardData, ExpedienteListItem, ListFilters, ProductivityBreakdownItem, ProductivityData, SolicitudListItem } from "../types";
 
 export function DashboardPage() {
   const { user } = useOutletContext<AppOutletContext>();
   const location = useLocation();
   const isClientView = location.pathname.startsWith("/cliente/");
   const isAdmin = user?.rol === "ADMIN" && !isClientView;
+  const [productivityFilters, setProductivityFilters] = useState<ListFilters>({ periodo: "ESTE_MES" });
   const dashboardQuery = useQuery({
     queryKey: ["dashboard"],
     queryFn: getDashboard,
+  });
+  const customRangeReady = productivityFilters.periodo !== "PERSONALIZADO" || Boolean(productivityFilters.fechaDesde && productivityFilters.fechaHasta);
+  const productivityQuery = useQuery({
+    queryKey: ["dashboard-productivity", productivityFilters.periodo, productivityFilters.fechaDesde, productivityFilters.fechaHasta],
+    queryFn: () => getProductivity(productivityFilters),
+    enabled: isAdmin && customRangeReady,
   });
 
   if (dashboardQuery.isLoading) {
@@ -86,6 +93,16 @@ export function DashboardPage() {
           ]}
         />
       </section>
+
+      {isAdmin ? (
+        <ProductivitySection
+          data={productivityQuery.data}
+          error={Boolean(productivityQuery.error)}
+          filters={productivityFilters}
+          loading={productivityQuery.isLoading || productivityQuery.isFetching}
+          onChange={setProductivityFilters}
+        />
+      ) : null}
 
       <section className="dashboard-grid dashboard-grid--tables">
         <LatestExpedientes data={data} isAdmin={isAdmin} />
@@ -266,6 +283,186 @@ function statusTone(status?: string | null) {
 
 function formatEnum(value?: string | null) {
   return value ? value.replaceAll("_", " ") : "Sin estado";
+}
+
+function ProductivitySection({
+  data,
+  filters,
+  loading,
+  error,
+  onChange,
+}: {
+  data?: ProductivityData;
+  filters: ListFilters;
+  loading: boolean;
+  error: boolean;
+  onChange: (filters: ListFilters) => void;
+}) {
+  return (
+    <section className="productivity-section">
+      <div className="productivity-heading">
+        <div>
+          <p className="eyebrow">Rendimiento de la gestoria</p>
+          <h2>Productividad y carga de trabajo</h2>
+          <p>{data ? `${data.periodo}: ${formatShortDate(data.fechaDesde)} - ${formatShortDate(data.fechaHasta)}` : "Analisis por periodo de cierres, tiempos y carga activa."}</p>
+        </div>
+        <ProductivityPeriodFilter filters={filters} onChange={onChange} />
+      </div>
+
+      {loading && !data ? <div className="productivity-loading"><Loader2 size={18} /> Calculando indicadores...</div> : null}
+      {error ? <div className="records-empty records-empty--danger"><AlertCircle size={20} /> No se pudo calcular la productividad.</div> : null}
+      {data ? (
+        <>
+          <div className={`productivity-kpis${loading ? " productivity-kpis--loading" : ""}`}>
+            <ProductivityKpi icon={<BriefcaseBusiness size={17} />} label="Creados" value={data.expedientesCreados} detail="en el periodo" />
+            <ProductivityKpi icon={<CircleCheck size={17} />} label="Finalizados" value={data.expedientesFinalizados} detail="cierres registrados" tone="success" />
+            <ProductivityKpi icon={<TimerReset size={17} />} label="Tiempo medio" value={formatDays(data.tiempoMedioDias)} detail="hasta finalizacion" />
+            <ProductivityKpi icon={<Activity size={17} />} label="En curso" value={data.expedientesEnCurso} detail="carga actual" tone="info" />
+            <ProductivityKpi icon={<ShieldAlert size={17} />} label="Incidencias" value={data.incidenciasActivas} detail="activas ahora" tone="danger" />
+            <ProductivityKpi icon={<FileWarning size={17} />} label="Falta documentacion" value={data.expedientesConDocumentacionPendiente} detail="expedientes afectados" tone="warning" />
+          </div>
+
+          <div className="productivity-grid">
+            <EvolutionPanel data={data} />
+            <BreakdownPanel data={data.cuellosBotella} empty="No hay expedientes activos." mode="bottleneck" title="Cuellos de botella" />
+            <BreakdownPanel data={data.tiemposPorTramite} empty="Todavia no hay cierres en este periodo." mode="duration" title="Tiempo medio por tramite" />
+            <BreakdownPanel data={data.volumenPorCliente} empty="No hay expedientes creados en este periodo." mode="client" title="Volumen por cliente" />
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function ProductivityPeriodFilter({ filters, onChange }: { filters: ListFilters; onChange: (filters: ListFilters) => void }) {
+  const selectPeriod = (periodo: string) => {
+    if (periodo !== "PERSONALIZADO") {
+      onChange({ periodo, fechaDesde: "", fechaHasta: "" });
+      return;
+    }
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    onChange({ periodo, fechaDesde: toInputDate(first), fechaHasta: toInputDate(now) });
+  };
+  return (
+    <div className="productivity-filter">
+      <CalendarRange size={16} />
+      <label>
+        <span>Periodo</span>
+        <select value={filters.periodo || "ESTE_MES"} onChange={(event) => selectPeriod(event.target.value)}>
+          <option value="ULTIMA_SEMANA">Ultima semana</option>
+          <option value="ESTE_MES">Este mes</option>
+          <option value="ULTIMOS_3_MESES">Ultimos 3 meses</option>
+          <option value="ESTE_ANIO">Este ano</option>
+          <option value="TODO">Todo el historico</option>
+          <option value="PERSONALIZADO">Rango personalizado</option>
+        </select>
+      </label>
+      {filters.periodo === "PERSONALIZADO" ? (
+        <div className="productivity-filter__dates">
+          <input aria-label="Fecha desde" type="date" value={filters.fechaDesde || ""} onChange={(event) => onChange({ ...filters, fechaDesde: event.target.value })} />
+          <span>hasta</span>
+          <input aria-label="Fecha hasta" type="date" value={filters.fechaHasta || ""} onChange={(event) => onChange({ ...filters, fechaHasta: event.target.value })} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ProductivityKpi({ icon, label, value, detail, tone = "neutral" }: { icon: ReactNode; label: string; value: ReactNode; detail: string; tone?: string }) {
+  return (
+    <article className={`productivity-kpi productivity-kpi--${tone}`}>
+      <span className="productivity-kpi__icon">{icon}</span>
+      <div><span>{label}</span><small>{detail}</small></div>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+
+function EvolutionPanel({ data }: { data: ProductivityData }) {
+  const max = Math.max(1, ...data.evolucion.flatMap((item) => [item.creados, item.finalizados]));
+  return (
+    <article className="productivity-panel productivity-panel--evolution">
+      <div className="productivity-panel__heading">
+        <div><h3>Ritmo de entrada y cierre</h3><span>Expedientes por intervalo</span></div>
+        <div className="productivity-legend"><span><i className="is-created" />Creados</span><span><i className="is-finished" />Finalizados</span></div>
+      </div>
+      {data.evolucion.length === 0 ? <ProductivityEmpty text="No hay actividad en este periodo." /> : (
+        <div className="productivity-chart" style={{ gridTemplateColumns: `repeat(${data.evolucion.length}, minmax(12px, 1fr))` }}>
+          {data.evolucion.map((item, index) => (
+            <div className="productivity-chart__column" key={`${item.etiqueta}-${index}`} title={`${item.etiqueta}: ${item.creados} creados, ${item.finalizados} finalizados`}>
+              <div className="productivity-chart__bars">
+                <span className="is-created" style={{ height: `${Math.max(item.creados ? 8 : 0, (item.creados / max) * 100)}%` }} />
+                <span className="is-finished" style={{ height: `${Math.max(item.finalizados ? 8 : 0, (item.finalizados / max) * 100)}%` }} />
+              </div>
+              <small>{showChartLabel(data.evolucion.length, index) ? item.etiqueta : ""}</small>
+            </div>
+          ))}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function BreakdownPanel({ data, title, mode, empty }: { data: ProductivityBreakdownItem[]; title: string; mode: "bottleneck" | "duration" | "client"; empty: string }) {
+  const max = Math.max(1, ...data.map((item) => mode === "duration" ? item.valorMedio : item.total));
+  return (
+    <article className={`productivity-panel productivity-panel--${mode}`}>
+      <div className="productivity-panel__heading"><div><h3>{title}</h3><span>{breakdownSubtitle(mode)}</span></div></div>
+      {data.length === 0 ? <ProductivityEmpty text={empty} /> : (
+        <div className="productivity-ranking">
+          {data.map((item) => {
+            const primary = mode === "duration" ? item.valorMedio : item.total;
+            return (
+              <div className="productivity-ranking__row" key={item.codigo}>
+                <div><strong>{item.etiqueta}</strong><span>{breakdownDetail(item, mode)}</span></div>
+                <b>{mode === "duration" ? formatDays(item.valorMedio) : item.total}</b>
+                <div className="productivity-ranking__track"><span style={{ width: `${Math.max(4, (primary / max) * 100)}%` }} /></div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ProductivityEmpty({ text }: { text: string }) {
+  return <div className="productivity-empty"><ClipboardCheck size={20} /><span>{text}</span></div>;
+}
+
+function breakdownSubtitle(mode: "bottleneck" | "duration" | "client") {
+  if (mode === "bottleneck") return "Carga actual y dias sin actividad";
+  if (mode === "duration") return "Solo expedientes finalizados";
+  return "Altas del periodo y cierres asociados";
+}
+
+function breakdownDetail(item: ProductivityBreakdownItem, mode: "bottleneck" | "duration" | "client") {
+  if (mode === "bottleneck") return `${formatDays(item.valorMedio)} sin actividad media`;
+  if (mode === "duration") return `${item.total} ${item.total === 1 ? "expediente" : "expedientes"}`;
+  return `${Math.round(item.valorMedio)} finalizados`;
+}
+
+function formatDays(value: number) {
+  return `${new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 }).format(value)} d`;
+}
+
+function formatShortDate(value: string) {
+  const [year, month, day] = value.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function toInputDate(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function showChartLabel(total: number, index: number) {
+  if (total <= 12) return true;
+  const step = Math.ceil(total / 8);
+  return index % step === 0 || index === total - 1;
 }
 
 function formatDashboardStatus(value?: string | null) {

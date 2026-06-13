@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import * as Tabs from "@radix-ui/react-tabs";
-import { useParams } from "react-router-dom";
-import { AlertCircle, CheckCircle2, Clock3, Download, Eye, FileText, History, Loader2, MessageCircle, Upload } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, Download, Eye, FileText, History, Loader2, MessageCircle, Upload } from "lucide-react";
 import { answerAdditionalInfo, getClienteExpediente, sendClienteExpedienteMessage, type ExpedienteCliente } from "../services/clienteExpedienteApi";
 import { uploadIncidentDocument } from "../services/expedienteDetailApi";
 import { uploadRequirementDocument } from "../services/requisitosApi";
 import type { DocumentoExpediente, IncidenciaExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 import { uppercaseInput } from "../../../shared/utils/text";
+import { clientInitials } from "../../../shared/utils/clientBranding";
 import { ApiError } from "../../../shared/api/http";
 import "../styles/expedienteDetail.css";
 
@@ -202,12 +204,22 @@ function ClientDocumentRequirementsPanel({
 
 export function ClienteExpedientePage() {
   const { id } = useParams();
+  const queryClient = useQueryClient();
   const [expediente, setExpediente] = useState<ExpedienteCliente | null>(null);
   const [message, setMessage] = useState("");
   const [additionalInfoResponse, setAdditionalInfoResponse] = useState("");
   const [uploadedIncidentIds, setUploadedIncidentIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const refreshRelatedData = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["expedientes"] }),
+      queryClient.invalidateQueries({ queryKey: ["tareas"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      queryClient.invalidateQueries({ queryKey: ["registro"] }),
+    ]);
+  }, [queryClient]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -241,6 +253,7 @@ export function ClienteExpedientePage() {
       await uploadIncidentDocument(incidencia.id, archivo);
       setUploadedIncidentIds((current) => new Set(current).add(incidencia.id));
       await load();
+      await refreshRelatedData();
     } catch {
       alert("No se pudo subir el documento.");
     }
@@ -250,6 +263,7 @@ export function ClienteExpedientePage() {
     try {
       await uploadRequirementDocument(requisito.id, archivo);
       await load();
+      await refreshRelatedData();
     } catch {
       alert("No se pudo aportar el documento solicitado.");
     }
@@ -262,6 +276,7 @@ export function ClienteExpedientePage() {
       await answerAdditionalInfo(id, contenido);
       setAdditionalInfoResponse("");
       await load();
+      await refreshRelatedData();
     } catch {
       alert("No se pudo enviar la respuesta.");
     }
@@ -274,6 +289,7 @@ export function ClienteExpedientePage() {
       await sendClienteExpedienteMessage(id, contenido);
       setMessage("");
       await load();
+      await refreshRelatedData();
     } catch {
       alert("No se pudo enviar el mensaje.");
     }
@@ -324,11 +340,26 @@ export function ClienteExpedientePage() {
 
   return (
     <main className="client-expediente-page">
+      <Link className="registry-back" to="/expedientes">
+        <ArrowLeft size={16} />
+        Volver a expedientes
+      </Link>
       <section className={`client-status-hero client-status-hero--${tone}`}>
-        <div>
-          <p className="eyebrow">{expediente.referencia}</p>
-          <h2>{expediente.matricula || "Expediente sin matricula"}</h2>
-          <p>{expediente.tipoTramiteDescripcion || "Tramite en curso"}</p>
+        <div className="client-status-hero__identity">
+          <div className="client-status-hero__brand" aria-hidden="true">
+            {expediente.cliente?.logoPrincipalUrl ? (
+              <img src={expediente.cliente.logoPrincipalUrl} alt="" />
+            ) : expediente.cliente?.logoCompactoUrl ? (
+              <img src={expediente.cliente.logoCompactoUrl} alt="" />
+            ) : (
+              clientInitials(expediente.cliente?.nombre)
+            )}
+          </div>
+          <div>
+            <p className="eyebrow">{expediente.referencia}</p>
+            <h2>{expediente.matricula || "Expediente sin matricula"}</h2>
+            <p>{expediente.tipoTramiteDescripcion || "Tramite en curso"}</p>
+          </div>
         </div>
         <div className="client-status-hero__state">
           {tone === "success" ? <CheckCircle2 size={28} /> : <Clock3 size={28} />}
@@ -471,15 +502,17 @@ export function ClienteExpedientePage() {
                   <span>{formatDocumentType(documento.tipo)}</span>
                   <small>{formatDateTime(documento.fechaSubida)}</small>
                 </div>
-                <button
-                  className="soft-button soft-button--compact"
-                  disabled={!documento.id}
-                  onClick={() => documento.id && window.open(`/documentos/ver/${documento.id}`, "_blank", "noopener,noreferrer")}
-                  type="button"
-                >
-                  <Eye size={15} />
-                  Ver
-                </button>
+                <div className="document-row__actions">
+                  <button
+                    className="soft-button soft-button--compact"
+                    disabled={!documento.id}
+                    onClick={() => documento.id && window.open(`/documentos/ver/${documento.id}`, "_blank", "noopener,noreferrer")}
+                    type="button"
+                  >
+                    <Eye size={15} />
+                    Ver
+                  </button>
+                </div>
               </article>
             ))
           )}

@@ -18,4 +18,6 @@ public class ClienteAdminResponse {
     private String email;
     private String direccion;
     private String telefono;
+    private String logoPrincipalUrl;
+    private String logoCompactoUrl;
 }

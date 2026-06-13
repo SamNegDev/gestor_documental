@@ -1,8 +1,11 @@
 package com.example.gestor_documental.controller.api;
 
+import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
+import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.util.ClienteBrandingUrls;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -30,6 +33,22 @@ public class SesionApiController {
                 .nombreCompleto(nombreCompleto(usuario))
                 .email(usuario.getEmail())
                 .rol(usuario.getRolUsuario() != null ? usuario.getRolUsuario().name() : null)
+                .cliente(mapCliente(usuario.getCliente()))
+                .build();
+    }
+
+    private ClienteResumenResponse mapCliente(com.example.gestor_documental.model.Cliente cliente) {
+        if (cliente == null) {
+            return null;
+        }
+        return ClienteResumenResponse.builder()
+                .id(cliente.getId())
+                .nombre(cliente.getNombre())
+                .nif(cliente.getNif())
+                .email(cliente.getEmail())
+                .telefono(cliente.getTelefono())
+                .logoPrincipalUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.PRINCIPAL))
+                .logoCompactoUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.COMPACTO))
                 .build();
     }
 

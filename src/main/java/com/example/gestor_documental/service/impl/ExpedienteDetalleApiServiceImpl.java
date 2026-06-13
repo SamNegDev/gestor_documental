@@ -17,6 +17,7 @@ import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.enums.TipoOperacionExpediente;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
@@ -42,6 +43,7 @@ import com.example.gestor_documental.service.IncidenciaService;
 import com.example.gestor_documental.service.MensajeService;
 import com.example.gestor_documental.service.OperacionExpedienteService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
+import com.example.gestor_documental.util.ClienteBrandingUrls;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -702,6 +704,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .nif(cliente.getNif())
                 .email(cliente.getEmail())
                 .telefono(cliente.getTelefono())
+                .logoPrincipalUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.PRINCIPAL))
+                .logoCompactoUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.COMPACTO))
                 .build();
     }
 

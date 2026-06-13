@@ -7,17 +7,21 @@ import com.example.gestor_documental.dto.expediente.UsuarioAdminResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioCatalogsResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioUpsertRequest;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.service.ClienteLogoService;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.UsuarioService;
 import com.example.gestor_documental.util.TextNormalizer;
+import com.example.gestor_documental.util.ClienteBrandingUrls;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,7 +31,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -36,6 +42,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class AdminManagementApiController {
 
     private final ClienteService clienteService;
+    private final ClienteLogoService clienteLogoService;
     private final UsuarioService usuarioService;
 
     @GetMapping("/clientes")
@@ -80,8 +87,32 @@ public class AdminManagementApiController {
     @DeleteMapping("/clientes/{id}")
     public ResponseEntity<Void> eliminarCliente(@PathVariable Long id, Authentication authentication) {
         requireAdmin(authentication);
+        Cliente cliente = clienteService.buscarPorId(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
         clienteService.eliminar(id);
+        clienteLogoService.eliminarArchivos(cliente);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(value = "/clientes/{id}/logos/{tipo}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ClienteAdminResponse guardarLogo(
+            @PathVariable Long id,
+            @PathVariable String tipo,
+            @RequestParam("archivo") MultipartFile archivo,
+            Authentication authentication
+    ) {
+        requireAdmin(authentication);
+        return mapClienteAdmin(clienteLogoService.guardar(id, TipoLogoCliente.fromRoute(tipo), archivo));
+    }
+
+    @DeleteMapping("/clientes/{id}/logos/{tipo}")
+    public ClienteAdminResponse eliminarLogo(
+            @PathVariable Long id,
+            @PathVariable String tipo,
+            Authentication authentication
+    ) {
+        requireAdmin(authentication);
+        return mapClienteAdmin(clienteLogoService.eliminar(id, TipoLogoCliente.fromRoute(tipo)));
     }
 
     @GetMapping("/usuarios")
@@ -193,6 +224,8 @@ public class AdminManagementApiController {
                 .email(cliente.getEmail())
                 .direccion(cliente.getDireccion())
                 .telefono(cliente.getTelefono())
+                .logoPrincipalUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.PRINCIPAL))
+                .logoCompactoUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.COMPACTO))
                 .build();
     }
 
@@ -203,6 +236,8 @@ public class AdminManagementApiController {
                 .nif(cliente.getNif())
                 .email(cliente.getEmail())
                 .telefono(cliente.getTelefono())
+                .logoPrincipalUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.PRINCIPAL))
+                .logoCompactoUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.COMPACTO))
                 .build();
     }
 

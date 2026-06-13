@@ -4,6 +4,7 @@ import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.DashboardMetricsResponse;
 import com.example.gestor_documental.dto.expediente.DashboardResponse;
 import com.example.gestor_documental.dto.expediente.ExpedienteListItemResponse;
+import com.example.gestor_documental.dto.expediente.ProductividadDashboardResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudListItemResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
 import com.example.gestor_documental.enums.EstadoExpediente;
@@ -15,6 +16,8 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.service.impl.DashboardProductividadService;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -23,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -36,6 +40,7 @@ public class DashboardApiController {
     private final UsuarioService usuarioService;
     private final ExpedienteService expedienteService;
     private final SolicitudService solicitudService;
+    private final DashboardProductividadService productividadService;
 
     @GetMapping
     public DashboardResponse obtenerDashboard(Authentication authentication) {
@@ -47,6 +52,24 @@ public class DashboardApiController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes un cliente asociado");
         }
         return clienteDashboard(usuario);
+    }
+
+    @GetMapping("/productividad")
+    public ProductividadDashboardResponse obtenerProductividad(
+            @RequestParam(defaultValue = "ESTE_MES") String periodo,
+            @RequestParam(required = false) LocalDate fechaDesde,
+            @RequestParam(required = false) LocalDate fechaHasta,
+            Authentication authentication
+    ) {
+        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+        if (usuario == null || usuario.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo el administrador puede consultar productividad");
+        }
+        try {
+            return productividadService.obtener(periodo, fechaDesde, fechaHasta);
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
     }
 
     private DashboardResponse adminDashboard() {

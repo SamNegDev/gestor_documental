@@ -16,4 +16,5 @@ public class UsuarioResumenResponse {
     private String nombreCompleto;
     private String email;
     private String rol;
+    private ClienteResumenResponse cliente;
 }

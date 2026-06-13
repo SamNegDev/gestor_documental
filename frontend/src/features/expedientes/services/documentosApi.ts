@@ -1,4 +1,5 @@
-import { apiDelete, apiGet, apiPatchForm, apiPostForm } from "../../../shared/api/http";
+import { apiDelete, apiGet, apiPatchForm, apiPostForm, apiPostJson } from "../../../shared/api/http";
+import type { DocumentoGenerado, PlantillaPreview, PlantillasExpediente } from "../types/expedienteDetail.types";
 
 export function uploadExpedienteDocument(expedienteId: number, tipoDocumento: string, archivo: File, operacionId?: number | null): Promise<void> {
   const formData = new FormData();
@@ -75,4 +76,24 @@ export function mergeDocuments(
   if (nombreArchivo) formData.append("nombreArchivo", nombreArchivo);
   if (operacionId) formData.append("operacionId", String(operacionId));
   return apiPostForm(`/api/documentos/${documentoPrincipalId}/unir`, formData);
+}
+
+export function getDocumentTemplates(expedienteId: number): Promise<PlantillasExpediente> {
+  return apiGet<PlantillasExpediente>(`/api/expedientes/${expedienteId}/plantillas`);
+}
+
+export function previewDocumentTemplate(
+  expedienteId: number,
+  codigo: string,
+  campos: Record<string, string> = {},
+): Promise<PlantillaPreview> {
+  return apiPostJson<PlantillaPreview>(`/api/expedientes/${expedienteId}/plantillas/preview`, { codigo, campos });
+}
+
+export function generateDocumentTemplate(
+  expedienteId: number,
+  codigo: string,
+  campos: Record<string, string>,
+): Promise<DocumentoGenerado> {
+  return apiPostJson<DocumentoGenerado>(`/api/expedientes/${expedienteId}/plantillas/generar`, { codigo, campos });
 }

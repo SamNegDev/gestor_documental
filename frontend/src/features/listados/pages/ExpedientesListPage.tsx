@@ -279,7 +279,6 @@ function ExpedientesTable({
               />
             </th>
             {!showClient ? <th className="records-col-interested">Interesados</th> : null}
-            <th className="records-col-phase">Fase actual</th>
             <th className="records-col-status">
               <span>Estado</span>
               <select className="records-table-filter" value={filters.estado || ""} onChange={(event) => nextFilter("estado", event.target.value)}>
@@ -291,6 +290,7 @@ function ExpedientesTable({
                 ))}
               </select>
             </th>
+            <th className="records-col-phase">Proximo paso</th>
             {showClient ? <th className="records-col-change">Ultima modificacion</th> : <th className="records-col-date">Ultima actividad</th>}
             <th aria-label="Acciones" className="records-col-actions" />
           </tr>
@@ -333,9 +333,6 @@ function ExpedientesTable({
                   <InterestedParties interesados={expediente.interesados} />
                 </td>
               ) : null}
-              <td className="records-col-phase">
-                <PhaseSummary expediente={expediente} />
-              </td>
               <td className="records-col-status" title={formatEnum(expediente.estado)}>
                 <div className="records-status-summary">
                   <StatusBadge tone={statusTone(expediente.estado)}>{formatStatusLabel(expediente.estado)}</StatusBadge>
@@ -355,6 +352,9 @@ function ExpedientesTable({
                     </div>
                   ) : null}
                 </div>
+              </td>
+              <td className="records-col-phase">
+                <NextStepSummary expediente={expediente} />
               </td>
               {showClient ? (
                 <td className="records-col-change">
@@ -520,8 +520,26 @@ function InteresadoListFilter({ value, onChange }: { value: string; onChange: (v
   );
 }
 
-function PhaseSummary({ expediente }: { expediente: ExpedienteListItem }) {
-  return <span className="records-phase-title">{expediente.faseActual || "Fase sin definir"}</span>;
+function NextStepSummary({ expediente }: { expediente: ExpedienteListItem }) {
+  let label = expediente.siguientePasoTitulo || "Consultar expediente";
+
+  if (expediente.estado === "FINALIZADO") {
+    label = expediente.justificantesFinalesPendientes?.length
+      ? `Adjuntar ${expediente.justificantesFinalesPendientes.join(" y ")}`
+      : "Sin acciones pendientes";
+  } else if (expediente.estado === "PENDIENTE_DOCUMENTACION") {
+    label = "Esperar documentacion";
+  } else if (expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL") {
+    label = "Esperar respuesta del cliente";
+  } else if (expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" || expediente.estado === "REVISANDO_INCIDENCIAS") {
+    label = "Revisar respuesta recibida";
+  }
+
+  return (
+    <span className="records-phase-title" title={expediente.siguientePasoDetalle || label}>
+      {label}
+    </span>
+  );
 }
 
 function InterestedParties({ interesados }: { interesados?: ExpedienteListItem["interesados"] }) {

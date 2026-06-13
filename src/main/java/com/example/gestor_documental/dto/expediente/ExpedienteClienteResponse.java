@@ -23,6 +23,7 @@ public class ExpedienteClienteResponse {
     private String faseActual;
     private String fechaInicio;
     private String siguienteMensaje;
+    private ClienteResumenResponse cliente;
 
     @Builder.Default
     private List<DocumentoExpedienteResponse> documentos = new ArrayList<>();

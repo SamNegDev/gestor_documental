@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FilePlus2, FileText, Loader2, MessageCircle, Route, ShieldCheck, Upload, UserRound, X } from "lucide-react";
 import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteUploadPanel";
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
 import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
 import { DocumentRequirementsPanel } from "../components/DocumentRequirementsPanel";
+import { DocumentTemplateDialog } from "../components/DocumentTemplateDialog";
 import { DocumentsPanel } from "../components/DocumentsPanel";
 import { ExpedienteHeader } from "../components/ExpedienteHeader";
 import { IncidentAlertPanel } from "../components/IncidentAlertPanel";
@@ -450,6 +452,7 @@ function AdditionalInfoDialog({
 
 export function ExpedienteDetailPage() {
   const { id } = useParams();
+  const queryClient = useQueryClient();
   const [expediente, setExpediente] = useState<ExpedienteDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -459,6 +462,7 @@ export function ExpedienteDetailPage() {
   const [completeExpedienteProcessing, setCompleteExpedienteProcessing] = useState(false);
   const [incidentDialogOpen, setIncidentDialogOpen] = useState(false);
   const [additionalInfoDialogOpen, setAdditionalInfoDialogOpen] = useState(false);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [requirementOpenSignal, setRequirementOpenSignal] = useState(0);
   const [incidentTypes, setIncidentTypes] = useState<TipoIncidencia[]>([]);
   const [incidentTypesLoading, setIncidentTypesLoading] = useState(false);
@@ -466,6 +470,15 @@ export function ExpedienteDetailPage() {
   const [activeOperationId, setActiveOperationId] = useState<number | null>(null);
   const [editingDocument, setEditingDocument] = useState<DocumentoExpediente | null>(null);
   const { confirm, dialog } = useConfirmDialog();
+
+  const refreshRelatedData = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["expedientes"] }),
+      queryClient.invalidateQueries({ queryKey: ["tareas"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      queryClient.invalidateQueries({ queryKey: ["registro"] }),
+    ]);
+  }, [queryClient]);
 
   const loadExpediente = useCallback(() => {
     if (!id) return;
@@ -507,14 +520,15 @@ export function ExpedienteDetailPage() {
 
   const refreshExpediente = useCallback(() => {
     if (!id) return Promise.resolve();
-    return getExpedienteDetail(id).then((data) => {
+    return getExpedienteDetail(id).then(async (data) => {
       setExpediente(data);
       if (!activeOperationId && data.operaciones?.length) {
         setActiveOperationId(data.operaciones[0].id);
       }
+      await refreshRelatedData();
       return data;
     });
-  }, [activeOperationId, id]);
+  }, [activeOperationId, id, refreshRelatedData]);
 
   const openIncidentDialog = () => {
     setIncidentDialogOpen(true);
@@ -973,6 +987,7 @@ export function ExpedienteDetailPage() {
             onDeleteDocument={handleDeleteDocument}
             onEditDocument={setEditingDocument}
             onOpenChecklist={() => setChecklistOpen(true)}
+            onOpenTemplates={() => setTemplateDialogOpen(true)}
             onUploadDocument={handleUploadDocument}
           />
         </div>
@@ -986,6 +1001,12 @@ export function ExpedienteDetailPage() {
         documentos={expediente.documentos}
         onClose={() => setChecklistOpen(false)}
         open={checklistOpen}
+      />
+      <DocumentTemplateDialog
+        expedienteId={expediente.id}
+        onClose={() => setTemplateDialogOpen(false)}
+        onGenerated={() => refreshExpediente()}
+        open={templateDialogOpen}
       />
       <OcrReviewDialog
         documentos={ocrReviewDocuments}

@@ -1,16 +1,17 @@
-import { Eye, FileText, Pencil, Trash2, Upload } from "lucide-react";
+import { Eye, FilePlus2, FileText, Pencil, Trash2, Upload } from "lucide-react";
 import type { DocumentoExpediente } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 
 type Props = {
   documentos: DocumentoExpediente[];
   onOpenChecklist: () => void;
+  onOpenTemplates: () => void;
   onUploadDocument: (documento: DocumentoExpediente, archivo: File) => void;
   onEditDocument: (documento: DocumentoExpediente) => void;
   onDeleteDocument: (documento: DocumentoExpediente) => void;
 };
 
-export function DocumentsPanel({ documentos, onOpenChecklist, onUploadDocument, onEditDocument, onDeleteDocument }: Props) {
+export function DocumentsPanel({ documentos, onOpenChecklist, onOpenTemplates, onUploadDocument, onEditDocument, onDeleteDocument }: Props) {
   const pendientesActuales = documentos.filter((documento) => documento.estado === "PENDIENTE" && documento.requeridoAhora);
 
   return (
@@ -20,9 +21,13 @@ export function DocumentsPanel({ documentos, onOpenChecklist, onUploadDocument, 
           <p className="eyebrow">Documentación</p>
           <h3>Documentos del expediente</h3>
         </div>
-        <button className="soft-button" onClick={onOpenChecklist} type="button">
-          Checklist
-        </button>
+        <div className="exp-panel__heading-actions">
+          <button className="soft-button" onClick={onOpenChecklist} type="button">Checklist</button>
+          <button className="primary-button" onClick={onOpenTemplates} type="button">
+            <FilePlus2 size={16} />
+            Generar documento
+          </button>
+        </div>
       </div>
 
       {pendientesActuales.length > 0 ? (
