@@ -54,13 +54,16 @@ public class RegistroApiController {
     ) {
         Usuario usuario = usuario(authentication);
         String query = normalizar(q);
-        List<Expediente> expedientesPeriodo = expedientesVisibles(usuario, periodo, fechaDesde, fechaHasta);
-        Map<Long, List<ExpedienteInteresado>> relacionesPorInteresado = expedientesPeriodo.stream()
-                .flatMap(expediente -> relacionRepository.findByExpedienteId(expediente.getId()).stream())
+        DateRange range = dateRange(periodo, fechaDesde, fechaHasta);
+        Long clienteId = clienteIdVisible(usuario);
+        if (usuario.getRolUsuario() != RolUsuario.ADMIN && clienteId == null) return List.of();
+
+        List<ExpedienteInteresado> relaciones = relacionRepository.findRegistro(clienteId, range.desde(), range.hasta());
+        Map<Long, List<ExpedienteInteresado>> relacionesPorInteresado = relaciones.stream()
                 .collect(java.util.stream.Collectors.groupingBy(relacion -> relacion.getInteresado().getId()));
         List<Interesado> interesados = usuario.getRolUsuario() == RolUsuario.ADMIN && "TODO".equals(periodo)
                 ? interesadoRepository.findAll()
-                : relacionesPorInteresado.values().stream().map(relaciones -> relaciones.get(0).getInteresado()).toList();
+                : relacionesPorInteresado.values().stream().map(items -> items.get(0).getInteresado()).toList();
 
         return interesados.stream()
                 .filter(interesado -> query == null
@@ -159,13 +162,15 @@ public class RegistroApiController {
     }
 
     private List<ExpedienteInteresado> tramitesInteresado(Long interesadoId, Usuario usuario) {
-        return relacionRepository.findByInteresadoId(interesadoId).stream()
-                .filter(relacion -> visible(relacion.getExpediente(), usuario)).toList();
+        Long clienteId = clienteIdVisible(usuario);
+        if (usuario.getRolUsuario() != RolUsuario.ADMIN && clienteId == null) return List.of();
+        return relacionRepository.findRegistroByInteresadoId(interesadoId, clienteId);
     }
 
-    private List<ExpedienteInteresado> relacionesCliente(Usuario usuario) {
-        if (usuario.getCliente() == null) return List.of();
-        return relacionRepository.findByClienteId(usuario.getCliente().getId());
+    private Long clienteIdVisible(Usuario usuario) {
+        return usuario.getRolUsuario() == RolUsuario.ADMIN || usuario.getCliente() == null
+                ? null
+                : usuario.getCliente().getId();
     }
 
     private List<Expediente> expedientesVisibles(Usuario usuario) {
@@ -177,11 +182,6 @@ public class RegistroApiController {
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) return expedienteRepository.findByPeriodo(range.desde(), range.hasta());
         if (usuario.getCliente() == null) return List.of();
         return expedienteRepository.findByClienteIdAndPeriodo(usuario.getCliente().getId(), range.desde(), range.hasta());
-    }
-
-    private boolean visible(Expediente expediente, Usuario usuario) {
-        return usuario.getRolUsuario() == RolUsuario.ADMIN || usuario.getCliente() != null
-                && expediente.getCliente() != null && usuario.getCliente().getId().equals(expediente.getCliente().getId());
     }
 
     private Usuario usuario(Authentication authentication) {
