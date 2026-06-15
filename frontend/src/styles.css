@@ -1807,6 +1807,126 @@ input.records-table-filter {
   display: block;
 }
 
+.records-status-filter {
+  position: relative;
+}
+
+.records-status-filter__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.records-status-filter__trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.records-status-filter__trigger svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.records-status-filter__menu {
+  position: fixed;
+  z-index: 35;
+  width: min(330px, 82vw);
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 16px 36px oklch(24% 0.02 250 / 0.18);
+  text-align: left;
+  text-transform: none;
+  white-space: normal;
+}
+
+.records-status-filter__group {
+  border-top: 1px solid var(--line);
+}
+
+.records-status-filter__option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  padding: 8px 12px;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 680;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.records-status-filter__option:hover {
+  background: var(--panel-soft);
+}
+
+.records-status-filter__option input {
+  flex: 0 0 auto;
+}
+
+.records-status-filter__option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.records-status-filter__option--all,
+.records-status-filter__option--group {
+  font-weight: 820;
+}
+
+.records-status-filter__children {
+  padding-bottom: 4px;
+}
+
+.records-status-filter__children .records-status-filter__option {
+  min-height: 30px;
+  padding-block: 6px;
+  padding-left: 34px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 680;
+}
+
+.records-status-filter__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  background: oklch(97% 0.006 92);
+  padding: 9px 12px;
+}
+
+.records-status-filter__footer span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 760;
+}
+
+.records-status-filter__footer button {
+  border: 0;
+  background: transparent;
+  color: var(--brand-strong);
+  font-size: 0.76rem;
+  font-weight: 840;
+  cursor: pointer;
+}
+
+.records-status-filter__footer button:hover,
+.records-status-filter__footer button:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
 .records-interested-list {
   display: grid;
   gap: 8px;

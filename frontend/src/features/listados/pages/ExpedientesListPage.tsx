@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useOutletContext, useSearchParams } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, Download, Eye, FilePlus2, FolderOpen, Search, UserRoundCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Download, Eye, FilePlus2, FolderOpen, Search, UserRoundCheck } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { ApiError } from "../../../shared/api/http";
 import { bulkAdvanceExpedientes, bulkFinalDocumentsUrl, getExpedienteListCatalogs, getExpedientes } from "../services/listadosApi";
@@ -14,6 +14,26 @@ import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { searchInteresados } from "../../expedientes/services/expedienteDetailApi";
 import type { InteresadoSearchResult } from "../../expedientes/types/expedienteDetail.types";
 import { PaginationBar } from "../components/PaginationBar";
+
+const STATUS_FILTER_GROUPS = [
+  {
+    id: "pendiente-resolucion",
+    label: "Pendiente de resolucion",
+    estados: ["PENDIENTE_DOCUMENTACION", "SOLICITADA_INFORMACION_ADICIONAL", "INCIDENCIA"],
+  },
+  {
+    id: "revision",
+    label: "En revision",
+    estados: ["INFORMACION_ADICIONAL_RECIBIDA", "REVISANDO_INCIDENCIAS"],
+  },
+  {
+    id: "curso",
+    label: "En curso",
+    estados: ["EN_TRAMITE", "ENVIADO_DGT"],
+  },
+];
+
+const STATUS_FILTER_GROUPED = new Set(STATUS_FILTER_GROUPS.flatMap((group) => group.estados));
 
 export function ExpedientesListPage() {
   const { user } = useOutletContext<AppOutletContext>();
@@ -281,14 +301,11 @@ function ExpedientesTable({
             {!showClient ? <th className="records-col-interested">Interesados</th> : null}
             <th className="records-col-status">
               <span>Estado</span>
-              <select className="records-table-filter" value={filters.estado || ""} onChange={(event) => nextFilter("estado", event.target.value)}>
-                <option value="">Todos los estados</option>
-                {catalogs?.estados.map((estado) => (
-                  <option key={estado} value={estado}>
-                    {formatEnum(estado)}
-                  </option>
-                ))}
-              </select>
+              <StatusTreeFilter
+                estados={catalogs?.estados ?? []}
+                value={filters.estados || filters.estado || ""}
+                onChange={(value) => onFilterChange({ ...filters, estado: "", estados: value })}
+              />
             </th>
             <th className="records-col-phase">Proximo paso</th>
             {showClient ? <th className="records-col-change">Ultima modificacion</th> : <th className="records-col-date">Ultima actividad</th>}
@@ -436,6 +453,7 @@ function readFilters(searchParams: URLSearchParams): ListFilters {
   return {
     periodo: searchParams.get("periodo") || "ESTE_MES",
     estado: searchParams.get("estado") || "",
+    estados: searchParams.get("estados") || "",
     tipoTramiteId: searchParams.get("tipoTramiteId") || "",
     clienteId: searchParams.get("clienteId") || "",
     matricula: searchParams.get("matricula") || "",
@@ -445,6 +463,188 @@ function readFilters(searchParams: URLSearchParams): ListFilters {
     pagina: searchParams.get("pagina") || "0",
     tamanio: searchParams.get("tamanio") || "25",
   };
+}
+
+function StatusTreeFilter({ estados, value, onChange }: { estados: string[]; value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ left: number; top: number; width: number } | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const selected = parseStatusFilterValue(value);
+  const selectedSet = new Set(selected);
+  const available = new Set(estados);
+  const groups = STATUS_FILTER_GROUPS.map((group) => ({
+    ...group,
+    estados: group.estados.filter((estado) => available.has(estado)),
+  })).filter((group) => group.estados.length > 0);
+  const individuales = estados.filter((estado) => !STATUS_FILTER_GROUPED.has(estado));
+
+  useEffect(() => {
+    const close = (event: PointerEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function updateMenuPosition() {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(330, window.innerWidth - 24);
+      const left = Math.min(Math.max(12, rect.left), window.innerWidth - width - 12);
+      setMenuPosition({ left, top: rect.bottom + 6, width });
+    }
+
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open]);
+
+  function emit(next: Set<string>) {
+    onChange(Array.from(next).join(","));
+  }
+
+  function toggleStatus(estado: string, checked: boolean) {
+    const next = new Set(selectedSet);
+    if (checked) {
+      next.add(estado);
+    } else {
+      next.delete(estado);
+    }
+    emit(next);
+  }
+
+  function toggleGroup(groupEstados: string[], checked: boolean) {
+    const next = new Set(selectedSet);
+    groupEstados.forEach((estado) => {
+      if (checked) {
+        next.add(estado);
+      } else {
+        next.delete(estado);
+      }
+    });
+    emit(next);
+  }
+
+  return (
+    <div className="records-status-filter" ref={wrapperRef}>
+      <button
+        aria-expanded={open}
+        className="records-table-filter records-status-filter__trigger"
+        onClick={() => setOpen((current) => !current)}
+        ref={triggerRef}
+        type="button"
+      >
+        <span>{statusFilterLabel(selected, groups)}</span>
+        <ChevronDown size={14} />
+      </button>
+      {open ? (
+        <div className="records-status-filter__menu" style={menuPosition ?? undefined}>
+          <label className="records-status-filter__option records-status-filter__option--all">
+            <input checked={selected.length === 0} onChange={() => emit(new Set())} type="checkbox" />
+            <span>Todos los estados</span>
+          </label>
+          {groups.map((group) => (
+            <StatusFilterGroup
+              key={group.id}
+              group={group}
+              selected={selectedSet}
+              onToggleGroup={toggleGroup}
+              onToggleStatus={toggleStatus}
+            />
+          ))}
+          {individuales.map((estado) => (
+            <label className="records-status-filter__option" key={estado}>
+              <input
+                checked={selectedSet.has(estado)}
+                onChange={(event) => toggleStatus(estado, event.target.checked)}
+                type="checkbox"
+              />
+              <span>{formatStatusLabel(estado)}</span>
+            </label>
+          ))}
+          <div className="records-status-filter__footer">
+            <span>{selected.length === 1 ? "1 estado seleccionado" : `${selected.length} estados seleccionados`}</span>
+            <button onClick={() => emit(new Set())} type="button">
+              Limpiar
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StatusFilterGroup({
+  group,
+  selected,
+  onToggleGroup,
+  onToggleStatus,
+}: {
+  group: { id: string; label: string; estados: string[] };
+  selected: Set<string>;
+  onToggleGroup: (estados: string[], checked: boolean) => void;
+  onToggleStatus: (estado: string, checked: boolean) => void;
+}) {
+  const checkboxRef = useRef<HTMLInputElement | null>(null);
+  const checkedCount = group.estados.filter((estado) => selected.has(estado)).length;
+  const checked = checkedCount === group.estados.length;
+  const indeterminate = checkedCount > 0 && checkedCount < group.estados.length;
+
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = indeterminate;
+    }
+  }, [indeterminate]);
+
+  return (
+    <div className="records-status-filter__group">
+      <label className="records-status-filter__option records-status-filter__option--group">
+        <input
+          checked={checked}
+          onChange={(event) => onToggleGroup(group.estados, event.target.checked)}
+          ref={checkboxRef}
+          type="checkbox"
+        />
+        <span>{group.label}</span>
+      </label>
+      <div className="records-status-filter__children">
+        {group.estados.map((estado) => (
+          <label className="records-status-filter__option" key={estado}>
+            <input
+              checked={selected.has(estado)}
+              onChange={(event) => onToggleStatus(estado, event.target.checked)}
+              type="checkbox"
+            />
+            <span>{formatStatusLabel(estado)}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function parseStatusFilterValue(value: string) {
+  return value
+    .split(",")
+    .map((estado) => estado.trim())
+    .filter(Boolean);
+}
+
+function statusFilterLabel(selected: string[], groups: Array<{ label: string; estados: string[] }>) {
+  if (selected.length === 0) return "Todos los estados";
+  const selectedSet = new Set(selected);
+  const matchingGroup = groups.find((group) => group.estados.length === selected.length && group.estados.every((estado) => selectedSet.has(estado)));
+  if (matchingGroup) return matchingGroup.label;
+  if (selected.length === 1) return formatStatusLabel(selected[0]);
+  return `${selected.length} estados`;
 }
 
 function InteresadoListFilter({ value, onChange }: { value: string; onChange: (value: string) => void }) {

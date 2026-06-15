@@ -45,7 +45,7 @@ public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
                     left join e.cliente cliente
                     left join e.tipoTramite tipoTramite
                     where (:clienteId is null or cliente.id = :clienteId)
-                      and (:estado is null or e.estadoExpediente = :estado)
+                      and (:filtrarEstados = false or e.estadoExpediente in :estados)
                       and (:tipoTramiteId is null or tipoTramite.id = :tipoTramiteId)
                       and (:matricula is null or upper(coalesce(e.matricula, '')) like :matricula)
                       and (:desde is null or coalesce(e.fechaUltimaModificacion, e.fechaCreacion) >= :desde)
@@ -64,7 +64,7 @@ public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
                     left join e.cliente cliente
                     left join e.tipoTramite tipoTramite
                     where (:clienteId is null or cliente.id = :clienteId)
-                      and (:estado is null or e.estadoExpediente = :estado)
+                      and (:filtrarEstados = false or e.estadoExpediente in :estados)
                       and (:tipoTramiteId is null or tipoTramite.id = :tipoTramiteId)
                       and (:matricula is null or upper(coalesce(e.matricula, '')) like :matricula)
                       and (:desde is null or coalesce(e.fechaUltimaModificacion, e.fechaCreacion) >= :desde)
@@ -79,7 +79,8 @@ public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
                     """
     )
     Page<Expediente> buscarListado(@Param("clienteId") Long clienteId,
-                                   @Param("estado") EstadoExpediente estado,
+                                   @Param("filtrarEstados") boolean filtrarEstados,
+                                   @Param("estados") List<EstadoExpediente> estados,
                                    @Param("tipoTramiteId") Long tipoTramiteId,
                                    @Param("matricula") String matricula,
                                    @Param("interesado") String interesado,

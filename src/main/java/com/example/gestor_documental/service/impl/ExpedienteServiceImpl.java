@@ -75,14 +75,16 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
     @Override
     public Page<Expediente> buscarListado(Long clienteId,
-                                          EstadoExpediente estado,
+                                          List<EstadoExpediente> estados,
                                           Long tipoTramiteId,
                                           String matricula,
                                           String interesado,
                                           LocalDateTime desde,
                                           LocalDateTime hasta,
                                           Pageable pageable) {
-        return expedienteRepository.buscarListado(clienteId, estado, tipoTramiteId, matricula, interesado, desde, hasta, pageable);
+        boolean filtrarEstados = estados != null && !estados.isEmpty();
+        List<EstadoExpediente> estadosFiltro = filtrarEstados ? estados : List.of(EstadoExpediente.values());
+        return expedienteRepository.buscarListado(clienteId, filtrarEstados, estadosFiltro, tipoTramiteId, matricula, interesado, desde, hasta, pageable);
     }
 
     @Override

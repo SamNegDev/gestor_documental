@@ -142,6 +142,7 @@ export interface DashboardData {
 
 export interface ListFilters {
   estado?: string;
+  estados?: string;
   tipoTramiteId?: string;
   clienteId?: string;
   matricula?: string;

@@ -83,6 +83,7 @@ public class ExpedienteApiController {
     public PagedResponse<ExpedienteListItemResponse> listarExpedientes(
             Authentication authentication,
             @RequestParam(required = false) EstadoExpediente estado,
+            @RequestParam(required = false) List<EstadoExpediente> estados,
             @RequestParam(required = false) Long tipoTramiteId,
             @RequestParam(required = false) String matricula,
             @RequestParam(required = false) String interesado,
@@ -103,7 +104,7 @@ public class ExpedienteApiController {
         DateRange dateRange = dateRange(periodo, fechaDesde, fechaHasta);
         return PagedResponse.of(expedienteService.buscarListado(
                         clienteVisibleId,
-                        estado,
+                        estadosFiltro(estado, estados),
                         tipoTramiteId,
                         likeParam(matricula),
                         likeParam(interesado),
@@ -609,6 +610,13 @@ public class ExpedienteApiController {
         return valor != null && !valor.trim().isEmpty()
                 ? "%" + valor.trim().toUpperCase() + "%"
                 : null;
+    }
+
+    private List<EstadoExpediente> estadosFiltro(EstadoExpediente estado, List<EstadoExpediente> estados) {
+        if (estados != null && !estados.isEmpty()) {
+            return estados.stream().distinct().toList();
+        }
+        return estado != null ? List.of(estado) : List.of();
     }
 
     private boolean contiene(String valor, String query) {

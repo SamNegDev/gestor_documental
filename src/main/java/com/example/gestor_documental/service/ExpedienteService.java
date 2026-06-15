@@ -27,7 +27,7 @@ public interface ExpedienteService {
     List<Expediente> listarPorClienteId(Long clienteId);
 
     Page<Expediente> buscarListado(Long clienteId,
-                                   EstadoExpediente estado,
+                                   List<EstadoExpediente> estados,
                                    Long tipoTramiteId,
                                    String matricula,
                                    String interesado,

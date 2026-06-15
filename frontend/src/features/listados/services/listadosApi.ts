@@ -5,7 +5,7 @@ function buildQuery(filters: ListFilters) {
   const params = new URLSearchParams();
 
   Object.entries(filters).forEach(([key, value]) => {
-    if (value && value.trim() !== "") {
+    if (typeof value === "string" && value.trim() !== "") {
       params.set(key, value.trim());
     }
   });
