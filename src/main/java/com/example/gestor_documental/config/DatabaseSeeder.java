@@ -6,7 +6,6 @@ import com.example.gestor_documental.model.TipoIncidencia;
 import com.example.gestor_documental.model.TipoTramite;
 import com.example.gestor_documental.repository.TipoIncidenciaRepository;
 import com.example.gestor_documental.repository.TipoTramiteRepository;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -22,21 +21,21 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final TipoTramiteRepository tipoTramiteRepository;
 
     @Override
-    public void run(String... args) throws Exception {
+    public void run(String... args) {
         if (tipoIncidenciaRepository.count() == 0) {
             List<TipoIncidencia> incidencias = Arrays.asList(
                     new TipoIncidencia(TipoIncidenciaEnum.RODAJE,
-                            "Falta pago de del impuesto de rodaje u otros impuestos locales.", true),
+                            "Falta pago del impuesto de rodaje u otros impuestos locales.", true),
                     new TipoIncidencia(TipoIncidenciaEnum.RESERVA,
-                            "El vehículo posee una reserva de dominio activa que impide la transmisión.", true),
+                            "El vehiculo posee una reserva de dominio activa que impide la transmision.", true),
                     new TipoIncidencia(TipoIncidenciaEnum.EMBARGO,
-                            "El vehículo consta con embargo activo. Requiere notificación expresa o levantamiento.",
+                            "El vehiculo consta con embargo activo. Requiere notificacion expresa o levantamiento.",
                             true),
                     new TipoIncidencia(TipoIncidenciaEnum.NOTIFICADO,
-                            "El vehículo consta ya como notificada su venta. Requiere aportar datos del notificador.",
+                            "El vehiculo consta ya como notificada su venta. Requiere aportar datos del notificador.",
                             true),
                     new TipoIncidencia(TipoIncidenciaEnum.RECHAZADO_DGT,
-                            "Trámite rechazado explícitamente por la DGT por inconsistencia de datos.", true));
+                            "Tramite rechazado explicitamente por la DGT por inconsistencia de datos.", true));
             tipoIncidenciaRepository.saveAll(incidencias);
             System.out.println("Base de datos inicializada: Se insertaron " + incidencias.size()
                     + " registros base para TipoIncidencia.");
@@ -45,33 +44,27 @@ public class DatabaseSeeder implements CommandLineRunner {
             List<TipoTramite> tiposTramite = Arrays.asList(
                     new TipoTramite(TipoTramiteEnum.TRASPASO, "Cambio de titularidad"),
                     new TipoTramite(TipoTramiteEnum.BATECOM, "BATECOM"),
-                    new TipoTramite(TipoTramiteEnum.ALTA, "Alta de vehículo"),
-                    new TipoTramite(TipoTramiteEnum.BAJA, "Baja de vehículo"),
+                    new TipoTramite(TipoTramiteEnum.ALTA, "Alta de vehiculo"),
+                    new TipoTramite(TipoTramiteEnum.BAJA, "Baja de vehiculo"),
                     new TipoTramite(TipoTramiteEnum.DUPLICADO, "Duplicado de tarjeta ITV"),
-                    new TipoTramite(TipoTramiteEnum.MATRICULACION, "Matriculación de vehículo"));
+                    new TipoTramite(TipoTramiteEnum.MATRICULACION, "Matriculacion de vehiculo"));
             tipoTramiteRepository.saveAll(tiposTramite);
             System.out.println("Base de datos inicializada: Se insertaron " + tiposTramite.size()
                     + " registros base para TipoTramite.");
         }
-        boolean existeBatecom = tipoTramiteRepository.findAll().stream()
-                .anyMatch(tipo -> tipo.getNombre() == TipoTramiteEnum.BATECOM);
-        if (!existeBatecom) {
+        if (tipoTramiteRepository.findAll().stream().noneMatch(tipo -> tipo.getNombre() == TipoTramiteEnum.BATECOM)) {
             tipoTramiteRepository.save(new TipoTramite(TipoTramiteEnum.BATECOM, "BATECOM"));
             System.out.println("Se inserto el nuevo TipoTramite: BATECOM");
         }
-
-        // Add the new state if it hasn't been added yet
-        boolean existsPendiente = false;
-        for (TipoIncidencia ti : tipoIncidenciaRepository.findAll()) {
-            if (ti.getNombre() == TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION) {
-                existsPendiente = true;
-                break;
-            }
-        }
-        if (!existsPendiente) {
+        if (tipoIncidenciaRepository.findByNombre(TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION).isEmpty()) {
             tipoIncidenciaRepository.save(new TipoIncidencia(TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION,
-                    "Falta documentación necesaria u obligatoria para el trámite.", true));
-            System.out.println("Se insertó el nuevo TipoIncidencia: PENDIENTE_DOCUMENTACION");
+                    "Falta documentacion necesaria u obligatoria para el tramite.", true));
+            System.out.println("Se inserto el nuevo TipoIncidencia: PENDIENTE_DOCUMENTACION");
+        }
+        if (tipoIncidenciaRepository.findByNombre(TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL).isEmpty()) {
+            tipoIncidenciaRepository.save(new TipoIncidencia(TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL,
+                    "Se necesita una respuesta o aclaracion adicional del cliente.", true));
+            System.out.println("Se inserto el nuevo TipoIncidencia: SOLICITADA_INFORMACION_ADICIONAL");
         }
     }
 }

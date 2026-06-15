@@ -1,8 +1,10 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.enums.EstadoExpediente;
+import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.CodigoHitoExpediente;
+import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaPreviewResponse;
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaResponse;
@@ -13,6 +15,8 @@ import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.HitoExpedienteRepository;
 import com.example.gestor_documental.repository.AvisoIncidenciaRepository;
+import com.example.gestor_documental.repository.MensajeRepository;
+import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.TipoIncidenciaRepository;
 import com.example.gestor_documental.service.*;
 import com.example.gestor_documental.util.TextNormalizer;
@@ -32,6 +36,8 @@ public class IncidenciaServiceImpl implements IncidenciaService {
     private final HitoExpedienteRepository hitoExpedienteRepository;
     private final AvisoIncidenciaRepository avisoIncidenciaRepository;
     private final TipoIncidenciaRepository tipoIncidenciaRepository;
+    private final MensajeRepository mensajeRepository;
+    private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final ExpedienteService expedienteService;
     private final SolicitudService solicitudService;
     private final TipoIncidenciaService tipoIncidenciaService;
@@ -108,22 +114,26 @@ public class IncidenciaServiceImpl implements IncidenciaService {
             throw new OperacionInvalidaException("El expediente ya no admite notificaciones al cliente");
         }
 
-        List<Incidencia> activas = incidenciaRepository.findByExpedienteIdAndResueltaFalse(expedienteId);
-        if (!activas.isEmpty()) {
-            return activas.stream()
-                    .filter(incidencia -> !incidencia.isSeguimientoArchivado())
-                    .findFirst()
-                    .orElse(activas.get(0));
-        }
-
         TipoIncidenciaEnum tipoNombre = expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
                 ? TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL
                 : TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION;
+        String observaciones = detallePendienteCliente(expediente, tipoNombre);
+
+        List<Incidencia> activas = incidenciaRepository.findByExpedienteIdAndResueltaFalse(expedienteId);
+        if (!activas.isEmpty()) {
+            Incidencia incidencia = activas.stream()
+                    .filter(item -> !item.isSeguimientoArchivado())
+                    .findFirst()
+                    .orElse(activas.get(0));
+            if (debeActualizarDetalle(incidencia.getObservaciones()) && observaciones != null) {
+                incidencia.setObservaciones(observaciones);
+                incidenciaRepository.save(incidencia);
+            }
+            return incidencia;
+        }
+
         TipoIncidencia tipo = tipoIncidenciaRepository.findByNombre(tipoNombre)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Tipo de incidencia no encontrado"));
-        String observaciones = tipoNombre == TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL
-                ? "INFORMACION PENDIENTE DE RESPUESTA DEL CLIENTE"
-                : "DOCUMENTACION PENDIENTE DE APORTACION DEL CLIENTE";
 
         Incidencia incidencia = new Incidencia(tipo, expediente, observaciones, admin);
         incidenciaRepository.save(incidencia);
@@ -405,6 +415,46 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         }
     }
 
+    private String detallePendienteCliente(Expediente expediente, TipoIncidenciaEnum tipoNombre) {
+        if (tipoNombre == TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL) {
+            String mensaje = ultimoMensajeAdmin(expediente.getId());
+            return mensaje != null ? mensaje : "INFORMACION PENDIENTE DE RESPUESTA DEL CLIENTE";
+        }
+        String requisitos = requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
+                .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                .map(this::descripcionRequisito)
+                .filter(valor -> valor != null && !valor.isBlank())
+                .distinct()
+                .collect(java.util.stream.Collectors.joining(" - "));
+        return !requisitos.isBlank() ? requisitos : "DOCUMENTACION PENDIENTE DE APORTACION DEL CLIENTE";
+    }
+
+    private String descripcionRequisito(RequisitoDocumentalExpediente requisito) {
+        if (requisito.getDescripcion() != null && !requisito.getDescripcion().isBlank()) {
+            return requisito.getDescripcion().trim();
+        }
+        return requisito.getTipoDocumento() != null ? requisito.getTipoDocumento().name().replace('_', ' ') : null;
+    }
+
+    private String ultimoMensajeAdmin(Long expedienteId) {
+        List<Mensaje> mensajes = mensajeRepository.findByExpedienteIdOrderByFechaCreacionAsc(expedienteId);
+        for (int index = mensajes.size() - 1; index >= 0; index--) {
+            Mensaje mensaje = mensajes.get(index);
+            if (mensaje.getAutor() != null && mensaje.getAutor().getRolUsuario() == RolUsuario.ADMIN
+                    && mensaje.getContenido() != null && !mensaje.getContenido().isBlank()) {
+                return mensaje.getContenido().trim();
+            }
+        }
+        return null;
+    }
+
+    private boolean debeActualizarDetalle(String observaciones) {
+        if (observaciones == null || observaciones.isBlank()) return true;
+        String normalizado = observaciones.trim();
+        return "INFORMACION PENDIENTE DE RESPUESTA DEL CLIENTE".equals(normalizado)
+                || "DOCUMENTACION PENDIENTE DE APORTACION DEL CLIENTE".equals(normalizado);
+    }
+
     private String correoCliente(Incidencia incidencia) {
         if (incidencia.getExpediente().getCliente() == null
                 || incidencia.getExpediente().getCliente().getEmail() == null
@@ -424,7 +474,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         String tipo = incidencia.getTipoIncidencia() != null && incidencia.getTipoIncidencia().getNombre() != null
                 ? incidencia.getTipoIncidencia().getNombre().name().replace('_', ' ')
                 : "INFORMACION PENDIENTE";
-        String detalle = incidencia.getObservaciones() != null && !incidencia.getObservaciones().isBlank() ? incidencia.getObservaciones() : "Consulta el detalle en el portal.";
+        String detalle = detalleCorreo(incidencia);
         String base = publicUrl != null ? publicUrl.replaceAll("/$", "") : "";
         return "Hola,\n\n"
                 + (numeroAviso == 1 ? "Necesitamos tu respuesta para continuar con el tramite." : "Te recordamos que seguimos pendientes de tu respuesta para continuar con el tramite.")
@@ -433,6 +483,18 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                 + "\nDetalle: " + detalle
                 + "\n\nAccede al portal: " + base + "/expedientes/" + incidencia.getExpediente().getId()
                 + "\n\nGracias,\nGestoria CN";
+    }
+
+    private String detalleCorreo(Incidencia incidencia) {
+        TipoIncidenciaEnum tipo = incidencia.getTipoIncidencia() != null ? incidencia.getTipoIncidencia().getNombre() : null;
+        if (incidencia.getExpediente() != null
+                && (tipo == TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION
+                || tipo == TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL)) {
+            return detallePendienteCliente(incidencia.getExpediente(), tipo);
+        }
+        return incidencia.getObservaciones() != null && !incidencia.getObservaciones().isBlank()
+                ? incidencia.getObservaciones()
+                : "Consulta el detalle en el portal.";
     }
 
     private EstadoExpediente estadoParaTipo(TipoIncidencia tipo) {

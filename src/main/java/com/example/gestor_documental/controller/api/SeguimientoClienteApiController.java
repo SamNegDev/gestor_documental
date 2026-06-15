@@ -6,11 +6,18 @@ import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaPrevi
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaRequest;
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaResponse;
 import com.example.gestor_documental.enums.EstadoExpediente;
+import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
+import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.model.AvisoIncidencia;
 import com.example.gestor_documental.model.Incidencia;
+import com.example.gestor_documental.model.Mensaje;
+import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.AvisoIncidenciaRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
+import com.example.gestor_documental.repository.MensajeRepository;
+import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.IncidenciaService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +37,8 @@ public class SeguimientoClienteApiController {
     private static final DateTimeFormatter FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private final IncidenciaRepository incidenciaRepository;
     private final AvisoIncidenciaRepository avisoRepository;
+    private final MensajeRepository mensajeRepository;
+    private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final IncidenciaService incidenciaService;
     private final CurrentUserService currentUserService;
 
@@ -82,8 +91,8 @@ public class SeguimientoClienteApiController {
         return SeguimientoIncidenciaResponse.builder().incidenciaId(incidencia.getId()).expedienteId(incidencia.getExpediente().getId())
                 .matricula(incidencia.getExpediente().getMatricula()).clienteId(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getId() : null)
                 .cliente(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getNombre() : null)
-                .tipoIncidencia(incidencia.getTipoIncidencia() != null && incidencia.getTipoIncidencia().getNombre() != null ? incidencia.getTipoIncidencia().getNombre().name() : null)
-                .observaciones(incidencia.getObservaciones()).avisosEnviados(incidencia.getContadorAvisos())
+                .tipoIncidencia(tipoIncidencia(incidencia))
+                .observaciones(observacionesSeguimiento(incidencia)).avisosEnviados(incidencia.getContadorAvisos())
                 .fechaPrimerAviso(avisos.isEmpty() ? null : format(avisos.get(0).getFechaEnvio())).fechaUltimoAviso(format(incidencia.getFechaUltimoAviso()))
                 .proximoAviso(format(incidencia.getProximoAviso())).pendienteNotificacion(incidencia.getContadorAvisos() == 0 || incidencia.getProximoAviso() != null && !incidencia.getProximoAviso().isAfter(LocalDateTime.now()))
                 .archivada(incidencia.isSeguimientoArchivado()).fechaArchivo(format(incidencia.getFechaArchivoSeguimiento()))
@@ -97,6 +106,49 @@ public class SeguimientoClienteApiController {
         if ("RECORDATORIO_VENCIDO".equals(accion)) return incidencia.getContadorAvisos() > 0
                 && incidencia.getProximoAviso() != null && !incidencia.getProximoAviso().isAfter(ahora);
         return true;
+    }
+
+    private String observacionesSeguimiento(Incidencia incidencia) {
+        TipoIncidenciaEnum tipo = incidencia.getTipoIncidencia() != null ? incidencia.getTipoIncidencia().getNombre() : null;
+        if (tipo == TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION) {
+            String requisitos = requisitoRepository.findByExpedienteIdOrderByIdAsc(incidencia.getExpediente().getId()).stream()
+                    .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                    .map(this::descripcionRequisito)
+                    .filter(valor -> valor != null && !valor.isBlank())
+                    .distinct()
+                    .collect(java.util.stream.Collectors.joining(" - "));
+            return !requisitos.isBlank() ? requisitos : incidencia.getObservaciones();
+        }
+        if (tipo == TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL) {
+            String mensaje = ultimoMensajeAdmin(incidencia.getExpediente().getId());
+            return mensaje != null ? mensaje : incidencia.getObservaciones();
+        }
+        return incidencia.getObservaciones();
+    }
+
+    private String descripcionRequisito(RequisitoDocumentalExpediente requisito) {
+        if (requisito.getDescripcion() != null && !requisito.getDescripcion().isBlank()) {
+            return requisito.getDescripcion().trim();
+        }
+        return requisito.getTipoDocumento() != null ? requisito.getTipoDocumento().name().replace('_', ' ') : null;
+    }
+
+    private String ultimoMensajeAdmin(Long expedienteId) {
+        List<Mensaje> mensajes = mensajeRepository.findByExpedienteIdOrderByFechaCreacionAsc(expedienteId);
+        for (int index = mensajes.size() - 1; index >= 0; index--) {
+            Mensaje mensaje = mensajes.get(index);
+            if (mensaje.getAutor() != null && mensaje.getAutor().getRolUsuario() == RolUsuario.ADMIN
+                    && mensaje.getContenido() != null && !mensaje.getContenido().isBlank()) {
+                return mensaje.getContenido().trim();
+            }
+        }
+        return null;
+    }
+
+    private String tipoIncidencia(Incidencia incidencia) {
+        return incidencia.getTipoIncidencia() != null && incidencia.getTipoIncidencia().getNombre() != null
+                ? incidencia.getTipoIncidencia().getNombre().name()
+                : null;
     }
     private Usuario requireAdmin(Authentication auth) { return currentUserService.requireAdmin(auth); }
     private String format(LocalDateTime fecha) { return fecha != null ? fecha.format(FORMAT) : null; }
