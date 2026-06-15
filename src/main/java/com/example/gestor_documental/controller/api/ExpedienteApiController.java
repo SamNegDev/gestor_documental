@@ -14,17 +14,14 @@ import com.example.gestor_documental.dto.expediente.HitoExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.InteresadoSearchResponse;
 import com.example.gestor_documental.enums.CodigoHitoExpediente;
 import com.example.gestor_documental.enums.EstadoExpediente;
-import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.dto.expediente.ExpedienteDetailResponse;
 import com.example.gestor_documental.dto.expediente.ListCatalogsResponse;
 import com.example.gestor_documental.dto.expediente.TipoIncidenciaResponse;
 import com.example.gestor_documental.dto.expediente.TipoTramiteResumenResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
 import com.example.gestor_documental.enums.RolUsuario;
-import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
-import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.service.ClienteService;
@@ -35,13 +32,11 @@ import com.example.gestor_documental.service.MensajeService;
 import com.example.gestor_documental.service.TipoIncidenciaService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.security.CurrentUserService;
+import com.example.gestor_documental.service.impl.ExpedienteJustificanteFinalService;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -50,11 +45,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -79,7 +70,6 @@ public class ExpedienteApiController {
     private final ExpedienteDetalleApiService expedienteDetalleApiService;
     private final ExpedienteService expedienteService;
     private final HitoExpedienteService hitoExpedienteService;
-    private final DocumentoRepository documentoRepository;
     private final ClienteInteresadoRepository clienteInteresadoRepository;
     private final InteresadoRepository interesadoRepository;
     private final MensajeService mensajeService;
@@ -87,9 +77,7 @@ public class ExpedienteApiController {
     private final TipoIncidenciaService tipoIncidenciaService;
     private final TipoTramiteService tipoTramiteService;
     private final CurrentUserService currentUserService;
-
-    @Value("${app.upload.dir:uploads}")
-    private String uploadDir;
+    private final ExpedienteJustificanteFinalService justificanteFinalService;
 
     @GetMapping
     public PagedResponse<ExpedienteListItemResponse> listarExpedientes(
@@ -362,42 +350,9 @@ public class ExpedienteApiController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecciona al menos un expediente");
         }
 
-        Map<String, List<Documento>> documentosPorCarpeta = new java.util.LinkedHashMap<>();
-        for (Long id : ids) {
-            ExpedienteDetailResponse detalle = expedienteDetalleApiService.obtenerDetalle(id, admin);
-            if (!"FINALIZADO".equals(detalle.getEstado())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solo se pueden descargar justificantes de expedientes finalizados");
-            }
-            List<Documento> documentos = documentoRepository.findByExpedienteId(id).stream()
-                    .filter(documento -> esJustificanteDgt(documento)
-                            || documento.getTipoDocumento() == TipoDocumento.MODELO_620)
-                    .sorted(Comparator.comparing(Documento::getTipoDocumento))
-                    .toList();
-            boolean tieneHuella = documentos.stream().anyMatch(this::esJustificanteDgt);
-            boolean tieneModelo = documentos.stream().anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.MODELO_620);
-            if (!tieneHuella || !tieneModelo) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Faltan justificantes finales en el expediente " + id);
-            }
-            documentosPorCarpeta.put(carpetaZipExpediente(detalle, id, documentosPorCarpeta.keySet()), documentos);
-        }
-
         response.setContentType("application/zip");
         response.setHeader("Content-Disposition", "attachment; filename=\"justificantes_finales.zip\"");
-        Path rutaBase = Paths.get(uploadDir).normalize().toAbsolutePath();
-        try (ZipOutputStream zip = new ZipOutputStream(response.getOutputStream())) {
-            for (Map.Entry<String, List<Documento>> entry : documentosPorCarpeta.entrySet()) {
-                for (Documento documento : entry.getValue()) {
-                    Path rutaArchivo = rutaBase.resolve(documento.getNombreArchivo()).normalize();
-                    if (!rutaArchivo.startsWith(rutaBase) || !Files.exists(rutaArchivo)) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se encontro un justificante en disco");
-                    }
-                    String nombreZip = entry.getKey() + "/" + nombreSeguro(documento.getNombreArchivoOriginal());
-                    zip.putNextEntry(new ZipEntry(nombreZip));
-                    Files.copy(rutaArchivo, zip);
-                    zip.closeEntry();
-                }
-            }
-        }
+        justificanteFinalService.escribirZipJustificantesFinales(ids, admin, response.getOutputStream());
     }
 
     @PostMapping("/{id}/incidencia")
@@ -551,8 +506,8 @@ public class ExpedienteApiController {
                         ? primerTextoDisponible(detalle.getSiguientePaso().getNota(), detalle.getSiguientePaso().getDescripcion())
                         : null)
                 .siguienteAccion(siguienteAccion)
-                .justificantesFinalesDisponibles(tieneJustificantesFinales(expediente.getId(), detalle.getEstado()))
-                .justificantesFinalesPendientes(justificantesFinalesPendientes(expediente.getId(), detalle.getEstado()))
+                .justificantesFinalesDisponibles(justificanteFinalService.tieneJustificantesFinales(expediente.getId(), detalle.getEstado()))
+                .justificantesFinalesPendientes(justificanteFinalService.justificantesFinalesPendientes(expediente.getId(), detalle.getEstado()))
                 .build();
     }
 
@@ -625,47 +580,6 @@ public class ExpedienteApiController {
         return new java.util.ArrayList<>(new LinkedHashSet<>(ids.stream()
                 .filter(java.util.Objects::nonNull)
                 .toList()));
-    }
-
-    private boolean tieneJustificantesFinales(Long expedienteId, String estado) {
-        if (!"FINALIZADO".equals(estado)) {
-            return false;
-        }
-        List<Documento> documentos = documentoRepository.findByExpedienteId(expedienteId);
-        return documentos.stream().anyMatch(this::esJustificanteDgt)
-                && documentos.stream().anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.MODELO_620);
-    }
-
-    private List<String> justificantesFinalesPendientes(Long expedienteId, String estado) {
-        if (!"FINALIZADO".equals(estado)) {
-            return List.of();
-        }
-        List<Documento> documentos = documentoRepository.findByExpedienteId(expedienteId);
-        List<String> pendientes = new java.util.ArrayList<>();
-        if (documentos.stream().noneMatch(this::esJustificanteDgt)) {
-            pendientes.add("DGT");
-        }
-        if (documentos.stream().noneMatch(documento -> documento.getTipoDocumento() == TipoDocumento.MODELO_620)) {
-            pendientes.add("620");
-        }
-        return pendientes;
-    }
-
-    private boolean esJustificanteDgt(Documento documento) {
-        return documento.getTipoDocumento() == TipoDocumento.HUELLA_TRAMITE
-                || documento.getTipoDocumento() == TipoDocumento.COMPROBANTE_DGT;
-    }
-
-    private String carpetaZipExpediente(ExpedienteDetailResponse detalle, Long expedienteId, Set<String> carpetasUsadas) {
-        String base = detalle.getMatricula() != null && !detalle.getMatricula().isBlank()
-                ? nombreSeguro(detalle.getMatricula())
-                : "EXP-" + expedienteId;
-        return carpetasUsadas.contains(base) ? base + "-EXP-" + expedienteId : base;
-    }
-
-    private String nombreSeguro(String nombre) {
-        String base = nombre != null && !nombre.isBlank() ? nombre : "documento.pdf";
-        return base.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
 
     private UsuarioResumenResponse mapUsuario(Usuario usuario) {
