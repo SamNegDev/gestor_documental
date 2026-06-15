@@ -160,7 +160,7 @@ function TaskRow({
       </div>
       <span className={`task-priority task-priority--${tarea.prioridad.toLowerCase()}`}>{tarea.prioridad}</span>
       <div className="task-row__actions">
-        {tarea.tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR" ? (
+        {tarea.tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR" && tarea.entidad === "INCIDENCIA" ? (
           <button className="soft-button soft-button--compact" onClick={() => onNotify(tarea.entidadId)} type="button">
             <BellRing size={15} />
             Notificar

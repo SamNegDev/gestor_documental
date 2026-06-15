@@ -37,6 +37,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -87,8 +88,20 @@ public class TareaApiController {
                 ? null
                 : usuario.getCliente().getId();
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
-            incidenciaRepository.findSeguimientoPendiente(LocalDateTime.now())
-                    .forEach(i -> tareas.add(tareaSeguimientoIncidencia(i)));
+            List<Incidencia> incidenciasPendientes = incidenciaRepository.findSeguimientoPendiente(LocalDateTime.now());
+            incidenciasPendientes.forEach(i -> tareas.add(tareaSeguimientoIncidencia(i)));
+            Set<Long> expedientesConIncidenciaPendiente = incidenciasPendientes.stream()
+                    .map(Incidencia::getExpediente)
+                    .filter(Objects::nonNull)
+                    .map(Expediente::getId)
+                    .collect(Collectors.toSet());
+            expedienteRepository.findTareasPorEstados(null, List.of(
+                            EstadoExpediente.PENDIENTE_DOCUMENTACION,
+                            EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
+                    ))
+                    .stream()
+                    .filter(expediente -> !expedientesConIncidenciaPendiente.contains(expediente.getId()))
+                    .forEach(expediente -> tareas.add(tareaAvisoPendienteExpediente(expediente)));
         }
 
         List<EstadoSolicitud> estadosSolicitud = usuario.getRolUsuario() == RolUsuario.ADMIN
@@ -156,6 +169,15 @@ public class TareaApiController {
                 .cliente(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getNombre() : null)
                 .fechaReferencia(format(fecha)).diasPendiente(dias(fecha))
                 .enlace("/expedientes/" + incidencia.getExpediente().getId()).build();
+    }
+
+    private TareaResponse tareaAvisoPendienteExpediente(Expediente expediente) {
+        boolean documentacion = expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION;
+        String contexto = documentacion ? contextoDocumentacion(expediente.getId()) : ultimoMensaje(expediente.getId(), RolUsuario.ADMIN);
+        return tareaExpediente(expediente, "INCIDENCIA_PENDIENTE_NOTIFICAR", "ALTA",
+                documentacion ? "Documentacion pendiente de aviso" : "Informacion pendiente de aviso",
+                "Este expediente ya esta pendiente del cliente. Abre el expediente para enviar o regularizar el aviso.",
+                contexto);
     }
 
     private List<TareaResponse> tareasJustificantesFinales() {
