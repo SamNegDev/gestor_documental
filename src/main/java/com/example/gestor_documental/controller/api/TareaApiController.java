@@ -101,6 +101,7 @@ public class TareaApiController {
                     ))
                     .stream()
                     .filter(expediente -> !expedientesConIncidenciaPendiente.contains(expediente.getId()))
+                    .filter(expediente -> !tieneIncidenciaActiva(expediente.getId()))
                     .forEach(expediente -> tareas.add(tareaAvisoPendienteExpediente(expediente)));
         }
 
@@ -178,6 +179,10 @@ public class TareaApiController {
                 documentacion ? "Documentacion pendiente de aviso" : "Informacion pendiente de aviso",
                 "Este expediente ya esta pendiente del cliente. Abre el expediente para enviar o regularizar el aviso.",
                 contexto);
+    }
+
+    private boolean tieneIncidenciaActiva(Long expedienteId) {
+        return !incidenciaRepository.findByExpedienteIdAndResueltaFalse(expedienteId).isEmpty();
     }
 
     private List<TareaResponse> tareasJustificantesFinales() {
