@@ -153,7 +153,9 @@ public class OcrPdfServiceImpl implements OcrPdfService {
                     "-c", "user_defined_dpi=" + (int) ocrProperties.getDpi()
             );
 
-            processBuilder.environment().put("TESSDATA_PREFIX", ocrProperties.getTessdataPath());
+            if (ocrProperties.getTessdataPath() != null && !ocrProperties.getTessdataPath().isBlank()) {
+                processBuilder.environment().put("TESSDATA_PREFIX", ocrProperties.getTessdataPath());
+            }
             processBuilder.redirectErrorStream(true);
 
             Process process = processBuilder.start();
@@ -168,8 +170,7 @@ public class OcrPdfServiceImpl implements OcrPdfService {
             int exitCode = process.waitFor();
 
             if (exitCode != 0) {
-                log.warn("Tesseract devolvio codigo {} al procesar una pagina OCR", exitCode);
-                log.debug("Salida de Tesseract: {}", output);
+                log.warn("Tesseract devolvio codigo {} al procesar una pagina OCR. Salida: {}", exitCode, output);
                 return "";
             }
 

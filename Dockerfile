@@ -36,6 +36,7 @@ RUN apt-get update \
 RUN mkdir -p /app/uploads /app/logs
 
 ENV TESSERACT_DATAPATH=/usr/share/tesseract-ocr/4.00/tessdata
+ENV TESSDATA_PATH=/usr/share/tesseract-ocr/4.00/tessdata
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
 
 COPY --from=backend-build /build/target/*.jar /app/app.jar
