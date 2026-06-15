@@ -48,7 +48,7 @@ export function SeguimientoClientesPage() {
         <div>
           <p className="eyebrow">Control de esperas</p>
           <h2>Seguimiento de clientes</h2>
-          <p>Incidencias notificadas pendientes de respuesta y seguimientos archivados que siguen vigentes.</p>
+          <p>Solicitudes al cliente ya notificadas pendientes de respuesta y seguimientos archivados que siguen vigentes.</p>
         </div>
         <span className="records-count">{data?.totalElementos ?? 0} casos</span>
       </header>

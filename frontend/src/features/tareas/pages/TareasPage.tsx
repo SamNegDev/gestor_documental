@@ -56,7 +56,7 @@ export function TareasPage() {
             <option value="">Todas las tareas</option>
             <option value="SOLICITUD_PENDIENTE_REVISION">Solicitudes por revisar</option>
             <option value="APORTACION_PENDIENTE_REVISION">Aportaciones por revisar</option>
-            <option value="INCIDENCIA_PENDIENTE_NOTIFICAR">Incidencias por notificar</option>
+            <option value="INCIDENCIA_PENDIENTE_NOTIFICAR">Avisos al cliente</option>
             <option value="INCIDENCIA_PENDIENTE_ARCHIVAR">Seguimientos por archivar</option>
             <option value="INCIDENCIA_PENDIENTE_CLIENTE">Incidencias</option>
             <option value="DOCUMENTACION_PENDIENTE_CLIENTE">Documentacion pendiente</option>
@@ -193,6 +193,7 @@ function taskIcon(tipo: string) {
 }
 
 function taskActionKind(tipo: string): { label: string; tone: "neutral" | "warning" | "success" | "danger" | "info" } | null {
+  if (tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR") return { label: "AVISO AL CLIENTE", tone: "warning" };
   if (tipo.startsWith("INCIDENCIA_")) return { label: "INCIDENCIA", tone: "danger" };
   if (tipo === "EXPEDIENTE_ESTANCADO") return { label: "SIN ACTIVIDAD", tone: "neutral" };
   if (tipo === "DOCUMENTACION_PENDIENTE_CLIENTE" || tipo === "JUSTIFICANTE_FINAL_PENDIENTE") return { label: "FALTA DOCUMENTACION", tone: "warning" };

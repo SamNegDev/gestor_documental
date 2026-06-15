@@ -149,8 +149,8 @@ public class TareaApiController {
     private TareaResponse tareaSeguimientoIncidencia(Incidencia incidencia) {
         LocalDateTime fecha = incidencia.getProximoAviso() != null ? incidencia.getProximoAviso() : incidencia.getFechaCreacion();
         return TareaResponse.builder().id("INC-" + incidencia.getId() + "-SEGUIMIENTO").tipo(incidencia.getContadorAvisos() >= 5 ? "INCIDENCIA_PENDIENTE_ARCHIVAR" : "INCIDENCIA_PENDIENTE_NOTIFICAR").ambito("GESTION")
-                .prioridad("ALTA").titulo(incidencia.getContadorAvisos() >= 5 ? "Seguimiento pendiente de archivar" : incidencia.getContadorAvisos() == 0 ? "Incidencia pendiente de notificar" : "Recordatorio de incidencia vencido")
-                .detalle(incidencia.getContadorAvisos() >= 5 ? "Se ha completado el ciclo de avisos sin respuesta." : incidencia.getContadorAvisos() == 0 ? "Debe enviarse la primera notificacion al cliente." : "Debe renovarse la notificacion al cliente.")
+                .prioridad("ALTA").titulo(incidencia.getContadorAvisos() >= 5 ? "Seguimiento pendiente de archivar" : incidencia.getContadorAvisos() == 0 ? "Solicitud al cliente pendiente de aviso" : "Recordatorio de solicitud vencido")
+                .detalle(incidencia.getContadorAvisos() >= 5 ? "Se ha completado el ciclo de avisos sin respuesta." : incidencia.getContadorAvisos() == 0 ? "Debe enviarse la primera notificacion al cliente antes de pasarla a seguimiento." : "Debe renovarse la notificacion al cliente.")
                 .contexto(contextoIncidencia(incidencia))
                 .entidad("INCIDENCIA").entidadId(incidencia.getId()).matricula(incidencia.getExpediente().getMatricula())
                 .cliente(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getNombre() : null)
