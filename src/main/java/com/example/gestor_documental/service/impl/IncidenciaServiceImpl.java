@@ -13,6 +13,7 @@ import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.HitoExpedienteRepository;
 import com.example.gestor_documental.repository.AvisoIncidenciaRepository;
+import com.example.gestor_documental.repository.TipoIncidenciaRepository;
 import com.example.gestor_documental.service.*;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
     private final IncidenciaRepository incidenciaRepository;
     private final HitoExpedienteRepository hitoExpedienteRepository;
     private final AvisoIncidenciaRepository avisoIncidenciaRepository;
+    private final TipoIncidenciaRepository tipoIncidenciaRepository;
     private final ExpedienteService expedienteService;
     private final SolicitudService solicitudService;
     private final TipoIncidenciaService tipoIncidenciaService;
@@ -88,6 +90,49 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                 "Nueva incidencia: " + tipo.getNombre().name() + " - " + observacionesNormalizadas
         );
 
+        return incidencia;
+    }
+
+    @Override
+    @Transactional
+    public Incidencia prepararNotificacionExpediente(Long expedienteId, Usuario admin) {
+        validarAdmin(admin);
+        Expediente expediente = expedienteService.buscarPorId(expedienteId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
+
+        if (!expedienteService.tienePermisoExpediente(expediente, admin)) {
+            throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
+        }
+        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
+                || expediente.getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
+            throw new OperacionInvalidaException("El expediente ya no admite notificaciones al cliente");
+        }
+
+        List<Incidencia> activas = incidenciaRepository.findByExpedienteIdAndResueltaFalse(expedienteId);
+        if (!activas.isEmpty()) {
+            return activas.stream()
+                    .filter(incidencia -> !incidencia.isSeguimientoArchivado())
+                    .findFirst()
+                    .orElse(activas.get(0));
+        }
+
+        TipoIncidenciaEnum tipoNombre = expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
+                ? TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL
+                : TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION;
+        TipoIncidencia tipo = tipoIncidenciaRepository.findByNombre(tipoNombre)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Tipo de incidencia no encontrado"));
+        String observaciones = tipoNombre == TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL
+                ? "INFORMACION PENDIENTE DE RESPUESTA DEL CLIENTE"
+                : "DOCUMENTACION PENDIENTE DE APORTACION DEL CLIENTE";
+
+        Incidencia incidencia = new Incidencia(tipo, expediente, observaciones, admin);
+        incidenciaRepository.save(incidencia);
+        historialCambioService.registrarCambioExpediente(
+                expediente,
+                admin,
+                "AVISO PENDIENTE",
+                "Se preparo la notificacion al cliente para una peticion ya pendiente."
+        );
         return incidencia;
     }
 

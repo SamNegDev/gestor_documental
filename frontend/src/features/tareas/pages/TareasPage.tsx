@@ -5,7 +5,7 @@ import { Link, useOutletContext } from "react-router-dom";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { PaginationBar } from "../../listados/components/PaginationBar";
-import { archivarSeguimiento } from "../../seguimiento/services/seguimientoApi";
+import { archivarSeguimiento, prepararNotificacionExpediente } from "../../seguimiento/services/seguimientoApi";
 import { NotificationEmailDialog } from "../components/NotificationEmailDialog";
 import { getTareas, getTareasResumen } from "../services/tareasApi";
 import type { Tarea } from "../types";
@@ -30,6 +30,19 @@ export function TareasPage() {
     queryClient.invalidateQueries({ queryKey: ["seguimiento"] });
   };
   const archiveMutation = useMutation({ mutationFn: archivarSeguimiento, onSuccess: refresh });
+  async function notify(tarea: Tarea) {
+    if (tarea.entidad === "INCIDENCIA") {
+      setIncidenciaParaNotificar(tarea.entidadId);
+      return;
+    }
+    try {
+      const preview = await prepararNotificacionExpediente(tarea.entidadId);
+      setIncidenciaParaNotificar(preview.incidenciaId);
+      refresh();
+    } catch {
+      alert("No se pudo preparar la notificacion.");
+    }
+  }
   const data = query.data;
 
   return (
@@ -90,7 +103,7 @@ export function TareasPage() {
               archivePending={archiveMutation.isPending}
               key={tarea.id}
               onArchive={(id) => archiveMutation.mutate(id)}
-              onNotify={setIncidenciaParaNotificar}
+              onNotify={notify}
               showClient={isAdmin}
               tarea={tarea}
             />
@@ -121,7 +134,7 @@ function TaskRow({
   tarea: Tarea;
   archivePending: boolean;
   onArchive: (id: number) => void;
-  onNotify: (id: number) => void;
+  onNotify: (tarea: Tarea) => void;
   showClient: boolean;
 }) {
   const actionKind = taskActionKind(tarea.tipo);
@@ -160,8 +173,8 @@ function TaskRow({
       </div>
       <span className={`task-priority task-priority--${tarea.prioridad.toLowerCase()}`}>{tarea.prioridad}</span>
       <div className="task-row__actions">
-        {tarea.tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR" && tarea.entidad === "INCIDENCIA" ? (
-          <button className="soft-button soft-button--compact" onClick={() => onNotify(tarea.entidadId)} type="button">
+        {tarea.tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR" ? (
+          <button className="soft-button soft-button--compact" onClick={() => onNotify(tarea)} type="button">
             <BellRing size={15} />
             Notificar
           </button>

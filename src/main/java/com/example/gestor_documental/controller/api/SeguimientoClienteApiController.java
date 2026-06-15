@@ -62,6 +62,12 @@ public class SeguimientoClienteApiController {
         return incidenciaService.previsualizarNotificacion(id, requireAdmin(authentication));
     }
 
+    @PostMapping("/expedientes/{id}/preparar-notificacion")
+    public NotificacionIncidenciaPreviewResponse prepararNotificacion(@PathVariable Long id, Authentication authentication) {
+        Incidencia incidencia = incidenciaService.prepararNotificacionExpediente(id, requireAdmin(authentication));
+        return incidenciaService.previsualizarNotificacion(incidencia.getId(), requireAdmin(authentication));
+    }
+
     @PostMapping("/{id}/notificar")
     public NotificacionIncidenciaResponse notificar(@PathVariable Long id, @RequestBody(required = false) NotificacionIncidenciaRequest body, Authentication authentication) {
         NotificacionIncidenciaResponse resultado = incidenciaService.notificarCliente(id, body != null ? body.asunto() : null, body != null ? body.mensaje() : null, requireAdmin(authentication));

@@ -13,6 +13,7 @@ public interface IncidenciaService {
     
     Incidencia crearIncidenciaExpediente(Long expedienteId, Long tipoIncidenciaId, String observaciones, Usuario admin);
     Incidencia crearIncidenciaSolicitud(Long solicitudId, Long tipoIncidenciaId, String observaciones, Usuario admin);
+    Incidencia prepararNotificacionExpediente(Long expedienteId, Usuario admin);
     
     void solicitarRevisionExpediente(Long expedienteId, Usuario cliente);
     void solicitarRevisionSolicitud(Long solicitudId, Usuario cliente);
