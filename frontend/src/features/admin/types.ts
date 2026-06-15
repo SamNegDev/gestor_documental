@@ -1,4 +1,5 @@
 import type { ClienteResumen } from "../expedientes/types/expedienteDetail.types";
+import type { DocumentoExpediente } from "../expedientes/types/expedienteDetail.types";
 
 export interface ClienteAdmin {
   id: number;
@@ -9,6 +10,7 @@ export interface ClienteAdmin {
   telefono?: string | null;
   logoPrincipalUrl?: string | null;
   logoCompactoUrl?: string | null;
+  documentos?: DocumentoExpediente[];
 }
 
 export interface ClienteInput {

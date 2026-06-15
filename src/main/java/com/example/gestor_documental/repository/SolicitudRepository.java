@@ -5,10 +5,12 @@ import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Solicitud;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     List<Solicitud> findByClienteId(Long clienteId);
@@ -18,6 +20,50 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
 
     @Query("select s from Solicitud s where s.cliente.id = :clienteId order by coalesce(s.fechaUltimaModificacion, s.fechaCreacion) desc")
     List<Solicitud> findByClienteIdOrderByFechaReferenciaDesc(Long clienteId);
+
+    @Query(
+            value = """
+                    select s from Solicitud s
+                    left join s.cliente cliente
+                    left join s.tipoTramite tipoTramite
+                    where (:clienteId is null or cliente.id = :clienteId)
+                      and (:estado is null or s.estadoSolicitud = :estado)
+                      and (:tipoTramiteId is null or tipoTramite.id = :tipoTramiteId)
+                      and (:matricula is null or upper(coalesce(s.matricula, '')) like :matricula)
+                      and (:desde is null or coalesce(s.fechaUltimaModificacion, s.fechaCreacion) >= :desde)
+                      and (:hasta is null or coalesce(s.fechaUltimaModificacion, s.fechaCreacion) < :hasta)
+                    order by coalesce(s.fechaUltimaModificacion, s.fechaCreacion) desc
+                    """,
+            countQuery = """
+                    select count(s) from Solicitud s
+                    left join s.cliente cliente
+                    left join s.tipoTramite tipoTramite
+                    where (:clienteId is null or cliente.id = :clienteId)
+                      and (:estado is null or s.estadoSolicitud = :estado)
+                      and (:tipoTramiteId is null or tipoTramite.id = :tipoTramiteId)
+                      and (:matricula is null or upper(coalesce(s.matricula, '')) like :matricula)
+                      and (:desde is null or coalesce(s.fechaUltimaModificacion, s.fechaCreacion) >= :desde)
+                      and (:hasta is null or coalesce(s.fechaUltimaModificacion, s.fechaCreacion) < :hasta)
+                    """
+    )
+    Page<Solicitud> buscarListado(@Param("clienteId") Long clienteId,
+                                  @Param("estado") EstadoSolicitud estado,
+                                  @Param("tipoTramiteId") Long tipoTramiteId,
+                                  @Param("matricula") String matricula,
+                                  @Param("desde") LocalDateTime desde,
+                                  @Param("hasta") LocalDateTime hasta,
+                                  Pageable pageable);
+
+    @Query("""
+            select s from Solicitud s
+            left join fetch s.cliente
+            left join fetch s.tipoTramite
+            where (:clienteId is null or s.cliente.id = :clienteId)
+              and s.estadoSolicitud in :estados
+            order by coalesce(s.fechaUltimaModificacion, s.fechaCreacion) desc
+            """)
+    List<Solicitud> findTareasPendientes(@Param("clienteId") Long clienteId,
+                                         @Param("estados") List<EstadoSolicitud> estados);
 
     List<Solicitud> findByFechaUltimaModificacionIsNullOrModificadoPorIsNull();
 

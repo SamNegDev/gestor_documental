@@ -15,6 +15,7 @@ import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.service.DocumentoService;
@@ -37,6 +38,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     private final ExpedienteService expedienteService;
     private final DocumentoService documentoService;
     private final InteresadoRepository interesadoRepository;
+    private final DocumentoRepository documentoRepository;
 
     @Override
     @Transactional
@@ -186,6 +188,8 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             documentos.stream()
                     .filter(documento -> documentoCubreRequisito(documento, requisito))
                     .findFirst()
+                    .or(() -> documentoHabitualCubreRequisito(expediente, requisito))
+                    .or(() -> documentoClienteCubreRequisito(expediente, requisito))
                     .ifPresent(documento -> {
                         requisito.setDocumento(documento);
                         requisito.setEstado(EstadoRequisitoDocumental.APORTADO);
@@ -339,8 +343,62 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         if (documento.getTipoDocumento() == requisito.getTipoDocumento()) {
             return true;
         }
+        if (requisito.getTipoDocumento() == TipoDocumento.MANDATO) {
+            return documento.getTipoDocumento() == TipoDocumento.MANDATO_REPRESENTACION;
+        }
         return requisito.getTipoDocumento() == TipoDocumento.CONTRATO_COMPRAVENTA
                 && documento.getTipoDocumento() == TipoDocumento.FACTURA;
+    }
+
+    private java.util.Optional<Documento> documentoClienteCubreRequisito(
+            Expediente expediente,
+            RequisitoDocumentalExpediente requisito
+    ) {
+        if (expediente.getCliente() == null || requisito.getEstado() == EstadoRequisitoDocumental.POSTERIOR) {
+            return java.util.Optional.empty();
+        }
+        if (!esDocumentoReutilizableCliente(requisito.getTipoDocumento())) {
+            return java.util.Optional.empty();
+        }
+        if (requisito.getInteresado() != null && !interesadoEsCliente(expediente, requisito.getInteresado())) {
+            return java.util.Optional.empty();
+        }
+
+        return documentoRepository.findByClienteIdOrderByFechaSubidaDesc(expediente.getCliente().getId()).stream()
+                .filter(documento -> documento.getInteresado() == null)
+                .filter(documento -> documentoCubreRequisito(documento, requisito))
+                .findFirst();
+    }
+
+    private java.util.Optional<Documento> documentoHabitualCubreRequisito(
+            Expediente expediente,
+            RequisitoDocumentalExpediente requisito
+    ) {
+        if (expediente.getCliente() == null || requisito.getInteresado() == null) {
+            return java.util.Optional.empty();
+        }
+        if (!esDocumentoReutilizableCliente(requisito.getTipoDocumento())) {
+            return java.util.Optional.empty();
+        }
+        return documentoRepository.findByClienteIdAndInteresadoIdOrderByFechaSubidaDesc(
+                        expediente.getCliente().getId(),
+                        requisito.getInteresado().getId()
+                ).stream()
+                .filter(documento -> documentoCubreRequisito(documento, requisito))
+                .findFirst();
+    }
+
+    private boolean esDocumentoReutilizableCliente(TipoDocumento tipoDocumento) {
+        return tipoDocumento == TipoDocumento.DNI
+                || tipoDocumento == TipoDocumento.CIF
+                || tipoDocumento == TipoDocumento.MANDATO
+                || tipoDocumento == TipoDocumento.MANDATO_REPRESENTACION;
+    }
+
+    private boolean interesadoEsCliente(Expediente expediente, Interesado interesado) {
+        String nifCliente = normalizarIdentificador(expediente.getCliente().getNif());
+        String dniInteresado = normalizarIdentificador(interesado.getDni());
+        return !nifCliente.isBlank() && nifCliente.equals(dniInteresado);
     }
 
     private void eliminarModelo620Automatico(Expediente expediente) {

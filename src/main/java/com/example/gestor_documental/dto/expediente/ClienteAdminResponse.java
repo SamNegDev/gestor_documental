@@ -1,5 +1,7 @@
 package com.example.gestor_documental.dto.expediente;
 
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,4 +22,6 @@ public class ClienteAdminResponse {
     private String telefono;
     private String logoPrincipalUrl;
     private String logoCompactoUrl;
+    @Builder.Default
+    private List<DocumentoExpedienteResponse> documentos = new ArrayList<>();
 }

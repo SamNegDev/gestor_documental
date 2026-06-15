@@ -3,7 +3,6 @@ package com.example.gestor_documental.controller.api;
 import com.example.gestor_documental.dto.busqueda.BusquedaGlobalItemResponse;
 import com.example.gestor_documental.dto.busqueda.BusquedaGlobalResponse;
 import com.example.gestor_documental.enums.RolUsuario;
-import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Solicitud;
@@ -11,7 +10,7 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
-import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.security.CurrentUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
@@ -28,7 +27,7 @@ import java.util.Locale;
 @RequestMapping("/api/busqueda-global")
 @RequiredArgsConstructor
 public class BusquedaGlobalApiController {
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
     private final ExpedienteRepository expedienteRepository;
     private final SolicitudRepository solicitudRepository;
     private final InteresadoRepository interesadoRepository;
@@ -82,9 +81,7 @@ public class BusquedaGlobalApiController {
     }
 
     private Usuario usuario(Authentication authentication) {
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
-        if (usuario == null) throw new AccesoDenegadoException("Usuario no encontrado");
-        return usuario;
+        return currentUserService.requireUser(authentication);
     }
 
     private String valor(String valor, String alternativa) { return valor != null && !valor.isBlank() ? valor : alternativa; }

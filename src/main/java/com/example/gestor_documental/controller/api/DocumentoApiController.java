@@ -1,9 +1,11 @@
 package com.example.gestor_documental.controller.api;
 
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.DocumentoService;
-import com.example.gestor_documental.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +29,7 @@ import java.util.Map;
 public class DocumentoApiController {
 
     private final DocumentoService documentoService;
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
 
     @PostMapping("/expedientes/{expedienteId}/documentos")
     public ResponseEntity<Void> subirDocumento(
@@ -37,7 +39,7 @@ public class DocumentoApiController {
             @RequestParam(required = false) Long operacionId,
             Authentication authentication
     ) {
-        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
         documentoService.guardarParaExpediente(expedienteId, archivo, tipoDocumento, operacionId, usuarioLogueado);
         return ResponseEntity.noContent().build();
     }
@@ -52,15 +54,22 @@ public class DocumentoApiController {
             @RequestParam(required = false, defaultValue = "false") boolean nombreAutomatico,
             Authentication authentication
     ) {
-        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
         documentoService.actualizarDocumento(id, tipoDocumento, nombreArchivo, operacionId, actualizarOperacion, nombreAutomatico, usuarioLogueado);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/documentos/{id}")
     public ResponseEntity<Void> eliminarDocumento(@PathVariable Long id, Authentication authentication) {
-        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
-        documentoService.obtenerDocumentoConPermiso(id, usuarioLogueado);
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
+        Documento documento = documentoService.obtenerDocumentoConPermiso(id, usuarioLogueado);
+        boolean documentoClienteMaestro = documento.getCliente() != null && documento.getInteresado() == null;
+        if (documentoClienteMaestro && usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Solo un administrador puede eliminar documentos del cliente"
+            );
+        }
         documentoService.eliminar(id);
         return ResponseEntity.noContent().build();
     }
@@ -71,7 +80,7 @@ public class DocumentoApiController {
             @RequestParam String rangoPaginas,
             Authentication authentication
     ) {
-        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
         documentoService.eliminarPaginasDocumento(id, rangoPaginas, usuarioLogueado);
         return ResponseEntity.noContent().build();
     }
@@ -85,14 +94,14 @@ public class DocumentoApiController {
             @RequestParam(required = false) Long operacionId,
             Authentication authentication
     ) {
-        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
         documentoService.extraerPaginasDocumento(id, rangoPaginas, tipoDocumento, nombreArchivo, operacionId, usuarioLogueado);
         return ResponseEntity.noContent().build();
     }
 
     @org.springframework.web.bind.annotation.GetMapping("/documentos/{id}/paginas")
     public ResponseEntity<Map<String, Integer>> contarPaginas(@PathVariable Long id, Authentication authentication) {
-        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
         return ResponseEntity.ok(Map.of("totalPaginas", documentoService.contarPaginasDocumento(id, usuarioLogueado)));
     }
 
@@ -102,7 +111,7 @@ public class DocumentoApiController {
             @PathVariable int pagina,
             Authentication authentication
     ) {
-        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_PNG)
                 .body(documentoService.renderizarPaginaDocumento(id, pagina, usuarioLogueado));
@@ -117,7 +126,7 @@ public class DocumentoApiController {
             @RequestParam(required = false) Long operacionId,
             Authentication authentication
     ) {
-        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
         List<Long> ids = Arrays.stream(documentoIds.split(","))
                 .map(String::trim)
                 .filter(valor -> !valor.isBlank())

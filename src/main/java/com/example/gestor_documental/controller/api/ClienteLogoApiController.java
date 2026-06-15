@@ -4,9 +4,9 @@ import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ClienteLogoService;
 import com.example.gestor_documental.service.ClienteService;
-import com.example.gestor_documental.service.UsuarioService;
 import java.nio.file.Path;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
@@ -29,7 +29,7 @@ public class ClienteLogoApiController {
 
     private final ClienteService clienteService;
     private final ClienteLogoService clienteLogoService;
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
 
     @GetMapping("/{id}/logos/{tipo}")
     public ResponseEntity<Resource> obtenerLogo(
@@ -37,7 +37,7 @@ public class ClienteLogoApiController {
             @PathVariable String tipo,
             Authentication authentication
     ) {
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuario = currentUserService.requireUser(authentication);
         if (usuario.getRolUsuario() != RolUsuario.ADMIN
                 && (usuario.getCliente() == null || !usuario.getCliente().getId().equals(id))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permiso para ver este logo");

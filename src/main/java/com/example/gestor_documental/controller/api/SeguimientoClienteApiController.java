@@ -6,15 +6,13 @@ import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaPrevi
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaRequest;
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaResponse;
 import com.example.gestor_documental.enums.EstadoExpediente;
-import com.example.gestor_documental.enums.RolUsuario;
-import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.model.AvisoIncidencia;
 import com.example.gestor_documental.model.Incidencia;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.AvisoIncidenciaRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.IncidenciaService;
-import com.example.gestor_documental.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -33,7 +31,7 @@ public class SeguimientoClienteApiController {
     private final IncidenciaRepository incidenciaRepository;
     private final AvisoIncidenciaRepository avisoRepository;
     private final IncidenciaService incidenciaService;
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
 
     @GetMapping
     public PagedResponse<SeguimientoIncidenciaResponse> listar(@RequestParam(defaultValue = "PENDIENTES") String vista,
@@ -94,6 +92,6 @@ public class SeguimientoClienteApiController {
                 && incidencia.getProximoAviso() != null && !incidencia.getProximoAviso().isAfter(ahora);
         return true;
     }
-    private Usuario requireAdmin(Authentication auth) { Usuario u = usuarioService.buscarPorEmail(auth.getName()); if (u == null || u.getRolUsuario() != RolUsuario.ADMIN) throw new AccesoDenegadoException("Solo el administrador puede consultar el seguimiento"); return u; }
+    private Usuario requireAdmin(Authentication auth) { return currentUserService.requireAdmin(auth); }
     private String format(LocalDateTime fecha) { return fecha != null ? fecha.format(FORMAT) : null; }
 }

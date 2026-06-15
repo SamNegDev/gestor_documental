@@ -16,7 +16,14 @@ import java.time.LocalDateTime;
 
 
 @Entity
-@Table (name="documento")
+@Table(name = "documento", indexes = {
+        @Index(name = "idx_documento_expediente_tipo", columnList = "expediente_id, tipo_documento"),
+        @Index(name = "idx_documento_solicitud_tipo", columnList = "solicitud_id, tipo_documento"),
+        @Index(name = "idx_documento_cliente_tipo", columnList = "cliente_id, tipo_documento"),
+        @Index(name = "idx_documento_cliente_interesado", columnList = "cliente_id, interesado_id"),
+        @Index(name = "idx_documento_incidencia", columnList = "incidencia_id"),
+        @Index(name = "idx_documento_fecha_subida", columnList = "fecha_subida")
+})
 public class Documento {
 
     @Id
@@ -50,6 +57,14 @@ public class Documento {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "expediente_id")
     private Expediente expediente;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cliente_id")
+    private Cliente cliente;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interesado_id")
+    private Interesado interesado;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "incidencia_id")

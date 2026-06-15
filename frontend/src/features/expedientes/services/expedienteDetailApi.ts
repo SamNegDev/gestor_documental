@@ -19,6 +19,10 @@ export function updateExpediente(id: string | number, input: ExpedienteEditInput
   return apiPutJson(`/api/expedientes/${id}`, input);
 }
 
+export function updateExpedienteInteresados(id: string | number, interesados: ExpedienteEditInput["interesados"]): Promise<void> {
+  return apiPutJson(`/api/expedientes/${id}/interesados`, { interesados });
+}
+
 export function createExpediente(input: ExpedienteEditInput): Promise<{ id: number }> {
   return apiPostJson<{ id: number }>("/api/expedientes", input);
 }

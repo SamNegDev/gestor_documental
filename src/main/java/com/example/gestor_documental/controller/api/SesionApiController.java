@@ -4,7 +4,7 @@ import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
 import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.model.Usuario;
-import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.util.ClienteBrandingUrls;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,7 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class SesionApiController {
 
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
 
     @GetMapping
     public UsuarioResumenResponse obtenerSesion(Authentication authentication) {
@@ -27,7 +27,7 @@ public class SesionApiController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesion no iniciada");
         }
 
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuario = currentUserService.requireUser(authentication);
         return UsuarioResumenResponse.builder()
                 .id(usuario.getId())
                 .nombreCompleto(nombreCompleto(usuario))

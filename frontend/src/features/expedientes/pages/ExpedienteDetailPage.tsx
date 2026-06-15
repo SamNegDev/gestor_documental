@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FilePlus2, FileText, Loader2, MessageCircle, Route, ShieldCheck, Upload, UserRound, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FilePlus2, FileText, Loader2, MessageCircle, Plus, Route, Save, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
 import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteUploadPanel";
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
 import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
@@ -13,6 +13,7 @@ import { IncidentAlertPanel } from "../components/IncidentAlertPanel";
 import { IncidentCreateDialog } from "../components/IncidentCreateDialog";
 import { IncidentResolutionDialog } from "../components/IncidentResolutionDialog";
 import { InteresadosPanel } from "../components/InteresadosPanel";
+import { InteresadoAutocomplete } from "../components/InteresadoAutocomplete";
 import { NextActionPanel } from "../components/NextActionPanel";
 import { OcrReviewDialog } from "../components/OcrReviewDialog";
 import { PhaseMilestonesPanel } from "../components/PhaseMilestonesPanel";
@@ -30,6 +31,7 @@ import {
   resolveAdditionalInfo,
   resolveIncident,
   sendExpedienteMessage,
+  updateExpedienteInteresados,
   uploadIncidentDocument,
 } from "../services/expedienteDetailApi";
 import {
@@ -45,9 +47,11 @@ import { uppercaseInput } from "../../../shared/utils/text";
 import type {
   DocumentoExpediente,
   ExpedienteDetail,
+  ExpedienteEditInput,
   HitoAccion,
   HitoExpediente,
   IncidenciaExpediente,
+  InteresadoSearchResult,
   OperacionExpediente,
   RequisitoDocumental,
   TipoIncidencia,
@@ -74,6 +78,24 @@ const CLOSING_DOCUMENTS = [
     logoAlt: "Logotipo Agencia Tributaria Canaria",
   },
 ] as const;
+
+const INTERESADO_ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
+
+type InteresadoCorrection = ExpedienteEditInput["interesados"][number];
+
+function emptyInteresadoCorrection(): InteresadoCorrection {
+  return { nombre: "", dni: "", telefono: "", direccion: "", rol: "" };
+}
+
+function hasInteresadoCorrectionData(interesado: InteresadoCorrection) {
+  return Boolean(
+    interesado.nombre?.trim()
+      || interesado.dni?.trim()
+      || interesado.telefono?.trim()
+      || interesado.direccion?.trim()
+      || interesado.rol?.trim(),
+  );
+}
 
 function formatShortDate(value?: string | null) {
   if (!value) return "Sin fecha";
@@ -450,6 +472,137 @@ function AdditionalInfoDialog({
   );
 }
 
+function InterestedPartiesCorrectionDialog({
+  expediente,
+  saving,
+  onClose,
+  onSubmit,
+}: {
+  expediente: ExpedienteDetail;
+  saving: boolean;
+  onClose: () => void;
+  onSubmit: (interesados: InteresadoCorrection[]) => void;
+}) {
+  const minimumRows = expediente.tipoTramite === "BATECOM" ? 3 : 2;
+  const initialRows = Math.max(minimumRows, expediente.interesados.length);
+  const [rows, setRows] = useState<InteresadoCorrection[]>(
+    Array.from({ length: initialRows }).map((_, index) => {
+      const interesado = expediente.interesados[index];
+      return interesado
+        ? {
+            nombre: uppercaseInput(interesado.nombre || ""),
+            dni: uppercaseInput(interesado.dni || ""),
+            telefono: uppercaseInput(interesado.telefono || ""),
+            direccion: uppercaseInput(interesado.direccion || ""),
+            rol: interesado.rol || "",
+          }
+        : emptyInteresadoCorrection();
+    }),
+  );
+
+  const updateRow = (index: number, field: keyof InteresadoCorrection, value: string) => {
+    setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: uppercaseInput(value) } : row)));
+  };
+
+  const selectInteresado = (index: number, interesado: InteresadoSearchResult) => {
+    setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? {
+      ...row,
+      nombre: uppercaseInput(interesado.nombre || ""),
+      dni: uppercaseInput(interesado.dni || ""),
+      telefono: uppercaseInput(interesado.telefono || ""),
+      direccion: uppercaseInput(interesado.direccion || ""),
+    } : row)));
+  };
+
+  const removeRow = (index: number) => {
+    if (rows.length <= minimumRows) {
+      setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? emptyInteresadoCorrection() : row)));
+      return;
+    }
+    setRows((current) => current.filter((_, rowIndex) => rowIndex !== index));
+  };
+
+  return (
+    <div className="exp-modal" role="dialog" aria-modal="true" aria-label="Corregir interesados">
+      <button className="exp-modal__backdrop" type="button" onClick={onClose} />
+      <section className="exp-modal__panel exp-modal__panel--wide">
+        <div className="exp-modal__header">
+          <div>
+            <p className="eyebrow">Correccion administrativa</p>
+            <h3>Interesados del expediente</h3>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} title="Cerrar">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="interesados-correction-note">
+          <ShieldCheck size={18} />
+          <span>El expediente seguira cerrado. El historial guardara los interesados anteriores y los nuevos.</span>
+        </div>
+
+        <div className="interesados-correction-list">
+          {rows.map((row, index) => (
+            <article className="interesados-correction-row" key={index}>
+              <div className="interesados-correction-row__title">
+                <strong>Interesado {index + 1}</strong>
+                <button className="icon-button icon-button--danger" onClick={() => removeRow(index)} title="Quitar interesado" type="button">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+              <InteresadoAutocomplete
+                label="Nombre"
+                value={row.nombre || ""}
+                placeholder="Buscar o escribir nombre"
+                onChange={(value) => updateRow(index, "nombre", value)}
+                onSelect={(interesado) => selectInteresado(index, interesado)}
+              />
+              <label>
+                <span>DNI / CIF</span>
+                <input value={row.dni || ""} onChange={(event) => updateRow(index, "dni", event.target.value)} />
+              </label>
+              <label>
+                <span>Rol</span>
+                <select value={row.rol || ""} onChange={(event) => updateRow(index, "rol", event.target.value)}>
+                  <option value="">Seleccionar rol</option>
+                  {INTERESADO_ROLES.map((role) => (
+                    <option key={role} value={role}>
+                      {role.replaceAll("_", " ")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Telefono</span>
+                <input value={row.telefono || ""} onChange={(event) => updateRow(index, "telefono", event.target.value)} />
+              </label>
+              <label className="interesados-correction-row__wide">
+                <span>Direccion</span>
+                <input value={row.direccion || ""} onChange={(event) => updateRow(index, "direccion", event.target.value)} />
+              </label>
+            </article>
+          ))}
+        </div>
+
+        <button className="soft-button soft-button--compact" onClick={() => setRows((current) => [...current, emptyInteresadoCorrection()])} type="button">
+          <Plus size={15} />
+          Añadir interesado
+        </button>
+
+        <footer className="exp-modal__footer">
+          <button className="soft-button" onClick={onClose} type="button">
+            Cancelar
+          </button>
+          <button className="primary-button" disabled={saving} onClick={() => onSubmit(rows.filter(hasInteresadoCorrectionData))} type="button">
+            <Save size={16} />
+            Guardar correccion
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 export function ExpedienteDetailPage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
@@ -462,6 +615,8 @@ export function ExpedienteDetailPage() {
   const [completeExpedienteProcessing, setCompleteExpedienteProcessing] = useState(false);
   const [incidentDialogOpen, setIncidentDialogOpen] = useState(false);
   const [additionalInfoDialogOpen, setAdditionalInfoDialogOpen] = useState(false);
+  const [interesadosCorrectionOpen, setInteresadosCorrectionOpen] = useState(false);
+  const [savingInteresadosCorrection, setSavingInteresadosCorrection] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [requirementOpenSignal, setRequirementOpenSignal] = useState(0);
   const [incidentTypes, setIncidentTypes] = useState<TipoIncidencia[]>([]);
@@ -597,6 +752,20 @@ export function ExpedienteDetailPage() {
       await refreshExpediente();
     } catch {
       alert("No se pudo crear el requisito.");
+    }
+  };
+
+  const handleCorrectInteresados = async (interesados: InteresadoCorrection[]) => {
+    if (!expediente) return;
+    setSavingInteresadosCorrection(true);
+    try {
+      await updateExpedienteInteresados(expediente.id, interesados);
+      setInteresadosCorrectionOpen(false);
+      await refreshExpediente();
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudieron corregir los interesados." : "No se pudieron corregir los interesados.");
+    } finally {
+      setSavingInteresadosCorrection(false);
     }
   };
 
@@ -952,7 +1121,7 @@ export function ExpedienteDetailPage() {
 
       <div className="exp-process-layout">
         <div className="exp-process-main">
-          <InteresadosPanel interesados={expediente.interesados} />
+          <InteresadosPanel interesados={expediente.interesados} onEditInteresados={() => setInteresadosCorrectionOpen(true)} />
           <NextActionPanel
             documentos={expediente.documentos}
             hitos={operationalHitos}
@@ -1034,6 +1203,14 @@ export function ExpedienteDetailPage() {
         onSubmit={handleRequestAdditionalInfo}
         open={additionalInfoDialogOpen}
       />
+      {interesadosCorrectionOpen ? (
+        <InterestedPartiesCorrectionDialog
+          expediente={expediente}
+          saving={savingInteresadosCorrection}
+          onClose={() => setInteresadosCorrectionOpen(false)}
+          onSubmit={handleCorrectInteresados}
+        />
+      ) : null}
       <IncidentCreateDialog
         loading={incidentTypesLoading}
         onClose={() => setIncidentDialogOpen(false)}

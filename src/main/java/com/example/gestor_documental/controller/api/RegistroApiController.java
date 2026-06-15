@@ -1,32 +1,46 @@
 package com.example.gestor_documental.controller.api;
 
+import com.example.gestor_documental.dto.expediente.DocumentoExpedienteResponse;
+import com.example.gestor_documental.dto.registro.InteresadoHabitualRequest;
 import com.example.gestor_documental.dto.registro.InteresadoRegistroResponse;
+import com.example.gestor_documental.dto.registro.InteresadoUpdateRequest;
 import com.example.gestor_documental.dto.registro.TramiteRegistroResponse;
 import com.example.gestor_documental.dto.registro.VehiculoRegistroResponse;
 import com.example.gestor_documental.dto.registro.VehiculoUpdateRequest;
+import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
+import com.example.gestor_documental.model.ClienteInteresado;
+import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.model.Vehiculo;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
-import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.security.CurrentUserService;
+import com.example.gestor_documental.service.ClienteService;
+import com.example.gestor_documental.service.DocumentoService;
+import com.example.gestor_documental.service.InteresadoService;
 import com.example.gestor_documental.service.VehiculoService;
 import com.example.gestor_documental.repository.VehiculoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
@@ -45,11 +59,15 @@ public class RegistroApiController {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
     private final InteresadoRepository interesadoRepository;
+    private final ClienteInteresadoRepository clienteInteresadoRepository;
     private final ExpedienteRepository expedienteRepository;
     private final ExpedienteInteresadoRepository relacionRepository;
     private final VehiculoRepository vehiculoRepository;
+    private final InteresadoService interesadoService;
+    private final ClienteService clienteService;
+    private final DocumentoService documentoService;
     private final VehiculoService vehiculoService;
 
     @GetMapping("/interesados")
@@ -69,15 +87,22 @@ public class RegistroApiController {
         List<ExpedienteInteresado> relaciones = relacionRepository.findRegistro(clienteId, range.desde(), range.hasta());
         Map<Long, List<ExpedienteInteresado>> relacionesPorInteresado = relaciones.stream()
                 .collect(java.util.stream.Collectors.groupingBy(relacion -> relacion.getInteresado().getId()));
-        List<Interesado> interesados = usuario.getRolUsuario() == RolUsuario.ADMIN && "TODO".equals(periodo)
+        List<Interesado> interesadosBase = usuario.getRolUsuario() == RolUsuario.ADMIN && "TODO".equals(periodo)
                 ? interesadoRepository.findAll()
                 : relacionesPorInteresado.values().stream().map(items -> items.get(0).getInteresado()).toList();
+        Map<Long, ClienteInteresado> habituales = clienteId != null
+                ? clienteInteresadoRepository.findByClienteIdOrderByInteresadoNombreAsc(clienteId).stream()
+                .collect(java.util.stream.Collectors.toMap(relacion -> relacion.getInteresado().getId(), relacion -> relacion))
+                : Map.of();
+        Map<Long, Interesado> interesadosPorId = new LinkedHashMap<>();
+        interesadosBase.forEach(interesado -> interesadosPorId.put(interesado.getId(), interesado));
+        habituales.values().forEach(relacion -> interesadosPorId.put(relacion.getInteresado().getId(), relacion.getInteresado()));
 
-        return interesados.stream()
+        return interesadosPorId.values().stream()
                 .filter(interesado -> query == null
                         || contiene(interesado.getNombre(), query)
                         || contiene(interesado.getDni(), query))
-                .map(interesado -> mapInteresado(interesado, relacionesPorInteresado.getOrDefault(interesado.getId(), List.of())))
+                .map(interesado -> mapInteresado(interesado, relacionesPorInteresado.getOrDefault(interesado.getId(), List.of()), habituales.containsKey(interesado.getId()), clienteId))
                 .sorted(Comparator.comparing(InteresadoRegistroResponse::getNombre, Comparator.nullsLast(String::compareToIgnoreCase)))
                 .toList();
     }
@@ -88,10 +113,68 @@ public class RegistroApiController {
         Interesado interesado = interesadoRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Interesado no encontrado"));
         List<ExpedienteInteresado> relaciones = tramitesInteresado(id, usuario);
-        if (usuario.getRolUsuario() != RolUsuario.ADMIN && relaciones.isEmpty()) {
+        Long clienteId = clienteIdVisible(usuario);
+        boolean habitual = clienteId != null && clienteInteresadoRepository.existsByClienteIdAndInteresadoId(clienteId, id);
+        if (usuario.getRolUsuario() != RolUsuario.ADMIN && relaciones.isEmpty() && !habitual) {
             throw new AccesoDenegadoException("No tienes permiso para consultar este interesado");
         }
-        return mapInteresado(interesado, relaciones);
+        return mapInteresado(interesado, relaciones, habitual, clienteId);
+    }
+
+    @PostMapping("/interesados")
+    public InteresadoRegistroResponse crearInteresadoHabitual(@RequestBody InteresadoHabitualRequest request,
+                                                              Authentication authentication) {
+        Usuario usuario = usuario(authentication);
+        Long clienteId = clienteIdVisible(usuario);
+        if (clienteId == null) {
+            throw new AccesoDenegadoException("Solo un usuario cliente puede crear interesados habituales");
+        }
+        String dni = normalizar(request.dni());
+        String nombre = request.nombre() != null ? request.nombre().trim() : null;
+        if (dni == null || nombre == null || nombre.isBlank()) {
+            throw new OperacionInvalidaException("DNI/CIF y nombre son obligatorios");
+        }
+        Interesado interesado = interesadoRepository.findByDni(dni).orElseGet(() -> {
+            Interesado nuevo = new Interesado();
+            nuevo.setDni(dni);
+            nuevo.setNombre(request.nombre());
+            nuevo.setTelefono(request.telefono());
+            nuevo.setDireccion(request.direccion());
+            nuevo.setTipoPersona(request.tipoPersona());
+            return interesadoService.guardar(nuevo);
+        });
+        if (!clienteInteresadoRepository.existsByClienteIdAndInteresadoId(clienteId, interesado.getId())) {
+            ClienteInteresado relacion = new ClienteInteresado();
+            relacion.setCliente(clienteService.buscarPorId(clienteId).orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado")));
+            relacion.setInteresado(interesado);
+            clienteInteresadoRepository.save(relacion);
+        }
+        return mapInteresado(interesado, tramitesInteresado(interesado.getId(), usuario), true, clienteId);
+    }
+
+    @PostMapping(value = "/interesados/{id}/documentos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public InteresadoRegistroResponse subirDocumentoInteresadoHabitual(@PathVariable Long id,
+                                                                       @RequestParam("archivo") MultipartFile archivo,
+                                                                       @RequestParam("tipoDocumento") TipoDocumento tipoDocumento,
+                                                                       Authentication authentication) {
+        Usuario usuario = usuario(authentication);
+        Long clienteId = clienteIdVisible(usuario);
+        if (clienteId == null || !clienteInteresadoRepository.existsByClienteIdAndInteresadoId(clienteId, id)) {
+            throw new AccesoDenegadoException("El interesado no pertenece a tu cartera habitual");
+        }
+        validarPdf(archivo);
+        documentoService.guardarParaInteresadoHabitual(clienteId, id, archivo, tipoDocumento, usuario);
+        Interesado interesado = interesadoRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Interesado no encontrado"));
+        return mapInteresado(interesado, tramitesInteresado(id, usuario), true, clienteId);
+    }
+
+    @PutMapping("/interesados/{id}")
+    public void actualizarInteresado(@PathVariable Long id,
+                                     @RequestBody InteresadoUpdateRequest request,
+                                     Authentication authentication) {
+        currentUserService.requireAdmin(authentication);
+        interesadoService.actualizar(id, request);
     }
 
     @GetMapping("/vehiculos")
@@ -142,7 +225,7 @@ public class RegistroApiController {
         vehiculoService.actualizarPorMatricula(matricula, request);
     }
 
-    private InteresadoRegistroResponse mapInteresado(Interesado interesado, List<ExpedienteInteresado> relaciones) {
+    private InteresadoRegistroResponse mapInteresado(Interesado interesado, List<ExpedienteInteresado> relaciones, boolean habitual, Long clienteId) {
         List<TramiteRegistroResponse> tramites = relaciones.stream()
                 .map(relacion -> mapTramite(relacion.getExpediente(), relacion.getRol() != null ? relacion.getRol().name() : null))
                 .sorted(Comparator.comparing(TramiteRegistroResponse::getFechaUltimaModificacion, Comparator.nullsLast(Comparator.reverseOrder())))
@@ -151,9 +234,25 @@ public class RegistroApiController {
                 .id(interesado.getId()).dni(interesado.getDni()).nombre(interesado.getNombre())
                 .telefono(interesado.getTelefono()).direccion(interesado.getDireccion())
                 .tipoPersona(interesado.getTipoPersona() != null ? interesado.getTipoPersona().name() : null)
+                .habitual(habitual)
                 .totalTramites(tramites.size())
                 .ultimaActividad(tramites.isEmpty() ? null : tramites.get(0).getFechaUltimaModificacion())
+                .documentos(clienteId != null ? documentoService.listarPorInteresadoHabitual(clienteId, interesado.getId()).stream().map(this::mapDocumento).toList() : List.of())
                 .tramites(tramites).build();
+    }
+
+    private DocumentoExpedienteResponse mapDocumento(Documento documento) {
+        return DocumentoExpedienteResponse.builder()
+                .id(documento.getId())
+                .nombre(documento.getNombreArchivo())
+                .nombreOriginal(documento.getNombreArchivoOriginal())
+                .tipo(documento.getTipoDocumento() != null ? documento.getTipoDocumento().name() : null)
+                .fechaSubida(documento.getFechaSubida() != null ? documento.getFechaSubida().toString() : null)
+                .subidoPor(documento.getSubidoPor() != null ? documento.getSubidoPor().getNombre() : null)
+                .estado("SUBIDO")
+                .subido(true)
+                .requeridoAhora(false)
+                .build();
     }
 
     private VehiculoRegistroResponse mapVehiculo(String matricula, List<Expediente> expedientes, Usuario usuario) {
@@ -215,9 +314,14 @@ public class RegistroApiController {
     }
 
     private Usuario usuario(Authentication authentication) {
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
-        if (usuario == null) throw new AccesoDenegadoException("Usuario no encontrado");
-        return usuario;
+        return currentUserService.requireUser(authentication);
+    }
+
+    private void validarPdf(MultipartFile archivo) {
+        String nombre = archivo != null ? archivo.getOriginalFilename() : null;
+        if (archivo == null || archivo.isEmpty() || nombre == null || !nombre.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+            throw new OperacionInvalidaException("El documento debe ser un PDF");
+        }
     }
 
     private LocalDateTime fechaReferencia(Expediente expediente) {

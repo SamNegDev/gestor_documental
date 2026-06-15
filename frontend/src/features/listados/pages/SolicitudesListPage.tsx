@@ -1,22 +1,26 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useOutletContext, useSearchParams } from "react-router-dom";
-import { ArrowRight, ClipboardCheck, Plus } from "lucide-react";
+import { ArrowRight, CheckCircle2, ClipboardCheck, Plus } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { ApiError } from "../../../shared/api/http";
-import { getSolicitudListCatalogs, getSolicitudes } from "../services/listadosApi";
+import { bulkConvertSolicitudes, getSolicitudListCatalogs, getSolicitudes } from "../services/listadosApi";
 import { ListFiltersBar } from "../components/ListFiltersBar";
 import { ListPageChrome } from "../components/ListPageChrome";
 import type { ListCatalogs, ListFilters, SolicitudListItem } from "../types";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { uppercaseInput } from "../../../shared/utils/text";
 import { PaginationBar } from "../components/PaginationBar";
+import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 
 export function SolicitudesListPage() {
   const { user } = useOutletContext<AppOutletContext>();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const [appliedFilters, setAppliedFilters] = useState<ListFilters>(() => readFilters(searchParams));
   const [draftFilters, setDraftFilters] = useState<ListFilters>(() => readFilters(searchParams));
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
 
   const catalogsQuery = useQuery({
@@ -32,10 +36,40 @@ export function SolicitudesListPage() {
 
   function applyFilters(filters: ListFilters) {
     setAppliedFilters({ ...filters, pagina: filters.pagina || "0", tamanio: filters.tamanio || "25" });
+    setSelectedIds(new Set());
   }
 
   const pageData = solicitudesQuery.data;
   const solicitudes = pageData?.contenido ?? [];
+  const selectedSolicitudes = solicitudes.filter((solicitud) => selectedIds.has(solicitud.id));
+  const convertibleSelected = selectedSolicitudes.filter(canConvertSolicitud);
+
+  async function handleBulkConvert() {
+    if (selectedSolicitudes.length === 0) return;
+    const confirmed = await confirm({
+      title: "Convertir solicitudes",
+      description: `Se intentara convertir ${selectedSolicitudes.length} solicitudes seleccionadas. Las que ya no sean convertibles quedaran sin cambios.`,
+      confirmLabel: "Convertir posibles",
+      tone: "success",
+    });
+    if (!confirmed) return;
+    try {
+      const response = await bulkConvertSolicitudes(selectedSolicitudes.map((solicitud) => solicitud.id));
+      setSelectedIds(new Set());
+      await queryClient.invalidateQueries({ queryKey: ["solicitudes"] });
+      await queryClient.invalidateQueries({ queryKey: ["expedientes"] });
+      if (response.fallidas > 0) {
+        const failed = response.resultados
+          .filter((result) => !result.convertida)
+          .slice(0, 4)
+          .map((result) => `SOL-${result.solicitudId}: ${result.mensaje || "No convertida"}`)
+          .join("\n");
+        alert(`${response.convertidas} convertidas y ${response.fallidas} no convertidas.\n${failed}`);
+      }
+    } catch (cause) {
+      alert(cause instanceof Error ? cause.message : "No se pudieron convertir las solicitudes seleccionadas.");
+    }
+  }
 
   return (
     <ListPageChrome
@@ -81,6 +115,14 @@ export function SolicitudesListPage() {
         </div>
 
         {solicitudesQuery.error ? <ErrorState error={solicitudesQuery.error} /> : null}
+        {isAdmin && selectedSolicitudes.length > 0 ? (
+          <SolicitudBulkActionsBar
+            convertibleCount={convertibleSelected.length}
+            selectedCount={selectedSolicitudes.length}
+            onClear={() => setSelectedIds(new Set())}
+            onConvert={handleBulkConvert}
+          />
+        ) : null}
         {solicitudesQuery.isLoading ? <ListSkeleton /> : null}
         {!solicitudesQuery.isLoading && !solicitudesQuery.error ? (
           <SolicitudesTable
@@ -88,15 +130,18 @@ export function SolicitudesListPage() {
             catalogs={catalogsQuery.data}
             filters={draftFilters}
             isAdmin={isAdmin}
+            selectedIds={selectedIds}
             showClient={isAdmin}
             onFilterChange={(nextFilters) => {
               setDraftFilters(nextFilters);
               applyFilters(nextFilters);
             }}
+            onSelectionChange={setSelectedIds}
           />
         ) : null}
         <PaginationBar page={pageData?.pagina ?? 0} totalPages={pageData?.totalPaginas ?? 0} totalItems={pageData?.totalElementos ?? 0} pageSize={pageData?.tamanio ?? 25} onPageChange={(pagina) => applyFilters({ ...draftFilters, pagina: String(pagina) })} onPageSizeChange={(tamanio) => applyFilters({ ...draftFilters, pagina: "0", tamanio: String(tamanio) })} />
       </div>
+      {dialog}
     </ListPageChrome>
   );
 }
@@ -106,27 +151,64 @@ function SolicitudesTable({
   catalogs,
   filters,
   isAdmin,
+  selectedIds,
   showClient,
   onFilterChange,
+  onSelectionChange,
 }: {
   solicitudes: SolicitudListItem[];
   catalogs?: ListCatalogs;
   filters: ListFilters;
   isAdmin: boolean;
+  selectedIds: Set<number>;
   showClient: boolean;
   onFilterChange: (filters: ListFilters) => void;
+  onSelectionChange: (ids: Set<number>) => void;
 }) {
   function nextFilter(key: keyof ListFilters, value: string) {
     onFilterChange({ ...filters, [key]: value });
   }
 
-  const columnCount = 8 + (showClient ? 1 : 0);
+  const allVisibleSelected = solicitudes.length > 0 && solicitudes.every((solicitud) => selectedIds.has(solicitud.id));
+  const columnCount = 8 + (showClient ? 1 : 0) + (isAdmin ? 1 : 0);
+
+  function toggleAllVisible(checked: boolean) {
+    const next = new Set(selectedIds);
+    solicitudes.forEach((solicitud) => {
+      if (checked) {
+        next.add(solicitud.id);
+      } else {
+        next.delete(solicitud.id);
+      }
+    });
+    onSelectionChange(next);
+  }
+
+  function toggleOne(id: number, checked: boolean) {
+    const next = new Set(selectedIds);
+    if (checked) {
+      next.add(id);
+    } else {
+      next.delete(id);
+    }
+    onSelectionChange(next);
+  }
 
   return (
     <div className="records-table-scroll">
       <table className="records-table records-table--solicitudes">
         <thead>
           <tr>
+            {isAdmin ? (
+              <th className="records-col-select">
+                <input
+                  aria-label="Seleccionar solicitudes visibles"
+                  checked={allVisibleSelected}
+                  onChange={(event) => toggleAllVisible(event.target.checked)}
+                  type="checkbox"
+                />
+              </th>
+            ) : null}
             <th className="records-col-kind">
               <span>Solicitud</span>
               <select
@@ -195,7 +277,17 @@ function SolicitudesTable({
             </tr>
           ) : null}
           {solicitudes.map((solicitud) => (
-            <tr key={solicitud.id}>
+            <tr className={selectedIds.has(solicitud.id) ? "records-row--selected" : ""} key={solicitud.id}>
+              {isAdmin ? (
+                <td className="records-col-select">
+                  <input
+                    aria-label={`Seleccionar solicitud ${solicitud.id}`}
+                    checked={selectedIds.has(solicitud.id)}
+                    onChange={(event) => toggleOne(solicitud.id, event.target.checked)}
+                    type="checkbox"
+                  />
+                </td>
+              ) : null}
               <td className="records-col-kind">
                 <strong className="records-solicitud-id">SOL-{solicitud.id}</strong>
                 <small>{solicitud.tipoTramite || "Sin tipo"}</small>
@@ -263,6 +355,44 @@ function MiniPlate({ value }: { value?: string | null }) {
     return <span className="muted-text">Sin matricula</span>;
   }
   return <strong className="records-plate-value">{value}</strong>;
+}
+
+function SolicitudBulkActionsBar({
+  convertibleCount,
+  selectedCount,
+  onClear,
+  onConvert,
+}: {
+  convertibleCount: number;
+  selectedCount: number;
+  onClear: () => void;
+  onConvert: () => void;
+}) {
+  return (
+    <div className="bulk-actions-bar">
+      <div>
+        <strong>{selectedCount} seleccionadas</strong>
+        <span>
+          {convertibleCount > 0
+            ? `${convertibleCount} parecen convertibles; el servidor validara cada solicitud`
+            : "No hay solicitudes convertibles en la seleccion"}
+        </span>
+      </div>
+      <div className="bulk-actions-bar__actions">
+        <button className="soft-button soft-button--compact" onClick={onClear} type="button">
+          Limpiar
+        </button>
+        <button className="primary-button primary-button--compact" disabled={convertibleCount === 0} onClick={onConvert} type="button">
+          <CheckCircle2 size={15} />
+          Convertir lote
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function canConvertSolicitud(solicitud: SolicitudListItem) {
+  return !solicitud.expedienteId && solicitud.estado !== "CONVERTIDA" && solicitud.estado !== "RECHAZADO";
 }
 
 function SolicitudInterestedParties({ interesados }: { interesados?: SolicitudListItem["interesados"] }) {

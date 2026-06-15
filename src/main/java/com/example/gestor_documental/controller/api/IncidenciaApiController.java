@@ -2,9 +2,9 @@ package com.example.gestor_documental.controller.api;
 
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.IncidenciaService;
-import com.example.gestor_documental.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -23,7 +23,7 @@ public class IncidenciaApiController {
 
     private final IncidenciaService incidenciaService;
     private final DocumentoService documentoService;
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
 
     @PostMapping("/{id}/resolver")
     public ResponseEntity<Void> resolver(@PathVariable Long id, Authentication authentication) {
@@ -75,6 +75,6 @@ public class IncidenciaApiController {
     }
 
     private Usuario usuario(Authentication authentication) {
-        return usuarioService.buscarPorEmail(authentication.getName());
+        return currentUserService.requireUser(authentication);
     }
 }

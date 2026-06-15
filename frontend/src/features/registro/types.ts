@@ -1,3 +1,5 @@
+import type { DocumentoExpediente } from "../expedientes/types/expedienteDetail.types";
+
 export interface TramiteRegistro {
   id: number;
   matricula?: string | null;
@@ -15,9 +17,19 @@ export interface InteresadoRegistro {
   telefono?: string | null;
   direccion?: string | null;
   tipoPersona?: string | null;
+  habitual?: boolean;
+  documentos?: DocumentoExpediente[];
   totalTramites: number;
   ultimaActividad?: string | null;
   tramites: TramiteRegistro[];
+}
+
+export interface InteresadoRegistroUpdateInput {
+  dni?: string | null;
+  nombre?: string | null;
+  telefono?: string | null;
+  direccion?: string | null;
+  tipoPersona?: string | null;
 }
 
 export interface VehiculoRegistro {

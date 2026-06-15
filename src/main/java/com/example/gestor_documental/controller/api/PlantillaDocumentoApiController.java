@@ -5,10 +5,8 @@ import com.example.gestor_documental.dto.plantilla.GenerarPlantillaRequest;
 import com.example.gestor_documental.dto.plantilla.PlantillaPreviewRequest;
 import com.example.gestor_documental.dto.plantilla.PlantillaPreviewResponse;
 import com.example.gestor_documental.dto.plantilla.PlantillasExpedienteResponse;
-import com.example.gestor_documental.enums.RolUsuario;
-import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.model.Usuario;
-import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.impl.PlantillaDocumentoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -25,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlantillaDocumentoApiController {
 
     private final PlantillaDocumentoService plantillaService;
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
 
     @GetMapping
     public PlantillasExpedienteResponse catalogo(@PathVariable Long expedienteId, Authentication authentication) {
@@ -45,10 +43,6 @@ public class PlantillaDocumentoApiController {
     }
 
     private Usuario requireAdmin(Authentication authentication) {
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
-        if (usuario == null || usuario.getRolUsuario() != RolUsuario.ADMIN) {
-            throw new AccesoDenegadoException("Solo el administrador puede gestionar plantillas documentales");
-        }
-        return usuario;
+        return currentUserService.requireAdmin(authentication);
     }
 }

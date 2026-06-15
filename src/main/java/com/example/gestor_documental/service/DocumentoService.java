@@ -29,9 +29,17 @@ public interface DocumentoService {
 
     Documento vincularAIncidencia(Long incidenciaId, Long documentoId, Usuario usuario);
 
+    Documento guardarParaCliente(Long clienteId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
+
+    Documento guardarParaInteresadoHabitual(Long clienteId, Long interesadoId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
+
     void guardarParaSolicitud(Long solicitudId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
 
     List<Documento> listarPorExpediente(Long id);
+
+    List<Documento> listarPorCliente(Long id);
+
+    List<Documento> listarPorInteresadoHabitual(Long clienteId, Long interesadoId);
 
     List<Documento> listarPorSolicitud(Long id);
 

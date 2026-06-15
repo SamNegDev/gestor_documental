@@ -31,6 +31,17 @@ export function deleteClienteLogo(id: string | number, tipo: "principal" | "comp
   return apiDelete(`/api/admin/clientes/${id}/logos/${tipo}`);
 }
 
+export function uploadClienteDocumento(id: string | number, tipoDocumento: string, archivo: File) {
+  const formData = new FormData();
+  formData.append("tipoDocumento", tipoDocumento);
+  formData.append("archivo", archivo);
+  return apiPostForm<ClienteAdmin>(`/api/admin/clientes/${id}/documentos`, formData);
+}
+
+export function deleteClienteDocumento(documentoId: number) {
+  return apiDelete(`/api/documentos/${documentoId}`);
+}
+
 export function getUsuarios() {
   return apiGet<UsuarioAdmin[]>("/api/admin/usuarios");
 }

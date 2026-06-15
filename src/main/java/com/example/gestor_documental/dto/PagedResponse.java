@@ -3,6 +3,7 @@ package com.example.gestor_documental.dto;
 import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
+import org.springframework.data.domain.Page;
 
 @Getter
 @Builder
@@ -23,6 +24,16 @@ public class PagedResponse<T> {
         return PagedResponse.<T>builder()
                 .contenido(elementos.subList(desde, hasta))
                 .pagina(page).tamanio(size).totalElementos(total).totalPaginas(totalPaginas)
+                .build();
+    }
+
+    public static <T> PagedResponse<T> of(Page<T> page) {
+        return PagedResponse.<T>builder()
+                .contenido(page.getContent())
+                .pagina(page.getNumber())
+                .tamanio(page.getSize())
+                .totalElementos(page.getTotalElements())
+                .totalPaginas(page.getTotalPages())
                 .build();
     }
 }

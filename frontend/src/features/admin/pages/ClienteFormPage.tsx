@@ -1,9 +1,18 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Building2, Image, Save, Trash2, Upload } from "lucide-react";
-import { createCliente, deleteClienteLogo, getCliente, updateCliente, uploadClienteLogo } from "../services/adminApi";
+import { ArrowLeft, Building2, ExternalLink, FileText, Image, Save, Trash2, Upload } from "lucide-react";
+import {
+  createCliente,
+  deleteClienteDocumento,
+  deleteClienteLogo,
+  getCliente,
+  updateCliente,
+  uploadClienteDocumento,
+  uploadClienteLogo,
+} from "../services/adminApi";
 import type { ClienteInput } from "../types";
+import type { DocumentoExpediente } from "../../expedientes/types/expedienteDetail.types";
 import { cleanLowerText, cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 
@@ -18,6 +27,14 @@ type BrandingFeedback = {
   tone: "success" | "danger";
   text: string;
 } | null;
+
+const CLIENT_DOCUMENT_TYPES = [
+  { value: "DNI", label: "DNI / NIE" },
+  { value: "CIF", label: "CIF" },
+  { value: "MANDATO", label: "Mandato" },
+  { value: "MANDATO_REPRESENTACION", label: "Mandato representacion" },
+  { value: "OTROS", label: "Otros" },
+];
 
 function emptyCliente(): ClienteInput {
   return { nif: "", nombre: "", email: "", telefono: "", direccion: "" };
@@ -40,6 +57,10 @@ export function ClienteFormPage() {
   const [form, setForm] = useState<ClienteInput>(emptyCliente);
   const [branding, setBranding] = useState<BrandingState>({ principal: null, compacto: null });
   const [brandingFeedback, setBrandingFeedback] = useState<BrandingFeedback>(null);
+  const [documentos, setDocumentos] = useState<DocumentoExpediente[]>([]);
+  const [documentType, setDocumentType] = useState("DNI");
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentFeedback, setDocumentFeedback] = useState<BrandingFeedback>(null);
   const { confirm, dialog } = useConfirmDialog();
 
   const clienteQuery = useQuery({
@@ -61,6 +82,7 @@ export function ClienteFormPage() {
         principal: clienteQuery.data.logoPrincipalUrl || null,
         compacto: clienteQuery.data.logoCompactoUrl || null,
       });
+      setDocumentos(clienteQuery.data.documentos || []);
     }
   }, [clienteQuery.data]);
 
@@ -85,6 +107,28 @@ export function ClienteFormPage() {
     onError: (cause) => setBrandingFeedback({ tone: "danger", text: errorMessage(cause, "No se pudo eliminar el logo.") }),
   });
 
+  const uploadDocumentMutation = useMutation({
+    mutationFn: () => {
+      if (!documentFile) throw new Error("Selecciona un PDF del cliente.");
+      return uploadClienteDocumento(id!, documentType, documentFile);
+    },
+    onSuccess: (cliente) => {
+      setDocumentos(cliente.documentos || []);
+      setDocumentFile(null);
+      setDocumentFeedback({ tone: "success", text: "Documento del cliente incorporado." });
+    },
+    onError: (cause) => setDocumentFeedback({ tone: "danger", text: errorMessage(cause, "No se pudo subir el documento.") }),
+  });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: (documentoId: number) => deleteClienteDocumento(documentoId),
+    onSuccess: (_, documentoId) => {
+      setDocumentos((current) => current.filter((documento) => documento.id !== documentoId));
+      setDocumentFeedback({ tone: "success", text: "Documento del cliente eliminado." });
+    },
+    onError: (cause) => setDocumentFeedback({ tone: "danger", text: errorMessage(cause, "No se pudo eliminar el documento.") }),
+  });
+
   function handleLogoFile(tipo: LogoType, archivo?: File) {
     if (!archivo) return;
     setBrandingFeedback(null);
@@ -107,6 +151,38 @@ export function ClienteFormPage() {
       tone: "danger",
     });
     if (confirmed) deleteLogoMutation.mutate(tipo);
+  }
+
+  function handleDocumentFile(archivo?: File) {
+    setDocumentFeedback(null);
+    if (!archivo) {
+      setDocumentFile(null);
+      return;
+    }
+    if (archivo.type && archivo.type !== "application/pdf") {
+      setDocumentFeedback({ tone: "danger", text: "El documento debe ser un PDF." });
+      return;
+    }
+    if (!archivo.name.toLowerCase().endsWith(".pdf")) {
+      setDocumentFeedback({ tone: "danger", text: "El documento debe tener extension PDF." });
+      return;
+    }
+    if (archivo.size > 15 * 1024 * 1024) {
+      setDocumentFeedback({ tone: "danger", text: "El PDF no puede superar 15 MB." });
+      return;
+    }
+    setDocumentFile(archivo);
+  }
+
+  async function handleDeleteDocument(documento: DocumentoExpediente) {
+    if (!documento.id) return;
+    const confirmed = await confirm({
+      title: "Eliminar documento del cliente",
+      description: "Los expedientes que lo estuvieran reutilizando volveran a mostrar ese requisito como pendiente.",
+      confirmLabel: "Eliminar documento",
+      tone: "danger",
+    });
+    if (confirmed) deleteDocumentMutation.mutate(documento.id);
   }
 
   const saveMutation = useMutation({
@@ -215,6 +291,76 @@ export function ClienteFormPage() {
           ) : null}
         </section>
 
+        <section className="client-documents-panel" aria-labelledby="client-documents-title">
+          <div className="client-branding-panel__heading">
+            <div className="row-icon"><FileText size={18} /></div>
+            <div>
+              <p className="eyebrow">Documentacion recurrente</p>
+              <h3 id="client-documents-title">PDFs del cliente</h3>
+              <p>DNI, CIF, mandato y otros documentos reutilizables cuando el cliente figura como interesado.</p>
+            </div>
+          </div>
+
+          {isEdit ? (
+            <>
+              <div className="client-document-uploader">
+                <label>
+                  Tipo
+                  <select value={documentType} onChange={(event) => setDocumentType(event.target.value)}>
+                    {CLIENT_DOCUMENT_TYPES.map((tipo) => (
+                      <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="client-document-uploader__file">
+                  PDF
+                  <span className="document-file-picker soft-button">
+                    <Upload size={15} />
+                    <span>{documentFile?.name || "Seleccionar PDF"}</span>
+                    <input
+                      accept="application/pdf,.pdf"
+                      type="file"
+                      onChange={(event) => {
+                        handleDocumentFile(event.target.files?.[0]);
+                        event.target.value = "";
+                      }}
+                    />
+                  </span>
+                </label>
+                <button
+                  className="primary-button"
+                  disabled={!documentFile || uploadDocumentMutation.isPending}
+                  type="button"
+                  onClick={() => uploadDocumentMutation.mutate()}
+                >
+                  <Upload size={16} />
+                  {uploadDocumentMutation.isPending ? "Subiendo" : "Subir PDF"}
+                </button>
+              </div>
+
+              <ClientDocumentsList
+                busyId={deleteDocumentMutation.variables}
+                documentos={documentos}
+                onDelete={handleDeleteDocument}
+              />
+            </>
+          ) : (
+            <div className="client-branding-panel__locked">
+              <FileText size={20} />
+              <div>
+                <strong>Guarda primero los datos del cliente</strong>
+                <span>Despues podras incorporar sus PDFs recurrentes.</span>
+              </div>
+            </div>
+          )}
+
+          {documentFeedback ? (
+            <p className={`client-branding-feedback client-branding-feedback--${documentFeedback.tone}`} role="status">
+              {documentFeedback.text}
+            </p>
+          ) : null}
+        </section>
+
         <div className="request-form-actions">
           <Link className="soft-button" to="/admin/clientes">Cancelar</Link>
           <button className="primary-button" disabled={saveMutation.isPending} type="submit">
@@ -279,6 +425,58 @@ function LogoEditor({
   );
 }
 
+function ClientDocumentsList({
+  documentos,
+  busyId,
+  onDelete,
+}: {
+  documentos: DocumentoExpediente[];
+  busyId?: number;
+  onDelete: (documento: DocumentoExpediente) => void;
+}) {
+  if (!documentos.length) {
+    return (
+      <div className="client-documents-empty">
+        <FileText size={18} />
+        <span>No hay PDFs recurrentes registrados para este cliente.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="client-documents-list">
+      {documentos.map((documento) => (
+        <article className="client-document-row" key={documento.id}>
+          <div className="client-document-row__icon"><FileText size={17} /></div>
+          <div className="client-document-row__main">
+            <strong>{documento.nombreOriginal || documento.nombre}</strong>
+            <span>{documentTypeLabel(documento.tipo)} · {formatDate(documento.fechaSubida)}</span>
+          </div>
+          {documento.id ? (
+            <div className="client-document-row__actions">
+              <a className="icon-button" href={`/documentos/ver/${documento.id}`} target="_blank" rel="noreferrer" title="Ver PDF">
+                <ExternalLink size={15} />
+              </a>
+              <a className="icon-button" href={`/documentos/descargar/${documento.id}`} title="Descargar PDF">
+                <FileText size={15} />
+              </a>
+              <button
+                className="icon-button icon-button--danger"
+                disabled={busyId === documento.id}
+                type="button"
+                title="Eliminar PDF"
+                onClick={() => onDelete(documento)}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ) : null}
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function isLogoBusy(
   tipo: LogoType,
   uploadMutation: { isPending: boolean; variables?: { tipo: LogoType } },
@@ -293,4 +491,15 @@ function errorMessage(cause: unknown, fallback: string) {
     return cause.details;
   }
   return cause instanceof Error ? cause.message : fallback;
+}
+
+function documentTypeLabel(tipo: string) {
+  return CLIENT_DOCUMENT_TYPES.find((item) => item.value === tipo)?.label || tipo.replaceAll("_", " ");
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Sin fecha";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("es-ES", { dateStyle: "short", timeStyle: "short" }).format(date);
 }

@@ -17,7 +17,13 @@ import java.util.List;
 @NoArgsConstructor
 
 @Entity
-@Table(name= "solicitud")
+@Table(name = "solicitud", indexes = {
+        @Index(name = "idx_solicitud_cliente_estado_fecha", columnList = "cliente_id, estado_solicitud, fecha_ultima_modificacion, fecha_creacion"),
+        @Index(name = "idx_solicitud_estado_fecha", columnList = "estado_solicitud, fecha_ultima_modificacion, fecha_creacion"),
+        @Index(name = "idx_solicitud_cliente_fecha", columnList = "cliente_id, fecha_ultima_modificacion, fecha_creacion"),
+        @Index(name = "idx_solicitud_matricula", columnList = "matricula"),
+        @Index(name = "idx_solicitud_tipo_tramite", columnList = "tipo_tramite_id")
+})
 public class Solicitud {
 
     @Id

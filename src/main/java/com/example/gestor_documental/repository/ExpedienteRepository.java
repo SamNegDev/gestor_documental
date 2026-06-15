@@ -5,6 +5,7 @@ import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Expediente;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
@@ -37,6 +38,85 @@ public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
             order by coalesce(e.fechaUltimaModificacion, e.fechaCreacion) desc
             """)
     List<Expediente> findByClienteIdAndPeriodo(Long clienteId, LocalDateTime desde, LocalDateTime hasta);
+
+    @Query(
+            value = """
+                    select distinct e from Expediente e
+                    left join e.cliente cliente
+                    left join e.tipoTramite tipoTramite
+                    where (:clienteId is null or cliente.id = :clienteId)
+                      and (:estado is null or e.estadoExpediente = :estado)
+                      and (:tipoTramiteId is null or tipoTramite.id = :tipoTramiteId)
+                      and (:matricula is null or upper(coalesce(e.matricula, '')) like :matricula)
+                      and (:desde is null or coalesce(e.fechaUltimaModificacion, e.fechaCreacion) >= :desde)
+                      and (:hasta is null or coalesce(e.fechaUltimaModificacion, e.fechaCreacion) < :hasta)
+                      and (:interesado is null or exists (
+                          select 1 from ExpedienteInteresado relacion
+                          join relacion.interesado interesado
+                          where relacion.expediente = e
+                            and (upper(coalesce(interesado.dni, '')) like :interesado
+                                 or upper(coalesce(interesado.nombre, '')) like :interesado)
+                      ))
+                    order by coalesce(e.fechaUltimaModificacion, e.fechaCreacion) desc
+                    """,
+            countQuery = """
+                    select count(distinct e) from Expediente e
+                    left join e.cliente cliente
+                    left join e.tipoTramite tipoTramite
+                    where (:clienteId is null or cliente.id = :clienteId)
+                      and (:estado is null or e.estadoExpediente = :estado)
+                      and (:tipoTramiteId is null or tipoTramite.id = :tipoTramiteId)
+                      and (:matricula is null or upper(coalesce(e.matricula, '')) like :matricula)
+                      and (:desde is null or coalesce(e.fechaUltimaModificacion, e.fechaCreacion) >= :desde)
+                      and (:hasta is null or coalesce(e.fechaUltimaModificacion, e.fechaCreacion) < :hasta)
+                      and (:interesado is null or exists (
+                          select 1 from ExpedienteInteresado relacion
+                          join relacion.interesado interesado
+                          where relacion.expediente = e
+                            and (upper(coalesce(interesado.dni, '')) like :interesado
+                                 or upper(coalesce(interesado.nombre, '')) like :interesado)
+                      ))
+                    """
+    )
+    Page<Expediente> buscarListado(@Param("clienteId") Long clienteId,
+                                   @Param("estado") EstadoExpediente estado,
+                                   @Param("tipoTramiteId") Long tipoTramiteId,
+                                   @Param("matricula") String matricula,
+                                   @Param("interesado") String interesado,
+                                   @Param("desde") LocalDateTime desde,
+                                   @Param("hasta") LocalDateTime hasta,
+                                   Pageable pageable);
+
+    @Query("""
+            select e from Expediente e
+            left join fetch e.cliente
+            left join fetch e.tipoTramite
+            where (:clienteId is null or e.cliente.id = :clienteId)
+              and e.estadoExpediente in :estados
+            order by coalesce(e.fechaUltimaModificacion, e.fechaCreacion) desc
+            """)
+    List<Expediente> findTareasPorEstados(@Param("clienteId") Long clienteId,
+                                          @Param("estados") List<EstadoExpediente> estados);
+
+    @Query("""
+            select e from Expediente e
+            left join fetch e.cliente
+            left join fetch e.tipoTramite
+            where e.estadoExpediente = com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO
+            order by coalesce(e.fechaUltimaModificacion, e.fechaCreacion) desc
+            """)
+    List<Expediente> findFinalizadosParaRevisionDocumental();
+
+    @Query("""
+            select e from Expediente e
+            left join fetch e.cliente
+            left join fetch e.tipoTramite
+            where coalesce(e.fechaUltimaModificacion, e.fechaCreacion) < :limite
+              and e.estadoExpediente not in :estadosExcluidos
+            order by coalesce(e.fechaUltimaModificacion, e.fechaCreacion) asc
+            """)
+    List<Expediente> findEstancados(@Param("limite") LocalDateTime limite,
+                                    @Param("estadosExcluidos") List<EstadoExpediente> estadosExcluidos);
 
     List<Expediente> findByFechaUltimaModificacionIsNullOrModificadoPorIsNull();
     List<Expediente> findByEstadoExpediente(EstadoExpediente estadoExpediente);

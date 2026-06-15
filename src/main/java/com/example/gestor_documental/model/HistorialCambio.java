@@ -12,7 +12,11 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "historial_cambio")
+@Table(name = "historial_cambio", indexes = {
+        @Index(name = "idx_historial_expediente_fecha", columnList = "expediente_id, fecha_cambio"),
+        @Index(name = "idx_historial_solicitud_fecha", columnList = "solicitud_id, fecha_cambio"),
+        @Index(name = "idx_historial_accion_fecha", columnList = "accion, fecha_cambio")
+})
 public class HistorialCambio {
 
     @Id

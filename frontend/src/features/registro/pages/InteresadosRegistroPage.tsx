@@ -1,20 +1,39 @@
 import { useDeferredValue, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, UserRound } from "lucide-react";
-import { Link } from "react-router-dom";
-import { getInteresadosRegistro } from "../services/registroApi";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronRight, Plus, Save, UserRound, X } from "lucide-react";
+import { Link, useOutletContext } from "react-router-dom";
+import type { AppOutletContext } from "../../../app/shell/AppLayout";
+import { createInteresadoHabitual, getInteresadosRegistro } from "../services/registroApi";
 import { RegistroFilters } from "../components/RegistroFilters";
+import type { InteresadoRegistroUpdateInput } from "../types";
+import { uppercaseInput } from "../../../shared/utils/text";
+import { ApiError } from "../../../shared/api/http";
+import "../../expedientes/styles/expedienteDetail.css";
 
 export function InteresadosRegistroPage() {
   const [search, setSearch] = useState("");
   const [periodo, setPeriodo] = useState("ESTE_MES");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState<InteresadoRegistroUpdateInput>({ tipoPersona: "PARTICULAR" });
+  const { user } = useOutletContext<AppOutletContext>();
+  const queryClient = useQueryClient();
   const deferredSearch = useDeferredValue(search);
   const query = useQuery({ queryKey: ["registro", "interesados", deferredSearch, periodo, fechaDesde, fechaHasta], queryFn: () => getInteresadosRegistro(deferredSearch, periodo, fechaDesde, fechaHasta) });
+  const mutation = useMutation({
+    mutationFn: (input: InteresadoRegistroUpdateInput) => createInteresadoHabitual(input),
+    onSuccess: async () => {
+      setCreating(false);
+      setForm({ tipoPersona: "PARTICULAR" });
+      await queryClient.invalidateQueries({ queryKey: ["registro", "interesados"] });
+    },
+  });
   const interesados = query.data ?? [];
+  const canCreateHabitual = user?.rol === "CLIENTE";
+  const updateField = (field: keyof InteresadoRegistroUpdateInput, value: string) => setForm((current) => ({ ...current, [field]: uppercaseInput(value) }));
   return <main className="records-page registry-page">
-    <header className="records-header"><div><p className="eyebrow">Registro relacionado</p><h2>Interesados</h2><p>Personas y empresas vinculadas a los tramites accesibles.</p></div><span className="records-count">{interesados.length} registros</span></header>
+    <header className="records-header"><div><p className="eyebrow">Registro relacionado</p><h2>Interesados</h2><p>Personas y empresas vinculadas a los tramites accesibles.</p></div><div className="records-header__actions">{canCreateHabitual ? <button className="primary-button primary-button--compact" type="button" onClick={() => setCreating(true)}><Plus size={16} />Nuevo habitual</button> : null}<span className="records-count">{interesados.length} registros</span></div></header>
     <RegistroFilters search={search} periodo={periodo} fechaDesde={fechaDesde} fechaHasta={fechaHasta} placeholder="Buscar por DNI, CIF o nombre" onSearch={setSearch} onPeriodo={setPeriodo} onFechaDesde={setFechaDesde} onFechaHasta={setFechaHasta} />
     <section className="records-panel records-panel--ledger">
       {query.isLoading ? <div className="records-skeleton"><span /><span /><span /></div> : null}
@@ -23,10 +42,33 @@ export function InteresadosRegistroPage() {
         {interesados.length === 0 ? <div className="records-empty">No hay interesados que coincidan con la busqueda.</div> : null}
         {interesados.map((item) => <Link className="registry-row" key={item.id} to={`/interesados/${item.id}`}>
           <span className="registry-row__icon"><UserRound size={19} /></span><span className="registry-row__identity"><strong>{item.nombre}</strong><small>{item.dni}</small></span>
-          <span><small>Contacto</small><strong>{item.telefono || "Sin telefono"}</strong></span><span><small>Tramites</small><strong>{item.totalTramites}</strong></span>
+          <span><small>Contacto</small><strong>{item.telefono || "Sin telefono"}</strong></span><span><small>Tramites</small><strong>{item.totalTramites}{item.habitual ? " · habitual" : ""}</strong></span>
           <span><small>Ultima actividad</small><strong>{item.ultimaActividad || "Sin actividad"}</strong></span><ChevronRight size={18} />
         </Link>)}
       </div> : null}
     </section>
+    {creating ? (
+      <div className="exp-modal" role="presentation">
+        <button className="exp-modal__backdrop" type="button" aria-label="Cerrar" onClick={() => setCreating(false)} />
+        <section className="exp-modal__panel exp-modal__panel--narrow" role="dialog" aria-modal="true" aria-labelledby="habitual-title">
+          <div className="exp-modal__header">
+            <div><p className="eyebrow">Cartera habitual</p><h3 id="habitual-title">Nuevo interesado</h3></div>
+            <button className="icon-button" type="button" aria-label="Cerrar" onClick={() => setCreating(false)}><X size={16} /></button>
+          </div>
+          <form className="vehicle-edit-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(form); }}>
+            <label><span>DNI / CIF</span><input required value={form.dni || ""} onChange={(event) => updateField("dni", event.target.value)} /></label>
+            <label><span>Nombre</span><input required value={form.nombre || ""} onChange={(event) => updateField("nombre", event.target.value)} /></label>
+            <label><span>Telefono</span><input value={form.telefono || ""} onChange={(event) => updateField("telefono", event.target.value)} /></label>
+            <label><span>Tipo</span><select value={form.tipoPersona || "PARTICULAR"} onChange={(event) => updateField("tipoPersona", event.target.value)}><option value="PARTICULAR">PARTICULAR</option><option value="EMPRESA">EMPRESA</option></select></label>
+            <label className="vehicle-edit-form__wide"><span>Direccion</span><textarea value={form.direccion || ""} onChange={(event) => updateField("direccion", event.target.value)} /></label>
+            {mutation.isError ? <p className="form-error">{mutation.error instanceof ApiError ? mutation.error.details || "No se pudo crear el interesado." : "No se pudo crear el interesado."}</p> : null}
+            <div className="vehicle-edit-form__actions">
+              <button className="soft-button" type="button" onClick={() => setCreating(false)}>Cancelar</button>
+              <button className="primary-button" disabled={mutation.isPending} type="submit"><Save size={16} /> Guardar habitual</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    ) : null}
   </main>;
 }

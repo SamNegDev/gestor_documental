@@ -19,9 +19,12 @@ import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.VehiculoService;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -68,6 +71,18 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     @Override
     public List<Expediente> listarPorClienteId(Long clienteId) {
         return expedienteRepository.findByClienteIdOrderByFechaReferenciaDesc(clienteId);
+    }
+
+    @Override
+    public Page<Expediente> buscarListado(Long clienteId,
+                                          EstadoExpediente estado,
+                                          Long tipoTramiteId,
+                                          String matricula,
+                                          String interesado,
+                                          LocalDateTime desde,
+                                          LocalDateTime hasta,
+                                          Pageable pageable) {
+        return expedienteRepository.buscarListado(clienteId, estado, tipoTramiteId, matricula, interesado, desde, hasta, pageable);
     }
 
     @Override
@@ -522,6 +537,51 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                         : "Se modificaron los campos: " + String.join(", ", cambios));
 
         return expedienteGuardado;
+    }
+
+    @Override
+    @Transactional
+    public Expediente corregirInteresados(Long id, Usuario admin, List<InteresadoFormDto> interesados) {
+        if (admin == null || admin.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo el administrador puede corregir interesados");
+        }
+        Expediente expediente = expedienteRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
+        if (!tienePermisoExpediente(expediente, admin)) {
+            throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
+        }
+
+        validarInteresados(interesados);
+        String antes = resumenInteresados(expediente.getId());
+
+        expedienteInteresadoRepository.deleteByExpedienteId(expediente.getId());
+        Expediente expedienteGuardado = expedienteRepository.save(expediente);
+        interesados.forEach(interesado -> guardarInteresadoSiValido(expedienteGuardado, interesado));
+
+        String despues = resumenInteresados(expediente.getId());
+        historialCambioService.registrarCambioExpediente(
+                expedienteGuardado,
+                admin,
+                "CORRECCION INTERESADOS",
+                "Correccion administrativa de interesados. Antes: " + antes + " | Despues: " + despues
+        );
+        return expedienteGuardado;
+    }
+
+    private String resumenInteresados(Long expedienteId) {
+        java.util.List<ExpedienteInteresado> relaciones = expedienteInteresadoRepository.findByExpedienteId(expedienteId);
+        if (relaciones.isEmpty()) {
+            return "sin interesados";
+        }
+        return relaciones.stream()
+                .map(relacion -> {
+                    Interesado interesado = relacion.getInteresado();
+                    String rol = relacion.getRol() != null ? relacion.getRol().name() : "SIN ROL";
+                    String dni = interesado != null && interesado.getDni() != null ? interesado.getDni() : "SIN DNI";
+                    String nombre = interesado != null && interesado.getNombre() != null ? interesado.getNombre() : "SIN NOMBRE";
+                    return rol + ": " + dni + " - " + nombre;
+                })
+                .collect(java.util.stream.Collectors.joining("; "));
     }
 
     private void normalizarExpediente(Expediente expediente) {

@@ -4,8 +4,8 @@ import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
-import com.example.gestor_documental.service.UsuarioService;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class RequisitoDocumentalApiController {
 
     private final RequisitoDocumentalExpedienteService requisitoService;
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
 
     @PostMapping("/expedientes/{expedienteId}/requisitos-documentales")
     public ResponseEntity<Void> crearRequisito(
@@ -85,6 +85,6 @@ public class RequisitoDocumentalApiController {
     }
 
     private Usuario usuario(Authentication authentication) {
-        return usuarioService.buscarPorEmail(authentication.getName());
+        return currentUserService.requireUser(authentication);
     }
 }

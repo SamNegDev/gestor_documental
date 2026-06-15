@@ -8,6 +8,9 @@ import com.example.gestor_documental.model.Usuario;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface ExpedienteService {
 
@@ -22,6 +25,15 @@ public interface ExpedienteService {
     long contarTodos();
 
     List<Expediente> listarPorClienteId(Long clienteId);
+
+    Page<Expediente> buscarListado(Long clienteId,
+                                   EstadoExpediente estado,
+                                   Long tipoTramiteId,
+                                   String matricula,
+                                   String interesado,
+                                   LocalDateTime desde,
+                                   LocalDateTime hasta,
+                                   Pageable pageable);
 
     boolean tienePermisoExpediente(Expediente expediente, Usuario usuario);
 
@@ -71,4 +83,6 @@ public interface ExpedienteService {
     Expediente actualizarExpediente(Long id, Expediente expedienteActualizado, Usuario usuarioLogueado, Long clienteId, Long tipoTramiteId, InteresadoFormDto interesado1, InteresadoFormDto interesado2);
 
     Expediente actualizarExpediente(Long id, Expediente expedienteActualizado, Usuario usuarioLogueado, Long clienteId, Long tipoTramiteId, List<InteresadoFormDto> interesados);
+
+    Expediente corregirInteresados(Long id, Usuario admin, List<InteresadoFormDto> interesados);
 }

@@ -107,6 +107,20 @@ export interface SolicitudUpsertInput {
   interesado2Direccion?: string | null;
 }
 
+export interface SolicitudBulkConvertResult {
+  solicitudId: number;
+  expedienteId?: number | null;
+  convertida: boolean;
+  mensaje?: string | null;
+}
+
+export interface SolicitudBulkConvertResponse {
+  total: number;
+  convertidas: number;
+  fallidas: number;
+  resultados: SolicitudBulkConvertResult[];
+}
+
 export interface DashboardMetrics {
   totalExpedientes: number;
   enTramite: number;

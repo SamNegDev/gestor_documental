@@ -59,11 +59,27 @@ async function apiRequest(path: string, init: RequestInit): Promise<void> {
   }
 }
 
-export function apiPostForm(path: string, formData: FormData): Promise<void> {
-  return apiRequest(path, {
+export async function apiPostForm<T = void>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
     method: "POST",
     body: formData,
   });
+
+  if (!response.ok) {
+    throw await buildApiError(response, "POST", path);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    return undefined as T;
+  }
+
+  return response.json() as Promise<T>;
 }
 
 export function apiPost(path: string): Promise<void> {

@@ -1,5 +1,9 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.dto.registro.InteresadoUpdateRequest;
+import com.example.gestor_documental.enums.TipoPersona;
+import com.example.gestor_documental.exception.OperacionInvalidaException;
+import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.service.InteresadoService;
@@ -28,6 +32,28 @@ public class InteresadoServiceImpl implements InteresadoService {
         nuevoInteresado.setTelefono(TextNormalizer.upperOrNull(nuevoInteresado.getTelefono()));
         nuevoInteresado.setDireccion(TextNormalizer.upperOrNull(nuevoInteresado.getDireccion()));
         return interesadoRepository.save(nuevoInteresado);
+    }
+
+    @Override
+    public Interesado actualizar(Long id, InteresadoUpdateRequest request) {
+        Interesado interesado = interesadoRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Interesado no encontrado"));
+        String dni = TextNormalizer.upperOrNull(request.dni());
+        String nombre = TextNormalizer.upperOrNull(request.nombre());
+        if (dni == null || nombre == null) {
+            throw new OperacionInvalidaException("DNI y nombre son obligatorios");
+        }
+        interesadoRepository.findByDni(dni)
+                .filter(existente -> !existente.getId().equals(id))
+                .ifPresent(existente -> {
+                    throw new OperacionInvalidaException("Ya existe otro interesado con ese DNI");
+                });
+        interesado.setDni(dni);
+        interesado.setNombre(nombre);
+        interesado.setTelefono(TextNormalizer.upperOrNull(request.telefono()));
+        interesado.setDireccion(TextNormalizer.upperOrNull(request.direccion()));
+        interesado.setTipoPersona(request.tipoPersona() != null ? request.tipoPersona() : TipoPersona.PARTICULAR);
+        return interesadoRepository.save(interesado);
     }
 
 }

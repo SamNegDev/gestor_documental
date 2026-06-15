@@ -3,15 +3,20 @@ package com.example.gestor_documental.controller.api;
 import com.example.gestor_documental.dto.expediente.ClienteAdminResponse;
 import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.ClienteUpsertRequest;
+import com.example.gestor_documental.dto.expediente.DocumentoExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioAdminResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioCatalogsResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioUpsertRequest;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.model.Cliente;
+import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ClienteLogoService;
 import com.example.gestor_documental.service.ClienteService;
+import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.UsuarioService;
 import com.example.gestor_documental.util.TextNormalizer;
 import com.example.gestor_documental.util.ClienteBrandingUrls;
@@ -43,7 +48,9 @@ public class AdminManagementApiController {
 
     private final ClienteService clienteService;
     private final ClienteLogoService clienteLogoService;
+    private final DocumentoService documentoService;
     private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
 
     @GetMapping("/clientes")
     public List<ClienteAdminResponse> listarClientes(Authentication authentication) {
@@ -103,6 +110,21 @@ public class AdminManagementApiController {
     ) {
         requireAdmin(authentication);
         return mapClienteAdmin(clienteLogoService.guardar(id, TipoLogoCliente.fromRoute(tipo), archivo));
+    }
+
+    @PostMapping(value = "/clientes/{id}/documentos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ClienteAdminResponse guardarDocumentoCliente(
+            @PathVariable Long id,
+            @RequestParam("archivo") MultipartFile archivo,
+            @RequestParam("tipoDocumento") TipoDocumento tipoDocumento,
+            Authentication authentication
+    ) {
+        Usuario admin = requireAdmin(authentication);
+        validarPdf(archivo);
+        documentoService.guardarParaCliente(id, archivo, tipoDocumento, admin);
+        Cliente cliente = clienteService.buscarPorId(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
+        return mapClienteAdmin(cliente);
     }
 
     @DeleteMapping("/clientes/{id}/logos/{tipo}")
@@ -169,11 +191,7 @@ public class AdminManagementApiController {
     }
 
     private Usuario requireAdmin(Authentication authentication) {
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
-        if (usuario.getRolUsuario() != RolUsuario.ADMIN) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo un administrador puede realizar esta accion");
-        }
-        return usuario;
+        return currentUserService.requireAdmin(authentication);
     }
 
     private void validarCliente(ClienteUpsertRequest request) {
@@ -196,6 +214,13 @@ public class AdminManagementApiController {
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private void validarPdf(MultipartFile archivo) {
+        String nombre = archivo != null ? archivo.getOriginalFilename() : null;
+        if (archivo == null || archivo.isEmpty() || nombre == null || !nombre.toLowerCase().endsWith(".pdf")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El documento debe ser un PDF");
+        }
     }
 
     private Cliente mapCliente(ClienteUpsertRequest request, Cliente cliente) {
@@ -226,6 +251,22 @@ public class AdminManagementApiController {
                 .telefono(cliente.getTelefono())
                 .logoPrincipalUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.PRINCIPAL))
                 .logoCompactoUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.COMPACTO))
+                .documentos(documentoService.listarPorCliente(cliente.getId()).stream().map(this::mapDocumento).toList())
+                .build();
+    }
+
+    private DocumentoExpedienteResponse mapDocumento(Documento documento) {
+        return DocumentoExpedienteResponse.builder()
+                .id(documento.getId())
+                .nombre(documento.getNombreArchivo())
+                .nombreOriginal(documento.getNombreArchivoOriginal())
+                .tipo(documento.getTipoDocumento() != null ? documento.getTipoDocumento().name() : null)
+                .descripcion(documento.getDescripcionArchivo())
+                .fechaSubida(documento.getFechaSubida() != null ? documento.getFechaSubida().toString() : null)
+                .subidoPor(documento.getSubidoPor() != null ? nombreCompleto(documento.getSubidoPor()) : null)
+                .estado("SUBIDO")
+                .subido(true)
+                .requeridoAhora(false)
                 .build();
     }
 
@@ -242,9 +283,7 @@ public class AdminManagementApiController {
     }
 
     private UsuarioAdminResponse mapUsuarioAdmin(Usuario usuario) {
-        String nombre = usuario.getNombre() != null ? usuario.getNombre() : "";
-        String apellidos = usuario.getApellidos() != null ? usuario.getApellidos() : "";
-        String completo = (nombre + " " + apellidos).trim();
+        String completo = nombreCompleto(usuario);
         return UsuarioAdminResponse.builder()
                 .id(usuario.getId())
                 .nombre(usuario.getNombre())
@@ -255,5 +294,11 @@ public class AdminManagementApiController {
                 .activo(usuario.isActivo())
                 .cliente(usuario.getCliente() != null ? mapClienteResumen(usuario.getCliente()) : null)
                 .build();
+    }
+
+    private String nombreCompleto(Usuario usuario) {
+        String nombre = usuario.getNombre() != null ? usuario.getNombre() : "";
+        String apellidos = usuario.getApellidos() != null ? usuario.getApellidos() : "";
+        return (nombre + " " + apellidos).trim();
     }
 }

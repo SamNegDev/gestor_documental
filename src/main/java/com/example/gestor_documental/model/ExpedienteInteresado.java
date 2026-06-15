@@ -12,7 +12,11 @@ import lombok.Setter;
 @NoArgsConstructor
 
 @Entity
-@Table(name = "expediente_interesado")
+@Table(name = "expediente_interesado", indexes = {
+        @Index(name = "idx_exp_interesado_expediente", columnList = "expediente_id"),
+        @Index(name = "idx_exp_interesado_interesado", columnList = "interesado_id"),
+        @Index(name = "idx_exp_interesado_expediente_rol", columnList = "expediente_id, rol")
+})
 public class ExpedienteInteresado {
 
     @Id

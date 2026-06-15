@@ -1,5 +1,5 @@
 import { apiGet, apiPostJson, apiPutJson } from "../../../shared/api/http";
-import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudDetail, SolicitudListItem, SolicitudUpsertInput } from "../types";
+import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudListItem, SolicitudUpsertInput } from "../types";
 
 function buildQuery(filters: ListFilters) {
   const params = new URLSearchParams();
@@ -54,6 +54,10 @@ export function updateSolicitud(id: string | number, input: SolicitudUpsertInput
 
 export function convertirSolicitud(id: number) {
   return apiPostJson<{ id: number }>(`/api/solicitudes/${id}/convertir`, {});
+}
+
+export function bulkConvertSolicitudes(solicitudIds: number[]) {
+  return apiPostJson<SolicitudBulkConvertResponse>("/api/solicitudes/convertir-masivo", { solicitudIds });
 }
 
 export function cambiarEstadoSolicitud(id: number, nuevoEstado: string) {

@@ -1,5 +1,6 @@
 package com.example.gestor_documental.dto.registro;
 
+import com.example.gestor_documental.dto.expediente.DocumentoExpedienteResponse;
 import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
@@ -13,7 +14,9 @@ public class InteresadoRegistroResponse {
     private String telefono;
     private String direccion;
     private String tipoPersona;
+    private boolean habitual;
     private long totalTramites;
     private String ultimaActividad;
+    private List<DocumentoExpedienteResponse> documentos;
     private List<TramiteRegistroResponse> tramites;
 }

@@ -8,6 +8,9 @@ import com.example.gestor_documental.model.Usuario;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface SolicitudService {
 
@@ -20,6 +23,14 @@ public interface SolicitudService {
     long contarTodos();
 
     List<Solicitud> listarPorClienteId(Long clienteId);
+
+    Page<Solicitud> buscarListado(Long clienteId,
+                                  EstadoSolicitud estado,
+                                  Long tipoTramiteId,
+                                  String matricula,
+                                  LocalDateTime desde,
+                                  LocalDateTime hasta,
+                                  Pageable pageable);
 
     boolean tienePermisoSolicitud(Solicitud solicitud, Usuario usuario);
 

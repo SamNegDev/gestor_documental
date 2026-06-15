@@ -13,9 +13,9 @@ import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.SolicitudService;
-import com.example.gestor_documental.service.UsuarioService;
 import com.example.gestor_documental.service.impl.DashboardProductividadService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -37,14 +37,14 @@ public class DashboardApiController {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
     private final ExpedienteService expedienteService;
     private final SolicitudService solicitudService;
     private final DashboardProductividadService productividadService;
 
     @GetMapping
     public DashboardResponse obtenerDashboard(Authentication authentication) {
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuario = currentUserService.requireUser(authentication);
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
             return adminDashboard();
         }
@@ -61,10 +61,7 @@ public class DashboardApiController {
             @RequestParam(required = false) LocalDate fechaHasta,
             Authentication authentication
     ) {
-        Usuario usuario = usuarioService.buscarPorEmail(authentication.getName());
-        if (usuario == null || usuario.getRolUsuario() != RolUsuario.ADMIN) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo el administrador puede consultar productividad");
-        }
+        currentUserService.requireAdmin(authentication);
         try {
             return productividadService.obtener(periodo, fechaDesde, fechaHasta);
         } catch (IllegalArgumentException exception) {

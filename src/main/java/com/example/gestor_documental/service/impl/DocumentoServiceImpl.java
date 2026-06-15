@@ -18,6 +18,9 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
+import com.example.gestor_documental.repository.ClienteRepository;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
+import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.repository.OperacionExpedienteRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
@@ -50,6 +53,9 @@ public class DocumentoServiceImpl implements DocumentoService {
     private final DocumentoRepository documentoRepository;
     private final ExpedienteRepository expedienteRepository;
     private final IncidenciaRepository incidenciaRepository;
+    private final ClienteRepository clienteRepository;
+    private final ClienteInteresadoRepository clienteInteresadoRepository;
+    private final InteresadoRepository interesadoRepository;
     private final SolicitudRepository solicitudRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoDocumentalRepository;
     private final OperacionExpedienteRepository operacionExpedienteRepository;
@@ -241,6 +247,54 @@ public class DocumentoServiceImpl implements DocumentoService {
         return guardado;
     }
 
+    @Override
+    @Transactional
+    public Documento guardarParaCliente(Long clienteId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario) {
+        if (archivo == null || archivo.isEmpty()) {
+            return null;
+        }
+        if (usuario == null || usuario.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo un administrador puede subir documentacion del cliente");
+        }
+
+        try {
+            com.example.gestor_documental.model.Cliente cliente = clienteRepository.findById(clienteId)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado"));
+            Documento documento = construirDocumentoBase(archivo, tipoDocumento, usuario);
+            documento.setCliente(cliente);
+            documentoRepository.save(documento);
+            return documento;
+        } catch (IOException e) {
+            throw new RuntimeException("Error al guardar el archivo", e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public Documento guardarParaInteresadoHabitual(Long clienteId, Long interesadoId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario) {
+        if (archivo == null || archivo.isEmpty()) {
+            return null;
+        }
+        validarPermisoCliente(clienteId, usuario, "subir documentacion de este interesado");
+        if (!clienteInteresadoRepository.existsByClienteIdAndInteresadoId(clienteId, interesadoId)) {
+            throw new AccesoDenegadoException("El interesado no pertenece a la cartera habitual del cliente");
+        }
+
+        try {
+            com.example.gestor_documental.model.Cliente cliente = clienteRepository.findById(clienteId)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado"));
+            com.example.gestor_documental.model.Interesado interesado = interesadoRepository.findById(interesadoId)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Interesado no encontrado"));
+            Documento documento = construirDocumentoBase(archivo, tipoDocumento, usuario);
+            documento.setCliente(cliente);
+            documento.setInteresado(interesado);
+            documentoRepository.save(documento);
+            return documento;
+        } catch (IOException e) {
+            throw new RuntimeException("Error al guardar el archivo", e);
+        }
+    }
+
     private void marcarIncidenciaEnRevisionSiProcede(Expediente expediente, Usuario usuario) {
         if (expediente.getEstadoExpediente() != EstadoExpediente.INCIDENCIA
                 && expediente.getEstadoExpediente() != EstadoExpediente.PENDIENTE_DOCUMENTACION) {
@@ -325,6 +379,16 @@ public class DocumentoServiceImpl implements DocumentoService {
     public List<Documento> listarPorExpediente(Long id) {
         return documentoRepository.findByExpedienteId(id);
 
+    }
+
+    @Override
+    public List<Documento> listarPorCliente(Long id) {
+        return documentoRepository.findByClienteIdAndInteresadoIsNullOrderByFechaSubidaDesc(id);
+    }
+
+    @Override
+    public List<Documento> listarPorInteresadoHabitual(Long clienteId, Long interesadoId) {
+        return documentoRepository.findByClienteIdAndInteresadoIdOrderByFechaSubidaDesc(clienteId, interesadoId);
     }
 
     @Override
@@ -454,7 +518,7 @@ public class DocumentoServiceImpl implements DocumentoService {
 
         Long entidadId = documento.getExpediente() != null
                 ? documento.getExpediente().getId()
-                : documento.getSolicitud().getId();
+                : documento.getSolicitud() != null ? documento.getSolicitud().getId() : documento.getCliente().getId();
 
         Path rutaArchivo = obtenerCarpetaUploads().resolve(documento.getNombreArchivo()).normalize();
 
@@ -502,6 +566,10 @@ public class DocumentoServiceImpl implements DocumentoService {
             throw new AccesoDenegadoException("No tienes permiso para acceder a este documento");
         }
 
+        if (documento.getCliente() != null) {
+            validarPermisoCliente(documento.getCliente().getId(), usuario, "acceder a este documento");
+        }
+
         return documento;
     }
 
@@ -527,6 +595,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     @Transactional
     public void actualizarDocumento(Long id, TipoDocumento nuevoTipo, String nuevoNombre, Long operacionId, boolean actualizarOperacion, boolean nombreAutomatico, Usuario usuario) {
         Documento documento = obtenerDocumentoConPermiso(id, usuario);
+        validarAdminSiDocumentoCliente(documento, usuario);
         TipoDocumento tipoAnterior = documento.getTipoDocumento();
 
         if (nuevoTipo != null) {
@@ -656,6 +725,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     public void extraerPaginasDocumento(Long idOriginal, String rangoPaginas, TipoDocumento nuevoTipo,
             String nuevoNombre, Long operacionId, Usuario usuario) {
         Documento documentoOriginal = obtenerDocumentoConPermiso(idOriginal, usuario);
+        validarTransformacionExpedienteOSolicitud(documentoOriginal);
 
         Path rutaOriginal = obtenerCarpetaUploads().resolve(documentoOriginal.getNombreArchivo()).normalize();
 
@@ -715,6 +785,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     @Transactional
     public void eliminarPaginasDocumento(Long id, String rangoPaginas, Usuario usuario) {
         Documento documento = obtenerDocumentoConPermiso(id, usuario);
+        validarTransformacionExpedienteOSolicitud(documento);
         Path ruta = obtenerCarpetaUploads().resolve(documento.getNombreArchivo()).normalize();
 
         try {
@@ -752,6 +823,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     @Transactional
     public void unirDocumentos(Long documentoPrincipalId, List<Long> documentoIds, TipoDocumento tipoDocumento, String nombreArchivo, Long operacionId, Usuario usuario) {
         Documento principal = obtenerDocumentoConPermiso(documentoPrincipalId, usuario);
+        validarTransformacionExpedienteOSolicitud(principal);
         List<Long> ids = documentoIds == null ? List.of() : documentoIds.stream()
                 .filter(id -> id != null && !id.equals(documentoPrincipalId))
                 .distinct()
@@ -811,10 +883,36 @@ public class DocumentoServiceImpl implements DocumentoService {
         Long expedienteDocumento = documento.getExpediente() != null ? documento.getExpediente().getId() : null;
         Long solicitudPrincipal = principal.getSolicitud() != null ? principal.getSolicitud().getId() : null;
         Long solicitudDocumento = documento.getSolicitud() != null ? documento.getSolicitud().getId() : null;
+        Long clientePrincipal = principal.getCliente() != null ? principal.getCliente().getId() : null;
+        Long clienteDocumento = documento.getCliente() != null ? documento.getCliente().getId() : null;
 
         if (!java.util.Objects.equals(expedientePrincipal, expedienteDocumento)
-                || !java.util.Objects.equals(solicitudPrincipal, solicitudDocumento)) {
+                || !java.util.Objects.equals(solicitudPrincipal, solicitudDocumento)
+                || !java.util.Objects.equals(clientePrincipal, clienteDocumento)) {
             throw new OperacionInvalidaException("Solo se pueden unir documentos del mismo expediente o solicitud");
+        }
+    }
+
+    private void validarAdminSiDocumentoCliente(Documento documento, Usuario usuario) {
+        if (documento.getCliente() != null && documento.getInteresado() == null
+                && (usuario == null || usuario.getRolUsuario() != RolUsuario.ADMIN)) {
+            throw new AccesoDenegadoException("Solo un administrador puede modificar documentos del cliente");
+        }
+    }
+
+    private void validarTransformacionExpedienteOSolicitud(Documento documento) {
+        if (documento.getCliente() != null) {
+            throw new OperacionInvalidaException("Los documentos del cliente no admiten esta operacion");
+        }
+    }
+
+    private void validarPermisoCliente(Long clienteId, Usuario usuario, String accion) {
+        boolean admin = usuario != null && usuario.getRolUsuario() == RolUsuario.ADMIN;
+        boolean clientePropio = usuario != null
+                && usuario.getCliente() != null
+                && usuario.getCliente().getId().equals(clienteId);
+        if (!admin && !clientePropio) {
+            throw new AccesoDenegadoException("No tienes permiso para " + accion);
         }
     }
 

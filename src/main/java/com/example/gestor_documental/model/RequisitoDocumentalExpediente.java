@@ -12,6 +12,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -26,7 +27,11 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "requisito_documental_expediente")
+@Table(name = "requisito_documental_expediente", indexes = {
+        @Index(name = "idx_requisito_expediente_estado", columnList = "expediente_id, estado"),
+        @Index(name = "idx_requisito_documento", columnList = "documento_id"),
+        @Index(name = "idx_requisito_interesado_rol", columnList = "interesado_id, rol_interesado")
+})
 public class RequisitoDocumentalExpediente {
 
     @Id

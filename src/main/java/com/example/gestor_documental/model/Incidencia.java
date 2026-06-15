@@ -14,7 +14,12 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 
 @Entity
-@Table (name= "incidencia")
+@Table(name = "incidencia", indexes = {
+        @Index(name = "idx_incidencia_expediente_resuelta", columnList = "expediente_id, resuelta"),
+        @Index(name = "idx_incidencia_solicitud_resuelta", columnList = "solicitud_id, resuelta"),
+        @Index(name = "idx_incidencia_seguimiento", columnList = "resuelta, seguimiento_archivado, proximo_aviso"),
+        @Index(name = "idx_incidencia_fecha_creacion", columnList = "fecha_creacion")
+})
 public class Incidencia {
 
     @Id

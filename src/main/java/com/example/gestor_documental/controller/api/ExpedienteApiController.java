@@ -4,6 +4,7 @@ import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.dto.PagedResponse;
 import com.example.gestor_documental.dto.expediente.AccionMasivaExpedienteRequest;
 import com.example.gestor_documental.dto.expediente.AccionMasivaExpedienteResponse;
+import com.example.gestor_documental.dto.expediente.ActualizarInteresadosExpedienteRequest;
 import com.example.gestor_documental.dto.expediente.ActualizarExpedienteRequest;
 import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.ExpedienteEditCatalogsResponse;
@@ -24,7 +25,7 @@ import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoRepository;
-import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
@@ -33,7 +34,7 @@ import com.example.gestor_documental.service.HitoExpedienteService;
 import com.example.gestor_documental.service.MensajeService;
 import com.example.gestor_documental.service.TipoIncidenciaService;
 import com.example.gestor_documental.service.TipoTramiteService;
-import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import java.io.IOException;
@@ -79,13 +80,13 @@ public class ExpedienteApiController {
     private final ExpedienteService expedienteService;
     private final HitoExpedienteService hitoExpedienteService;
     private final DocumentoRepository documentoRepository;
-    private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final ClienteInteresadoRepository clienteInteresadoRepository;
     private final InteresadoRepository interesadoRepository;
     private final MensajeService mensajeService;
     private final ClienteService clienteService;
     private final TipoIncidenciaService tipoIncidenciaService;
     private final TipoTramiteService tipoTramiteService;
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -105,57 +106,24 @@ public class ExpedienteApiController {
             , @RequestParam(required = false, defaultValue = "25") int tamanio
     ) {
         Usuario usuarioLogueado = usuario(authentication);
-        List<Expediente> expedientes;
-
-        if (usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN) {
-            expedientes = expedienteService.listarTodos();
-            if (clienteId != null) {
-                expedientes = expedientes.stream()
-                        .filter(expediente -> expediente.getCliente() != null && expediente.getCliente().getId().equals(clienteId))
-                        .toList();
-            }
-        } else if (usuarioLogueado.getCliente() != null) {
-            expedientes = expedienteService.listarPorClienteId(usuarioLogueado.getCliente().getId());
-        } else {
-            expedientes = List.of();
-        }
-
-        if (estado != null) {
-            expedientes = expedientes.stream()
-                    .filter(expediente -> expediente.getEstadoExpediente() == estado)
-                    .toList();
-        }
-        if (tipoTramiteId != null) {
-            expedientes = expedientes.stream()
-                    .filter(expediente -> expediente.getTipoTramite() != null && expediente.getTipoTramite().getId().equals(tipoTramiteId))
-                    .toList();
-        }
-        if (matricula != null && !matricula.trim().isEmpty()) {
-            String busqueda = matricula.trim().toLowerCase();
-            expedientes = expedientes.stream()
-                    .filter(expediente -> expediente.getMatricula() != null && expediente.getMatricula().toLowerCase().contains(busqueda))
-                    .toList();
-        }
-        if (interesado != null && !interesado.trim().isEmpty()) {
-            Set<Long> expedientesCoincidentes = new java.util.HashSet<>(
-                    expedienteInteresadoRepository.buscarExpedienteIdsPorInteresado(interesado.trim())
-            );
-            expedientes = expedientes.stream()
-                    .filter(expediente -> expedientesCoincidentes.contains(expediente.getId()))
-                    .toList();
+        Long clienteVisibleId = usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN
+                ? clienteId
+                : usuarioLogueado.getCliente() != null ? usuarioLogueado.getCliente().getId() : null;
+        if (usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN && clienteVisibleId == null) {
+            return PagedResponse.of(List.of(), pagina, tamanio);
         }
         DateRange dateRange = dateRange(periodo, fechaDesde, fechaHasta);
-        if (dateRange != null) {
-            expedientes = expedientes.stream()
-                    .filter(expediente -> isWithinRange(fechaReferencia(expediente.getFechaCreacion(), expediente.getFechaUltimaModificacion()), dateRange))
-                    .toList();
-        }
-
-        return PagedResponse.of(
-                expedientes.stream().map(expediente -> mapExpedienteListItem(expediente, usuarioLogueado)).toList(),
-                pagina,
-                tamanio
-        );
+        return PagedResponse.of(expedienteService.buscarListado(
+                        clienteVisibleId,
+                        estado,
+                        tipoTramiteId,
+                        likeParam(matricula),
+                        likeParam(interesado),
+                        dateRange != null ? dateRange.desde() : null,
+                        dateRange != null ? dateRange.hasta() : null,
+                        pageRequest(pagina, tamanio)
+                )
+                .map(expediente -> mapExpedienteListItem(expediente, usuarioLogueado)));
     }
 
     @GetMapping("/catalogos-listado")
@@ -234,11 +202,23 @@ public class ExpedienteApiController {
                             PageRequest.of(0, 8)
                     );
         } else if (usuarioLogueado.getCliente() != null) {
-            resultados = interesadoRepository.buscarPorClienteYTexto(
+            java.util.List<com.example.gestor_documental.model.Interesado> resultadosCliente = new java.util.ArrayList<>(interesadoRepository.buscarPorClienteYTexto(
                     usuarioLogueado.getCliente().getId(),
                     query,
                     PageRequest.of(0, 8)
-            );
+            ));
+            clienteInteresadoRepository.findByClienteIdOrderByInteresadoNombreAsc(usuarioLogueado.getCliente().getId()).stream()
+                    .map(com.example.gestor_documental.model.ClienteInteresado::getInteresado)
+                    .filter(interesado -> contiene(interesado.getDni(), query) || contiene(interesado.getNombre(), query))
+                    .forEach(interesado -> {
+                        if (resultadosCliente.stream().noneMatch(existente -> existente.getId().equals(interesado.getId()))) {
+                            resultadosCliente.add(interesado);
+                        }
+                    });
+            resultados = resultadosCliente.stream()
+                    .sorted(Comparator.comparing(com.example.gestor_documental.model.Interesado::getNombre, Comparator.nullsLast(String::compareToIgnoreCase)))
+                    .limit(8)
+                    .toList();
         } else {
             resultados = List.of();
         }
@@ -301,6 +281,17 @@ public class ExpedienteApiController {
                 request.getTipoTramiteId(),
                 mapInteresados(request)
         );
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/interesados")
+    public ResponseEntity<Void> corregirInteresados(
+            @PathVariable Long id,
+            @RequestBody ActualizarInteresadosExpedienteRequest request,
+            Authentication authentication
+    ) {
+        Usuario admin = requireAdmin(authentication);
+        expedienteService.corregirInteresados(id, admin, mapInteresados(request));
         return ResponseEntity.noContent().build();
     }
 
@@ -468,15 +459,11 @@ public class ExpedienteApiController {
     }
 
     private Usuario usuario(Authentication authentication) {
-        return usuarioService.buscarPorEmail(authentication.getName());
+        return currentUserService.requireUser(authentication);
     }
 
     private Usuario requireAdmin(Authentication authentication) {
-        Usuario usuario = usuario(authentication);
-        if (usuario.getRolUsuario() != RolUsuario.ADMIN) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo un administrador puede realizar esta accion");
-        }
-        return usuario;
+        return currentUserService.requireAdmin(authentication);
     }
 
     private void validarDatosBase(ActualizarExpedienteRequest request) {
@@ -502,6 +489,21 @@ public class ExpedienteApiController {
     private List<InteresadoFormDto> mapInteresados(ActualizarExpedienteRequest request) {
         if (request.getInteresados() == null || request.getInteresados().isEmpty()) {
             return List.of(mapInteresado(request, 0), mapInteresado(request, 1));
+        }
+        return request.getInteresados().stream().map(interesado -> {
+            InteresadoFormDto dto = new InteresadoFormDto();
+            dto.setNombre(TextNormalizer.upperOrNull(interesado.getNombre()));
+            dto.setDni(TextNormalizer.upperOrNull(interesado.getDni()));
+            dto.setTelefono(TextNormalizer.upperOrNull(interesado.getTelefono()));
+            dto.setDireccion(TextNormalizer.upperOrNull(interesado.getDireccion()));
+            dto.setRol(interesado.getRol());
+            return dto;
+        }).toList();
+    }
+
+    private List<InteresadoFormDto> mapInteresados(ActualizarInteresadosExpedienteRequest request) {
+        if (request.getInteresados() == null) {
+            return List.of();
         }
         return request.getInteresados().stream().map(interesado -> {
             InteresadoFormDto dto = new InteresadoFormDto();
@@ -685,6 +687,21 @@ public class ExpedienteApiController {
         return fecha != null ? fecha.format(DATE_TIME_FORMATTER) : null;
     }
 
+    private PageRequest pageRequest(int pagina, int tamanio) {
+        return PageRequest.of(Math.max(0, pagina), Math.max(1, Math.min(tamanio, 100)));
+    }
+
+    private String likeParam(String valor) {
+        return valor != null && !valor.trim().isEmpty()
+                ? "%" + valor.trim().toUpperCase() + "%"
+                : null;
+    }
+
+    private boolean contiene(String valor, String query) {
+        String normalizado = TextNormalizer.upperOrNull(valor);
+        return normalizado != null && normalizado.contains(query);
+    }
+
     private DateRange dateRange(String periodo, LocalDate fechaDesde, LocalDate fechaHasta) {
         LocalDate today = LocalDate.now();
         return switch (periodo != null ? periodo : "ESTE_MES") {
@@ -699,19 +716,6 @@ public class ExpedienteApiController {
         };
     }
 
-    private boolean isWithinRange(LocalDateTime fecha, DateRange range) {
-        if (fecha == null) {
-            return false;
-        }
-        boolean afterStart = !fecha.isBefore(range.start());
-        boolean beforeEnd = range.end() == null || fecha.isBefore(range.end());
-        return afterStart && beforeEnd;
-    }
-
-    private LocalDateTime fechaReferencia(LocalDateTime fechaCreacion, LocalDateTime fechaUltimaModificacion) {
-        return fechaUltimaModificacion != null ? fechaUltimaModificacion : fechaCreacion;
-    }
-
-    private record DateRange(LocalDateTime start, LocalDateTime end) {
+    private record DateRange(LocalDateTime desde, LocalDateTime hasta) {
     }
 }

@@ -19,9 +19,12 @@ import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 @Service
@@ -60,6 +63,17 @@ public class SolicitudServiceImpl implements SolicitudService {
     @Override
     public List<Solicitud> listarPorClienteId(Long clienteId) {
         return solicitudRepository.findByClienteIdOrderByFechaReferenciaDesc(clienteId);
+    }
+
+    @Override
+    public Page<Solicitud> buscarListado(Long clienteId,
+                                         EstadoSolicitud estado,
+                                         Long tipoTramiteId,
+                                         String matricula,
+                                         LocalDateTime desde,
+                                         LocalDateTime hasta,
+                                         Pageable pageable) {
+        return solicitudRepository.buscarListado(clienteId, estado, tipoTramiteId, matricula, desde, hasta, pageable);
     }
 
     @Override

@@ -1,12 +1,13 @@
-import { Home, IdCard, Phone, UserRound } from "lucide-react";
+import { Home, IdCard, Pencil, Phone, UserRound } from "lucide-react";
 import type { InteresadoExpediente } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
 
 type Props = {
   interesados: InteresadoExpediente[];
+  onEditInteresados?: () => void;
 };
 
-export function InteresadosPanel({ interesados }: Props) {
+export function InteresadosPanel({ interesados, onEditInteresados }: Props) {
   return (
     <section className="exp-panel">
       <div className="exp-panel__heading">
@@ -14,7 +15,15 @@ export function InteresadosPanel({ interesados }: Props) {
           <p className="eyebrow">Datos principales</p>
           <h3>Interesados</h3>
         </div>
-        <span className="exp-panel__counter">{interesados.length}</span>
+        <div className="exp-panel__heading-actions">
+          {onEditInteresados ? (
+            <button className="soft-button soft-button--compact" onClick={onEditInteresados} type="button">
+              <Pencil size={15} />
+              Corregir interesados
+            </button>
+          ) : null}
+          <span className="exp-panel__counter">{interesados.length}</span>
+        </div>
       </div>
 
       {interesados.length === 0 ? (

@@ -8,10 +8,10 @@ import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.MensajeService;
-import com.example.gestor_documental.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,11 +31,11 @@ public class ClienteExpedienteApiController {
     private final ExpedienteDetalleApiService expedienteDetalleApiService;
     private final ExpedienteService expedienteService;
     private final MensajeService mensajeService;
-    private final UsuarioService usuarioService;
+    private final CurrentUserService currentUserService;
 
     @GetMapping("/{id}")
     public ExpedienteClienteResponse obtenerDetalleCliente(@PathVariable Long id, Authentication authentication) {
-        Usuario usuarioLogueado = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
         ExpedienteDetailResponse detalle = expedienteDetalleApiService.obtenerDetalle(id, usuarioLogueado);
 
         return ExpedienteClienteResponse.builder()
@@ -69,7 +69,7 @@ public class ClienteExpedienteApiController {
             Authentication authentication
     ) {
         String contenidoFinal = contenido != null ? contenido : body != null ? body.get("contenido") : null;
-        mensajeService.añadirAExpediente(id, contenidoFinal, usuarioService.buscarPorEmail(authentication.getName()));
+        mensajeService.añadirAExpediente(id, contenidoFinal, currentUserService.requireUser(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -80,7 +80,7 @@ public class ClienteExpedienteApiController {
             @RequestBody(required = false) java.util.Map<String, String> body,
             Authentication authentication
     ) {
-        Usuario cliente = usuarioService.buscarPorEmail(authentication.getName());
+        Usuario cliente = currentUserService.requireUser(authentication);
         Expediente expediente = expedienteService.buscarPorId(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
         if (!expedienteService.tienePermisoExpediente(expediente, cliente)) {

@@ -10,6 +10,9 @@ import com.example.gestor_documental.dto.expediente.InteresadoSolicitudResponse;
 import com.example.gestor_documental.dto.expediente.ListCatalogsResponse;
 import com.example.gestor_documental.dto.expediente.MensajeExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudUpsertRequest;
+import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertRequest;
+import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertResponse;
+import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertResponse.SolicitudBulkConvertResult;
 import com.example.gestor_documental.dto.expediente.SolicitudDetailResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudListItemResponse;
 import com.example.gestor_documental.dto.expediente.TipoTramiteResumenResponse;
@@ -33,7 +36,7 @@ import com.example.gestor_documental.service.IncidenciaService;
 import com.example.gestor_documental.service.MensajeService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
-import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.util.TextNormalizer;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
@@ -43,6 +46,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -65,13 +69,13 @@ public class SolicitudApiController {
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final SolicitudService solicitudService;
-    private final UsuarioService usuarioService;
     private final ClienteService clienteService;
     private final TipoTramiteService tipoTramiteService;
     private final DocumentoService documentoService;
     private final IncidenciaService incidenciaService;
     private final HistorialCambioService historialCambioService;
     private final MensajeService mensajeService;
+    private final CurrentUserService currentUserService;
 
     @GetMapping
     public PagedResponse<SolicitudListItemResponse> listarSolicitudes(
@@ -87,45 +91,23 @@ public class SolicitudApiController {
             , @RequestParam(required = false, defaultValue = "25") int tamanio
     ) {
         Usuario usuarioLogueado = usuario(authentication);
-        List<Solicitud> solicitudes;
-
-        if (usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN) {
-            solicitudes = solicitudService.listarTodas();
-            if (clienteId != null) {
-                solicitudes = solicitudes.stream()
-                        .filter(solicitud -> solicitud.getCliente() != null && solicitud.getCliente().getId().equals(clienteId))
-                        .toList();
-            }
-        } else if (usuarioLogueado.getCliente() != null) {
-            solicitudes = solicitudService.listarPorClienteId(usuarioLogueado.getCliente().getId());
-        } else {
-            solicitudes = List.of();
-        }
-
-        if (estado != null) {
-            solicitudes = solicitudes.stream()
-                    .filter(solicitud -> solicitud.getEstadoSolicitud() == estado)
-                    .toList();
-        }
-        if (tipoTramiteId != null) {
-            solicitudes = solicitudes.stream()
-                    .filter(solicitud -> solicitud.getTipoTramite() != null && solicitud.getTipoTramite().getId().equals(tipoTramiteId))
-                    .toList();
-        }
-        if (matricula != null && !matricula.trim().isEmpty()) {
-            String busqueda = matricula.trim().toLowerCase();
-            solicitudes = solicitudes.stream()
-                    .filter(solicitud -> solicitud.getMatricula() != null && solicitud.getMatricula().toLowerCase().contains(busqueda))
-                    .toList();
+        Long clienteVisibleId = usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN
+                ? clienteId
+                : usuarioLogueado.getCliente() != null ? usuarioLogueado.getCliente().getId() : null;
+        if (usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN && clienteVisibleId == null) {
+            return PagedResponse.of(List.of(), pagina, tamanio);
         }
         DateRange dateRange = dateRange(periodo, fechaDesde, fechaHasta);
-        if (dateRange != null) {
-            solicitudes = solicitudes.stream()
-                    .filter(solicitud -> isWithinRange(fechaReferencia(solicitud.getFechaCreacion(), solicitud.getFechaUltimaModificacion()), dateRange))
-                    .toList();
-        }
-
-        return PagedResponse.of(solicitudes.stream().map(this::mapSolicitudListItem).toList(), pagina, tamanio);
+        return PagedResponse.of(solicitudService.buscarListado(
+                        clienteVisibleId,
+                        estado,
+                        tipoTramiteId,
+                        likeParam(matricula),
+                        dateRange != null ? dateRange.desde() : null,
+                        dateRange != null ? dateRange.hasta() : null,
+                        pageRequest(pagina, tamanio)
+                )
+                .map(this::mapSolicitudListItem));
     }
 
     @GetMapping("/catalogos-listado")
@@ -171,6 +153,40 @@ public class SolicitudApiController {
         Usuario usuarioLogueado = requireAdmin(authentication);
         Expediente expediente = solicitudService.convertirAExpediente(id, usuarioLogueado);
         return ResponseEntity.ok(java.util.Map.of("id", expediente.getId()));
+    }
+
+    @PostMapping("/convertir-masivo")
+    public ResponseEntity<SolicitudBulkConvertResponse> convertirMasivo(
+            @RequestBody SolicitudBulkConvertRequest request,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = requireAdmin(authentication);
+        List<Long> ids = request.getSolicitudIds() != null ? request.getSolicitudIds().stream().distinct().toList() : List.of();
+        List<SolicitudBulkConvertResult> resultados = new java.util.ArrayList<>();
+        for (Long solicitudId : ids) {
+            try {
+                Expediente expediente = solicitudService.convertirAExpediente(solicitudId, usuarioLogueado);
+                resultados.add(SolicitudBulkConvertResult.builder()
+                        .solicitudId(solicitudId)
+                        .expedienteId(expediente.getId())
+                        .convertida(true)
+                        .mensaje("Convertida")
+                        .build());
+            } catch (Exception ex) {
+                resultados.add(SolicitudBulkConvertResult.builder()
+                        .solicitudId(solicitudId)
+                        .convertida(false)
+                        .mensaje(ex.getMessage() != null ? ex.getMessage() : "No se pudo convertir")
+                        .build());
+            }
+        }
+        int convertidas = (int) resultados.stream().filter(SolicitudBulkConvertResult::isConvertida).count();
+        return ResponseEntity.ok(SolicitudBulkConvertResponse.builder()
+                .total(resultados.size())
+                .convertidas(convertidas)
+                .fallidas(resultados.size() - convertidas)
+                .resultados(resultados)
+                .build());
     }
 
     @PostMapping
@@ -240,15 +256,11 @@ public class SolicitudApiController {
     }
 
     private Usuario usuario(Authentication authentication) {
-        return usuarioService.buscarPorEmail(authentication.getName());
+        return currentUserService.requireUser(authentication);
     }
 
     private Usuario requireAdmin(Authentication authentication) {
-        Usuario usuario = usuario(authentication);
-        if (usuario.getRolUsuario() != RolUsuario.ADMIN) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo un administrador puede realizar esta accion");
-        }
-        return usuario;
+        return currentUserService.requireAdmin(authentication);
     }
 
     private void validarSolicitudRequest(SolicitudUpsertRequest request) {
@@ -353,6 +365,16 @@ public class SolicitudApiController {
 
     private String formatDate(LocalDateTime fecha) {
         return fecha != null ? fecha.format(DATE_TIME_FORMATTER) : null;
+    }
+
+    private PageRequest pageRequest(int pagina, int tamanio) {
+        return PageRequest.of(Math.max(0, pagina), Math.max(1, Math.min(tamanio, 100)));
+    }
+
+    private String likeParam(String valor) {
+        return valor != null && !valor.trim().isEmpty()
+                ? "%" + valor.trim().toUpperCase() + "%"
+                : null;
     }
 
     private SolicitudDetailResponse mapSolicitudDetail(Solicitud solicitud) {
@@ -503,19 +525,6 @@ public class SolicitudApiController {
         };
     }
 
-    private boolean isWithinRange(LocalDateTime fecha, DateRange range) {
-        if (fecha == null) {
-            return false;
-        }
-        boolean afterStart = !fecha.isBefore(range.start());
-        boolean beforeEnd = range.end() == null || fecha.isBefore(range.end());
-        return afterStart && beforeEnd;
-    }
-
-    private LocalDateTime fechaReferencia(LocalDateTime fechaCreacion, LocalDateTime fechaUltimaModificacion) {
-        return fechaUltimaModificacion != null ? fechaUltimaModificacion : fechaCreacion;
-    }
-
-    private record DateRange(LocalDateTime start, LocalDateTime end) {
+    private record DateRange(LocalDateTime desde, LocalDateTime hasta) {
     }
 }
