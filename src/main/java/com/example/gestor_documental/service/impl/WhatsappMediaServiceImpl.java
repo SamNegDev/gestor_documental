@@ -5,6 +5,7 @@ import com.example.gestor_documental.model.WhatsappWebhookEvento;
 import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
 import com.example.gestor_documental.service.WhatsappMediaService;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +27,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WhatsappMediaServiceImpl implements WhatsappMediaService {
     private final RestClient restClient = RestClient.create();
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final WhatsappAdjuntoRepository adjuntoRepository;
 
     @Value("${app.whatsapp.access-token:}")
@@ -64,7 +66,7 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
         }
 
         try {
-            JsonNode metadata = restClient.get()
+            String metadataResponse = restClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .scheme("https")
                             .host("graph.facebook.com")
@@ -72,7 +74,8 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
                             .build())
                     .header("Authorization", "Bearer " + accessToken.trim())
                     .retrieve()
-                    .body(JsonNode.class);
+                    .body(String.class);
+            JsonNode metadata = parseJson(metadataResponse);
 
             if (metadata != null) {
                 adjunto.setMimeType(textOrFallback(metadata.path("mime_type"), adjunto.getMimeType()));
@@ -184,5 +187,16 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
     private String textOrFallback(JsonNode node, String fallback) {
         String value = text(node);
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private JsonNode parseJson(String response) {
+        if (!StringUtils.hasText(response)) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(response);
+        } catch (Exception exception) {
+            throw new RestClientException("Meta devolvio una respuesta no interpretable.");
+        }
     }
 }

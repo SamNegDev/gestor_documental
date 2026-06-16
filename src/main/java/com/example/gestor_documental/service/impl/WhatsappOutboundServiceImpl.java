@@ -2,6 +2,7 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.service.WhatsappOutboundService;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -17,6 +18,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
     private final RestClient restClient = RestClient.create();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.whatsapp.access-token:}")
     private String accessToken;
@@ -49,17 +51,7 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
                             "body", mensaje != null ? mensaje : ""
                     )
             );
-            JsonNode response = restClient.post()
-                    .uri(uriBuilder -> uriBuilder
-                            .scheme("https")
-                            .host("graph.facebook.com")
-                            .pathSegment(version(), phoneNumberId.trim(), "messages")
-                            .build())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Bearer " + accessToken.trim())
-                    .body(payload)
-                    .retrieve()
-                    .body(JsonNode.class);
+            JsonNode response = enviar(payload);
             String messageId = response != null ? response.path("messages").path(0).path("id").asText(null) : null;
             return ResultadoWhatsapp.enviado(messageId);
         } catch (RestClientResponseException ex) {
@@ -161,7 +153,7 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
     }
 
     private JsonNode enviar(Map<String, Object> payload) {
-        return restClient.post()
+        String response = restClient.post()
                 .uri(uriBuilder -> uriBuilder
                         .scheme("https")
                         .host("graph.facebook.com")
@@ -171,7 +163,19 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
                 .header("Authorization", "Bearer " + accessToken.trim())
                 .body(payload)
                 .retrieve()
-                .body(JsonNode.class);
+                .body(String.class);
+        return parseJson(response);
+    }
+
+    private JsonNode parseJson(String response) {
+        if (!StringUtils.hasText(response)) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(response);
+        } catch (Exception exception) {
+            throw new RestClientException("WhatsApp devolvio una respuesta no interpretable.");
+        }
     }
 
     private Map<String, Object> quickReply(String id, String title) {
