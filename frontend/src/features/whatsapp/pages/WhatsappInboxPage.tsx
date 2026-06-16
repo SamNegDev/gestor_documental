@@ -1,23 +1,26 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Link2, MessageCircle, RefreshCw, Search, Smartphone, X } from "lucide-react";
+import { Archive, ArrowRight, CheckCircle2, Link2, MessageCircle, RefreshCw, Search, Smartphone, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ApiError } from "../../../shared/api/http";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { PaginationBar } from "../../listados/components/PaginationBar";
 import { getExpedienteListCatalogs } from "../../listados/services/listadosApi";
-import { asociarWhatsappEvento, getWhatsappEventos } from "../services/whatsappApi";
+import { archivarWhatsappEvento, asociarWhatsappEvento, getWhatsappEventos, revisarWhatsappEvento } from "../services/whatsappApi";
 import type { WhatsappEvento } from "../types";
 
 const estados = [
-  { value: "TODOS", label: "Todos" },
+  { value: "PENDIENTES", label: "Pendientes" },
   { value: "NO_ASOCIADOS", label: "Sin asociar" },
   { value: "ASOCIADOS", label: "Asociados" },
+  { value: "REVISADOS", label: "Revisados" },
+  { value: "ARCHIVADOS", label: "Archivados" },
   { value: "ERRORES", label: "Errores" },
+  { value: "TODOS", label: "Todos" },
 ];
 
 export function WhatsappInboxPage() {
-  const [estado, setEstado] = useState("TODOS");
+  const [estado, setEstado] = useState("PENDIENTES");
   const [telefono, setTelefono] = useState("");
   const [pagina, setPagina] = useState(0);
   const [tamanio, setTamanio] = useState(25);
@@ -27,6 +30,8 @@ export function WhatsappInboxPage() {
     queryKey: ["whatsapp-eventos", estado, telefono, pagina, tamanio],
     queryFn: () => getWhatsappEventos({ estado, telefono, pagina, tamanio }),
   });
+  const reviewMutation = useMutation({ mutationFn: revisarWhatsappEvento, onSuccess: () => qc.invalidateQueries({ queryKey: ["whatsapp-eventos"] }) });
+  const archiveMutation = useMutation({ mutationFn: archivarWhatsappEvento, onSuccess: () => qc.invalidateQueries({ queryKey: ["whatsapp-eventos"] }) });
   const data = query.data;
 
   return (
@@ -72,7 +77,15 @@ export function WhatsappInboxPage() {
             </div>
           ) : null}
           {data?.contenido.map((evento) => (
-            <WhatsappRow evento={evento} key={evento.id} onAssociate={setEventoParaAsociar} />
+            <WhatsappRow
+              archivePending={archiveMutation.isPending}
+              evento={evento}
+              key={evento.id}
+              onArchive={(id) => archiveMutation.mutate(id)}
+              onAssociate={setEventoParaAsociar}
+              onReview={(id) => reviewMutation.mutate(id)}
+              reviewPending={reviewMutation.isPending}
+            />
           ))}
         </div>
         <PaginationBar
@@ -96,13 +109,29 @@ export function WhatsappInboxPage() {
   );
 }
 
-function WhatsappRow({ evento, onAssociate }: { evento: WhatsappEvento; onAssociate: (evento: WhatsappEvento) => void }) {
+function WhatsappRow({
+  evento,
+  onAssociate,
+  onReview,
+  onArchive,
+  reviewPending,
+  archivePending,
+}: {
+  evento: WhatsappEvento;
+  onAssociate: (evento: WhatsappEvento) => void;
+  onReview: (id: number) => void;
+  onArchive: (id: number) => void;
+  reviewPending: boolean;
+  archivePending: boolean;
+}) {
   const associated = Boolean(evento.clienteId);
+  const pendiente = evento.estado !== "REVISADO" && evento.estado !== "ARCHIVADO";
   return (
-    <article className={`whatsapp-row ${associated ? "whatsapp-row--linked" : "whatsapp-row--pending"}`}>
+    <article className={`whatsapp-row ${associated ? "whatsapp-row--linked" : "whatsapp-row--pending"} ${pendiente ? "" : "whatsapp-row--closed"}`}>
       <span className="whatsapp-row__icon"><Smartphone size={18} /></span>
       <div className="whatsapp-row__contact">
         <div className="whatsapp-row__badges">
+          <StatusBadge tone={evento.estado === "PENDIENTE" ? "warning" : evento.estado === "REVISADO" ? "success" : "neutral"}>{evento.estado || "PENDIENTE"}</StatusBadge>
           <StatusBadge tone={associated ? "success" : "warning"}>{associated ? "ASOCIADO" : "SIN ASOCIAR"}</StatusBadge>
           <StatusBadge tone={evento.procesado ? "info" : "danger"}>{evento.tipo || "EVENTO"}</StatusBadge>
         </div>
@@ -118,10 +147,16 @@ function WhatsappRow({ evento, onAssociate }: { evento: WhatsappEvento; onAssoci
         {evento.expedienteId ? <span>{evento.matricula || `EXP-${evento.expedienteId}`}</span> : <span>Sin expediente</span>}
       </div>
       <div className="whatsapp-row__actions">
+        {pendiente ? (
+          <button className="icon-button" disabled={reviewPending} onClick={() => onReview(evento.id)} title="Marcar revisado" type="button"><CheckCircle2 size={16} /></button>
+        ) : null}
         <button className="soft-button soft-button--compact" onClick={() => onAssociate(evento)} type="button">
           <Link2 size={15} />
           Asociar
         </button>
+        {pendiente ? (
+          <button className="icon-button" disabled={archivePending} onClick={() => onArchive(evento.id)} title="Archivar" type="button"><Archive size={16} /></button>
+        ) : null}
         {evento.expedienteId ? <Link className="icon-button" title="Ver expediente" to={`/expedientes/${evento.expedienteId}`}><ArrowRight size={16} /></Link> : null}
       </div>
     </article>

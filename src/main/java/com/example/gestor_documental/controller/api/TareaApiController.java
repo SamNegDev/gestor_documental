@@ -6,6 +6,7 @@ import com.example.gestor_documental.dto.tarea.TareasResumenResponse;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoSolicitud;
+import com.example.gestor_documental.enums.EstadoWhatsappEvento;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Documento;
@@ -15,12 +16,14 @@ import com.example.gestor_documental.model.Mensaje;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.WhatsappWebhookEvento;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.MensajeRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
+import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +55,7 @@ public class TareaApiController {
     private final IncidenciaRepository incidenciaRepository;
     private final MensajeRepository mensajeRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
+    private final WhatsappWebhookEventoRepository whatsappWebhookEventoRepository;
     private final CurrentUserService currentUserService;
     private final ConfiguracionSeguimientoService configuracionSeguimientoService;
 
@@ -92,6 +96,8 @@ public class TareaApiController {
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
             List<Incidencia> incidenciasPendientes = incidenciaRepository.findSeguimientoPendiente(LocalDateTime.now());
             incidenciasPendientes.forEach(i -> tareas.add(tareaSeguimientoIncidencia(i)));
+            whatsappWebhookEventoRepository.findByEstadoWithExpediente(EstadoWhatsappEvento.PENDIENTE)
+                    .forEach(evento -> tareas.add(tareaWhatsapp(evento)));
             Set<Long> expedientesConIncidenciaPendiente = incidenciasPendientes.stream()
                     .map(Incidencia::getExpediente)
                     .filter(Objects::nonNull)
@@ -183,6 +189,30 @@ public class TareaApiController {
                 documentacion ? "Documentacion pendiente de aviso" : "Informacion pendiente de aviso",
                 "Este expediente ya esta pendiente del cliente. Abre el expediente para enviar o regularizar el aviso.",
                 contexto);
+    }
+
+    private TareaResponse tareaWhatsapp(WhatsappWebhookEvento evento) {
+        Expediente expediente = evento.getExpediente();
+        LocalDateTime fecha = evento.getFechaRecepcion();
+        String contacto = evento.getNombrePerfil() != null && !evento.getNombrePerfil().isBlank()
+                ? evento.getNombrePerfil()
+                : evento.getTelefono();
+        return TareaResponse.builder()
+                .id("WSP-" + evento.getId() + "-REVISION")
+                .tipo("WHATSAPP_PENDIENTE_REVISION")
+                .ambito("GESTION")
+                .prioridad("ALTA")
+                .titulo("Respuesta WhatsApp pendiente")
+                .detalle("Hay un mensaje de WhatsApp asociado al expediente pendiente de revisar.")
+                .contexto(limitar((contacto != null ? contacto + ": " : "") + (evento.getTexto() != null ? evento.getTexto() : "Mensaje sin texto visible.")))
+                .entidad("WHATSAPP")
+                .entidadId(evento.getId())
+                .matricula(expediente.getMatricula())
+                .cliente(expediente.getCliente() != null ? expediente.getCliente().getNombre() : null)
+                .fechaReferencia(format(fecha))
+                .diasPendiente(dias(fecha))
+                .enlace("/expedientes/" + expediente.getId())
+                .build();
     }
 
     private boolean tieneIncidenciaActiva(Long expedienteId) {

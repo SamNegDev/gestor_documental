@@ -12,6 +12,7 @@ import com.example.gestor_documental.dto.expediente.MensajeExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.OperacionExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.RequisitoDocumentalResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
+import com.example.gestor_documental.dto.expediente.WhatsappExpedienteResponse;
 import com.example.gestor_documental.enums.CodigoHitoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoExpediente;
@@ -33,7 +34,9 @@ import com.example.gestor_documental.model.Mensaje;
 import com.example.gestor_documental.model.OperacionExpediente;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.WhatsappWebhookEvento;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
+import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
 import com.example.gestor_documental.service.ExpedienteService;
@@ -78,6 +81,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
     private final RequisitoDocumentalExpedienteService requisitoDocumentalService;
     private final HitoExpedienteService hitoExpedienteService;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final WhatsappWebhookEventoRepository whatsappWebhookEventoRepository;
 
     @Override
     @Transactional
@@ -94,6 +98,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         List<Incidencia> incidencias = incidenciaService.listarPorExpediente(expedienteId);
         List<HistorialCambio> historial = historialCambioService.listarPorExpediente(expedienteId);
         List<Mensaje> mensajes = mensajeService.listarPorExpediente(expedienteId);
+        List<WhatsappWebhookEvento> whatsappMensajes = whatsappWebhookEventoRepository.findByExpedienteIdAndMessageIdIsNotNullOrderByFechaRecepcionDesc(expedienteId);
         List<RequisitoDocumentalExpediente> requisitos = requisitoDocumentalService.sincronizarYListar(expediente, interesados, documentos, usuarioLogueado);
         List<OperacionExpediente> operaciones = operacionExpedienteService.sincronizarYListar(expediente);
         Map<CodigoHitoExpediente, HitoExpediente> hitosPersistidos = hitoExpedienteService.listarPorExpediente(expedienteId)
@@ -132,6 +137,21 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .incidencias(incidencias.stream().map(incidencia -> mapIncidencia(incidencia, documentos, expediente)).toList())
                 .historial(historial.stream().map(this::mapHistorial).toList())
                 .mensajes(mensajes.stream().map(this::mapMensaje).toList())
+                .whatsappMensajes(whatsappMensajes.stream().map(this::mapWhatsapp).toList())
+                .build();
+    }
+
+    private WhatsappExpedienteResponse mapWhatsapp(WhatsappWebhookEvento evento) {
+        return WhatsappExpedienteResponse.builder()
+                .id(evento.getId())
+                .telefono(evento.getTelefono())
+                .nombrePerfil(evento.getNombrePerfil())
+                .tipo(evento.getTipo())
+                .texto(evento.getTexto())
+                .estado(evento.getEstado() != null ? evento.getEstado().name() : null)
+                .fechaRecepcion(formatearFecha(evento.getFechaRecepcion()))
+                .fechaRevision(formatearFecha(evento.getFechaRevision()))
+                .revisadoPor(evento.getRevisadoPor() != null ? nombreCompleto(evento.getRevisadoPor()) : null)
                 .build();
     }
 
@@ -725,7 +745,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
     private String nombreCompleto(Usuario usuario) {
         String nombre = usuario.getNombre() != null ? usuario.getNombre() : "";
         String apellidos = usuario.getApellidos() != null ? usuario.getApellidos() : "";
-        return (nombre + " " + apellidos).trim();
+        String completo = (nombre + " " + apellidos).trim();
+        return !completo.isBlank() ? completo : usuario.getEmail();
     }
 
     private String formatearFecha(LocalDateTime fecha) {

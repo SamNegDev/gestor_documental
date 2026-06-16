@@ -75,6 +75,7 @@ export function TareasPage() {
             <option value="DOCUMENTACION_PENDIENTE_CLIENTE">Documentacion pendiente</option>
             <option value="INFORMACION_PENDIENTE_CLIENTE">Informacion pendiente</option>
             <option value="JUSTIFICANTE_FINAL_PENDIENTE">Justificantes finales</option>
+            <option value="WHATSAPP_PENDIENTE_REVISION">WhatsApp por revisar</option>
             <option value="EXPEDIENTE_ESTANCADO">Sin actividad</option>
           </select>
         </label>
@@ -199,6 +200,7 @@ function taskIcon(tipo: string) {
   if (tipo === "EXPEDIENTE_ESTANCADO") return <Clock3 size={19} />;
   if (tipo === "DOCUMENTACION_PENDIENTE_CLIENTE" || tipo === "JUSTIFICANTE_FINAL_PENDIENTE") return <FileWarning size={19} />;
   if (tipo === "INFORMACION_PENDIENTE_CLIENTE") return <MessageCircle size={19} />;
+  if (tipo === "WHATSAPP_PENDIENTE_REVISION") return <MessageCircle size={19} />;
   if (tipo === "APORTACION_PENDIENTE_REVISION") return <SearchCheck size={19} />;
   if (tipo === "SOLICITUD_PENDIENTE_REVISION") return <ClipboardList size={19} />;
   if (tipo.startsWith("INCIDENCIA_")) return <AlertTriangle size={19} />;
@@ -212,6 +214,7 @@ function taskActionKind(tipo: string): { label: string; tone: "neutral" | "warni
   if (tipo === "DOCUMENTACION_PENDIENTE_CLIENTE" || tipo === "JUSTIFICANTE_FINAL_PENDIENTE") return { label: "FALTA DOCUMENTACION", tone: "warning" };
   if (tipo === "INFORMACION_PENDIENTE_CLIENTE") return { label: "REQUIERE CONTESTACION", tone: "info" };
   if (tipo === "APORTACION_PENDIENTE_REVISION") return { label: "REVISION", tone: "info" };
+  if (tipo === "WHATSAPP_PENDIENTE_REVISION") return { label: "WHATSAPP", tone: "info" };
   if (tipo === "SOLICITUD_PENDIENTE_REVISION") return { label: "SOLICITUD", tone: "neutral" };
   return null;
 }
@@ -219,5 +222,6 @@ function taskActionKind(tipo: string): { label: string; tone: "neutral" | "warni
 function taskContextLabel(tipo: string) {
   if (tipo === "EXPEDIENTE_ESTANCADO") return "Motivo";
   if (tipo === "JUSTIFICANTE_FINAL_PENDIENTE") return "Pendiente";
+  if (tipo === "WHATSAPP_PENDIENTE_REVISION") return "Mensaje";
   return "Detalle solicitado";
 }

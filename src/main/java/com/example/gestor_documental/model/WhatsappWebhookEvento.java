@@ -1,7 +1,10 @@
 package com.example.gestor_documental.model;
 
+import com.example.gestor_documental.enums.EstadoWhatsappEvento;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -52,6 +55,12 @@ public class WhatsappWebhookEvento {
     @Column(nullable = false)
     private boolean procesado;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30, columnDefinition = "varchar(30) default 'PENDIENTE'")
+    private EstadoWhatsappEvento estado = EstadoWhatsappEvento.PENDIENTE;
+
+    private LocalDateTime fechaRevision;
+
     @Column(length = 500)
     private String errorProcesado;
 
@@ -66,4 +75,8 @@ public class WhatsappWebhookEvento {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "expediente_id")
     private Expediente expediente;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "revisado_por_id")
+    private Usuario revisadoPor;
 }

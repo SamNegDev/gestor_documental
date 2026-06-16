@@ -2397,6 +2397,7 @@ input.records-table-filter {
 .whatsapp-row { display: grid; grid-template-columns: 38px minmax(235px, .95fr) minmax(260px, 1.45fr) minmax(160px, .7fr) auto; align-items: center; gap: 14px; min-height: 88px; border-bottom: 1px solid oklch(90% .009 92); padding: 12px 13px; box-shadow: inset 3px 0 0 transparent; }
 .whatsapp-row--pending { box-shadow: inset 3px 0 0 oklch(70% .13 78); }
 .whatsapp-row--linked { box-shadow: inset 3px 0 0 oklch(66% .13 154); }
+.whatsapp-row--closed { opacity: .78; }
 .whatsapp-row__icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; background: oklch(96% .028 154); color: oklch(42% .11 154); }
 .whatsapp-row > div { display: grid; min-width: 0; gap: 3px; }
 .whatsapp-row strong { overflow: hidden; color: var(--ink-strong); font-size: .84rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -2410,6 +2411,9 @@ input.records-table-filter {
 .mail-dialog__body select { width: 100%; border: 1px solid oklch(84% .014 90); border-radius: 5px; background: white; color: var(--ink); font: inherit; padding: 10px 11px; }
 @media(max-width:1050px){.whatsapp-row{grid-template-columns:38px minmax(220px,1fr) minmax(230px,1.2fr) auto}.whatsapp-row__links{display:none}}
 @media(max-width:720px){.whatsapp-row{grid-template-columns:38px minmax(0,1fr) auto}.whatsapp-row__message{display:none}.whatsapp-row__actions .soft-button{font-size:0}.whatsapp-row__actions .soft-button svg{margin:0}}
+.timeline-item--whatsapp { box-shadow: inset 3px 0 0 oklch(64% .12 154); }
+.timeline-item--pendiente { box-shadow: inset 3px 0 0 oklch(70% .13 78); }
+.timeline-item--archivado { opacity: .72; }
 .followup-config { display: grid; gap: 18px; border: 1px solid oklch(88% .012 90); background: white; padding: 18px; }
 .followup-config__intro { display: grid; grid-template-columns: 42px 1fr; gap: 12px; align-items: start; border-bottom: 1px solid oklch(90% .01 90); padding-bottom: 16px; }
 .followup-config__intro > span { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 7px; background: oklch(96% .028 205); color: oklch(42% .09 215); }

@@ -8,8 +8,11 @@ export interface WhatsappEvento {
   tipo?: string | null;
   texto?: string | null;
   procesado: boolean;
+  estado?: "PENDIENTE" | "REVISADO" | "ARCHIVADO" | string | null;
   errorProcesado?: string | null;
   fechaRecepcion?: string | null;
+  fechaRevision?: string | null;
+  revisadoPor?: string | null;
   clienteId?: number | null;
   cliente?: string | null;
   expedienteId?: number | null;

@@ -1,5 +1,6 @@
 package com.example.gestor_documental.controller.api;
 
+import com.example.gestor_documental.enums.EstadoWhatsappEvento;
 import com.example.gestor_documental.dto.PagedResponse;
 import com.example.gestor_documental.dto.whatsapp.WhatsappEventoAsociarRequest;
 import com.example.gestor_documental.dto.whatsapp.WhatsappEventoResponse;
@@ -11,6 +12,7 @@ import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.security.CurrentUserService;
+import com.example.gestor_documental.service.HistorialCambioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -38,6 +40,7 @@ public class WhatsappInboxApiController {
     private final ClienteRepository clienteRepository;
     private final ExpedienteRepository expedienteRepository;
     private final CurrentUserService currentUserService;
+    private final HistorialCambioService historialCambioService;
 
     @GetMapping("/eventos")
     public PagedResponse<WhatsappEventoResponse> listar(@RequestParam(defaultValue = "TODOS") String estado,
@@ -57,7 +60,7 @@ public class WhatsappInboxApiController {
     @Transactional
     public WhatsappEventoResponse asociar(@PathVariable Long id, @RequestBody WhatsappEventoAsociarRequest request,
             Authentication authentication) {
-        requireAdmin(authentication);
+        Usuario admin = requireAdmin(authentication);
         WhatsappWebhookEvento evento = eventoRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento de WhatsApp no encontrado."));
         if (request == null || request.clienteId() == null) {
@@ -73,8 +76,42 @@ public class WhatsappInboxApiController {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El expediente no pertenece al cliente seleccionado.");
             }
             evento.setExpediente(expediente);
+            historialCambioService.registrarCambioExpediente(expediente, admin, "WHATSAPP ASOCIADO",
+                    "Mensaje de WhatsApp asociado al expediente desde el telefono " + nullSafe(evento.getTelefono()) + ".");
         } else {
             evento.setExpediente(null);
+        }
+        return map(eventoRepository.save(evento));
+    }
+
+    @PostMapping("/eventos/{id}/revisar")
+    @Transactional
+    public WhatsappEventoResponse revisar(@PathVariable Long id, Authentication authentication) {
+        Usuario admin = requireAdmin(authentication);
+        WhatsappWebhookEvento evento = eventoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento de WhatsApp no encontrado."));
+        evento.setEstado(EstadoWhatsappEvento.REVISADO);
+        evento.setFechaRevision(java.time.LocalDateTime.now());
+        evento.setRevisadoPor(admin);
+        if (evento.getExpediente() != null) {
+            historialCambioService.registrarCambioExpediente(evento.getExpediente(), admin, "WHATSAPP REVISADO",
+                    "Mensaje de WhatsApp revisado: " + limitar(evento.getTexto()));
+        }
+        return map(eventoRepository.save(evento));
+    }
+
+    @PostMapping("/eventos/{id}/archivar")
+    @Transactional
+    public WhatsappEventoResponse archivar(@PathVariable Long id, Authentication authentication) {
+        Usuario admin = requireAdmin(authentication);
+        WhatsappWebhookEvento evento = eventoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento de WhatsApp no encontrado."));
+        evento.setEstado(EstadoWhatsappEvento.ARCHIVADO);
+        evento.setFechaRevision(java.time.LocalDateTime.now());
+        evento.setRevisadoPor(admin);
+        if (evento.getExpediente() != null) {
+            historialCambioService.registrarCambioExpediente(evento.getExpediente(), admin, "WHATSAPP ARCHIVADO",
+                    "Mensaje de WhatsApp archivado: " + limitar(evento.getTexto()));
         }
         return map(eventoRepository.save(evento));
     }
@@ -88,8 +125,11 @@ public class WhatsappInboxApiController {
                 .tipo(evento.getTipo())
                 .texto(evento.getTexto())
                 .procesado(evento.isProcesado())
+                .estado(evento.getEstado() != null ? evento.getEstado().name() : null)
                 .errorProcesado(evento.getErrorProcesado())
                 .fechaRecepcion(evento.getFechaRecepcion() != null ? evento.getFechaRecepcion().format(FORMAT) : null)
+                .fechaRevision(evento.getFechaRevision() != null ? evento.getFechaRevision().format(FORMAT) : null)
+                .revisadoPor(evento.getRevisadoPor() != null ? nombreUsuario(evento.getRevisadoPor()) : null)
                 .clienteId(evento.getCliente() != null ? evento.getCliente().getId() : null)
                 .cliente(evento.getCliente() != null ? evento.getCliente().getNombre() : null)
                 .expedienteId(evento.getExpediente() != null ? evento.getExpediente().getId() : null)
@@ -98,7 +138,8 @@ public class WhatsappInboxApiController {
     }
 
     private String estadoPermitido(String estado) {
-        if ("ASOCIADOS".equals(estado) || "NO_ASOCIADOS".equals(estado) || "ERRORES".equals(estado)) {
+        if ("PENDIENTES".equals(estado) || "REVISADOS".equals(estado) || "ARCHIVADOS".equals(estado)
+                || "ASOCIADOS".equals(estado) || "NO_ASOCIADOS".equals(estado) || "ERRORES".equals(estado)) {
             return estado;
         }
         return "TODOS";
@@ -113,5 +154,21 @@ public class WhatsappInboxApiController {
 
     private Usuario requireAdmin(Authentication auth) {
         return currentUserService.requireAdmin(auth);
+    }
+
+    private String limitar(String valor) {
+        if (!StringUtils.hasText(valor)) return "Sin texto visible.";
+        String limpio = valor.trim().replaceAll("\\s+", " ");
+        return limpio.length() <= 180 ? limpio : limpio.substring(0, 177) + "...";
+    }
+
+    private String nullSafe(String valor) {
+        return StringUtils.hasText(valor) ? valor : "sin telefono";
+    }
+
+    private String nombreUsuario(Usuario usuario) {
+        String nombre = ((usuario.getNombre() != null ? usuario.getNombre() : "") + " "
+                + (usuario.getApellidos() != null ? usuario.getApellidos() : "")).trim();
+        return !nombre.isBlank() ? nombre : usuario.getEmail();
     }
 }

@@ -1,7 +1,7 @@
 import * as Tabs from "@radix-ui/react-tabs";
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { History, MessageSquareWarning, MessagesSquare } from "lucide-react";
+import { History, MessageCircle, MessageSquareWarning, MessagesSquare } from "lucide-react";
 import type { ExpedienteDetail } from "../types/expedienteDetail.types";
 import { formatDateTime, humanizeEnum } from "../utils/formatters";
 import { uppercaseInput } from "../../../shared/utils/text";
@@ -40,6 +40,9 @@ export function SecondaryExpedienteTabs({ expediente, onSendMessage }: Props) {
           </Tabs.Trigger>
           <Tabs.Trigger value="mensajes">
             <MessagesSquare size={16} /> Mensajes
+          </Tabs.Trigger>
+          <Tabs.Trigger value="whatsapp">
+            <MessageCircle size={16} /> WhatsApp
           </Tabs.Trigger>
         </Tabs.List>
 
@@ -98,6 +101,26 @@ export function SecondaryExpedienteTabs({ expediente, onSendMessage }: Props) {
                   <strong>{mensaje.autor || "Usuario"}</strong>
                   <p>{mensaje.contenido}</p>
                   <small>{formatDateTime(mensaje.fechaCreacion)}</small>
+                </article>
+              ))}
+            </div>
+          )}
+        </Tabs.Content>
+
+        <Tabs.Content value="whatsapp" className="secondary-tabs__content">
+          {expediente.whatsappMensajes.length === 0 ? (
+            <p className="exp-empty">No hay mensajes de WhatsApp asociados.</p>
+          ) : (
+            <div className="timeline-list">
+              {expediente.whatsappMensajes.map((mensaje) => (
+                <article className={`timeline-item timeline-item--whatsapp timeline-item--${(mensaje.estado || "PENDIENTE").toLowerCase()}`} key={mensaje.id}>
+                  <strong>{mensaje.nombrePerfil || mensaje.telefono || "WhatsApp"}</strong>
+                  <span>{mensaje.estado || "PENDIENTE"}</span>
+                  <p>{mensaje.texto || "Mensaje sin texto visible"}</p>
+                  <small>
+                    {formatDateTime(mensaje.fechaRecepcion)}
+                    {mensaje.revisadoPor ? ` · Revisado por ${mensaje.revisadoPor}` : ""}
+                  </small>
                 </article>
               ))}
             </div>

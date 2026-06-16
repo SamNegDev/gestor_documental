@@ -55,4 +55,7 @@ public class ExpedienteDetailResponse {
 
     @Builder.Default
     private List<MensajeExpedienteResponse> mensajes = new ArrayList<>();
+
+    @Builder.Default
+    private List<WhatsappExpedienteResponse> whatsappMensajes = new ArrayList<>();
 }

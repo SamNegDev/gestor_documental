@@ -174,6 +174,18 @@ export interface MensajeExpediente {
   contenido: string;
 }
 
+export interface WhatsappExpediente {
+  id: number;
+  telefono?: string | null;
+  nombrePerfil?: string | null;
+  tipo?: string | null;
+  texto?: string | null;
+  estado?: "PENDIENTE" | "REVISADO" | "ARCHIVADO" | string | null;
+  fechaRecepcion?: string | null;
+  fechaRevision?: string | null;
+  revisadoPor?: string | null;
+}
+
 export interface PlantillaDocumento {
   codigo: string;
   nombre: string;
@@ -246,4 +258,5 @@ export interface ExpedienteDetail {
   incidencias: IncidenciaExpediente[];
   historial: HistorialExpediente[];
   mensajes: MensajeExpediente[];
+  whatsappMensajes: WhatsappExpediente[];
 }

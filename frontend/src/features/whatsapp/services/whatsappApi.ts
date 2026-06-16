@@ -26,3 +26,11 @@ export function getWhatsappEventos(filters: Filters) {
 export function asociarWhatsappEvento(id: number, body: { clienteId: number; expedienteId?: number | null }) {
   return apiPostJson<WhatsappEvento>(`/api/whatsapp/eventos/${id}/asociar`, body);
 }
+
+export function revisarWhatsappEvento(id: number) {
+  return apiPostJson<WhatsappEvento>(`/api/whatsapp/eventos/${id}/revisar`, {});
+}
+
+export function archivarWhatsappEvento(id: number) {
+  return apiPostJson<WhatsappEvento>(`/api/whatsapp/eventos/${id}/archivar`, {});
+}

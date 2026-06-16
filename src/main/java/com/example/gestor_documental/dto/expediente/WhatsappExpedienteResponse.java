@@ -1,25 +1,18 @@
-package com.example.gestor_documental.dto.whatsapp;
+package com.example.gestor_documental.dto.expediente;
 
 import lombok.Builder;
 import lombok.Getter;
 
 @Getter
 @Builder
-public class WhatsappEventoResponse {
+public class WhatsappExpedienteResponse {
     private Long id;
-    private String messageId;
     private String telefono;
     private String nombrePerfil;
     private String tipo;
     private String texto;
-    private boolean procesado;
     private String estado;
-    private String errorProcesado;
     private String fechaRecepcion;
     private String fechaRevision;
     private String revisadoPor;
-    private Long clienteId;
-    private String cliente;
-    private Long expedienteId;
-    private String matricula;
 }
