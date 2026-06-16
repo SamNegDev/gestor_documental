@@ -63,22 +63,23 @@ public class WhatsappInboxApiController {
         Usuario admin = requireAdmin(authentication);
         WhatsappWebhookEvento evento = eventoRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evento de WhatsApp no encontrado."));
-        if (request == null || request.clienteId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecciona un cliente.");
+        if (request == null || (request.clienteId() == null && request.expedienteId() == null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecciona un cliente o un expediente.");
         }
-        Cliente cliente = clienteRepository.findById(request.clienteId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado."));
-        evento.setCliente(cliente);
         if (request.expedienteId() != null) {
             Expediente expediente = expedienteRepository.findById(request.expedienteId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Expediente no encontrado."));
-            if (expediente.getCliente() == null || !cliente.getId().equals(expediente.getCliente().getId())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El expediente no pertenece al cliente seleccionado.");
+            if (expediente.getCliente() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El expediente no tiene cliente asociado.");
             }
+            evento.setCliente(expediente.getCliente());
             evento.setExpediente(expediente);
             historialCambioService.registrarCambioExpediente(expediente, admin, "WHATSAPP ASOCIADO",
                     "Mensaje de WhatsApp asociado al expediente desde el telefono " + nullSafe(evento.getTelefono()) + ".");
         } else {
+            Cliente cliente = clienteRepository.findById(request.clienteId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado."));
+            evento.setCliente(cliente);
             evento.setExpediente(null);
         }
         return map(eventoRepository.save(evento));

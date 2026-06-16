@@ -168,7 +168,10 @@ function AssociateDialog({ evento, onClose, onDone }: { evento: WhatsappEvento |
   const [clienteId, setClienteId] = useState("");
   const [expedienteId, setExpedienteId] = useState("");
   const mutation = useMutation({
-    mutationFn: () => asociarWhatsappEvento(evento!.id, { clienteId: Number(clienteId), expedienteId: expedienteId ? Number(expedienteId) : null }),
+    mutationFn: () => asociarWhatsappEvento(evento!.id, {
+      clienteId: clienteId ? Number(clienteId) : null,
+      expedienteId: expedienteId ? Number(expedienteId) : null,
+    }),
     onSuccess: onDone,
   });
 
@@ -199,7 +202,7 @@ function AssociateDialog({ evento, onClose, onDone }: { evento: WhatsappEvento |
           <label>
             <span>Cliente</span>
             <select value={clienteId} onChange={(event) => setClienteId(event.target.value)}>
-              <option value="">Selecciona cliente</option>
+              <option value="">Se toma del expediente si indicas uno</option>
               {catalogs.data?.clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
             </select>
           </label>
@@ -211,7 +214,7 @@ function AssociateDialog({ evento, onClose, onDone }: { evento: WhatsappEvento |
         </div>
         <footer className="mail-dialog__actions">
           <button className="soft-button" type="button" onClick={onClose}>Cancelar</button>
-          <button className="primary-button" disabled={!clienteId || mutation.isPending} type="button" onClick={() => mutation.mutate()}>
+          <button className="primary-button" disabled={(!clienteId && !expedienteId) || mutation.isPending} type="button" onClick={() => mutation.mutate()}>
             <Link2 size={16} />
             {mutation.isPending ? "Asociando..." : "Asociar"}
           </button>

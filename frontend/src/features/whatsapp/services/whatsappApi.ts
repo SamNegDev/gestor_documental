@@ -23,7 +23,7 @@ export function getWhatsappEventos(filters: Filters) {
   return apiGet<WhatsappEventosPage>(`/api/whatsapp/eventos${query(filters)}`);
 }
 
-export function asociarWhatsappEvento(id: number, body: { clienteId: number; expedienteId?: number | null }) {
+export function asociarWhatsappEvento(id: number, body: { clienteId?: number | null; expedienteId?: number | null }) {
   return apiPostJson<WhatsappEvento>(`/api/whatsapp/eventos/${id}/asociar`, body);
 }
 
