@@ -188,6 +188,10 @@ En el `docker-compose.yml` actual el puerto se expone solo en `127.0.0.1`, por l
 | `APP_PUBLIC_URL` | URL publica usada en enlaces incluidos en correos. |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Token propio usado por Meta para verificar el webhook de WhatsApp. |
 | `WHATSAPP_APP_SECRET` | Secreto de la app de Meta para validar `X-Hub-Signature-256` si se configura. |
+| `WHATSAPP_ACCESS_TOKEN` | Token permanente del usuario de sistema de Meta para llamar a Cloud API. |
+| `WHATSAPP_PHONE_NUMBER_ID` | ID del numero de telefono emisor de WhatsApp Cloud API. |
+| `WHATSAPP_BUSINESS_ACCOUNT_ID` | ID de la cuenta de WhatsApp Business, usado para plantillas y gestion. |
+| `WHATSAPP_GRAPH_API_VERSION` | Version de Graph API usada para llamadas salientes; por defecto `v23.0`. |
 
 ## OCR y procesamiento documental
 
