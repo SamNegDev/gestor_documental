@@ -6,6 +6,7 @@ import com.example.gestor_documental.dto.tarea.TareasResumenResponse;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoSolicitud;
+import com.example.gestor_documental.enums.EstadoWhatsappAdjunto;
 import com.example.gestor_documental.enums.EstadoWhatsappEvento;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
@@ -16,6 +17,7 @@ import com.example.gestor_documental.model.Mensaje;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.WhatsappAdjunto;
 import com.example.gestor_documental.model.WhatsappWebhookEvento;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
@@ -23,6 +25,7 @@ import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.MensajeRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
+import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
@@ -55,6 +58,7 @@ public class TareaApiController {
     private final IncidenciaRepository incidenciaRepository;
     private final MensajeRepository mensajeRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
+    private final WhatsappAdjuntoRepository whatsappAdjuntoRepository;
     private final WhatsappWebhookEventoRepository whatsappWebhookEventoRepository;
     private final CurrentUserService currentUserService;
     private final ConfiguracionSeguimientoService configuracionSeguimientoService;
@@ -102,6 +106,8 @@ public class TareaApiController {
                     .forEach(evento -> tareas.add(tareaWhatsappSinExpediente(evento)));
             whatsappWebhookEventoRepository.findByEstadoWithoutCliente(EstadoWhatsappEvento.PENDIENTE)
                     .forEach(evento -> tareas.add(tareaWhatsappSinCliente(evento)));
+            whatsappAdjuntoRepository.findByEstadoForTareas(EstadoWhatsappAdjunto.PENDIENTE_CLASIFICAR)
+                    .forEach(adjunto -> tareas.add(tareaWhatsappAdjunto(adjunto)));
             Set<Long> expedientesConIncidenciaPendiente = incidenciasPendientes.stream()
                     .map(Incidencia::getExpediente)
                     .filter(Objects::nonNull)
@@ -217,6 +223,29 @@ public class TareaApiController {
                 .fechaReferencia(format(fecha))
                 .diasPendiente(dias(fecha))
                 .enlace("/expedientes/" + expediente.getId())
+                .build();
+    }
+
+    private TareaResponse tareaWhatsappAdjunto(WhatsappAdjunto adjunto) {
+        LocalDateTime fecha = adjunto.getFechaRecepcion();
+        String contexto = "Archivo: " + (adjunto.getNombreArchivoOriginal() != null ? adjunto.getNombreArchivoOriginal() : "Adjunto sin nombre")
+                + (adjunto.getMimeType() != null ? " - " + adjunto.getMimeType() : "")
+                + (adjunto.getErrorDescarga() != null ? " - Error: " + adjunto.getErrorDescarga() : "");
+        return TareaResponse.builder()
+                .id("WSP-ADJ-" + adjunto.getId() + "-CLASIFICAR")
+                .tipo("WHATSAPP_ADJUNTO_CLASIFICAR")
+                .ambito("GESTION")
+                .prioridad("ALTA")
+                .titulo("Adjunto WhatsApp pendiente")
+                .detalle("Clasifica el archivo recibido y vinculalo al expediente o cliente correcto.")
+                .contexto(limitar(contexto))
+                .entidad("WHATSAPP_ADJUNTO")
+                .entidadId(adjunto.getId())
+                .matricula(adjunto.getExpediente() != null ? adjunto.getExpediente().getMatricula() : null)
+                .cliente(adjunto.getCliente() != null ? adjunto.getCliente().getNombre() : "Sin asociar")
+                .fechaReferencia(format(fecha))
+                .diasPendiente(dias(fecha))
+                .enlace("/admin/whatsapp")
                 .build();
     }
 

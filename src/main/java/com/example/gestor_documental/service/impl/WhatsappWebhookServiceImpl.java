@@ -13,6 +13,7 @@ import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.service.HistorialCambioService;
+import com.example.gestor_documental.service.WhatsappMediaService;
 import com.example.gestor_documental.service.WhatsappOutboundService;
 import com.example.gestor_documental.service.WhatsappWebhookService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -47,6 +48,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final HistorialCambioService historialCambioService;
     private final WhatsappOutboundService whatsappOutboundService;
+    private final WhatsappMediaService whatsappMediaService;
 
     @Value("${app.whatsapp.webhook.verify-token:}")
     private String verifyToken;
@@ -85,11 +87,18 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             evento.setAccionCodigo(extraerAccionCodigo(message));
             evento.setNombrePerfil(text(value.path("contacts").path(0).path("profile").path("name")));
             asociarClienteYExpediente(evento);
-            if (!procesarAccion(evento)) {
+            boolean media = esMedia(message);
+            if (media) {
+                evento.setEstado(EstadoWhatsappEvento.REVISADO);
+                evento.setFechaRevision(LocalDateTime.now());
+            } else if (!procesarAccion(evento)) {
                 procesarMenuEspontaneo(evento);
             }
             evento.setProcesado(true);
-            eventoRepository.save(evento);
+            evento = eventoRepository.save(evento);
+            if (media) {
+                whatsappMediaService.descargarYGuardar(evento, message);
+            }
         } catch (Exception ex) {
             WhatsappWebhookEvento evento = new WhatsappWebhookEvento();
             evento.setPayload(payload != null ? payload : "");
@@ -296,7 +305,24 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             String button = text(message.path("interactive").path("button_reply").path("title"));
             return StringUtils.hasText(button) ? button : text(message.path("interactive").path("list_reply").path("title"));
         }
+        if ("image".equals(tipo)) {
+            String caption = text(message.path("image").path("caption"));
+            return StringUtils.hasText(caption) ? caption : "Imagen recibida por WhatsApp";
+        }
+        if ("document".equals(tipo)) {
+            String caption = text(message.path("document").path("caption"));
+            String filename = text(message.path("document").path("filename"));
+            if (StringUtils.hasText(caption)) {
+                return caption;
+            }
+            return StringUtils.hasText(filename) ? filename : "Documento recibido por WhatsApp";
+        }
         return null;
+    }
+
+    private boolean esMedia(JsonNode message) {
+        String tipo = text(message.path("type"));
+        return "image".equals(tipo) || "document".equals(tipo);
     }
 
     private String extraerAccionCodigo(JsonNode message) {
