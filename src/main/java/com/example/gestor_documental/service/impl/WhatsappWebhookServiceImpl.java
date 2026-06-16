@@ -3,10 +3,14 @@ package com.example.gestor_documental.service.impl;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Incidencia;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.WhatsappWebhookEvento;
+import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
+import com.example.gestor_documental.enums.EstadoWhatsappEvento;
 import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
+import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.WhatsappOutboundService;
@@ -25,9 +29,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.text.Normalizer;
 import java.util.HexFormat;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -38,6 +44,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
     private final ClienteRepository clienteRepository;
     private final ExpedienteRepository expedienteRepository;
     private final IncidenciaRepository incidenciaRepository;
+    private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final HistorialCambioService historialCambioService;
     private final WhatsappOutboundService whatsappOutboundService;
 
@@ -78,7 +85,9 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             evento.setAccionCodigo(extraerAccionCodigo(message));
             evento.setNombrePerfil(text(value.path("contacts").path(0).path("profile").path("name")));
             asociarClienteYExpediente(evento);
-            procesarAccion(evento);
+            if (!procesarAccion(evento)) {
+                procesarMenuEspontaneo(evento);
+            }
             evento.setProcesado(true);
             eventoRepository.save(evento);
         } catch (Exception ex) {
@@ -138,22 +147,56 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         return origen.endsWith(cliente) || cliente.endsWith(origen);
     }
 
-    private void procesarAccion(WhatsappWebhookEvento evento) {
-        if (!StringUtils.hasText(evento.getAccionCodigo()) || evento.getExpediente() == null) {
-            return;
+    private boolean procesarAccion(WhatsappWebhookEvento evento) {
+        if (!StringUtils.hasText(evento.getAccionCodigo())) {
+            return false;
         }
         String accion = evento.getAccionCodigo();
+        if (evento.getCliente() == null) {
+            enviarIdentificacionNecesaria(evento);
+            return true;
+        }
+        if ("gestapp_menu_expedientes".equals(accion)) {
+            enviarEnlacePortalCliente(evento, "Puedes consultar tus expedientes desde el portal:");
+            return true;
+        }
+        if ("gestapp_menu_pendiente".equals(accion)) {
+            enviarDocumentacionPendiente(evento);
+            return true;
+        }
+        if ("gestapp_contactar".equals(accion)) {
+            return false;
+        }
+        if (evento.getExpediente() == null) {
+            enviarEnlacePortalCliente(evento, "Puedes continuar desde el portal de GestApp:");
+            return true;
+        }
         if ("gestapp_recordar_manana".equals(accion)) {
             posponerSeguimiento(evento);
-            return;
+            return true;
         }
         if ("gestapp_enviar_documentacion".equals(accion)) {
             enviarEnlacePortal(evento, "Puedes subir la documentacion desde el portal:");
-            return;
+            return true;
         }
         if ("gestapp_ver_expediente".equals(accion)) {
             enviarEnlacePortal(evento, "Puedes consultar el expediente desde el portal:");
+            return true;
         }
+        return false;
+    }
+
+    private void procesarMenuEspontaneo(WhatsappWebhookEvento evento) {
+        if (!esSolicitudMenu(evento.getTexto())) {
+            return;
+        }
+        if (evento.getCliente() == null) {
+            enviarIdentificacionNecesaria(evento);
+            return;
+        }
+        whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
+        evento.setEstado(EstadoWhatsappEvento.REVISADO);
+        evento.setFechaRevision(LocalDateTime.now());
     }
 
     private void posponerSeguimiento(WhatsappWebhookEvento evento) {
@@ -166,7 +209,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         LocalDateTime proximoAviso = LocalDateTime.now().plusDays(1).with(LocalTime.of(9, 0));
         incidencia.get().setProximoAviso(proximoAviso);
         incidenciaRepository.save(incidencia.get());
-        evento.setEstado(com.example.gestor_documental.enums.EstadoWhatsappEvento.REVISADO);
+        evento.setEstado(EstadoWhatsappEvento.REVISADO);
         evento.setFechaRevision(LocalDateTime.now());
         historialCambioService.registrarCambioExpediente(evento.getExpediente(), evento.getExpediente().getModificadoPor(), "WHATSAPP ACCION",
                 "El cliente pidio recordatorio por WhatsApp. Seguimiento pospuesto hasta " + proximoAviso + ".");
@@ -176,10 +219,69 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         String base = publicUrl != null ? publicUrl : "";
         String enlace = (StringUtils.hasText(base) ? base.replaceAll("/$", "") : "") + "/expedientes/" + evento.getExpediente().getId();
         whatsappOutboundService.enviarTexto(evento.getTelefono(), introduccion + "\n" + enlace);
-        evento.setEstado(com.example.gestor_documental.enums.EstadoWhatsappEvento.REVISADO);
+        evento.setEstado(EstadoWhatsappEvento.REVISADO);
         evento.setFechaRevision(LocalDateTime.now());
         historialCambioService.registrarCambioExpediente(evento.getExpediente(), evento.getExpediente().getModificadoPor(), "WHATSAPP ACCION",
                 "Se envio al cliente un enlace al portal tras pulsar un boton de WhatsApp.");
+    }
+
+    private void enviarEnlacePortalCliente(WhatsappWebhookEvento evento, String introduccion) {
+        String base = publicUrl != null ? publicUrl : "";
+        String enlace = (StringUtils.hasText(base) ? base.replaceAll("/$", "") : "") + "/cliente/expedientes";
+        whatsappOutboundService.enviarTexto(evento.getTelefono(), introduccion + "\n" + enlace);
+        evento.setEstado(EstadoWhatsappEvento.REVISADO);
+        evento.setFechaRevision(LocalDateTime.now());
+    }
+
+    private void enviarDocumentacionPendiente(WhatsappWebhookEvento evento) {
+        if (evento.getExpediente() == null) {
+            enviarEnlacePortalCliente(evento, "Puedes revisar la documentacion pendiente desde el portal:");
+            return;
+        }
+        List<String> pendientes = requisitoRepository.findByExpedienteIdOrderByIdAsc(evento.getExpediente().getId()).stream()
+                .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                .map(this::descripcionRequisito)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .limit(5)
+                .toList();
+        String detalle = pendientes.isEmpty()
+                ? "No veo documentacion marcada como pendiente en tu ultimo expediente. Puedes revisarlo en el portal:"
+                : "Documentacion pendiente en tu ultimo expediente:\n- " + String.join("\n- ", pendientes) + "\n\nPuedes aportarla desde el portal:";
+        enviarEnlacePortal(evento, detalle);
+    }
+
+    private String descripcionRequisito(RequisitoDocumentalExpediente requisito) {
+        if (StringUtils.hasText(requisito.getDescripcion())) {
+            return requisito.getDescripcion().trim();
+        }
+        if (requisito.getTipoDocumento() != null) {
+            return requisito.getTipoDocumento().name().replace('_', ' ');
+        }
+        return null;
+    }
+
+    private void enviarIdentificacionNecesaria(WhatsappWebhookEvento evento) {
+        whatsappOutboundService.enviarTexto(evento.getTelefono(),
+                "Hola, soy GestApp. No he podido identificar este telefono. Responde con tu nombre y la gestoria revisara la asociacion.");
+    }
+
+    private boolean esSolicitudMenu(String texto) {
+        String limpio = normalizarTexto(texto);
+        if (!StringUtils.hasText(limpio)) {
+            return false;
+        }
+        return List.of("hola", "buenas", "buenos dias", "buenas tardes", "menu", "menú", "ayuda", "inicio", "gestapp")
+                .contains(limpio);
+    }
+
+    private String normalizarTexto(String texto) {
+        if (!StringUtils.hasText(texto)) {
+            return null;
+        }
+        String sinAcentos = Normalizer.normalize(texto.trim(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return sinAcentos.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
     }
 
     private String extraerTexto(JsonNode message) {

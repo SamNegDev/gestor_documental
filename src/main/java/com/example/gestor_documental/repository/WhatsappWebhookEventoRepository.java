@@ -58,5 +58,27 @@ public interface WhatsappWebhookEventoRepository extends JpaRepository<WhatsappW
             """)
     List<WhatsappWebhookEvento> findByEstadoWithExpediente(@Param("estado") EstadoWhatsappEvento estado);
 
+    @Query("""
+            select evento from WhatsappWebhookEvento evento
+            left join fetch evento.cliente cliente
+            where evento.messageId is not null
+              and evento.estado = :estado
+              and cliente is null
+            order by evento.fechaRecepcion asc
+            """)
+    List<WhatsappWebhookEvento> findByEstadoWithoutCliente(@Param("estado") EstadoWhatsappEvento estado);
+
+    @Query("""
+            select evento from WhatsappWebhookEvento evento
+            left join fetch evento.cliente cliente
+            left join fetch evento.expediente expediente
+            where evento.messageId is not null
+              and evento.estado = :estado
+              and cliente is not null
+              and expediente is null
+            order by evento.fechaRecepcion asc
+            """)
+    List<WhatsappWebhookEvento> findByEstadoWithClienteWithoutExpediente(@Param("estado") EstadoWhatsappEvento estado);
+
     List<WhatsappWebhookEvento> findByExpedienteIdAndMessageIdIsNotNullOrderByFechaRecepcionDesc(Long expedienteId);
 }

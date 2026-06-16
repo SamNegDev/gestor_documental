@@ -98,6 +98,10 @@ public class TareaApiController {
             incidenciasPendientes.forEach(i -> tareas.add(tareaSeguimientoIncidencia(i)));
             whatsappWebhookEventoRepository.findByEstadoWithExpediente(EstadoWhatsappEvento.PENDIENTE)
                     .forEach(evento -> tareas.add(tareaWhatsapp(evento)));
+            whatsappWebhookEventoRepository.findByEstadoWithClienteWithoutExpediente(EstadoWhatsappEvento.PENDIENTE)
+                    .forEach(evento -> tareas.add(tareaWhatsappSinExpediente(evento)));
+            whatsappWebhookEventoRepository.findByEstadoWithoutCliente(EstadoWhatsappEvento.PENDIENTE)
+                    .forEach(evento -> tareas.add(tareaWhatsappSinCliente(evento)));
             Set<Long> expedientesConIncidenciaPendiente = incidenciasPendientes.stream()
                     .map(Incidencia::getExpediente)
                     .filter(Objects::nonNull)
@@ -213,6 +217,53 @@ public class TareaApiController {
                 .fechaReferencia(format(fecha))
                 .diasPendiente(dias(fecha))
                 .enlace("/expedientes/" + expediente.getId())
+                .build();
+    }
+
+    private TareaResponse tareaWhatsappSinExpediente(WhatsappWebhookEvento evento) {
+        LocalDateTime fecha = evento.getFechaRecepcion();
+        String contacto = evento.getNombrePerfil() != null && !evento.getNombrePerfil().isBlank()
+                ? evento.getNombrePerfil()
+                : evento.getTelefono();
+        String tipo = tipoTareaWhatsapp(evento);
+        return TareaResponse.builder()
+                .id("WSP-" + evento.getId() + "-REVISION")
+                .tipo(tipo)
+                .ambito("GESTION")
+                .prioridad("ALTA")
+                .titulo(tituloTareaWhatsapp(tipo))
+                .detalle("Hay un mensaje de WhatsApp de un cliente identificado, pero sin expediente asociado.")
+                .contexto(limitar((contacto != null ? contacto + ": " : "") + (evento.getTexto() != null ? evento.getTexto() : "Mensaje sin texto visible.")))
+                .entidad("WHATSAPP")
+                .entidadId(evento.getId())
+                .matricula(null)
+                .cliente(evento.getCliente() != null ? evento.getCliente().getNombre() : null)
+                .fechaReferencia(format(fecha))
+                .diasPendiente(dias(fecha))
+                .enlace("/admin/whatsapp")
+                .build();
+    }
+
+    private TareaResponse tareaWhatsappSinCliente(WhatsappWebhookEvento evento) {
+        LocalDateTime fecha = evento.getFechaRecepcion();
+        String contacto = evento.getNombrePerfil() != null && !evento.getNombrePerfil().isBlank()
+                ? evento.getNombrePerfil()
+                : evento.getTelefono();
+        return TareaResponse.builder()
+                .id("WSP-" + evento.getId() + "-ASOCIAR")
+                .tipo("WHATSAPP_PENDIENTE_ASOCIAR")
+                .ambito("GESTION")
+                .prioridad("ALTA")
+                .titulo("WhatsApp sin cliente asociado")
+                .detalle("Hay que identificar el telefono y asociarlo a un cliente antes de poder automatizar acciones.")
+                .contexto(limitar((contacto != null ? contacto + ": " : "") + (evento.getTexto() != null ? evento.getTexto() : "Mensaje sin texto visible.")))
+                .entidad("WHATSAPP")
+                .entidadId(evento.getId())
+                .matricula(null)
+                .cliente("Sin asociar")
+                .fechaReferencia(format(fecha))
+                .diasPendiente(dias(fecha))
+                .enlace("/admin/whatsapp")
                 .build();
     }
 
