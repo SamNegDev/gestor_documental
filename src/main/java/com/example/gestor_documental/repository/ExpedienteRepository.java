@@ -157,4 +157,15 @@ public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
                                   @Param("texto") String texto,
                                   @Param("identificador") String identificador,
                                   Pageable pageable);
+
+    @Query("""
+            select e from Expediente e
+            left join fetch e.cliente
+            left join fetch e.tipoTramite
+            where e.cliente.id = :clienteId
+              and upper(replace(replace(coalesce(e.matricula, ''), ' ', ''), '-', '')) = :matricula
+            order by coalesce(e.fechaUltimaModificacion, e.fechaCreacion) desc
+            """)
+    List<Expediente> findByClienteIdAndMatriculaNormalizada(@Param("clienteId") Long clienteId,
+                                                            @Param("matricula") String matricula);
 }

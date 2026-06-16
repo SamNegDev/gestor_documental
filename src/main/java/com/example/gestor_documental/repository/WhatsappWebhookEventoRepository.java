@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface WhatsappWebhookEventoRepository extends JpaRepository<WhatsappWebhookEvento, Long> {
     boolean existsByMessageId(String messageId);
@@ -81,4 +82,6 @@ public interface WhatsappWebhookEventoRepository extends JpaRepository<WhatsappW
     List<WhatsappWebhookEvento> findByEstadoWithClienteWithoutExpediente(@Param("estado") EstadoWhatsappEvento estado);
 
     List<WhatsappWebhookEvento> findByExpedienteIdAndMessageIdIsNotNullOrderByFechaRecepcionDesc(Long expedienteId);
+
+    Optional<WhatsappWebhookEvento> findTopByTelefonoAndMessageIdIsNotNullOrderByFechaRecepcionDesc(String telefono);
 }

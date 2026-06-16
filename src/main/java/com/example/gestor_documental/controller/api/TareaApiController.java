@@ -303,18 +303,23 @@ public class TareaApiController {
         if ("gestapp_contactar".equals(evento.getAccionCodigo())) {
             return "WHATSAPP_CONTACTO_SOLICITADO";
         }
+        if ("gestapp_estado_tramite".equals(evento.getAccionCodigo()) || "gestapp_menu_expedientes".equals(evento.getAccionCodigo())) {
+            return "WHATSAPP_ESTADO_SOLICITADO";
+        }
         return "WHATSAPP_PENDIENTE_REVISION";
     }
 
     private String tituloTareaWhatsapp(String tipo) {
         if ("WHATSAPP_APORTACION_INDICADA".equals(tipo)) return "Cliente indica aportacion enviada";
         if ("WHATSAPP_CONTACTO_SOLICITADO".equals(tipo)) return "Cliente solicita contacto";
+        if ("WHATSAPP_ESTADO_SOLICITADO".equals(tipo)) return "Cliente solicita estado del tramite";
         return "Respuesta WhatsApp pendiente";
     }
 
     private String detalleTareaWhatsapp(String tipo) {
         if ("WHATSAPP_APORTACION_INDICADA".equals(tipo)) return "El cliente pulso 'Ya lo envie'. Revisa si la documentacion o respuesta ha llegado.";
         if ("WHATSAPP_CONTACTO_SOLICITADO".equals(tipo)) return "El cliente ha pedido que la gestoria contacte con el.";
+        if ("WHATSAPP_ESTADO_SOLICITADO".equals(tipo)) return "El cliente ha pedido una revision o actualizacion del estado de su tramite.";
         return "Hay un mensaje de WhatsApp asociado al expediente pendiente de revisar.";
     }
 

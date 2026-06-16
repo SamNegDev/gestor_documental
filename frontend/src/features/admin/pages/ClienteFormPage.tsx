@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Building2, ExternalLink, FileText, Image, Save, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Building2, ExternalLink, FileText, Image, MessageCircle, Save, Trash2, Upload } from "lucide-react";
 import {
   createCliente,
   deleteClienteDocumento,
   deleteClienteLogo,
   getCliente,
+  iniciarWhatsappCliente,
   updateCliente,
   uploadClienteDocumento,
   uploadClienteLogo,
@@ -62,6 +63,7 @@ export function ClienteFormPage() {
   const [documentType, setDocumentType] = useState("DNI");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [documentFeedback, setDocumentFeedback] = useState<BrandingFeedback>(null);
+  const [whatsappFeedback, setWhatsappFeedback] = useState<BrandingFeedback>(null);
   const { confirm, dialog } = useConfirmDialog();
 
   const clienteQuery = useQuery({
@@ -129,6 +131,15 @@ export function ClienteFormPage() {
       setDocumentFeedback({ tone: "success", text: "Documento del cliente eliminado." });
     },
     onError: (cause) => setDocumentFeedback({ tone: "danger", text: errorMessage(cause, "No se pudo eliminar el documento.") }),
+  });
+
+  const iniciarWhatsappMutation = useMutation({
+    mutationFn: () => iniciarWhatsappCliente(id!),
+    onSuccess: (resultado) => setWhatsappFeedback({
+      tone: "success",
+      text: resultado.simulado ? "Presentacion preparada en modo simulacion." : "Presentacion y menu enviados por WhatsApp.",
+    }),
+    onError: (cause) => setWhatsappFeedback({ tone: "danger", text: errorMessage(cause, "No se pudo iniciar la conversacion por WhatsApp.") }),
   });
 
   function handleLogoFile(tipo: LogoType, archivo?: File) {
@@ -213,11 +224,33 @@ export function ClienteFormPage() {
             </div>
           </div>
         </div>
-        <Link className="soft-button soft-button--compact" to="/admin/clientes">
-          <ArrowLeft size={16} />
-          Volver
-        </Link>
+        <div className="request-hero__actions">
+          {isEdit ? (
+            <button
+              className="soft-button soft-button--compact"
+              disabled={!form.telefono || iniciarWhatsappMutation.isPending}
+              type="button"
+              onClick={() => {
+                setWhatsappFeedback(null);
+                iniciarWhatsappMutation.mutate();
+              }}
+            >
+              <MessageCircle size={16} />
+              {iniciarWhatsappMutation.isPending ? "Enviando" : "Iniciar WhatsApp"}
+            </button>
+          ) : null}
+          <Link className="soft-button soft-button--compact" to="/admin/clientes">
+            <ArrowLeft size={16} />
+            Volver
+          </Link>
+        </div>
       </section>
+
+      {whatsappFeedback ? (
+        <p className={`client-branding-feedback client-branding-feedback--${whatsappFeedback.tone}`} role="status">
+          {whatsappFeedback.text}
+        </p>
+      ) : null}
 
       <form className="request-form-grid" onSubmit={(event) => { event.preventDefault(); saveMutation.mutate(); }}>
         <section className="panel request-form-main">

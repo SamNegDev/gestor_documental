@@ -19,6 +19,7 @@ import com.example.gestor_documental.service.ClienteLogoService;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.UsuarioService;
+import com.example.gestor_documental.service.WhatsappOutboundService;
 import com.example.gestor_documental.util.TextNormalizer;
 import com.example.gestor_documental.util.ClienteBrandingUrls;
 import java.net.URI;
@@ -52,6 +53,7 @@ public class AdminManagementApiController {
     private final DocumentoService documentoService;
     private final UsuarioService usuarioService;
     private final CurrentUserService currentUserService;
+    private final WhatsappOutboundService whatsappOutboundService;
 
     @GetMapping("/clientes")
     public List<ClienteAdminResponse> listarClientes(Authentication authentication) {
@@ -126,6 +128,35 @@ public class AdminManagementApiController {
         Cliente cliente = clienteService.buscarPorId(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
         return mapClienteAdmin(cliente);
+    }
+
+    @PostMapping("/clientes/{id}/whatsapp/iniciar")
+    public Map<String, Object> iniciarWhatsappCliente(@PathVariable Long id, Authentication authentication) {
+        requireAdmin(authentication);
+        Cliente cliente = clienteService.buscarPorId(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
+        if (isBlank(cliente.getTelefono())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El cliente no tiene telefono configurado");
+        }
+        String nombre = cliente.getNombre() != null ? cliente.getNombre() : "";
+        String presentacion = """
+                Hola%s, soy GestApp, el asistente de Gestoria Casado Negrin.
+
+                Desde aqui puedes consultar el estado de tus tramites, aportar documentacion o iniciar una nueva solicitud.
+                """.formatted(nombre.isBlank() ? "" : " " + nombre).trim();
+        WhatsappOutboundService.ResultadoWhatsapp texto = whatsappOutboundService.enviarTexto(cliente.getTelefono(), presentacion);
+        if (!texto.exito()) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, texto.error());
+        }
+        WhatsappOutboundService.ResultadoWhatsapp menu = whatsappOutboundService.enviarMenuPrincipal(cliente.getTelefono());
+        if (!menu.exito()) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, menu.error());
+        }
+        return Map.of(
+                "exito", true,
+                "simulado", texto.simulado() || menu.simulado(),
+                "messageId", menu.messageId() != null ? menu.messageId() : ""
+        );
     }
 
     @DeleteMapping("/clientes/{id}/logos/{tipo}")

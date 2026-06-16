@@ -42,6 +42,10 @@ export function deleteClienteDocumento(documentoId: number) {
   return apiDelete(`/api/documentos/${documentoId}`);
 }
 
+export function iniciarWhatsappCliente(id: string | number) {
+  return apiPostJson<{ exito: boolean; simulado: boolean; messageId?: string }>(`/api/admin/clientes/${id}/whatsapp/iniciar`, {});
+}
+
 export function getUsuarios() {
   return apiGet<UsuarioAdmin[]>("/api/admin/usuarios");
 }

@@ -80,6 +80,7 @@ export function TareasPage() {
             <option value="WHATSAPP_ADJUNTO_CLASIFICAR">WhatsApp: adjuntos</option>
             <option value="WHATSAPP_APORTACION_INDICADA">WhatsApp: aportacion indicada</option>
             <option value="WHATSAPP_CONTACTO_SOLICITADO">WhatsApp: contacto solicitado</option>
+            <option value="WHATSAPP_ESTADO_SOLICITADO">WhatsApp: estado solicitado</option>
             <option value="EXPEDIENTE_ESTANCADO">Sin actividad</option>
           </select>
         </label>
@@ -209,7 +210,7 @@ function taskIcon(tipo: string) {
   if (tipo === "EXPEDIENTE_ESTANCADO") return <Clock3 size={19} />;
   if (tipo === "DOCUMENTACION_PENDIENTE_CLIENTE" || tipo === "JUSTIFICANTE_FINAL_PENDIENTE") return <FileWarning size={19} />;
   if (tipo === "INFORMACION_PENDIENTE_CLIENTE") return <MessageCircle size={19} />;
-  if (tipo === "WHATSAPP_PENDIENTE_REVISION" || tipo === "WHATSAPP_PENDIENTE_ASOCIAR" || tipo === "WHATSAPP_ADJUNTO_CLASIFICAR" || tipo === "WHATSAPP_APORTACION_INDICADA" || tipo === "WHATSAPP_CONTACTO_SOLICITADO") return <MessageCircle size={19} />;
+  if (tipo === "WHATSAPP_PENDIENTE_REVISION" || tipo === "WHATSAPP_PENDIENTE_ASOCIAR" || tipo === "WHATSAPP_ADJUNTO_CLASIFICAR" || tipo === "WHATSAPP_APORTACION_INDICADA" || tipo === "WHATSAPP_CONTACTO_SOLICITADO" || tipo === "WHATSAPP_ESTADO_SOLICITADO") return <MessageCircle size={19} />;
   if (tipo === "APORTACION_PENDIENTE_REVISION") return <SearchCheck size={19} />;
   if (tipo === "SOLICITUD_PENDIENTE_REVISION") return <ClipboardList size={19} />;
   if (tipo.startsWith("INCIDENCIA_")) return <AlertTriangle size={19} />;
@@ -227,6 +228,7 @@ function taskActionKind(tipo: string): { label: string; tone: "neutral" | "warni
   if (tipo === "WHATSAPP_PENDIENTE_ASOCIAR") return { label: "WHATSAPP SIN ASOCIAR", tone: "warning" };
   if (tipo === "WHATSAPP_ADJUNTO_CLASIFICAR") return { label: "WHATSAPP ADJUNTO", tone: "warning" };
   if (tipo === "WHATSAPP_CONTACTO_SOLICITADO") return { label: "WHATSAPP CONTACTO", tone: "danger" };
+  if (tipo === "WHATSAPP_ESTADO_SOLICITADO") return { label: "WHATSAPP ESTADO", tone: "info" };
   if (tipo === "WHATSAPP_PENDIENTE_REVISION") return { label: "WHATSAPP", tone: "info" };
   if (tipo === "SOLICITUD_PENDIENTE_REVISION") return { label: "SOLICITUD", tone: "neutral" };
   return null;
@@ -236,6 +238,6 @@ function taskContextLabel(tipo: string) {
   if (tipo === "EXPEDIENTE_ESTANCADO") return "Motivo";
   if (tipo === "JUSTIFICANTE_FINAL_PENDIENTE") return "Pendiente";
   if (tipo === "WHATSAPP_ADJUNTO_CLASIFICAR") return "Archivo";
-  if (tipo === "WHATSAPP_PENDIENTE_REVISION" || tipo === "WHATSAPP_PENDIENTE_ASOCIAR" || tipo === "WHATSAPP_APORTACION_INDICADA" || tipo === "WHATSAPP_CONTACTO_SOLICITADO") return "Mensaje";
+  if (tipo === "WHATSAPP_PENDIENTE_REVISION" || tipo === "WHATSAPP_PENDIENTE_ASOCIAR" || tipo === "WHATSAPP_APORTACION_INDICADA" || tipo === "WHATSAPP_CONTACTO_SOLICITADO" || tipo === "WHATSAPP_ESTADO_SOLICITADO") return "Mensaje";
   return "Detalle solicitado";
 }
