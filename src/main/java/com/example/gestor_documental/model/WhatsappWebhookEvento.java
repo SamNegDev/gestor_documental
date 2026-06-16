@@ -49,6 +49,9 @@ public class WhatsappWebhookEvento {
     @Column(columnDefinition = "TEXT")
     private String texto;
 
+    @Column(length = 80)
+    private String accionCodigo;
+
     @Column(columnDefinition = "LONGTEXT", nullable = false)
     private String payload;
 

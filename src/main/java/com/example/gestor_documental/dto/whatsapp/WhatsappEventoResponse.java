@@ -12,6 +12,7 @@ public class WhatsappEventoResponse {
     private String nombrePerfil;
     private String tipo;
     private String texto;
+    private String accionCodigo;
     private boolean procesado;
     private String estado;
     private String errorProcesado;

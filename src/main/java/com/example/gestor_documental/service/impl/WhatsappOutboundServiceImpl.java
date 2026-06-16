@@ -72,6 +72,42 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
     }
 
     @Override
+    public ResultadoWhatsapp enviarAvisoSeguimiento(String destinatario, String mensaje) {
+        String telefono = normalizarTelefono(destinatario);
+        if (!StringUtils.hasText(telefono)) {
+            return ResultadoWhatsapp.error("El cliente no tiene un telefono configurado.");
+        }
+        if (!envioRealDisponible()) {
+            return ResultadoWhatsapp.simulacion();
+        }
+        try {
+            Map<String, Object> payload = Map.of(
+                    "messaging_product", "whatsapp",
+                    "to", telefono,
+                    "type", "interactive",
+                    "interactive", Map.of(
+                            "type", "button",
+                            "body", Map.of("text", mensaje != null ? mensaje : ""),
+                            "action", Map.of("buttons", java.util.List.of(
+                                    quickReply("gestapp_ya_lo_envie", "Ya lo envie"),
+                                    quickReply("gestapp_recordar_manana", "Recordarme manana"),
+                                    quickReply("gestapp_contactar", "Contactar")
+                            ))
+                    )
+            );
+            JsonNode response = enviar(payload);
+            String messageId = response != null ? response.path("messages").path(0).path("id").asText(null) : null;
+            return ResultadoWhatsapp.enviado(messageId);
+        } catch (RestClientResponseException ex) {
+            String body = ex.getResponseBodyAsString();
+            return ResultadoWhatsapp.error("WhatsApp ha rechazado el envio (" + ex.getStatusCode().value() + "): "
+                    + (StringUtils.hasText(body) ? body : ex.getMessage()));
+        } catch (RestClientException | IllegalArgumentException ex) {
+            return ResultadoWhatsapp.error("No se pudo enviar por WhatsApp: " + ex.getMessage());
+        }
+    }
+
+    @Override
     public boolean envioRealDisponible() {
         return StringUtils.hasText(accessToken) && StringUtils.hasText(phoneNumberId);
     }
@@ -79,6 +115,30 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
     private String version() {
         String value = StringUtils.hasText(graphApiVersion) ? graphApiVersion.trim() : "v23.0";
         return value.startsWith("v") ? value : "v" + value;
+    }
+
+    private JsonNode enviar(Map<String, Object> payload) {
+        return restClient.post()
+                .uri(uriBuilder -> uriBuilder
+                        .scheme("https")
+                        .host("graph.facebook.com")
+                        .pathSegment(version(), phoneNumberId.trim(), "messages")
+                        .build())
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken.trim())
+                .body(payload)
+                .retrieve()
+                .body(JsonNode.class);
+    }
+
+    private Map<String, Object> quickReply(String id, String title) {
+        return Map.of(
+                "type", "reply",
+                "reply", Map.of(
+                        "id", id,
+                        "title", title
+                )
+        );
     }
 
     private String normalizarTelefono(String value) {

@@ -129,6 +129,7 @@ public class WhatsappInboxApiController {
                 .nombrePerfil(evento.getNombrePerfil())
                 .tipo(evento.getTipo())
                 .texto(evento.getTexto())
+                .accionCodigo(evento.getAccionCodigo())
                 .procesado(evento.isProcesado())
                 .estado(evento.getEstado() != null ? evento.getEstado().name() : null)
                 .errorProcesado(evento.getErrorProcesado())

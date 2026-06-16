@@ -197,13 +197,14 @@ public class TareaApiController {
         String contacto = evento.getNombrePerfil() != null && !evento.getNombrePerfil().isBlank()
                 ? evento.getNombrePerfil()
                 : evento.getTelefono();
+        String tipo = tipoTareaWhatsapp(evento);
         return TareaResponse.builder()
                 .id("WSP-" + evento.getId() + "-REVISION")
-                .tipo("WHATSAPP_PENDIENTE_REVISION")
+                .tipo(tipo)
                 .ambito("GESTION")
                 .prioridad("ALTA")
-                .titulo("Respuesta WhatsApp pendiente")
-                .detalle("Hay un mensaje de WhatsApp asociado al expediente pendiente de revisar.")
+                .titulo(tituloTareaWhatsapp(tipo))
+                .detalle(detalleTareaWhatsapp(tipo))
                 .contexto(limitar((contacto != null ? contacto + ": " : "") + (evento.getTexto() != null ? evento.getTexto() : "Mensaje sin texto visible.")))
                 .entidad("WHATSAPP")
                 .entidadId(evento.getId())
@@ -213,6 +214,28 @@ public class TareaApiController {
                 .diasPendiente(dias(fecha))
                 .enlace("/expedientes/" + expediente.getId())
                 .build();
+    }
+
+    private String tipoTareaWhatsapp(WhatsappWebhookEvento evento) {
+        if ("gestapp_ya_lo_envie".equals(evento.getAccionCodigo())) {
+            return "WHATSAPP_APORTACION_INDICADA";
+        }
+        if ("gestapp_contactar".equals(evento.getAccionCodigo())) {
+            return "WHATSAPP_CONTACTO_SOLICITADO";
+        }
+        return "WHATSAPP_PENDIENTE_REVISION";
+    }
+
+    private String tituloTareaWhatsapp(String tipo) {
+        if ("WHATSAPP_APORTACION_INDICADA".equals(tipo)) return "Cliente indica aportacion enviada";
+        if ("WHATSAPP_CONTACTO_SOLICITADO".equals(tipo)) return "Cliente solicita contacto";
+        return "Respuesta WhatsApp pendiente";
+    }
+
+    private String detalleTareaWhatsapp(String tipo) {
+        if ("WHATSAPP_APORTACION_INDICADA".equals(tipo)) return "El cliente pulso 'Ya lo envie'. Revisa si la documentacion o respuesta ha llegado.";
+        if ("WHATSAPP_CONTACTO_SOLICITADO".equals(tipo)) return "El cliente ha pedido que la gestoria contacte con el.";
+        return "Hay un mensaje de WhatsApp asociado al expediente pendiente de revisar.";
     }
 
     private boolean tieneIncidenciaActiva(Long expedienteId) {

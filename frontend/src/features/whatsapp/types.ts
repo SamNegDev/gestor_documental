@@ -7,6 +7,7 @@ export interface WhatsappEvento {
   nombrePerfil?: string | null;
   tipo?: string | null;
   texto?: string | null;
+  accionCodigo?: string | null;
   procesado: boolean;
   estado?: "PENDIENTE" | "REVISADO" | "ARCHIVADO" | string | null;
   errorProcesado?: string | null;

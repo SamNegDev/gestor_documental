@@ -2,6 +2,7 @@ package com.example.gestor_documental.service;
 
 public interface WhatsappOutboundService {
     ResultadoWhatsapp enviarTexto(String destinatario, String mensaje);
+    ResultadoWhatsapp enviarAvisoSeguimiento(String destinatario, String mensaje);
     boolean envioRealDisponible();
 
     record ResultadoWhatsapp(boolean exito, boolean simulado, String messageId, String error) {

@@ -423,7 +423,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         if (numero > config.getMaxAvisos()) throw new OperacionInvalidaException("Se ha alcanzado el maximo de avisos. Archiva el seguimiento.");
         String texto = mensaje != null && !mensaje.isBlank() ? mensaje.trim() : mensajeWhatsappPorDefecto(incidencia, numero);
         String destinatario = telefonoCliente(incidencia);
-        WhatsappOutboundService.ResultadoWhatsapp resultado = whatsappOutboundService.enviarTexto(destinatario, texto);
+        WhatsappOutboundService.ResultadoWhatsapp resultado = whatsappOutboundService.enviarAvisoSeguimiento(destinatario, texto);
         AvisoIncidencia aviso = new AvisoIncidencia();
         aviso.setIncidencia(incidencia); aviso.setNumeroAviso(numero); aviso.setEnviadoPor(admin); aviso.setMensaje(texto);
         aviso.setDestinatario(destinatario); aviso.setAsunto("WhatsApp aviso " + numero); aviso.setCanal("WHATSAPP");
