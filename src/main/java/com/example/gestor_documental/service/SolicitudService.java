@@ -5,6 +5,7 @@ import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 
 import java.util.List;
 import java.util.Optional;
@@ -49,6 +50,8 @@ public interface SolicitudService {
             Long tipoTramiteId);
 
     Expediente convertirAExpediente(Long solicitudId, Usuario admin);
+
+    List<SolicitudInteresadoCoincidenciaResponse> buscarCoincidenciasInteresadosConDiferencias(Long solicitudId, Usuario admin);
 
     void cambiarEstadoSolicitud(Long id, EstadoSolicitud nuevoEstado, Usuario admin);
 

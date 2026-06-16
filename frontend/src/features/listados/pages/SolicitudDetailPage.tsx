@@ -23,6 +23,7 @@ import {
   cambiarEstadoSolicitud,
   convertirSolicitud,
   enviarMensajeSolicitud,
+  getSolicitudInteresadoCoincidencias,
   getSolicitudDetail,
 } from "../services/listadosApi";
 import type { SolicitudDetail } from "../types";
@@ -36,6 +37,7 @@ export function SolicitudDetailPage() {
   const [ocrReviewOpen, setOcrReviewOpen] = useState(false);
   const [ocrReviewDocuments, setOcrReviewDocuments] = useState<DocumentoExpediente[]>([]);
   const [completeSolicitudProcessing, setCompleteSolicitudProcessing] = useState(false);
+  const [checkingInteresados, setCheckingInteresados] = useState(false);
   const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
 
@@ -203,6 +205,30 @@ export function SolicitudDetailPage() {
     }
   };
 
+  const handleConvertSolicitud = async () => {
+    const solicitudActual = solicitudQuery.data;
+    if (!solicitudActual) return;
+    setCheckingInteresados(true);
+    try {
+      const coincidencias = await getSolicitudInteresadoCoincidencias(solicitudActual.id);
+      if (coincidencias.length > 0) {
+        const confirmed = await confirm({
+          title: "Interesado ya registrado",
+          description: buildCoincidenciasDescription(coincidencias),
+          confirmLabel: "Usar datos registrados",
+          cancelLabel: "Revisar solicitud",
+          tone: "default",
+        });
+        if (!confirmed) return;
+      }
+      convertirMutation.mutate(solicitudActual.id);
+    } catch {
+      alert("No se pudo comprobar si los interesados ya estaban registrados.");
+    } finally {
+      setCheckingInteresados(false);
+    }
+  };
+
   if (solicitudQuery.isLoading) {
     return <div className="records-empty">Cargando solicitud...</div>;
   }
@@ -254,9 +280,9 @@ export function SolicitudDetailPage() {
         <AdminActions
           solicitud={solicitud}
           isClosed={isClosed}
-          onConvert={() => convertirMutation.mutate(solicitud.id)}
+          onConvert={handleConvertSolicitud}
           onStateChange={(estado) => estadoMutation.mutate({ solicitudId: solicitud.id, estado })}
-          pending={convertirMutation.isPending || estadoMutation.isPending}
+          pending={checkingInteresados || convertirMutation.isPending || estadoMutation.isPending}
         />
       ) : null}
 
@@ -570,6 +596,27 @@ function hasInteresadoData(interesado: { nombre?: string | null; apellidos?: str
   return [interesado.nombre, interesado.apellidos, interesado.rol, interesado.dni, interesado.telefono, interesado.direccion].some(
     (value) => value && value.trim() !== "",
   );
+}
+
+function buildCoincidenciasDescription(coincidencias: Array<{
+  rol?: string | null;
+  dni?: string | null;
+  camposDiferentes: string[];
+  nombreRegistrado?: string | null;
+  nombreDeclarado?: string | null;
+  telefonoRegistrado?: string | null;
+  telefonoDeclarado?: string | null;
+  direccionRegistrada?: string | null;
+  direccionDeclarada?: string | null;
+}>) {
+  return coincidencias
+    .map((item) => {
+      const diferencias = item.camposDiferentes.join(", ");
+      const registrado = [item.nombreRegistrado, item.telefonoRegistrado, item.direccionRegistrada].filter(Boolean).join(" / ");
+      const declarado = [item.nombreDeclarado, item.telefonoDeclarado, item.direccionDeclarada].filter(Boolean).join(" / ");
+      return `${item.rol ? formatEnum(item.rol) + " - " : ""}${item.dni}: cambian ${diferencias}. Registro: ${registrado || "sin datos"}. Solicitud: ${declarado || "sin datos"}.`;
+    })
+    .join("\n");
 }
 
 function getInformativeMissingDocuments(solicitud: SolicitudDetail) {

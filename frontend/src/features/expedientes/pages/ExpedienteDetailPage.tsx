@@ -551,9 +551,9 @@ function InterestedPartiesCorrectionDialog({
                 </button>
               </div>
               <InteresadoAutocomplete
-                label="Nombre"
+                label="Nombre completo/Razon social"
                 value={row.nombre || ""}
-                placeholder="Buscar o escribir nombre"
+                placeholder="Buscar o escribir nombre o razon social"
                 onChange={(value) => updateRow(index, "nombre", value)}
                 onSelect={(interesado) => selectInteresado(index, interesado)}
               />

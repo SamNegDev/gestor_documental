@@ -1,6 +1,7 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.InteresadoFormDto;
+import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolInteresado;
@@ -15,6 +16,7 @@ import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
+import com.example.gestor_documental.service.InteresadoService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.util.TextNormalizer;
@@ -38,6 +40,7 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final DocumentoRepository documentoRepository;
     private final IncidenciaRepository incidenciaRepository;
     private final HistorialCambioService historialCambioService;
+    private final InteresadoService interesadoService;
 
     @Override
     public List<Solicitud> listarTodas() {
@@ -263,14 +266,14 @@ public class SolicitudServiceImpl implements SolicitudService {
 
          InteresadoFormDto interesado1dto = new InteresadoFormDto();
          interesado1dto.setDni(solicitud.getInteresado1Dni());
-         interesado1dto.setNombre(solicitud.getInteresado1Nombre());
+         interesado1dto.setNombre(nombreCompletoDeclarado(solicitud.getInteresado1Nombre(), solicitud.getInteresado1Apellidos()));
          interesado1dto.setRol(solicitud.getInteresado1Rol());
          interesado1dto.setDireccion(solicitud.getInteresado1Direccion());
          interesado1dto.setTelefono(solicitud.getInteresado1Telefono());
 
          InteresadoFormDto interesado2dto = new InteresadoFormDto();
          interesado2dto.setDni(solicitud.getInteresado2Dni());
-         interesado2dto.setNombre(solicitud.getInteresado2Nombre());
+         interesado2dto.setNombre(nombreCompletoDeclarado(solicitud.getInteresado2Nombre(), solicitud.getInteresado2Apellidos()));
          interesado2dto.setRol(solicitud.getInteresado2Rol());
          interesado2dto.setDireccion(solicitud.getInteresado2Direccion());
          interesado2dto.setTelefono(solicitud.getInteresado2Telefono());
@@ -288,6 +291,92 @@ public class SolicitudServiceImpl implements SolicitudService {
         );
 
         return expedienteGuardado;
+    }
+
+    @Override
+    public List<SolicitudInteresadoCoincidenciaResponse> buscarCoincidenciasInteresadosConDiferencias(Long solicitudId, Usuario admin) {
+        if (admin == null || admin.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo el administrador puede revisar coincidencias de interesados");
+        }
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+        if (!tienePermisoSolicitud(solicitud, admin)) {
+            throw new AccesoDenegadoException("No tienes permiso para acceder a esta solicitud");
+        }
+
+        return List.of(
+                        construirCoincidenciaSiHayDiferencias(
+                                solicitud.getInteresado1Rol(),
+                                solicitud.getInteresado1Dni(),
+                                nombreCompletoDeclarado(solicitud.getInteresado1Nombre(), solicitud.getInteresado1Apellidos()),
+                                solicitud.getInteresado1Telefono(),
+                                solicitud.getInteresado1Direccion()
+                        ),
+                        construirCoincidenciaSiHayDiferencias(
+                                solicitud.getInteresado2Rol(),
+                                solicitud.getInteresado2Dni(),
+                                nombreCompletoDeclarado(solicitud.getInteresado2Nombre(), solicitud.getInteresado2Apellidos()),
+                                solicitud.getInteresado2Telefono(),
+                                solicitud.getInteresado2Direccion()
+                        )
+                ).stream()
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    private Optional<SolicitudInteresadoCoincidenciaResponse> construirCoincidenciaSiHayDiferencias(
+            RolInteresado rol,
+            String dni,
+            String nombreDeclarado,
+            String telefonoDeclarado,
+            String direccionDeclarada
+    ) {
+        if (dni == null || dni.isBlank()) {
+            return Optional.empty();
+        }
+        return interesadoService.buscarInteresadoPorDNI(dni)
+                .flatMap(interesado -> {
+                    List<String> diferencias = new java.util.ArrayList<>();
+                    if (valorAportadoDiferente(nombreDeclarado, interesado.getNombre())) {
+                        diferencias.add("Nombre completo/Razon social");
+                    }
+                    if (valorAportadoDiferente(telefonoDeclarado, interesado.getTelefono())) {
+                        diferencias.add("Telefono");
+                    }
+                    if (valorAportadoDiferente(direccionDeclarada, interesado.getDireccion())) {
+                        diferencias.add("Direccion");
+                    }
+                    if (diferencias.isEmpty()) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(SolicitudInteresadoCoincidenciaResponse.builder()
+                            .rol(rol != null ? rol.name() : null)
+                            .dni(interesado.getDni())
+                            .nombreRegistrado(interesado.getNombre())
+                            .nombreDeclarado(TextNormalizer.upperOrNull(nombreDeclarado))
+                            .telefonoRegistrado(interesado.getTelefono())
+                            .telefonoDeclarado(TextNormalizer.upperOrNull(telefonoDeclarado))
+                            .direccionRegistrada(interesado.getDireccion())
+                            .direccionDeclarada(TextNormalizer.upperOrNull(direccionDeclarada))
+                            .camposDiferentes(diferencias)
+                            .build());
+                });
+    }
+
+    private boolean valorAportadoDiferente(String declarado, String registrado) {
+        String declaradoNormalizado = TextNormalizer.upperOrNull(declarado);
+        if (declaradoNormalizado == null || declaradoNormalizado.isBlank()) {
+            return false;
+        }
+        String registradoNormalizado = TextNormalizer.upperOrNull(registrado);
+        return !declaradoNormalizado.equals(registradoNormalizado);
+    }
+
+    private String nombreCompletoDeclarado(String nombre, String apellidos) {
+        String nombreBase = nombre != null ? nombre.trim() : "";
+        String apellidosBase = apellidos != null ? apellidos.trim() : "";
+        String completo = (nombreBase + " " + apellidosBase).trim();
+        return completo.isEmpty() ? null : completo;
     }
 
     /**

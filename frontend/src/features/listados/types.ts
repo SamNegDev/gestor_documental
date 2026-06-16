@@ -89,6 +89,18 @@ export interface SolicitudDetail {
   mensajes: MensajeExpediente[];
 }
 
+export interface SolicitudInteresadoCoincidencia {
+  rol?: string | null;
+  dni?: string | null;
+  nombreRegistrado?: string | null;
+  nombreDeclarado?: string | null;
+  telefonoRegistrado?: string | null;
+  telefonoDeclarado?: string | null;
+  direccionRegistrada?: string | null;
+  direccionDeclarada?: string | null;
+  camposDiferentes: string[];
+}
+
 export interface SolicitudUpsertInput {
   tipoTramiteId: number;
   matricula: string;

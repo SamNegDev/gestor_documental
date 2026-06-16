@@ -239,22 +239,22 @@ function InteresadoFields({
   return (
     <div className="edit-form-grid">
       <InteresadoAutocomplete
-        label="DNI/NIF"
+        label="DNI/CIF"
         value={(form[field("Dni")] as string) || ""}
-        placeholder="Buscar por DNI/NIF"
+        placeholder="Buscar por DNI/CIF"
         onChange={(value) => onChange({ ...form, [field("Dni")]: value })}
         onSelect={applyInteresado}
       />
       {form[field("Dni")] ? (
         <label>
-          Nombre
+          Nombre/Razon social
           <input value={(form[field("Nombre")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Nombre")]: uppercaseInput(event.target.value) })} />
         </label>
       ) : (
         <InteresadoAutocomplete
-          label="Nombre"
+          label="Nombre/Razon social"
           value={(form[field("Nombre")] as string) || ""}
-          placeholder="Buscar por nombre"
+          placeholder="Buscar por nombre o razon social"
           onChange={(value) => onChange({ ...form, [field("Nombre")]: value })}
           onSelect={applyInteresado}
         />

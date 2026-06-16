@@ -14,6 +14,7 @@ import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertResponse.SolicitudBulkConvertResult;
 import com.example.gestor_documental.dto.expediente.SolicitudDetailResponse;
+import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudListItemResponse;
 import com.example.gestor_documental.dto.expediente.TipoTramiteResumenResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
@@ -153,6 +154,15 @@ public class SolicitudApiController {
         Usuario usuarioLogueado = requireAdmin(authentication);
         Expediente expediente = solicitudService.convertirAExpediente(id, usuarioLogueado);
         return ResponseEntity.ok(java.util.Map.of("id", expediente.getId()));
+    }
+
+    @GetMapping("/{id}/interesados/coincidencias")
+    public List<SolicitudInteresadoCoincidenciaResponse> revisarCoincidenciasInteresados(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = requireAdmin(authentication);
+        return solicitudService.buscarCoincidenciasInteresadosConDiferencias(id, usuarioLogueado);
     }
 
     @PostMapping("/convertir-masivo")

@@ -274,16 +274,16 @@ export function ExpedienteCreatePage() {
               <article className="edit-interesado-card" key={index}>
                 <strong>{isBatecom(form.tipoTramiteId) ? BATECOM_LABELS[index] : `Interesado ${index + 1}`}</strong>
                 <InteresadoAutocomplete
-                  label="DNI/NIF"
+                  label="DNI/CIF"
                   value={interesado.dni || ""}
-                  placeholder="Buscar por DNI/NIF"
+                  placeholder="Buscar por DNI/CIF"
                   onChange={(value) => updateInteresado(index, "dni", value)}
                   onSelect={(seleccionado) => selectInteresado(index, seleccionado)}
                 />
                 <InteresadoAutocomplete
-                  label="Nombre"
+                  label="Nombre completo/Razon social"
                   value={interesado.nombre || ""}
-                  placeholder="Buscar por nombre"
+                  placeholder="Buscar por nombre o razon social"
                   onChange={(value) => updateInteresado(index, "nombre", value)}
                   onSelect={(seleccionado) => selectInteresado(index, seleccionado)}
                 />
