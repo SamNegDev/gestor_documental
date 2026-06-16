@@ -26,6 +26,8 @@ public interface IncidenciaService {
     void responderIncidenciaExpediente(Long incidenciaId, String respuesta, Usuario cliente);
     NotificacionIncidenciaPreviewResponse previsualizarNotificacion(Long incidenciaId, Usuario admin);
     NotificacionIncidenciaResponse notificarCliente(Long incidenciaId, String asunto, String mensaje, Usuario admin);
+    NotificacionIncidenciaPreviewResponse previsualizarNotificacionWhatsapp(Long incidenciaId, Usuario admin);
+    NotificacionIncidenciaResponse notificarClienteWhatsapp(Long incidenciaId, String mensaje, Usuario admin);
     void posponerSeguimiento(Long incidenciaId, LocalDateTime proximoAviso, Usuario admin);
     void archivarSeguimiento(Long incidenciaId, Usuario admin);
     void reactivarSeguimiento(Long incidenciaId, Usuario admin);

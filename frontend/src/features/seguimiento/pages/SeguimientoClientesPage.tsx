@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArrowRight, BellRing, CalendarClock, Clock3, History, RotateCcw, Send, X } from "lucide-react";
+import { Archive, ArrowRight, BellRing, CalendarClock, Clock3, History, Mail, MessageCircle, RotateCcw, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ApiError } from "../../../shared/api/http";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
@@ -17,7 +17,7 @@ export function SeguimientoClientesPage() {
   const [anio, setAnio] = useState("");
   const [pagina, setPagina] = useState(0);
   const [tamanio, setTamanio] = useState(25);
-  const [incidenciaParaNotificar, setIncidenciaParaNotificar] = useState<number | null>(null);
+  const [notificacion, setNotificacion] = useState<{ incidenciaId: number; canal: "email" | "whatsapp" } | null>(null);
   const [seguimientoParaPosponer, setSeguimientoParaPosponer] = useState<Seguimiento | null>(null);
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirmDialog();
@@ -97,7 +97,7 @@ export function SeguimientoClientesPage() {
             </div>
           ) : null}
           {data?.contenido.map((item) => (
-            <FollowupRow item={item} key={item.incidenciaId} onAction={run} onNotify={setIncidenciaParaNotificar} onPostpone={setSeguimientoParaPosponer} vista={vista} />
+            <FollowupRow item={item} key={item.incidenciaId} onAction={run} onNotify={(incidenciaId, canal) => setNotificacion({ incidenciaId, canal })} onPostpone={setSeguimientoParaPosponer} vista={vista} />
           ))}
         </div>
         <PaginationBar
@@ -109,7 +109,7 @@ export function SeguimientoClientesPage() {
           onPageSizeChange={(size) => { setTamanio(size); setPagina(0); }}
         />
       </section>
-      <NotificationEmailDialog incidenciaId={incidenciaParaNotificar} onClose={() => setIncidenciaParaNotificar(null)} onSent={refresh} />
+      <NotificationEmailDialog canal={notificacion?.canal} incidenciaId={notificacion?.incidenciaId ?? null} onClose={() => setNotificacion(null)} onSent={refresh} />
       <PostponeDialog item={seguimientoParaPosponer} error={postpone.error} pending={postpone.isPending} onClose={() => setSeguimientoParaPosponer(null)} onSubmit={(proximoAviso) => seguimientoParaPosponer && postpone.mutate({ id: seguimientoParaPosponer.incidenciaId, proximoAviso })} />
       {dialog}
     </main>
@@ -126,7 +126,7 @@ function FollowupRow({
   item: Seguimiento;
   vista: string;
   onAction: (type: string, item: Seguimiento) => void;
-  onNotify: (incidenciaId: number) => void;
+  onNotify: (incidenciaId: number, canal: "email" | "whatsapp") => void;
   onPostpone: (item: Seguimiento) => void;
 }) {
   const kind = followupKind(item.tipoIncidencia);
@@ -161,9 +161,12 @@ function FollowupRow({
       <div className="followup-row__actions">
         {vista === "PENDIENTES" ? (
           <>
-            <button className="soft-button soft-button--compact" disabled={item.avisosEnviados >= item.maxAvisos} onClick={() => onNotify(item.incidenciaId)} title={item.avisosEnviados >= item.maxAvisos ? "Maximo de avisos alcanzado" : "Enviar una notificacion ahora"} type="button">
-              <Send size={15} />
-              Enviar aviso
+            <button className="icon-button" disabled={item.avisosEnviados >= item.maxAvisos} onClick={() => onNotify(item.incidenciaId, "email")} title={item.avisosEnviados >= item.maxAvisos ? "Maximo de avisos alcanzado" : "Enviar correo"} type="button">
+              <Mail size={16} />
+            </button>
+            <button className="soft-button soft-button--compact" disabled={item.avisosEnviados >= item.maxAvisos} onClick={() => onNotify(item.incidenciaId, "whatsapp")} title={item.avisosEnviados >= item.maxAvisos ? "Maximo de avisos alcanzado" : "Enviar WhatsApp"} type="button">
+              <MessageCircle size={15} />
+              WhatsApp
             </button>
             <button className="icon-button" title="Posponer vencimiento" onClick={() => onPostpone(item)} type="button"><CalendarClock size={16} /></button>
             <button className="icon-button" title="Archivar" onClick={() => onAction("archivar", item)} type="button"><Archive size={16} /></button>

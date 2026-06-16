@@ -19,9 +19,11 @@ public class AvisoIncidencia {
     @CreationTimestamp @Column(nullable = false, updatable = false) private LocalDateTime fechaEnvio;
     @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "enviado_por_usuario_id", nullable = false)
     private Usuario enviadoPor;
-    @Column(length = 500) private String mensaje;
+    @Column(columnDefinition = "TEXT") private String mensaje;
     @Column(length = 250) private String destinatario;
     @Column(length = 250) private String asunto;
+    @Column(nullable = false, length = 30, columnDefinition = "varchar(30) default 'EMAIL'")
+    private String canal = "EMAIL";
     @Column(nullable = false, length = 20) private String estadoEnvio;
     @Column(length = 1000) private String errorEnvio;
 }

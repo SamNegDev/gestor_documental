@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Archive, ArrowRight, BellRing, CheckSquare2, ClipboardList, Clock3, FileWarning, Inbox, MessageCircle, SearchCheck } from "lucide-react";
+import { AlertTriangle, Archive, ArrowRight, CheckSquare2, ClipboardList, Clock3, FileWarning, Inbox, Mail, MessageCircle, SearchCheck } from "lucide-react";
 import { Link, useOutletContext } from "react-router-dom";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
@@ -19,7 +19,7 @@ export function TareasPage() {
   const [prioridad, setPrioridad] = useState("");
   const [pagina, setPagina] = useState(0);
   const [tamanio, setTamanio] = useState(25);
-  const [incidenciaParaNotificar, setIncidenciaParaNotificar] = useState<number | null>(null);
+  const [notificacion, setNotificacion] = useState<{ incidenciaId: number; canal: "email" | "whatsapp" } | null>(null);
   const query = useQuery({
     queryKey: ["tareas", ambito, tipo, prioridad, pagina, tamanio],
     queryFn: () => getTareas({ ambito, tipo, prioridad, pagina, tamanio }),
@@ -30,14 +30,14 @@ export function TareasPage() {
     queryClient.invalidateQueries({ queryKey: ["seguimiento"] });
   };
   const archiveMutation = useMutation({ mutationFn: archivarSeguimiento, onSuccess: refresh });
-  async function notify(tarea: Tarea) {
+  async function notify(tarea: Tarea, canal: "email" | "whatsapp") {
     if (tarea.entidad === "INCIDENCIA") {
-      setIncidenciaParaNotificar(tarea.entidadId);
+      setNotificacion({ incidenciaId: tarea.entidadId, canal });
       return;
     }
     try {
       const preview = await prepararNotificacionExpediente(tarea.entidadId);
-      setIncidenciaParaNotificar(preview.incidenciaId);
+      setNotificacion({ incidenciaId: preview.incidenciaId, canal });
       refresh();
     } catch {
       alert("No se pudo preparar la notificacion.");
@@ -120,7 +120,7 @@ export function TareasPage() {
         />
       </section>
 
-      <NotificationEmailDialog incidenciaId={incidenciaParaNotificar} onClose={() => setIncidenciaParaNotificar(null)} onSent={refresh} />
+      <NotificationEmailDialog canal={notificacion?.canal} incidenciaId={notificacion?.incidenciaId ?? null} onClose={() => setNotificacion(null)} onSent={refresh} />
     </main>
   );
 }
@@ -135,7 +135,7 @@ function TaskRow({
   tarea: Tarea;
   archivePending: boolean;
   onArchive: (id: number) => void;
-  onNotify: (tarea: Tarea) => void;
+  onNotify: (tarea: Tarea, canal: "email" | "whatsapp") => void;
   showClient: boolean;
 }) {
   const actionKind = taskActionKind(tarea.tipo);
@@ -175,10 +175,15 @@ function TaskRow({
       <span className={`task-priority task-priority--${tarea.prioridad.toLowerCase()}`}>{tarea.prioridad}</span>
       <div className="task-row__actions">
         {tarea.tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR" ? (
-          <button className="soft-button soft-button--compact" onClick={() => onNotify(tarea)} type="button">
-            <BellRing size={15} />
-            Notificar
-          </button>
+          <>
+            <button className="icon-button" onClick={() => onNotify(tarea, "email")} title="Enviar correo" type="button">
+              <Mail size={16} />
+            </button>
+            <button className="soft-button soft-button--compact" onClick={() => onNotify(tarea, "whatsapp")} type="button">
+              <MessageCircle size={15} />
+              WhatsApp
+            </button>
+          </>
         ) : null}
         {tarea.tipo === "INCIDENCIA_PENDIENTE_ARCHIVAR" ? (
           <button className="soft-button soft-button--compact" disabled={archivePending} onClick={() => onArchive(tarea.entidadId)} type="button">

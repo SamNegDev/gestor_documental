@@ -44,6 +44,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
     private final HistorialCambioService historialCambioService;
     private final MensajeService mensajeService;
     private final CorreoService correoService;
+    private final WhatsappOutboundService whatsappOutboundService;
     private final ConfiguracionSeguimientoService configuracionSeguimientoService;
 
     @Value("${app.mail.enabled:false}")
@@ -368,6 +369,26 @@ public class IncidenciaServiceImpl implements IncidenciaService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public NotificacionIncidenciaPreviewResponse previsualizarNotificacionWhatsapp(Long incidenciaId, Usuario admin) {
+        validarAdmin(admin);
+        Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        validarSeguimiento(incidencia);
+        int numero = incidencia.getContadorAvisos() + 1;
+        var config = configuracionSeguimientoService.obtener();
+        return new NotificacionIncidenciaPreviewResponse(
+                incidencia.getId(),
+                telefonoCliente(incidencia),
+                "",
+                mensajeWhatsappPorDefecto(incidencia, numero),
+                numero,
+                config.getMaxAvisos(),
+                whatsappOutboundService.envioRealDisponible(),
+                "whatsapp"
+        );
+    }
+
+    @Override
     @Transactional
     public NotificacionIncidenciaResponse notificarCliente(Long incidenciaId, String asunto, String mensaje, Usuario admin) {
         validarAdmin(admin);
@@ -382,15 +403,36 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         CorreoService.ResultadoCorreo resultado = correoService.enviar(destinatario, asuntoFinal, texto);
         AvisoIncidencia aviso = new AvisoIncidencia();
         aviso.setIncidencia(incidencia); aviso.setNumeroAviso(numero); aviso.setEnviadoPor(admin); aviso.setMensaje(texto);
-        aviso.setDestinatario(destinatario); aviso.setAsunto(asuntoFinal);
+        aviso.setDestinatario(destinatario); aviso.setAsunto(asuntoFinal); aviso.setCanal("EMAIL");
         aviso.setEstadoEnvio(resultado.exito() ? resultado.simulado() ? "SIMULADO" : "ENVIADO" : "ERROR");
         aviso.setErrorEnvio(resultado.error());
         avisoIncidenciaRepository.save(aviso);
         if (!resultado.exito()) return new NotificacionIncidenciaResponse(false, false, resultado.error());
-        LocalDateTime ahora = LocalDateTime.now(); incidencia.setContadorAvisos(numero); incidencia.setFechaUltimoAviso(ahora); incidencia.setProximoAviso(siguienteVencimiento(ahora, numero, config)); incidencia.setSeguimientoArchivado(false); incidencia.setFechaArchivoSeguimiento(null); incidencia.setSeguimientoArchivadoPor(null); incidenciaRepository.save(incidencia);
-        mensajeService.añadirAExpediente(incidencia.getExpediente().getId(), texto, admin);
-        historialCambioService.registrarCambioExpediente(incidencia.getExpediente(), admin, "AVISO INCIDENCIA", "Aviso " + numero + (resultado.simulado() ? " simulado." : " enviado al cliente."));
+        registrarAvisoCorrecto(incidencia, numero, texto, config, admin, resultado.simulado(), "EMAIL");
         return new NotificacionIncidenciaResponse(true, resultado.simulado(), resultado.simulado() ? "Envio simulado correctamente." : "Correo enviado correctamente.");
+    }
+
+    @Override
+    @Transactional
+    public NotificacionIncidenciaResponse notificarClienteWhatsapp(Long incidenciaId, String mensaje, Usuario admin) {
+        validarAdmin(admin);
+        Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        validarSeguimiento(incidencia);
+        int numero = incidencia.getContadorAvisos() + 1;
+        var config = configuracionSeguimientoService.obtener();
+        if (numero > config.getMaxAvisos()) throw new OperacionInvalidaException("Se ha alcanzado el maximo de avisos. Archiva el seguimiento.");
+        String texto = mensaje != null && !mensaje.isBlank() ? mensaje.trim() : mensajeWhatsappPorDefecto(incidencia, numero);
+        String destinatario = telefonoCliente(incidencia);
+        WhatsappOutboundService.ResultadoWhatsapp resultado = whatsappOutboundService.enviarTexto(destinatario, texto);
+        AvisoIncidencia aviso = new AvisoIncidencia();
+        aviso.setIncidencia(incidencia); aviso.setNumeroAviso(numero); aviso.setEnviadoPor(admin); aviso.setMensaje(texto);
+        aviso.setDestinatario(destinatario); aviso.setAsunto("WhatsApp aviso " + numero); aviso.setCanal("WHATSAPP");
+        aviso.setEstadoEnvio(resultado.exito() ? resultado.simulado() ? "SIMULADO" : "ENVIADO" : "ERROR");
+        aviso.setErrorEnvio(resultado.error());
+        avisoIncidenciaRepository.save(aviso);
+        if (!resultado.exito()) return new NotificacionIncidenciaResponse(false, false, resultado.error());
+        registrarAvisoCorrecto(incidencia, numero, texto, config, admin, resultado.simulado(), "WHATSAPP");
+        return new NotificacionIncidenciaResponse(true, resultado.simulado(), resultado.simulado() ? "WhatsApp simulado correctamente." : "WhatsApp enviado correctamente.");
     }
 
     @Override
@@ -437,6 +479,21 @@ public class IncidenciaServiceImpl implements IncidenciaService {
             default -> 0;
         };
         return numeroAviso >= config.getMaxAvisos() || dias <= 0 ? null : fecha.plusDays(dias);
+    }
+
+    private void registrarAvisoCorrecto(Incidencia incidencia, int numero, String texto, ConfiguracionSeguimiento config,
+            Usuario admin, boolean simulado, String canal) {
+        LocalDateTime ahora = LocalDateTime.now();
+        incidencia.setContadorAvisos(numero);
+        incidencia.setFechaUltimoAviso(ahora);
+        incidencia.setProximoAviso(siguienteVencimiento(ahora, numero, config));
+        incidencia.setSeguimientoArchivado(false);
+        incidencia.setFechaArchivoSeguimiento(null);
+        incidencia.setSeguimientoArchivadoPor(null);
+        incidenciaRepository.save(incidencia);
+        mensajeService.añadirAExpediente(incidencia.getExpediente().getId(), texto, admin);
+        historialCambioService.registrarCambioExpediente(incidencia.getExpediente(), admin, "AVISO INCIDENCIA",
+                "Aviso " + numero + " por " + canal + (simulado ? " simulado." : " enviado al cliente."));
     }
 
     private String formatFecha(LocalDateTime fecha) {
@@ -504,6 +561,15 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         return incidencia.getExpediente().getCliente().getEmail();
     }
 
+    private String telefonoCliente(Incidencia incidencia) {
+        if (incidencia.getExpediente().getCliente() == null
+                || incidencia.getExpediente().getCliente().getTelefono() == null
+                || incidencia.getExpediente().getCliente().getTelefono().isBlank()) {
+            throw new OperacionInvalidaException("El cliente no tiene un telefono configurado.");
+        }
+        return incidencia.getExpediente().getCliente().getTelefono();
+    }
+
     private String asuntoPorDefecto(Incidencia incidencia, int numeroAviso) {
         String matricula = incidencia.getExpediente().getMatricula() != null ? incidencia.getExpediente().getMatricula() : "EXPEDIENTE " + incidencia.getExpediente().getId();
         return (numeroAviso == 1 ? "Informacion pendiente" : "Recordatorio de informacion pendiente") + " - " + matricula;
@@ -523,6 +589,17 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                 + "\nDetalle: " + detalle
                 + "\n\nAccede al portal: " + base + "/expedientes/" + incidencia.getExpediente().getId()
                 + "\n\nGracias,\nGestoria CN";
+    }
+
+    private String mensajeWhatsappPorDefecto(Incidencia incidencia, int numeroAviso) {
+        String matricula = incidencia.getExpediente().getMatricula() != null ? incidencia.getExpediente().getMatricula() : "EXP-" + incidencia.getExpediente().getId();
+        String detalle = detalleCorreo(incidencia);
+        String base = publicUrl != null ? publicUrl.replaceAll("/$", "") : "";
+        return "Hola, somos Gestoria Casado Negrin.\n\n"
+                + (numeroAviso == 1 ? "Necesitamos tu respuesta para continuar con el tramite." : "Te recordamos que seguimos pendientes de tu respuesta.")
+                + "\n\nExpediente: " + matricula
+                + "\nPendiente: " + detalle
+                + "\n\nPuedes responder a este WhatsApp o acceder al portal: " + base + "/expedientes/" + incidencia.getExpediente().getId();
     }
 
     private String detalleCorreo(Incidencia incidencia) {

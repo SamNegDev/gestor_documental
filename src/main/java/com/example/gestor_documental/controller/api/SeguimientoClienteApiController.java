@@ -74,6 +74,11 @@ public class SeguimientoClienteApiController {
         return incidenciaService.previsualizarNotificacion(id, requireAdmin(authentication));
     }
 
+    @GetMapping("/{id}/notificacion-whatsapp-preview")
+    public NotificacionIncidenciaPreviewResponse previewWhatsapp(@PathVariable Long id, Authentication authentication) {
+        return incidenciaService.previsualizarNotificacionWhatsapp(id, requireAdmin(authentication));
+    }
+
     @PostMapping("/expedientes/{id}/preparar-notificacion")
     public NotificacionIncidenciaPreviewResponse prepararNotificacion(@PathVariable Long id, Authentication authentication) {
         Incidencia incidencia = incidenciaService.prepararNotificacionExpediente(id, requireAdmin(authentication));
@@ -83,6 +88,13 @@ public class SeguimientoClienteApiController {
     @PostMapping("/{id}/notificar")
     public NotificacionIncidenciaResponse notificar(@PathVariable Long id, @RequestBody(required = false) NotificacionIncidenciaRequest body, Authentication authentication) {
         NotificacionIncidenciaResponse resultado = incidenciaService.notificarCliente(id, body != null ? body.asunto() : null, body != null ? body.mensaje() : null, requireAdmin(authentication));
+        if (!resultado.exito()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, resultado.mensaje());
+        return resultado;
+    }
+
+    @PostMapping("/{id}/notificar-whatsapp")
+    public NotificacionIncidenciaResponse notificarWhatsapp(@PathVariable Long id, @RequestBody(required = false) NotificacionIncidenciaRequest body, Authentication authentication) {
+        NotificacionIncidenciaResponse resultado = incidenciaService.notificarClienteWhatsapp(id, body != null ? body.mensaje() : null, requireAdmin(authentication));
         if (!resultado.exito()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, resultado.mensaje());
         return resultado;
     }
