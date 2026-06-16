@@ -186,6 +186,8 @@ En el `docker-compose.yml` actual el puerto se expone solo en `127.0.0.1`, por l
 | `MAIL_GRAPH_SENDER` | Buzon desde el que Microsoft Graph enviara el correo. |
 | `MAIL_GRAPH_SAVE_TO_SENT_ITEMS` | Guarda los mensajes enviados en elementos enviados del buzon. |
 | `APP_PUBLIC_URL` | URL publica usada en enlaces incluidos en correos. |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Token propio usado por Meta para verificar el webhook de WhatsApp. |
+| `WHATSAPP_APP_SECRET` | Secreto de la app de Meta para validar `X-Hub-Signature-256` si se configura. |
 
 ## OCR y procesamiento documental
 

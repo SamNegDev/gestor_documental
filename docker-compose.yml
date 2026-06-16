@@ -70,6 +70,8 @@ services:
       MAIL_GRAPH_SENDER: ${MAIL_GRAPH_SENDER:-}
       MAIL_GRAPH_SAVE_TO_SENT_ITEMS: ${MAIL_GRAPH_SAVE_TO_SENT_ITEMS:-true}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs

@@ -46,7 +46,7 @@ public class SecurityConfig {
                                         return uri.startsWith("/api/");
                                 }))
                                 .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers("/api/login", "/assets/**", "/favicon.svg", "/icons.svg", "/actuator/health")
+                                                .requestMatchers("/api/login", "/api/webhooks/whatsapp", "/assets/**", "/favicon.svg", "/icons.svg", "/actuator/health")
                                                 .permitAll()
                                                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                                                 .requestMatchers("/api/cliente/**").hasRole("CLIENTE")
