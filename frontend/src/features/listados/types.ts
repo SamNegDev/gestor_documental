@@ -63,7 +63,6 @@ export interface SolicitudListItem {
 
 export interface InteresadoSolicitud {
   nombre?: string | null;
-  apellidos?: string | null;
   rol?: string | null;
   dni?: string | null;
   telefono?: string | null;
@@ -107,13 +106,11 @@ export interface SolicitudUpsertInput {
   observaciones?: string | null;
   interesado1Rol?: string | null;
   interesado1Nombre?: string | null;
-  interesado1Apellidos?: string | null;
   interesado1Dni?: string | null;
   interesado1Telefono?: string | null;
   interesado1Direccion?: string | null;
   interesado2Rol?: string | null;
   interesado2Nombre?: string | null;
-  interesado2Apellidos?: string | null;
   interesado2Dni?: string | null;
   interesado2Telefono?: string | null;
   interesado2Direccion?: string | null;

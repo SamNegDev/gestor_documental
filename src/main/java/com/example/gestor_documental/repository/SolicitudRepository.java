@@ -85,9 +85,9 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
               and (upper(coalesce(s.matricula, '')) like :texto
                    or str(s.id) like :identificador
                    or upper(coalesce(s.interesado1Dni, '')) like :texto
-                   or upper(concat(coalesce(s.interesado1Nombre, ''), ' ', coalesce(s.interesado1Apellidos, ''))) like :texto
+                   or upper(coalesce(s.interesado1Nombre, '')) like :texto
                    or upper(coalesce(s.interesado2Dni, '')) like :texto
-                   or upper(concat(coalesce(s.interesado2Nombre, ''), ' ', coalesce(s.interesado2Apellidos, ''))) like :texto)
+                   or upper(coalesce(s.interesado2Nombre, '')) like :texto)
             order by coalesce(s.fechaUltimaModificacion, s.fechaCreacion) desc
             """)
     List<Solicitud> buscarGlobal(@Param("clienteId") Long clienteId,

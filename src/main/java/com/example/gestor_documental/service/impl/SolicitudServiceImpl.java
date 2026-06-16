@@ -266,14 +266,14 @@ public class SolicitudServiceImpl implements SolicitudService {
 
          InteresadoFormDto interesado1dto = new InteresadoFormDto();
          interesado1dto.setDni(solicitud.getInteresado1Dni());
-         interesado1dto.setNombre(nombreCompletoDeclarado(solicitud.getInteresado1Nombre(), solicitud.getInteresado1Apellidos()));
+         interesado1dto.setNombre(solicitud.getInteresado1Nombre());
          interesado1dto.setRol(solicitud.getInteresado1Rol());
          interesado1dto.setDireccion(solicitud.getInteresado1Direccion());
          interesado1dto.setTelefono(solicitud.getInteresado1Telefono());
 
          InteresadoFormDto interesado2dto = new InteresadoFormDto();
          interesado2dto.setDni(solicitud.getInteresado2Dni());
-         interesado2dto.setNombre(nombreCompletoDeclarado(solicitud.getInteresado2Nombre(), solicitud.getInteresado2Apellidos()));
+         interesado2dto.setNombre(solicitud.getInteresado2Nombre());
          interesado2dto.setRol(solicitud.getInteresado2Rol());
          interesado2dto.setDireccion(solicitud.getInteresado2Direccion());
          interesado2dto.setTelefono(solicitud.getInteresado2Telefono());
@@ -308,14 +308,14 @@ public class SolicitudServiceImpl implements SolicitudService {
                         construirCoincidenciaSiHayDiferencias(
                                 solicitud.getInteresado1Rol(),
                                 solicitud.getInteresado1Dni(),
-                                nombreCompletoDeclarado(solicitud.getInteresado1Nombre(), solicitud.getInteresado1Apellidos()),
+                                solicitud.getInteresado1Nombre(),
                                 solicitud.getInteresado1Telefono(),
                                 solicitud.getInteresado1Direccion()
                         ),
                         construirCoincidenciaSiHayDiferencias(
                                 solicitud.getInteresado2Rol(),
                                 solicitud.getInteresado2Dni(),
-                                nombreCompletoDeclarado(solicitud.getInteresado2Nombre(), solicitud.getInteresado2Apellidos()),
+                                solicitud.getInteresado2Nombre(),
                                 solicitud.getInteresado2Telefono(),
                                 solicitud.getInteresado2Direccion()
                         )
@@ -370,13 +370,6 @@ public class SolicitudServiceImpl implements SolicitudService {
         }
         String registradoNormalizado = TextNormalizer.upperOrNull(registrado);
         return !declaradoNormalizado.equals(registradoNormalizado);
-    }
-
-    private String nombreCompletoDeclarado(String nombre, String apellidos) {
-        String nombreBase = nombre != null ? nombre.trim() : "";
-        String apellidosBase = apellidos != null ? apellidos.trim() : "";
-        String completo = (nombreBase + " " + apellidosBase).trim();
-        return completo.isEmpty() ? null : completo;
     }
 
     /**
@@ -478,14 +471,12 @@ public class SolicitudServiceImpl implements SolicitudService {
 
         solicitudBase.setInteresado1Rol(solicitudActualizada.getInteresado1Rol());
         solicitudBase.setInteresado1Nombre(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Nombre()));
-        solicitudBase.setInteresado1Apellidos(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Apellidos()));
         solicitudBase.setInteresado1Dni(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Dni()));
         solicitudBase.setInteresado1Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Telefono()));
         solicitudBase.setInteresado1Direccion(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Direccion()));
 
         solicitudBase.setInteresado2Rol(solicitudActualizada.getInteresado2Rol());
         solicitudBase.setInteresado2Nombre(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Nombre()));
-        solicitudBase.setInteresado2Apellidos(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Apellidos()));
         solicitudBase.setInteresado2Dni(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Dni()));
         solicitudBase.setInteresado2Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Telefono()));
         solicitudBase.setInteresado2Direccion(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Direccion()));
@@ -516,12 +507,10 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setMatricula(TextNormalizer.upperOrNull(solicitud.getMatricula()));
         solicitud.setObservaciones(TextNormalizer.upperOrNull(solicitud.getObservaciones()));
         solicitud.setInteresado1Nombre(TextNormalizer.upperOrNull(solicitud.getInteresado1Nombre()));
-        solicitud.setInteresado1Apellidos(TextNormalizer.upperOrNull(solicitud.getInteresado1Apellidos()));
         solicitud.setInteresado1Dni(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()));
         solicitud.setInteresado1Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado1Telefono()));
         solicitud.setInteresado1Direccion(TextNormalizer.upperOrNull(solicitud.getInteresado1Direccion()));
         solicitud.setInteresado2Nombre(TextNormalizer.upperOrNull(solicitud.getInteresado2Nombre()));
-        solicitud.setInteresado2Apellidos(TextNormalizer.upperOrNull(solicitud.getInteresado2Apellidos()));
         solicitud.setInteresado2Dni(TextNormalizer.upperOrNull(solicitud.getInteresado2Dni()));
         solicitud.setInteresado2Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado2Telefono()));
         solicitud.setInteresado2Direccion(TextNormalizer.upperOrNull(solicitud.getInteresado2Direccion()));

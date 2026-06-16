@@ -13,7 +13,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class InteresadoSolicitudResponse {
     private String nombre;
-    private String apellidos;
     private String rol;
     private String dni;
     private String telefono;

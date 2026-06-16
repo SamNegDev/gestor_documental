@@ -18,13 +18,11 @@ function emptyForm(): SolicitudUpsertInput {
     observaciones: "",
     interesado1Rol: "",
     interesado1Nombre: "",
-    interesado1Apellidos: "",
     interesado1Dni: "",
     interesado1Telefono: "",
     interesado1Direccion: "",
     interesado2Rol: "",
     interesado2Nombre: "",
-    interesado2Apellidos: "",
     interesado2Dni: "",
     interesado2Telefono: "",
     interesado2Direccion: "",
@@ -40,13 +38,11 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     observaciones: uppercaseInput(solicitud.observaciones || ""),
     interesado1Rol: interesado1?.rol || "",
     interesado1Nombre: uppercaseInput(interesado1?.nombre || ""),
-    interesado1Apellidos: uppercaseInput(interesado1?.apellidos || ""),
     interesado1Dni: uppercaseInput(interesado1?.dni || ""),
     interesado1Telefono: uppercaseInput(interesado1?.telefono || ""),
     interesado1Direccion: uppercaseInput(interesado1?.direccion || ""),
     interesado2Rol: interesado2?.rol || "",
     interesado2Nombre: uppercaseInput(interesado2?.nombre || ""),
-    interesado2Apellidos: uppercaseInput(interesado2?.apellidos || ""),
     interesado2Dni: uppercaseInput(interesado2?.dni || ""),
     interesado2Telefono: uppercaseInput(interesado2?.telefono || ""),
     interesado2Direccion: uppercaseInput(interesado2?.direccion || ""),
@@ -60,13 +56,11 @@ function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
     observaciones: cleanUpperText(form.observaciones),
     interesado1Rol: cleanUpperText(form.interesado1Rol),
     interesado1Nombre: cleanUpperText(form.interesado1Nombre),
-    interesado1Apellidos: cleanUpperText(form.interesado1Apellidos),
     interesado1Dni: cleanUpperText(form.interesado1Dni),
     interesado1Telefono: cleanUpperText(form.interesado1Telefono),
     interesado1Direccion: cleanUpperText(form.interesado1Direccion),
     interesado2Rol: cleanUpperText(form.interesado2Rol),
     interesado2Nombre: cleanUpperText(form.interesado2Nombre),
-    interesado2Apellidos: cleanUpperText(form.interesado2Apellidos),
     interesado2Dni: cleanUpperText(form.interesado2Dni),
     interesado2Telefono: cleanUpperText(form.interesado2Telefono),
     interesado2Direccion: cleanUpperText(form.interesado2Direccion),
@@ -247,22 +241,18 @@ function InteresadoFields({
       />
       {form[field("Dni")] ? (
         <label>
-          Nombre/Razon social
+          Nombre completo/Razon social
           <input value={(form[field("Nombre")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Nombre")]: uppercaseInput(event.target.value) })} />
         </label>
       ) : (
         <InteresadoAutocomplete
-          label="Nombre/Razon social"
+          label="Nombre completo/Razon social"
           value={(form[field("Nombre")] as string) || ""}
           placeholder="Buscar por nombre o razon social"
           onChange={(value) => onChange({ ...form, [field("Nombre")]: value })}
           onSelect={applyInteresado}
         />
       )}
-      <label>
-        Apellidos
-        <input value={(form[field("Apellidos")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Apellidos")]: uppercaseInput(event.target.value) })} />
-      </label>
       <label>
         Rol
         <select value={(form[field("Rol")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Rol")]: event.target.value })}>

@@ -406,7 +406,7 @@ function SolicitudInterestedParties({ interesados }: { interesados?: SolicitudLi
     <div className="records-interested-list">
       {visible.map((interesado, index) => (
         <span key={`${interesado.dni || interesado.nombre || "interesado"}-${index}`}>
-          <strong>{[interesado.nombre, interesado.apellidos].filter(Boolean).join(" ") || "Sin nombre"}</strong>
+          <strong>{interesado.nombre || "Sin nombre"}</strong>
           <small>{[interesado.dni, interesado.rol ? formatEnum(interesado.rol) : null].filter(Boolean).join(" · ")}</small>
         </span>
       ))}

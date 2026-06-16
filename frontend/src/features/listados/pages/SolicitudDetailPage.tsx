@@ -353,7 +353,7 @@ export function SolicitudDetailPage() {
                   <UserRound size={18} />
                 </div>
                 <div>
-                  <strong>{[interesado.nombre, interesado.apellidos].filter(Boolean).join(" ") || "Interesado"}</strong>
+                  <strong>{interesado.nombre || "Interesado"}</strong>
                   <span>{interesado.rol ? formatEnum(interesado.rol) : "Sin rol"}</span>
                 </div>
                 <small>{interesado.dni || interesado.telefono || ""}</small>
@@ -592,8 +592,8 @@ function formatEnum(value?: string | null) {
   return value ? value.replaceAll("_", " ") : "Sin estado";
 }
 
-function hasInteresadoData(interesado: { nombre?: string | null; apellidos?: string | null; rol?: string | null; dni?: string | null; telefono?: string | null; direccion?: string | null }) {
-  return [interesado.nombre, interesado.apellidos, interesado.rol, interesado.dni, interesado.telefono, interesado.direccion].some(
+function hasInteresadoData(interesado: { nombre?: string | null; rol?: string | null; dni?: string | null; telefono?: string | null; direccion?: string | null }) {
+  return [interesado.nombre, interesado.rol, interesado.dni, interesado.telefono, interesado.direccion].some(
     (value) => value && value.trim() !== "",
   );
 }

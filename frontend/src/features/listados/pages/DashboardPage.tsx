@@ -165,7 +165,7 @@ function LatestExpedientes({ data, isAdmin }: { data: DashboardData; isAdmin: bo
           <h3>{isAdmin ? "Ultimos expedientes" : "Tus ultimos expedientes"}</h3>
           <span>{data.ultimosExpedientes.length} recientes</span>
         </div>
-        <Link className="soft-button soft-button--compact" to={isAdmin ? "/expedientes" : "/cliente/expedientes"}>
+        <Link className="soft-button soft-button--compact" to="/expedientes">
           <FolderOpen size={16} />
           Ver todos
         </Link>
@@ -194,7 +194,7 @@ function LatestSolicitudes({ data, isAdmin }: { data: DashboardData; isAdmin: bo
           <h3>{isAdmin ? "Ultimas solicitudes" : "Tus ultimas solicitudes"}</h3>
           <span>{data.ultimasSolicitudes.length} recientes</span>
         </div>
-        <Link className="soft-button soft-button--compact" to={isAdmin ? "/solicitudes" : "/cliente/solicitudes"}>
+        <Link className="soft-button soft-button--compact" to="/solicitudes">
           <Inbox size={16} />
           Ver todas
         </Link>

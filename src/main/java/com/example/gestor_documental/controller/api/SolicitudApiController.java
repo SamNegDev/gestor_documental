@@ -288,13 +288,11 @@ public class SolicitudApiController {
         solicitud.setObservaciones(TextNormalizer.upperOrNull(request.getObservaciones()));
         solicitud.setInteresado1Rol(request.getInteresado1Rol());
         solicitud.setInteresado1Nombre(TextNormalizer.upperOrNull(request.getInteresado1Nombre()));
-        solicitud.setInteresado1Apellidos(TextNormalizer.upperOrNull(request.getInteresado1Apellidos()));
         solicitud.setInteresado1Dni(TextNormalizer.upperOrNull(request.getInteresado1Dni()));
         solicitud.setInteresado1Telefono(TextNormalizer.upperOrNull(request.getInteresado1Telefono()));
         solicitud.setInteresado1Direccion(TextNormalizer.upperOrNull(request.getInteresado1Direccion()));
         solicitud.setInteresado2Rol(request.getInteresado2Rol());
         solicitud.setInteresado2Nombre(TextNormalizer.upperOrNull(request.getInteresado2Nombre()));
-        solicitud.setInteresado2Apellidos(TextNormalizer.upperOrNull(request.getInteresado2Apellidos()));
         solicitud.setInteresado2Dni(TextNormalizer.upperOrNull(request.getInteresado2Dni()));
         solicitud.setInteresado2Telefono(TextNormalizer.upperOrNull(request.getInteresado2Telefono()));
         solicitud.setInteresado2Direccion(TextNormalizer.upperOrNull(request.getInteresado2Direccion()));
@@ -425,14 +423,12 @@ public class SolicitudApiController {
         java.util.ArrayList<InteresadoSolicitudResponse> interesados = new java.util.ArrayList<>();
         if (hasInteresadoData(
                 solicitud.getInteresado1Nombre(),
-                solicitud.getInteresado1Apellidos(),
                 solicitud.getInteresado1Dni(),
                 solicitud.getInteresado1Telefono(),
                 solicitud.getInteresado1Direccion(),
                 solicitud.getInteresado1Rol() != null ? solicitud.getInteresado1Rol().name() : null)) {
             interesados.add(InteresadoSolicitudResponse.builder()
                     .nombre(solicitud.getInteresado1Nombre())
-                    .apellidos(solicitud.getInteresado1Apellidos())
                     .rol(solicitud.getInteresado1Rol() != null ? solicitud.getInteresado1Rol().name() : null)
                     .dni(solicitud.getInteresado1Dni())
                     .telefono(solicitud.getInteresado1Telefono())
@@ -441,14 +437,12 @@ public class SolicitudApiController {
         }
         if (hasInteresadoData(
                 solicitud.getInteresado2Nombre(),
-                solicitud.getInteresado2Apellidos(),
                 solicitud.getInteresado2Dni(),
                 solicitud.getInteresado2Telefono(),
                 solicitud.getInteresado2Direccion(),
                 solicitud.getInteresado2Rol() != null ? solicitud.getInteresado2Rol().name() : null)) {
             interesados.add(InteresadoSolicitudResponse.builder()
                     .nombre(solicitud.getInteresado2Nombre())
-                    .apellidos(solicitud.getInteresado2Apellidos())
                     .rol(solicitud.getInteresado2Rol() != null ? solicitud.getInteresado2Rol().name() : null)
                     .dni(solicitud.getInteresado2Dni())
                     .telefono(solicitud.getInteresado2Telefono())
