@@ -48,6 +48,9 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             JsonNode root = objectMapper.readTree(payload);
             JsonNode value = root.path("entry").path(0).path("changes").path(0).path("value");
             JsonNode message = value.path("messages").path(0);
+            if (message.isMissingNode() || message.isNull()) {
+                return;
+            }
             String messageId = text(message.path("id"));
             if (StringUtils.hasText(messageId) && eventoRepository.existsByMessageId(messageId)) {
                 return;

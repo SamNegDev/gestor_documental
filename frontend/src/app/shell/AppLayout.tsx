@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { BellRing, CarFront, FilePlus2, FolderOpen, Inbox, LayoutDashboard, LogOut, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
+import { BellRing, CarFront, FilePlus2, FolderOpen, Inbox, LayoutDashboard, LogOut, MessageCircle, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
 import { SidebarLink } from "./SidebarLink";
 import { Tooltip } from "../../shared/ui/Tooltip";
 import { getSessionUser, type SessionUser } from "../../shared/api/sessionApi";
@@ -21,6 +21,7 @@ function pageTitle(pathname: string) {
   if (pathname === "/admin/tareas") return "Bandeja de tareas";
   if (pathname === "/admin/seguimiento-clientes") return "Seguimiento de clientes";
   if (pathname === "/admin/seguimiento-config") return "Periodos de seguimiento";
+  if (pathname === "/admin/whatsapp") return "WhatsApp";
   if (pathname === "/cliente/tareas") return "Mis tareas";
   if (pathname === "/admin/clientes") return "Clientes";
   if (pathname.includes("/admin/clientes/nuevo")) return "Nuevo cliente";
@@ -54,6 +55,7 @@ const adminMenuItems: MenuItemConfig[] = [
   { id: "tareas", to: "/admin/tareas", icon: Inbox, label: "Tareas" },
   { id: "seguimiento", to: "/admin/seguimiento-clientes", icon: BellRing, label: "Seguimiento clientes" },
   { id: "seguimiento-config", to: "/admin/seguimiento-config", icon: Settings2, label: "Config. seguimiento" },
+  { id: "whatsapp", to: "/admin/whatsapp", icon: MessageCircle, label: "WhatsApp" },
   { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Expedientes" },
   { id: "nuevo-expediente", to: "/expedientes/nuevo", icon: FilePlus2, label: "Nuevo expediente" },
   { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },

@@ -14,7 +14,7 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 ### Notificaciones y recordatorios
 
 - Automatizar el envio programado de avisos por correo cuando falte documentacion o respuesta del cliente.
-- Completar integracion WhatsApp: bandeja de eventos entrantes, asociacion manual cuando el telefono no sea concluyente y envio saliente por plantillas aprobadas.
+- Completar integracion WhatsApp: envio saliente por plantillas aprobadas y seleccion de canal preferido por cliente.
 
 ### Ampliacion del historial documental
 
