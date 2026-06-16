@@ -72,6 +72,10 @@ public class WhatsappInboxApiController {
             if (expediente.getCliente() == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El expediente no tiene cliente asociado.");
             }
+            if (request.clienteId() != null && !request.clienteId().equals(expediente.getCliente().getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El cliente seleccionado no coincide con el cliente real del expediente.");
+            }
             evento.setCliente(expediente.getCliente());
             evento.setExpediente(expediente);
             historialCambioService.registrarCambioExpediente(expediente, admin, "WHATSAPP ASOCIADO",

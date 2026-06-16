@@ -181,6 +181,10 @@ function AssociateDialog({ evento, onClose, onDone }: { evento: WhatsappEvento |
     setExpedienteId(evento.expedienteId ? String(evento.expedienteId) : "");
   }, [evento]);
 
+  useEffect(() => {
+    if (expedienteId) setClienteId("");
+  }, [expedienteId]);
+
   if (!evento) return null;
   const message = mutation.error instanceof ApiError ? mutation.error.details || mutation.error.message : null;
 
@@ -201,7 +205,7 @@ function AssociateDialog({ evento, onClose, onDone }: { evento: WhatsappEvento |
           </div>
           <label>
             <span>Cliente</span>
-            <select value={clienteId} onChange={(event) => setClienteId(event.target.value)}>
+            <select disabled={Boolean(expedienteId)} value={clienteId} onChange={(event) => setClienteId(event.target.value)}>
               <option value="">Se toma del expediente si indicas uno</option>
               {catalogs.data?.clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
             </select>
