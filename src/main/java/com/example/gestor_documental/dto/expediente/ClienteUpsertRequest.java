@@ -11,4 +11,5 @@ public class ClienteUpsertRequest {
     private String email;
     private String direccion;
     private String telefono;
+    private String preferenciaCanal;
 }

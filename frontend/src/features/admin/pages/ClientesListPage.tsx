@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Mail, Pencil, Phone, Plus, Trash2, UsersRound } from "lucide-react";
+import { BellRing, Mail, Pencil, Phone, Plus, Trash2, UsersRound } from "lucide-react";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { deleteCliente, getClientes } from "../services/adminApi";
 import type { ClienteAdmin } from "../types";
@@ -88,6 +88,7 @@ function ClienteCard({ cliente, onDelete }: { cliente: ClienteAdmin; onDelete: (
       <div className="admin-entity-card__body">
         <span><Mail size={15} /> {cliente.email}</span>
         <span><Phone size={15} /> {cliente.telefono || "Sin telefono"}</span>
+        <span><BellRing size={15} /> {canalLabel(cliente.preferenciaCanal)}</span>
         <small>{cliente.direccion || "Sin direccion"}</small>
       </div>
       <div className="admin-entity-card__actions">
@@ -101,6 +102,13 @@ function ClienteCard({ cliente, onDelete }: { cliente: ClienteAdmin; onDelete: (
       </div>
     </article>
   );
+}
+
+function canalLabel(value?: string | null) {
+  if (value === "EMAIL") return "Solo email";
+  if (value === "WHATSAPP") return "Solo WhatsApp";
+  if (value === "SIN_AVISOS") return "Sin avisos";
+  return "Email y WhatsApp";
 }
 
 function EmptyState({ text }: { text: string }) {

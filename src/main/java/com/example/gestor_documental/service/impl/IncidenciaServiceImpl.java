@@ -4,6 +4,7 @@ import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.CodigoHitoExpediente;
+import com.example.gestor_documental.enums.PreferenciaCanalCliente;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaPreviewResponse;
@@ -397,6 +398,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         int numero = incidencia.getContadorAvisos() + 1;
         var config = configuracionSeguimientoService.obtener();
         if (numero > config.getMaxAvisos()) throw new OperacionInvalidaException("Se ha alcanzado el maximo de avisos. Archiva el seguimiento.");
+        validarCanalPermitido(incidencia, "EMAIL");
         String asuntoFinal = asunto != null && !asunto.isBlank() ? asunto.trim() : asuntoPorDefecto(incidencia, numero);
         String texto = mensaje != null && !mensaje.isBlank() ? mensaje.trim() : mensajePorDefecto(incidencia, numero);
         String destinatario = correoCliente(incidencia);
@@ -421,6 +423,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         int numero = incidencia.getContadorAvisos() + 1;
         var config = configuracionSeguimientoService.obtener();
         if (numero > config.getMaxAvisos()) throw new OperacionInvalidaException("Se ha alcanzado el maximo de avisos. Archiva el seguimiento.");
+        validarCanalPermitido(incidencia, "WHATSAPP");
         String texto = mensaje != null && !mensaje.isBlank() ? mensaje.trim() : mensajeWhatsappPorDefecto(incidencia, numero);
         String destinatario = telefonoCliente(incidencia);
         WhatsappOutboundService.ResultadoWhatsapp resultado = whatsappOutboundService.enviarAvisoSeguimiento(destinatario, texto);
@@ -433,6 +436,22 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         if (!resultado.exito()) return new NotificacionIncidenciaResponse(false, false, resultado.error());
         registrarAvisoCorrecto(incidencia, numero, texto, config, admin, resultado.simulado(), "WHATSAPP");
         return new NotificacionIncidenciaResponse(true, resultado.simulado(), resultado.simulado() ? "WhatsApp simulado correctamente." : "WhatsApp enviado correctamente.");
+    }
+
+    private void validarCanalPermitido(Incidencia incidencia, String canal) {
+        Cliente cliente = incidencia.getExpediente() != null ? incidencia.getExpediente().getCliente() : null;
+        PreferenciaCanalCliente preferencia = cliente != null && cliente.getPreferenciaCanal() != null
+                ? cliente.getPreferenciaCanal()
+                : PreferenciaCanalCliente.AMBOS;
+        if (preferencia == PreferenciaCanalCliente.SIN_AVISOS) {
+            throw new OperacionInvalidaException("El cliente tiene los avisos automaticos desactivados.");
+        }
+        if ("EMAIL".equals(canal) && preferencia == PreferenciaCanalCliente.WHATSAPP) {
+            throw new OperacionInvalidaException("El cliente prefiere recibir avisos por WhatsApp.");
+        }
+        if ("WHATSAPP".equals(canal) && preferencia == PreferenciaCanalCliente.EMAIL) {
+            throw new OperacionInvalidaException("El cliente prefiere recibir avisos por email.");
+        }
     }
 
     @Override

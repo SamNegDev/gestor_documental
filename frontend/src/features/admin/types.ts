@@ -8,6 +8,7 @@ export interface ClienteAdmin {
   email: string;
   direccion?: string | null;
   telefono?: string | null;
+  preferenciaCanal?: "EMAIL" | "WHATSAPP" | "AMBOS" | "SIN_AVISOS" | null;
   logoPrincipalUrl?: string | null;
   logoCompactoUrl?: string | null;
   documentos?: DocumentoExpediente[];
@@ -19,6 +20,7 @@ export interface ClienteInput {
   email: string;
   direccion?: string | null;
   telefono?: string | null;
+  preferenciaCanal?: "EMAIL" | "WHATSAPP" | "AMBOS" | "SIN_AVISOS" | null;
 }
 
 export interface UsuarioAdmin {

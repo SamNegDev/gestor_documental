@@ -17,6 +17,7 @@ public class ClienteResumenResponse {
     private String nif;
     private String email;
     private String telefono;
+    private String preferenciaCanal;
     private String logoPrincipalUrl;
     private String logoCompactoUrl;
 }

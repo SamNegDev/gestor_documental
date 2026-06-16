@@ -8,6 +8,7 @@ import com.example.gestor_documental.dto.expediente.UsuarioAdminResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioCatalogsResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioUpsertRequest;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.enums.PreferenciaCanalCliente;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.model.Cliente;
@@ -229,6 +230,7 @@ public class AdminManagementApiController {
         cliente.setEmail(TextNormalizer.lowerOrNull(request.getEmail()));
         cliente.setDireccion(TextNormalizer.upperOrNull(request.getDireccion()));
         cliente.setTelefono(TextNormalizer.upperOrNull(request.getTelefono()));
+        cliente.setPreferenciaCanal(preferenciaCanal(request.getPreferenciaCanal()));
         return cliente;
     }
 
@@ -249,6 +251,7 @@ public class AdminManagementApiController {
                 .email(cliente.getEmail())
                 .direccion(cliente.getDireccion())
                 .telefono(cliente.getTelefono())
+                .preferenciaCanal(cliente.getPreferenciaCanal() != null ? cliente.getPreferenciaCanal().name() : PreferenciaCanalCliente.AMBOS.name())
                 .logoPrincipalUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.PRINCIPAL))
                 .logoCompactoUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.COMPACTO))
                 .documentos(documentoService.listarPorCliente(cliente.getId()).stream().map(this::mapDocumento).toList())
@@ -277,6 +280,7 @@ public class AdminManagementApiController {
                 .nif(cliente.getNif())
                 .email(cliente.getEmail())
                 .telefono(cliente.getTelefono())
+                .preferenciaCanal(cliente.getPreferenciaCanal() != null ? cliente.getPreferenciaCanal().name() : PreferenciaCanalCliente.AMBOS.name())
                 .logoPrincipalUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.PRINCIPAL))
                 .logoCompactoUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.COMPACTO))
                 .build();
@@ -294,6 +298,17 @@ public class AdminManagementApiController {
                 .activo(usuario.isActivo())
                 .cliente(usuario.getCliente() != null ? mapClienteResumen(usuario.getCliente()) : null)
                 .build();
+    }
+
+    private PreferenciaCanalCliente preferenciaCanal(String value) {
+        if (value == null || value.isBlank()) {
+            return PreferenciaCanalCliente.AMBOS;
+        }
+        try {
+            return PreferenciaCanalCliente.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Preferencia de canal no valida");
+        }
     }
 
     private String nombreCompleto(Usuario usuario) {

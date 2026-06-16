@@ -20,6 +20,7 @@ public class ClienteAdminResponse {
     private String email;
     private String direccion;
     private String telefono;
+    private String preferenciaCanal;
     private String logoPrincipalUrl;
     private String logoCompactoUrl;
     @Builder.Default

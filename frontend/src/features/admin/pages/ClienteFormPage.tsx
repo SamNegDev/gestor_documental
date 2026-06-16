@@ -37,7 +37,7 @@ const CLIENT_DOCUMENT_TYPES = [
 ];
 
 function emptyCliente(): ClienteInput {
-  return { nif: "", nombre: "", email: "", telefono: "", direccion: "" };
+  return { nif: "", nombre: "", email: "", telefono: "", direccion: "", preferenciaCanal: "AMBOS" };
 }
 
 function clean(input: ClienteInput): ClienteInput {
@@ -47,6 +47,7 @@ function clean(input: ClienteInput): ClienteInput {
     email: cleanLowerText(input.email) || "",
     telefono: cleanUpperText(input.telefono),
     direccion: cleanUpperText(input.direccion),
+    preferenciaCanal: input.preferenciaCanal || "AMBOS",
   };
 }
 
@@ -77,6 +78,7 @@ export function ClienteFormPage() {
         nombre: uppercaseInput(clienteQuery.data.nombre || ""),
         telefono: uppercaseInput(clienteQuery.data.telefono || ""),
         direccion: uppercaseInput(clienteQuery.data.direccion || ""),
+        preferenciaCanal: clienteQuery.data.preferenciaCanal || "AMBOS",
       });
       setBranding({
         principal: clienteQuery.data.logoPrincipalUrl || null,
@@ -235,6 +237,15 @@ export function ClienteFormPage() {
             <label>
               Telefono
               <input value={form.telefono || ""} maxLength={20} onChange={(event) => setForm({ ...form, telefono: uppercaseInput(event.target.value) })} />
+            </label>
+            <label>
+              Canal de avisos
+              <select value={form.preferenciaCanal || "AMBOS"} onChange={(event) => setForm({ ...form, preferenciaCanal: event.target.value as ClienteInput["preferenciaCanal"] })}>
+                <option value="AMBOS">Email y WhatsApp</option>
+                <option value="EMAIL">Solo email</option>
+                <option value="WHATSAPP">Solo WhatsApp</option>
+                <option value="SIN_AVISOS">Sin avisos automaticos</option>
+              </select>
             </label>
             <label className="edit-form-grid__wide">
               Direccion
