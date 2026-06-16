@@ -26,7 +26,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final WhatsappWebhookEventoRepository eventoRepository;
     private final ClienteRepository clienteRepository;
     private final ExpedienteRepository expedienteRepository;
