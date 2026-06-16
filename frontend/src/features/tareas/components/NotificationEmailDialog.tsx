@@ -25,8 +25,9 @@ export function NotificationEmailDialog({ incidenciaId, onClose, onSent }: Props
       <header className="mail-dialog__header"><div className="mail-dialog__mark"><Mail size={20} /></div><div><p>Notificacion al cliente</p><h3 id="mail-dialog-title">Revisar correo antes de enviar</h3></div><button className="icon-button" title="Cerrar" type="button" onClick={onClose}><X size={17} /></button></header>
       {preview.isLoading ? <div className="mail-dialog__loading">Preparando el mensaje...</div> : null}
       {preview.data ? <div className="mail-dialog__body">
-        <div className="mail-dialog__route"><span>Para</span><strong>{preview.data.destinatario}</strong><small>Aviso {preview.data.numeroAviso} de 5</small></div>
+        <div className="mail-dialog__route"><span>Para</span><strong>{preview.data.destinatario}</strong><small>Aviso {preview.data.numeroAviso} de {preview.data.maxAvisos}</small></div>
         {!preview.data.envioReal ? <div className="mail-dialog__simulation">Modo simulacion: se registrara el aviso sin enviar un correo real.</div> : null}
+        {preview.data.envioReal ? <div className="mail-dialog__delivery">Envio real mediante {providerLabel(preview.data.proveedor)}.</div> : null}
         <label><span>Asunto</span><input maxLength={250} value={asunto} onChange={event => setAsunto(event.target.value)} /></label>
         <label><span>Mensaje</span><textarea rows={12} value={mensaje} onChange={event => setMensaje(event.target.value)} /></label>
       </div> : null}
@@ -34,4 +35,8 @@ export function NotificationEmailDialog({ incidenciaId, onClose, onSent }: Props
       <footer className="mail-dialog__actions"><button className="soft-button" type="button" onClick={onClose}>Cancelar</button><button className="primary-button" disabled={!preview.data || !asunto.trim() || !mensaje.trim() || send.isPending} type="button" onClick={() => send.mutate()}><Send size={16} /> {send.isPending ? "Enviando..." : preview.data?.envioReal ? "Enviar correo" : "Registrar simulacion"}</button></footer>
     </section>
   </div>;
+}
+
+function providerLabel(provider?: string | null) {
+  return provider?.toLowerCase() === "graph" ? "Microsoft Graph" : "SMTP";
 }

@@ -13,6 +13,7 @@ public class SeguimientoIncidenciaResponse {
     private String tipoIncidencia;
     private String observaciones;
     private int avisosEnviados;
+    private int maxAvisos;
     private String fechaPrimerAviso;
     private String fechaUltimoAviso;
     private String proximoAviso;

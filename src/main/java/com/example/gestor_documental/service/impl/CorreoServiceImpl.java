@@ -3,31 +3,53 @@ package com.example.gestor_documental.service.impl;
 import com.example.gestor_documental.service.CorreoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.StringUtils;
 import org.springframework.mail.MailException;
 import org.springframework.mail.MailAuthenticationException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import jakarta.mail.MessagingException;
 import java.io.UnsupportedEncodingException;
 import jakarta.mail.AuthenticationFailedException;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class CorreoServiceImpl implements CorreoService {
     private final JavaMailSender mailSender;
+    private final RestClient restClient = RestClient.create();
 
     @Value("${app.mail.enabled:false}")
     private boolean enabled;
+    @Value("${app.mail.provider:smtp}")
+    private String provider;
     @Value("${app.mail.from:}")
     private String from;
     @Value("${app.mail.from-name:Gestoria CN}")
     private String fromName;
+    @Value("${app.mail.graph.tenant-id:}")
+    private String graphTenantId;
+    @Value("${app.mail.graph.client-id:}")
+    private String graphClientId;
+    @Value("${app.mail.graph.client-secret:}")
+    private String graphClientSecret;
+    @Value("${app.mail.graph.sender:}")
+    private String graphSender;
+    @Value("${app.mail.graph.save-to-sent-items:true}")
+    private boolean graphSaveToSentItems;
 
     @Override
     public ResultadoCorreo enviar(String destinatario, String asunto, String mensaje) {
         if (!enabled) return ResultadoCorreo.simulacion();
         if (destinatario == null || destinatario.isBlank()) return ResultadoCorreo.error("El cliente no tiene un correo configurado.");
+        if ("graph".equalsIgnoreCase(provider)) return enviarGraph(destinatario, asunto, mensaje);
         if (from == null || from.isBlank()) return ResultadoCorreo.error("No se ha configurado el remitente del correo.");
         try {
             var correo = mailSender.createMimeMessage();
@@ -41,6 +63,75 @@ public class CorreoServiceImpl implements CorreoService {
         } catch (MailException | MessagingException | UnsupportedEncodingException | IllegalArgumentException ex) {
             return ResultadoCorreo.error(detalleError(ex));
         }
+    }
+
+    private ResultadoCorreo enviarGraph(String destinatario, String asunto, String mensaje) {
+        String remitente = StringUtils.hasText(graphSender) ? graphSender.trim() : trim(from);
+        if (!StringUtils.hasText(remitente)) return ResultadoCorreo.error("No se ha configurado el buzon remitente de Microsoft Graph.");
+        if (!StringUtils.hasText(graphTenantId) || !StringUtils.hasText(graphClientId) || !StringUtils.hasText(graphClientSecret)) {
+            return ResultadoCorreo.error("Faltan credenciales de Microsoft Graph: tenant, client id o client secret.");
+        }
+        try {
+            String token = obtenerTokenGraph();
+            Map<String, Object> payload = Map.of(
+                    "message", Map.of(
+                            "subject", asunto != null ? asunto : "",
+                            "body", Map.of(
+                                    "contentType", "Text",
+                                    "content", mensaje != null ? mensaje : ""
+                            ),
+                            "toRecipients", List.of(Map.of(
+                                    "emailAddress", Map.of("address", destinatario.trim())
+                            ))
+                    ),
+                    "saveToSentItems", graphSaveToSentItems
+            );
+            restClient.post()
+                    .uri(uriBuilder -> uriBuilder
+                            .scheme("https")
+                            .host("graph.microsoft.com")
+                            .pathSegment("v1.0", "users", remitente, "sendMail")
+                            .build())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("Authorization", "Bearer " + token)
+                    .body(payload)
+                    .retrieve()
+                    .toBodilessEntity();
+            return ResultadoCorreo.enviado();
+        } catch (RestClientResponseException ex) {
+            return ResultadoCorreo.error("Microsoft Graph ha rechazado el envio (" + ex.getStatusCode().value() + "): " + detalleGraph(ex));
+        } catch (RestClientException | IllegalArgumentException ex) {
+            return ResultadoCorreo.error("No se pudo enviar mediante Microsoft Graph: " + ex.getMessage());
+        }
+    }
+
+    private String obtenerTokenGraph() {
+        var form = new LinkedMultiValueMap<String, String>();
+        form.add("client_id", graphClientId.trim());
+        form.add("client_secret", graphClientSecret.trim());
+        form.add("scope", "https://graph.microsoft.com/.default");
+        form.add("grant_type", "client_credentials");
+
+        Map<?, ?> response = restClient.post()
+                .uri("https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token", graphTenantId.trim())
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(form)
+                .retrieve()
+                .body(Map.class);
+        Object token = response != null ? response.get("access_token") : null;
+        if (token == null || token.toString().isBlank()) {
+            throw new RestClientException("Microsoft no devolvio access_token.");
+        }
+        return token.toString();
+    }
+
+    private String detalleGraph(RestClientResponseException error) {
+        String body = error.getResponseBodyAsString();
+        return body != null && !body.isBlank() ? body : error.getMessage();
+    }
+
+    private String trim(String value) {
+        return value != null ? value.trim() : "";
     }
 
     private String detalleError(Throwable error) {

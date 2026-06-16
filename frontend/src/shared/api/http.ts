@@ -121,6 +121,28 @@ export function apiPutJson(path: string, body: unknown): Promise<void> {
   });
 }
 
+export async function apiPutJsonResponse<T = void>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw await buildApiError(response, "PUT", path);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export function apiPatchForm(path: string, formData: FormData): Promise<void> {
   return apiRequest(path, {
     method: "PATCH",

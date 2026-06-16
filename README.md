@@ -176,6 +176,16 @@ En el `docker-compose.yml` actual el puerto se expone solo en `127.0.0.1`, por l
 | `TESSERACT_DATAPATH` | Ruta al directorio `tessdata` de Tesseract. |
 | `TESSDATA_PATH` | Ruta alternativa usada por el perfil local para localizar `tessdata`. |
 | `COOKIE_SECURE` | Activa cookies seguras. Usar `true` en HTTPS y `false` en local sin HTTPS. |
+| `MAIL_ENABLED` | Activa el envio real de correos; con `false` queda en simulacion. |
+| `MAIL_PROVIDER` | Proveedor de correo: `smtp` o `graph`. |
+| `MAIL_FROM` | Remitente por defecto para SMTP o fallback de Graph. |
+| `MAIL_FROM_NAME` | Nombre visible del remitente cuando el proveedor lo permite. |
+| `MAIL_GRAPH_TENANT_ID` | ID del inquilino de Microsoft Entra. |
+| `MAIL_GRAPH_CLIENT_ID` | ID de aplicacion de Microsoft Entra. |
+| `MAIL_GRAPH_CLIENT_SECRET` | Valor del secreto de cliente de Microsoft Entra. |
+| `MAIL_GRAPH_SENDER` | Buzon desde el que Microsoft Graph enviara el correo. |
+| `MAIL_GRAPH_SAVE_TO_SENT_ITEMS` | Guarda los mensajes enviados en elementos enviados del buzon. |
+| `APP_PUBLIC_URL` | URL publica usada en enlaces incluidos en correos. |
 
 ## OCR y procesamiento documental
 

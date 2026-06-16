@@ -5,6 +5,7 @@ import com.example.gestor_documental.dto.seguimiento.SeguimientoIncidenciaRespon
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaPreviewResponse;
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaRequest;
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaResponse;
+import com.example.gestor_documental.dto.seguimiento.PosponerSeguimientoRequest;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.RolUsuario;
@@ -19,6 +20,7 @@ import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.MensajeRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.security.CurrentUserService;
+import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
 import com.example.gestor_documental.service.IncidenciaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -41,6 +43,7 @@ public class SeguimientoClienteApiController {
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final IncidenciaService incidenciaService;
     private final CurrentUserService currentUserService;
+    private final ConfiguracionSeguimientoService configuracionSeguimientoService;
 
     @GetMapping
     public PagedResponse<SeguimientoIncidenciaResponse> listar(@RequestParam(defaultValue = "PENDIENTES") String vista,
@@ -83,6 +86,7 @@ public class SeguimientoClienteApiController {
         if (!resultado.exito()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, resultado.mensaje());
         return resultado;
     }
+    @PostMapping("/{id}/posponer") public void posponer(@PathVariable Long id, @RequestBody PosponerSeguimientoRequest body, Authentication authentication) { incidenciaService.posponerSeguimiento(id, body != null ? body.proximoAviso() : null, requireAdmin(authentication)); }
     @PostMapping("/{id}/archivar") public void archivar(@PathVariable Long id, Authentication authentication) { incidenciaService.archivarSeguimiento(id, requireAdmin(authentication)); }
     @PostMapping("/{id}/reactivar") public void reactivar(@PathVariable Long id, Authentication authentication) { incidenciaService.reactivarSeguimiento(id, requireAdmin(authentication)); }
 
@@ -93,6 +97,7 @@ public class SeguimientoClienteApiController {
                 .cliente(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getNombre() : null)
                 .tipoIncidencia(tipoIncidencia(incidencia))
                 .observaciones(observacionesSeguimiento(incidencia)).avisosEnviados(incidencia.getContadorAvisos())
+                .maxAvisos(configuracionSeguimientoService.obtener().getMaxAvisos())
                 .fechaPrimerAviso(avisos.isEmpty() ? null : format(avisos.get(0).getFechaEnvio())).fechaUltimoAviso(format(incidencia.getFechaUltimoAviso()))
                 .proximoAviso(format(incidencia.getProximoAviso())).pendienteNotificacion(incidencia.getContadorAvisos() == 0 || incidencia.getProximoAviso() != null && !incidencia.getProximoAviso().isAfter(LocalDateTime.now()))
                 .archivada(incidencia.isSeguimientoArchivado()).fechaArchivo(format(incidencia.getFechaArchivoSeguimiento()))

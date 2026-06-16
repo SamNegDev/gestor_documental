@@ -44,9 +44,12 @@ public class IncidenciaServiceImpl implements IncidenciaService {
     private final HistorialCambioService historialCambioService;
     private final MensajeService mensajeService;
     private final CorreoService correoService;
+    private final ConfiguracionSeguimientoService configuracionSeguimientoService;
 
     @Value("${app.mail.enabled:false}")
     private boolean mailEnabled;
+    @Value("${app.mail.provider:smtp}")
+    private String mailProvider;
     @Value("${app.public-url:http://127.0.0.1:5173}")
     private String publicUrl;
 
@@ -351,13 +354,16 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
         validarSeguimiento(incidencia);
         int numero = incidencia.getContadorAvisos() + 1;
+        var config = configuracionSeguimientoService.obtener();
         return new NotificacionIncidenciaPreviewResponse(
                 incidencia.getId(),
                 correoCliente(incidencia),
                 asuntoPorDefecto(incidencia, numero),
                 mensajePorDefecto(incidencia, numero),
                 numero,
-                mailEnabled
+                config.getMaxAvisos(),
+                mailEnabled,
+                mailProvider
         );
     }
 
@@ -368,7 +374,8 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
         validarSeguimiento(incidencia);
         int numero = incidencia.getContadorAvisos() + 1;
-        if (numero > 5) throw new OperacionInvalidaException("Se ha alcanzado el maximo de avisos. Archiva el seguimiento.");
+        var config = configuracionSeguimientoService.obtener();
+        if (numero > config.getMaxAvisos()) throw new OperacionInvalidaException("Se ha alcanzado el maximo de avisos. Archiva el seguimiento.");
         String asuntoFinal = asunto != null && !asunto.isBlank() ? asunto.trim() : asuntoPorDefecto(incidencia, numero);
         String texto = mensaje != null && !mensaje.isBlank() ? mensaje.trim() : mensajePorDefecto(incidencia, numero);
         String destinatario = correoCliente(incidencia);
@@ -380,10 +387,31 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         aviso.setErrorEnvio(resultado.error());
         avisoIncidenciaRepository.save(aviso);
         if (!resultado.exito()) return new NotificacionIncidenciaResponse(false, false, resultado.error());
-        LocalDateTime ahora = LocalDateTime.now(); incidencia.setContadorAvisos(numero); incidencia.setFechaUltimoAviso(ahora); incidencia.setProximoAviso(siguienteVencimiento(ahora, numero)); incidencia.setSeguimientoArchivado(false); incidencia.setFechaArchivoSeguimiento(null); incidencia.setSeguimientoArchivadoPor(null); incidenciaRepository.save(incidencia);
+        LocalDateTime ahora = LocalDateTime.now(); incidencia.setContadorAvisos(numero); incidencia.setFechaUltimoAviso(ahora); incidencia.setProximoAviso(siguienteVencimiento(ahora, numero, config)); incidencia.setSeguimientoArchivado(false); incidencia.setFechaArchivoSeguimiento(null); incidencia.setSeguimientoArchivadoPor(null); incidenciaRepository.save(incidencia);
         mensajeService.añadirAExpediente(incidencia.getExpediente().getId(), texto, admin);
         historialCambioService.registrarCambioExpediente(incidencia.getExpediente(), admin, "AVISO INCIDENCIA", "Aviso " + numero + (resultado.simulado() ? " simulado." : " enviado al cliente."));
         return new NotificacionIncidenciaResponse(true, resultado.simulado(), resultado.simulado() ? "Envio simulado correctamente." : "Correo enviado correctamente.");
+    }
+
+    @Override
+    @Transactional
+    public void posponerSeguimiento(Long incidenciaId, LocalDateTime proximoAviso, Usuario admin) {
+        validarAdmin(admin);
+        if (proximoAviso == null) throw new OperacionInvalidaException("Indica la nueva fecha del recordatorio.");
+        if (proximoAviso.isBefore(LocalDateTime.now())) throw new OperacionInvalidaException("La fecha de recordatorio no puede estar en el pasado.");
+        Incidencia incidencia = incidenciaRepository.findById(incidenciaId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        validarSeguimiento(incidencia);
+        if (incidencia.isSeguimientoArchivado()) throw new OperacionInvalidaException("No se puede posponer un seguimiento archivado.");
+        LocalDateTime anterior = incidencia.getProximoAviso();
+        incidencia.setProximoAviso(proximoAviso);
+        incidenciaRepository.save(incidencia);
+        historialCambioService.registrarCambioExpediente(
+                incidencia.getExpediente(),
+                admin,
+                "SEGUIMIENTO POSPUESTO",
+                "Recordatorio aplazado de " + formatFecha(anterior) + " a " + formatFecha(proximoAviso) + "."
+        );
     }
 
     @Override @Transactional
@@ -399,8 +427,20 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         incidencia.setSeguimientoArchivado(false); incidencia.setFechaArchivoSeguimiento(null); incidencia.setSeguimientoArchivadoPor(null); incidencia.setProximoAviso(LocalDateTime.now()); incidenciaRepository.save(incidencia);
     }
 
-    private LocalDateTime siguienteVencimiento(LocalDateTime fecha, int numeroAviso) {
-        return switch (numeroAviso) { case 1, 2, 3 -> fecha.plusWeeks(1); case 4 -> fecha.plusMonths(1); case 5 -> fecha.plusMonths(2); default -> null; };
+    private LocalDateTime siguienteVencimiento(LocalDateTime fecha, int numeroAviso, ConfiguracionSeguimiento config) {
+        int dias = switch (numeroAviso) {
+            case 1 -> config.getDiasAviso1();
+            case 2 -> config.getDiasAviso2();
+            case 3 -> config.getDiasAviso3();
+            case 4 -> config.getDiasAviso4();
+            case 5 -> config.getDiasAviso5();
+            default -> 0;
+        };
+        return numeroAviso >= config.getMaxAvisos() || dias <= 0 ? null : fecha.plusDays(dias);
+    }
+
+    private String formatFecha(LocalDateTime fecha) {
+        return fecha != null ? fecha.toString().replace('T', ' ') : "sin fecha";
     }
 
     private void validarAdmin(Usuario usuario) {

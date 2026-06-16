@@ -22,6 +22,7 @@ import { VehiculosRegistroPage } from "../features/registro/pages/VehiculosRegis
 import { VehiculoRegistroDetailPage } from "../features/registro/pages/VehiculoRegistroDetailPage";
 import { TareasPage } from "../features/tareas/pages/TareasPage";
 import { SeguimientoClientesPage } from "../features/seguimiento/pages/SeguimientoClientesPage";
+import { SeguimientoConfigPage } from "../features/seguimiento/pages/SeguimientoConfigPage";
 
 
 export const router = createBrowserRouter([
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
       { path: "admin/dashboard", element: <RequireRole allow={["ADMIN"]}><DashboardPage /></RequireRole> },
       { path: "admin/tareas", element: <RequireRole allow={["ADMIN"]}><TareasPage /></RequireRole> },
       { path: "admin/seguimiento-clientes", element: <RequireRole allow={["ADMIN"]}><SeguimientoClientesPage /></RequireRole> },
+      { path: "admin/seguimiento-config", element: <RequireRole allow={["ADMIN"]}><SeguimientoConfigPage /></RequireRole> },
       { path: "cliente/tareas", element: <RequireRole allow={["CLIENTE"]}><TareasPage /></RequireRole> },
       { path: "admin/clientes", element: <RequireRole allow={["ADMIN"]}><ClientesListPage /></RequireRole> },
       { path: "admin/clientes/nuevo", element: <RequireRole allow={["ADMIN"]}><ClienteFormPage /></RequireRole> },

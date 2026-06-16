@@ -6,5 +6,7 @@ public record NotificacionIncidenciaPreviewResponse(
         String asunto,
         String mensaje,
         int numeroAviso,
-        boolean envioReal
+        int maxAvisos,
+        boolean envioReal,
+        String proveedor
 ) {}

@@ -20,6 +20,7 @@ function pageTitle(pathname: string) {
   if (pathname.includes("/dashboard")) return "Dashboard";
   if (pathname === "/admin/tareas") return "Bandeja de tareas";
   if (pathname === "/admin/seguimiento-clientes") return "Seguimiento de clientes";
+  if (pathname === "/admin/seguimiento-config") return "Periodos de seguimiento";
   if (pathname === "/cliente/tareas") return "Mis tareas";
   if (pathname === "/admin/clientes") return "Clientes";
   if (pathname.includes("/admin/clientes/nuevo")) return "Nuevo cliente";
@@ -52,6 +53,7 @@ const adminMenuItems: MenuItemConfig[] = [
   { id: "dashboard", to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { id: "tareas", to: "/admin/tareas", icon: Inbox, label: "Tareas" },
   { id: "seguimiento", to: "/admin/seguimiento-clientes", icon: BellRing, label: "Seguimiento clientes" },
+  { id: "seguimiento-config", to: "/admin/seguimiento-config", icon: Settings2, label: "Config. seguimiento" },
   { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Expedientes" },
   { id: "nuevo-expediente", to: "/expedientes/nuevo", icon: FilePlus2, label: "Nuevo expediente" },
   { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },

@@ -2363,6 +2363,7 @@ input.records-table-filter {
 .mail-dialog__body label { display: grid; gap: 7px; }.mail-dialog__body label > span { color: var(--muted); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
 .mail-dialog__body input, .mail-dialog__body textarea { width: 100%; border: 1px solid oklch(84% .014 90); border-radius: 5px; background: white; color: var(--ink); font: inherit; padding: 10px 11px; }.mail-dialog__body textarea { min-height: 245px; resize: vertical; line-height: 1.55; text-transform: none; }
 .mail-dialog__simulation { border-left: 3px solid oklch(68% .13 75); background: oklch(97% .03 82); color: oklch(39% .07 72); padding: 10px 12px; font-size: .8rem; }
+.mail-dialog__delivery { border-left: 3px solid oklch(62% .1 205); background: oklch(97% .018 205); color: oklch(36% .08 215); padding: 10px 12px; font-size: .8rem; }
 .mail-dialog__loading, .mail-dialog__error { margin: 20px; padding: 14px; font-size: .84rem; }.mail-dialog__error { border-left: 3px solid oklch(58% .18 28); background: oklch(97% .025 28); color: oklch(43% .14 28); }
 .mail-dialog__actions { display: flex; justify-content: flex-end; gap: 9px; padding: 14px 20px 18px; border-top: 1px solid oklch(89% .01 90); }
 @media (max-width: 620px) { .mail-dialog { padding: 0; place-items: end center; }.mail-dialog__panel { max-height: 94vh; border-radius: 8px 8px 0 0; }.mail-dialog__route { grid-template-columns: 44px 1fr; }.mail-dialog__route small { grid-column: 2; } }
@@ -2391,6 +2392,22 @@ input.records-table-filter {
 .followup-row__actions { display: flex !important; align-items: center; justify-content: flex-end; gap: 5px; }
 @media(max-width:1050px){.followup-row{grid-template-columns:38px minmax(230px,1fr) minmax(230px,1.2fr) minmax(120px,.65fr) auto}.followup-row>div:nth-of-type(4){display:none}}
 @media(max-width:720px){.followup-row{grid-template-columns:38px minmax(0,1fr) auto}.followup-row__detail,.followup-row>div:nth-of-type(3),.followup-row>div:nth-of-type(4){display:none}.followup-row__actions .soft-button{font-size:0}.followup-row__actions .soft-button svg{margin:0}}
+.followup-config { display: grid; gap: 18px; border: 1px solid oklch(88% .012 90); background: white; padding: 18px; }
+.followup-config__intro { display: grid; grid-template-columns: 42px 1fr; gap: 12px; align-items: start; border-bottom: 1px solid oklch(90% .01 90); padding-bottom: 16px; }
+.followup-config__intro > span { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 7px; background: oklch(96% .028 205); color: oklch(42% .09 215); }
+.followup-config__intro strong { display: block; margin-bottom: 4px; color: var(--ink-strong); font-size: .96rem; }.followup-config__intro p { max-width: 760px; margin: 0; color: var(--muted); font-size: .84rem; line-height: 1.5; }
+.followup-config__form { display: grid; gap: 16px; }
+.followup-config__grid { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 12px; }
+.followup-config__field { display: grid; gap: 7px; border: 1px solid oklch(90% .012 90); background: oklch(99% .004 92); padding: 12px; }
+.followup-config__field span { color: var(--muted); font-size: .72rem; font-weight: 760; text-transform: uppercase; }
+.followup-config__field input { width: 100%; border: 1px solid oklch(84% .014 90); border-radius: 5px; background: white; color: var(--ink-strong); font: inherit; font-size: 1rem; font-weight: 760; padding: 9px 10px; }
+.followup-config__field small { color: var(--muted); font-size: .72rem; }
+.followup-config__actions { display: flex; justify-content: flex-end; gap: 9px; border-top: 1px solid oklch(90% .01 90); padding-top: 14px; }
+.followup-config__error { margin: 0; }
+.followup-config__success { border-left: 3px solid oklch(62% .12 145); background: oklch(97% .025 145); color: oklch(38% .08 145); padding: 10px 12px; font-size: .82rem; }
+.postpone-dialog__panel { width: min(560px, 100%); }
+@media(max-width:900px){.followup-config__grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.followup-config{padding:14px}.followup-config__grid{grid-template-columns:1fr}.followup-config__actions{align-items:stretch; flex-direction:column-reverse}.followup-config__actions button{justify-content:center}}
 
 .registry-search:focus-within {
   border-color: oklch(67% 0.095 232);

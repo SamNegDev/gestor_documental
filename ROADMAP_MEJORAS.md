@@ -13,9 +13,7 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 
 ### Notificaciones y recordatorios
 
-- Activar Microsoft Graph cuando el administrador conceda `Mail.Send`.
 - Automatizar el envio programado de avisos por correo cuando falte documentacion o respuesta del cliente.
-- Hacer configurables los umbrales de seguimiento: dias sin respuesta, numero maximo de avisos y dias para considerar un expediente estancado.
 
 ### Ampliacion del historial documental
 

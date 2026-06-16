@@ -22,6 +22,7 @@ import com.example.gestor_documental.repository.MensajeRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.security.CurrentUserService;
+import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -52,6 +53,7 @@ public class TareaApiController {
     private final MensajeRepository mensajeRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final CurrentUserService currentUserService;
+    private final ConfiguracionSeguimientoService configuracionSeguimientoService;
 
     @GetMapping
     public PagedResponse<TareaResponse> listar(@RequestParam(required = false) String tipo,
@@ -121,7 +123,8 @@ public class TareaApiController {
                             contextoAportacion(expediente))));
 
             tareas.addAll(tareasJustificantesFinales());
-            expedienteRepository.findEstancados(LocalDateTime.now().minusDays(7), List.of(
+            int diasEstancado = configuracionSeguimientoService.obtener().getDiasExpedienteEstancado();
+            expedienteRepository.findEstancados(LocalDateTime.now().minusDays(diasEstancado), List.of(
                             EstadoExpediente.RECHAZADO,
                             EstadoExpediente.INCIDENCIA,
                             EstadoExpediente.PENDIENTE_DOCUMENTACION,
@@ -129,7 +132,7 @@ public class TareaApiController {
                             EstadoExpediente.FINALIZADO
                     ))
                     .forEach(expediente -> tareas.add(tareaExpediente(expediente, "EXPEDIENTE_ESTANCADO", "MEDIA",
-                            "Expediente sin actividad", "Lleva mas de siete dias sin modificaciones.",
+                            "Expediente sin actividad", "Lleva mas de " + diasEstancado + " dias sin modificaciones.",
                             contextoExpedienteEstancado(fechaReferencia(expediente)))));
         } else if (clienteId != null) {
             List<Expediente> expedientes = expedienteRepository.findTareasPorEstados(clienteId, List.of(
@@ -162,9 +165,10 @@ public class TareaApiController {
 
     private TareaResponse tareaSeguimientoIncidencia(Incidencia incidencia) {
         LocalDateTime fecha = incidencia.getProximoAviso() != null ? incidencia.getProximoAviso() : incidencia.getFechaCreacion();
-        return TareaResponse.builder().id("INC-" + incidencia.getId() + "-SEGUIMIENTO").tipo(incidencia.getContadorAvisos() >= 5 ? "INCIDENCIA_PENDIENTE_ARCHIVAR" : "INCIDENCIA_PENDIENTE_NOTIFICAR").ambito("GESTION")
-                .prioridad("ALTA").titulo(incidencia.getContadorAvisos() >= 5 ? "Seguimiento pendiente de archivar" : incidencia.getContadorAvisos() == 0 ? "Solicitud al cliente pendiente de aviso" : "Recordatorio de solicitud vencido")
-                .detalle(incidencia.getContadorAvisos() >= 5 ? "Se ha completado el ciclo de avisos sin respuesta." : incidencia.getContadorAvisos() == 0 ? "Debe enviarse la primera notificacion al cliente antes de pasarla a seguimiento." : "Debe renovarse la notificacion al cliente.")
+        int maxAvisos = configuracionSeguimientoService.obtener().getMaxAvisos();
+        return TareaResponse.builder().id("INC-" + incidencia.getId() + "-SEGUIMIENTO").tipo(incidencia.getContadorAvisos() >= maxAvisos ? "INCIDENCIA_PENDIENTE_ARCHIVAR" : "INCIDENCIA_PENDIENTE_NOTIFICAR").ambito("GESTION")
+                .prioridad("ALTA").titulo(incidencia.getContadorAvisos() >= maxAvisos ? "Seguimiento pendiente de archivar" : incidencia.getContadorAvisos() == 0 ? "Solicitud al cliente pendiente de aviso" : "Recordatorio de solicitud vencido")
+                .detalle(incidencia.getContadorAvisos() >= maxAvisos ? "Se ha completado el ciclo de avisos sin respuesta." : incidencia.getContadorAvisos() == 0 ? "Debe enviarse la primera notificacion al cliente antes de pasarla a seguimiento." : "Debe renovarse la notificacion al cliente.")
                 .contexto(contextoIncidencia(incidencia))
                 .entidad("INCIDENCIA").entidadId(incidencia.getId()).matricula(incidencia.getExpediente().getMatricula())
                 .cliente(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getNombre() : null)
