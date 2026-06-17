@@ -214,11 +214,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         if (!estadoDetalle.tramiteSubido()) {
             return "Pendiente de subir a programa de gestion";
         }
-        if (!estadoDetalle.modelo620Subido()) {
-            return "Tramite subido, a la espera de pasar el impuesto 620";
-        }
         if (!estadoDetalle.enviadoDgt()) {
-            return "Impuesto 620 presentado, pendiente de enviar a DGT";
+            return "Tramite subido, pendiente de enviar a DGT";
         }
         return "Tramite enviado a DGT, pendiente de cierre";
     }
@@ -231,6 +228,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         boolean modelo620Completado = finalizado || estadoDetalle.modelo620Subido();
         boolean tramiteSubido = finalizado || estadoDetalle.tramiteSubido();
         boolean enviadoDgt = finalizado || estadoDetalle.enviadoDgt();
+        boolean puedeContinuarTrasTramite = finalizado || tramiteSubido || estadoDetalle.conIncidencia();
         HitoExpediente tramitePersistido = estadoDetalle.hitosPersistidos().get(CodigoHitoExpediente.TRAMITE_PROGRAMA_GESTION);
         HitoExpediente modelo620Persistido = estadoDetalle.hitosPersistidos().get(CodigoHitoExpediente.MODELO_620_PRESENTADO);
         HitoExpediente enviadoDgtPersistido = estadoDetalle.hitosPersistidos().get(CodigoHitoExpediente.ENVIADO_DGT);
@@ -300,21 +298,21 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .bloqueado(!modelo620Completado && !tramiteSubido)
                 .build());
 
-        List<HitoAccionResponse> accionesCierre = accionesCierre(finalizado, estadoDetalle.conIncidencia(), modelo620Completado, enviadoDgt);
+        List<HitoAccionResponse> accionesCierre = accionesCierre(finalizado, estadoDetalle.conIncidencia(), puedeContinuarTrasTramite, enviadoDgt);
         hitos.add(HitoExpedienteResponse.builder()
                 .id("finalizado-incidencia")
                 .titulo(tituloCierre(finalizado, estadoDetalle.conIncidencia(), enviadoDgt))
                 .descripcion("Decision final del expediente: enviar a DGT, abrir incidencia o finalizar.")
-                .estado(finalizado ? "COMPLETADO" : estadoDetalle.conIncidencia() ? "ACTUAL" : modelo620Completado ? "ACTUAL" : "BLOQUEADO")
+                .estado(finalizado ? "COMPLETADO" : estadoDetalle.conIncidencia() ? "ACTUAL" : puedeContinuarTrasTramite ? "ACTUAL" : "BLOQUEADO")
                 .tipo("DECISION")
                 .fecha(fechaHito(enviadoDgtPersistido, expediente.getEstadoExpediente() == EstadoExpediente.ENVIADO_DGT ? expediente.getFechaUltimaModificacion() : null))
                 .usuario(usuarioHito(enviadoDgtPersistido))
-                .nota(notaCierre(finalizado, estadoDetalle.conIncidencia(), enviadoDgt, modelo620Completado))
+                .nota(notaCierre(finalizado, estadoDetalle.conIncidencia(), enviadoDgt, puedeContinuarTrasTramite))
                 .acciones(accionesCierre)
                 .accion(accionesCierre.isEmpty() ? null : accionesCierre.get(0).getTipo())
                 .accionLabel(accionesCierre.isEmpty() ? null : accionesCierre.get(0).getLabel())
                 .completado(finalizado)
-                .bloqueado(!finalizado && !modelo620Completado && !estadoDetalle.conIncidencia())
+                .bloqueado(!finalizado && !puedeContinuarTrasTramite && !estadoDetalle.conIncidencia())
                 .build());
 
         return hitos;
@@ -361,8 +359,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 : null;
 
         boolean tramite = estadoDetalle.hitosPersistidos().containsKey(tramiteCodigo);
-        boolean modelo = estadoDetalle.hitosPersistidos().containsKey(modeloCodigo)
-                || requisitoModeloResuelto(estadoDetalle.requisitos(), tipoOperacion);
+        boolean modelo = estadoDetalle.hitosPersistidos().containsKey(modeloCodigo);
         boolean cierre = estadoDetalle.hitosPersistidos().containsKey(cierreCodigo);
         boolean envio = envioCodigo != null && estadoDetalle.hitosPersistidos().containsKey(envioCodigo);
         HitoExpediente tramitePersistido = estadoDetalle.hitosPersistidos().get(tramiteCodigo);
@@ -426,7 +423,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .bloqueado(!modelo && !tramite)
                 .build());
         List<HitoAccionResponse> accionesCierre = new ArrayList<>();
-        if (tipoOperacion == TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM && modelo && !envio) {
+        if (tipoOperacion == TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM && tramite && !envio) {
             accionesCierre.add(HitoAccionResponse.builder()
                     .tipo("COMPLETAR_HITO")
                     .codigoHito(envioCodigo.name())
@@ -434,7 +431,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                     .tono("primary")
                     .build());
         }
-        if (modelo && !cierre) {
+        if (tramite && !cierre) {
             accionesCierre.add(HitoAccionResponse.builder()
                     .tipo("COMPLETAR_HITO")
                     .codigoHito(cierreCodigo.name())
@@ -446,16 +443,16 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .id(tipoOperacion.name().toLowerCase() + "-cierre")
                 .titulo(cierre ? "Operacion finalizada" : "Cierre de operacion")
                 .descripcion("Decision final de esta operacion.")
-                .estado(cierre ? "COMPLETADO" : modelo ? "ACTUAL" : "BLOQUEADO")
+                .estado(cierre ? "COMPLETADO" : tramite ? "ACTUAL" : "BLOQUEADO")
                 .tipo("DECISION")
                 .fecha(fechaHito(cierrePersistido != null ? cierrePersistido : envioPersistido, null))
                 .usuario(usuarioHito(cierrePersistido != null ? cierrePersistido : envioPersistido))
-                .nota(cierre ? "Operacion cerrada correctamente" : modelo ? "Pendiente de cierre" : "Primero debe presentarse el Modelo 620")
+                .nota(cierre ? "Operacion cerrada correctamente" : tramite ? "Pendiente de cierre" : "Primero debe subirse el tramite")
                 .acciones(accionesCierre)
                 .accion(accionesCierre.isEmpty() ? null : accionesCierre.get(0).getTipo())
                 .accionLabel(accionesCierre.isEmpty() ? null : accionesCierre.get(0).getLabel())
                 .completado(cierre)
-                .bloqueado(!cierre && !modelo)
+                .bloqueado(!cierre && !tramite)
                 .build());
         return hitos;
     }
@@ -487,8 +484,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                         || requisito.getEstado() == EstadoRequisitoDocumental.OMITIDO);
     }
 
-    private List<HitoAccionResponse> accionesCierre(boolean finalizado, boolean conIncidencia, boolean modelo620Completado, boolean enviadoDgt) {
-        if (finalizado || conIncidencia || !modelo620Completado) {
+    private List<HitoAccionResponse> accionesCierre(boolean finalizado, boolean conIncidencia, boolean puedeContinuar, boolean enviadoDgt) {
+        if (finalizado || conIncidencia || !puedeContinuar) {
             return List.of();
         }
         List<HitoAccionResponse> acciones = new ArrayList<>();
@@ -523,15 +520,15 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         return enviadoDgt ? "Enviado a DGT" : "Cierre del expediente";
     }
 
-    private String notaCierre(boolean finalizado, boolean conIncidencia, boolean enviadoDgt, boolean modelo620Completado) {
+    private String notaCierre(boolean finalizado, boolean conIncidencia, boolean enviadoDgt, boolean puedeContinuar) {
         if (finalizado) {
             return "Expediente cerrado correctamente";
         }
         if (conIncidencia) {
             return "Hay una incidencia abierta antes de continuar";
         }
-        if (!modelo620Completado) {
-            return "Primero debe presentarse el Modelo 620";
+        if (!puedeContinuar) {
+            return "Primero debe subirse el tramite al programa de gestion";
         }
         return enviadoDgt ? "Pendiente de finalizar o abrir incidencia" : "Elige enviar a DGT, abrir incidencia o finalizar";
     }

@@ -35,6 +35,8 @@ const DOCUMENT_TYPES = [
   "OTROS",
 ];
 
+const CLOSING_REQUIREMENT_TYPES = new Set(["MODELO_620", "COMPROBANTE_DGT", "HUELLA_TRAMITE"]);
+
 const OMIT_REASONS = [
   "No aplica para este tramite",
   "Ya cubierto por otro documento",
@@ -67,8 +69,10 @@ export function DocumentRequirementsPanel({
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
   const [omittingRequirement, setOmittingRequirement] = useState<RequisitoDocumental | null>(null);
   const [omitReason, setOmitReason] = useState(OMIT_REASONS[0]);
-  const requisitosVisibles = requisitos.filter((requisito) => requisito.estado === "REQUERIDO" || requisito.estado === "POSTERIOR");
-  const requisitosPendientes = requisitos.filter((requisito) => requisito.estado === "REQUERIDO");
+  const requisitosVisibles = requisitos.filter((requisito) =>
+    !CLOSING_REQUIREMENT_TYPES.has(requisito.tipoDocumento) && (requisito.estado === "REQUERIDO" || requisito.estado === "POSTERIOR")
+  );
+  const requisitosPendientes = requisitos.filter((requisito) => !CLOSING_REQUIREMENT_TYPES.has(requisito.tipoDocumento) && requisito.estado === "REQUERIDO");
   const pendientes = requisitosPendientes.length;
   const documentosSubidos = documentos.filter((documento) => documento.id);
 

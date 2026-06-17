@@ -308,7 +308,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
 
         boolean tramiteAvanzado = hitoRepository.existsByExpedienteIdAndCodigo(expediente.getId(), hitoTramite);
         if (tramiteAvanzado && requiereModelo620(expediente)) {
-            crearPorOperacionSiNoExiste(expediente, TipoDocumento.MODELO_620, operacion, descripcionModelo, EstadoRequisitoDocumental.REQUERIDO, usuario);
+            crearPorOperacionSiNoExiste(expediente, TipoDocumento.MODELO_620, operacion, descripcionModelo, EstadoRequisitoDocumental.POSTERIOR, usuario);
         }
 
         boolean finalizado = expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
@@ -418,6 +418,13 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         }
         if (requisito.getEstado() == EstadoRequisitoDocumental.POSTERIOR && estado == EstadoRequisitoDocumental.REQUERIDO) {
             requisito.setEstado(EstadoRequisitoDocumental.REQUERIDO);
+            modificado = true;
+        }
+        if (requisito.getTipoDocumento() == TipoDocumento.MODELO_620
+                && requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO
+                && estado == EstadoRequisitoDocumental.POSTERIOR
+                && requisito.getDocumento() == null) {
+            requisito.setEstado(EstadoRequisitoDocumental.POSTERIOR);
             modificado = true;
         }
         if (modificado) {

@@ -247,6 +247,12 @@
   background: oklch(99% 0.008 92);
 }
 
+.closure-doc-card--disabled {
+  border-color: oklch(88% 0.015 250);
+  background: oklch(98% 0.004 250);
+  opacity: 0.74;
+}
+
 .closure-doc-card__identity {
   display: grid;
   align-content: center;

@@ -61,12 +61,6 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
         if (codigo == CodigoHitoExpediente.TRAMITE_PROGRAMA_GESTION) {
             validarDocumentacionCompleta(expedienteId);
         }
-        if (codigo == CodigoHitoExpediente.ENVIADO_DGT || codigo == CodigoHitoExpediente.COM_ENVIADO_DGT) {
-            TipoOperacionExpediente tipoOperacion = codigo == CodigoHitoExpediente.COM_ENVIADO_DGT
-                    ? TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM
-                    : TipoOperacionExpediente.TRASPASO_DIRECTO;
-            validarModelo620Resuelto(expediente, tipoOperacion, "Primero debe resolverse el Modelo 620.");
-        }
         if (codigo == CodigoHitoExpediente.MODELO_620_PRESENTADO
                 || codigo == CodigoHitoExpediente.BATE_MODELO_620_PRESENTADO
                 || codigo == CodigoHitoExpediente.COM_MODELO_620_PRESENTADO) {
@@ -77,15 +71,6 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
             validarHitoCompletado(expedienteId, CodigoHitoExpediente.BATE_FINALIZADO,
                     "Primero debe finalizarse la operacion Entrega a compraventa (BATE).");
         }
-        if (codigo == CodigoHitoExpediente.BATE_FINALIZADO) {
-            validarModelo620Resuelto(expediente, TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE,
-                    "Primero debe resolverse el Modelo 620 de la operacion BATE.");
-        }
-        if (codigo == CodigoHitoExpediente.COM_FINALIZADO) {
-            validarModelo620Resuelto(expediente, TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM,
-                    "Primero debe resolverse el Modelo 620 de la operacion COM.");
-        }
-
         HitoExpediente hito = hitoExpedienteRepository
                 .findByExpedienteIdAndCodigo(expedienteId, codigo)
                 .orElseGet(() -> {

@@ -173,9 +173,9 @@ function ProcessFlowPanel({ expediente }: { expediente: ExpedienteDetail }) {
     {
       id: "envio-dgt",
       title: sentDgt ? "Tramite enviado a DGT" : "Pendiente de enviar a DGT",
-      description: sentDgt ? "Envio a la DGT completado." : "El envio se habilita tras presentar el impuesto 620.",
-      state: sentDgt || isClosed ? "Completado" : model620Ready && !processPaused ? "Fase actual" : "Pendiente",
-      tone: sentDgt || isClosed ? "done" : model620Ready && !processPaused ? "active" : "pending",
+      description: sentDgt ? "Envio a la DGT completado." : "El envio se habilita al tener el tramite subido.",
+      state: sentDgt || isClosed ? "Completado" : managementReady && !processPaused ? "Fase actual" : "Pendiente",
+      tone: sentDgt || isClosed ? "done" : managementReady && !processPaused ? "active" : "pending",
     },
     {
       id: "cierre",
@@ -277,21 +277,33 @@ function OperationalAside({ expediente }: { expediente: ExpedienteDetail }) {
 }
 
 function ClosingDocumentsPanel({
+  disabledDocumentTypes = new Set(),
   documentos,
+  hiddenDocumentTypes = new Set(),
+  operationId = null,
   onUploadClosingDocument,
 }: {
+  disabledDocumentTypes?: Set<string>;
   documentos: DocumentoExpediente[];
+  hiddenDocumentTypes?: Set<string>;
+  operationId?: number | null;
   onUploadClosingDocument: (tipoDocumento: string, archivo: File) => void;
 }) {
+  const closingDocuments = CLOSING_DOCUMENTS.filter((item) => !hiddenDocumentTypes.has(item.tipo));
   const documentByType = new Map(
-    CLOSING_DOCUMENTS
+    closingDocuments
       .map((item) => [
         item.tipo,
-        documentos.find((documento) => item.aliases.some((alias) => alias === documento.tipo) && documento.subido && documento.id),
+        documentos.find((documento) =>
+          item.aliases.some((alias) => alias === documento.tipo)
+          && documento.subido
+          && documento.id
+          && (operationId == null || documento.operacionId === operationId)
+        ),
       ] as const)
       .filter((entry): entry is readonly [typeof CLOSING_DOCUMENTS[number]["tipo"], DocumentoExpediente] => Boolean(entry[1])),
   );
-  const missingDocuments = CLOSING_DOCUMENTS.filter((item) => !documentByType.has(item.tipo));
+  const missingDocuments = closingDocuments.filter((item) => !documentByType.has(item.tipo) && !disabledDocumentTypes.has(item.tipo));
 
   return (
     <section className="closure-docs-panel" aria-label="Documentos de cierre">
@@ -317,13 +329,14 @@ function ClosingDocumentsPanel({
       ) : null}
 
       <div className="closure-docs-grid">
-        {CLOSING_DOCUMENTS.map((item) => {
+        {closingDocuments.map((item) => {
           const documento = documentByType.get(item.tipo);
           const ready = Boolean(documento?.id);
           const fileName = documento?.nombreOriginal || documento?.nombre;
+          const disabled = disabledDocumentTypes.has(item.tipo);
 
           return (
-            <article className={`closure-doc-card ${ready ? "closure-doc-card--ready" : "closure-doc-card--missing"}`} key={item.tipo}>
+            <article className={`closure-doc-card ${ready ? "closure-doc-card--ready" : disabled ? "closure-doc-card--disabled" : "closure-doc-card--missing"}`} key={item.tipo}>
               <div className="closure-doc-card__identity">
                 <span className="closure-doc-card__logo">
                   <img src={item.logoSrc} alt={item.logoAlt} loading="lazy" />
@@ -341,6 +354,8 @@ function ClosingDocumentsPanel({
                     Subido {formatShortDate(documento?.fechaSubida)}
                     {documento?.subidoPor ? ` por ${documento.subidoPor}` : ""}
                   </small>
+                ) : disabled ? (
+                  <small>Disponible cuando finalice el tramite</small>
                 ) : (
                   <small>Pendiente de adjuntar</small>
                 )}
@@ -356,6 +371,11 @@ function ClosingDocumentsPanel({
                       Descargar
                     </a>
                   </>
+                ) : disabled ? (
+                  <span className="soft-button soft-button--compact primary-button--disabled">
+                    <Upload size={15} />
+                    Adjuntar
+                  </span>
                 ) : (
                   <label className="primary-button primary-button--compact">
                     <Upload size={15} />
@@ -731,7 +751,7 @@ export function ExpedienteDetailPage() {
   const handleUploadClosingDocument = async (tipoDocumento: string, archivo: File) => {
     if (!expediente) return;
     try {
-      await uploadExpedienteDocument(expediente.id, tipoDocumento, archivo);
+      await uploadExpedienteDocument(expediente.id, tipoDocumento, archivo, activeOperationId);
       await refreshExpediente();
     } catch {
       alert("No se pudo subir el documento de cierre.");
@@ -1098,6 +1118,20 @@ export function ExpedienteDetailPage() {
       : operationalHitos.find((hito) => hito.accion && !hito.completado && !hito.bloqueado) ?? expediente.siguientePaso;
   const hasActiveIncidents = expediente.incidencias.some((incidencia) => !incidencia.resuelta);
   const canRequestAdditionalInfo = expediente.estado !== "FINALIZADO" && expediente.estado !== "RECHAZADO";
+  const model620PhaseCompleted = operationalHitos.some((hito) => hito.id.toLowerCase().includes("modelo-620") && hito.completado);
+  const showClosingDocumentsPanel = expediente.estado === "FINALIZADO" || model620PhaseCompleted;
+  const disabledClosingDocumentTypes = new Set<string>();
+  if (!model620PhaseCompleted && expediente.estado !== "FINALIZADO") {
+    disabledClosingDocumentTypes.add("MODELO_620");
+  }
+  if (expediente.estado !== "FINALIZADO") {
+    disabledClosingDocumentTypes.add("COMPROBANTE_DGT");
+  }
+  const hiddenClosingDocumentTypes = new Set<string>();
+  if (expediente.tipoTramite === "NOTIFICACION_VENTA") {
+    hiddenClosingDocumentTypes.add("MODELO_620");
+  }
+  const closingOperationId = operaciones.length > 1 ? activeOperation?.id ?? null : null;
 
   return (
     <main className="exp-detail-page">
@@ -1107,8 +1141,14 @@ export function ExpedienteDetailPage() {
         operaciones={operaciones}
         onSelect={setActiveOperationId}
       />
-      {expediente.estado === "FINALIZADO" ? (
-        <ClosingDocumentsPanel documentos={expediente.documentos} onUploadClosingDocument={handleUploadClosingDocument} />
+      {showClosingDocumentsPanel ? (
+        <ClosingDocumentsPanel
+          disabledDocumentTypes={disabledClosingDocumentTypes}
+          documentos={expediente.documentos}
+          hiddenDocumentTypes={hiddenClosingDocumentTypes}
+          operationId={closingOperationId}
+          onUploadClosingDocument={handleUploadClosingDocument}
+        />
       ) : null}
       <IncidentAlertPanel incidencias={expediente.incidencias} onResolveIncident={setResolvingIncident} />
       {canRequestAdditionalInfo ? (
