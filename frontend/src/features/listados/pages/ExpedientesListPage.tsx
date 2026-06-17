@@ -360,9 +360,12 @@ function ExpedientesTable({
                   ) : null}
                   {expediente.justificantesFinalesPendientes?.length ? (
                     <div className="records-final-doc-warnings" aria-label="Justificantes finales pendientes">
-                      <span title={`Faltan justificantes finales: ${expediente.justificantesFinalesPendientes.join(", ")}`}>
-                        <AlertTriangle size={14} />
-                      </span>
+                      {expediente.justificantesFinalesPendientes.map((tipo) => (
+                        <span key={tipo} title={`Falta justificante ${tipo}`}>
+                          <AlertTriangle size={14} />
+                          <small>{tipo}</small>
+                        </span>
+                      ))}
                     </div>
                   ) : null}
                 </div>
