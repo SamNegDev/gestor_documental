@@ -16,7 +16,6 @@ import com.example.gestor_documental.repository.HistorialCambioRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.MensajeRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
-import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
@@ -25,11 +24,16 @@ import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.util.DireccionFormatter;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -45,9 +49,11 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final IncidenciaRepository incidenciaRepository;
     private final HistorialCambioRepository historialCambioRepository;
     private final MensajeRepository mensajeRepository;
-    private final DocumentoService documentoService;
     private final HistorialCambioService historialCambioService;
     private final InteresadoService interesadoService;
+
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
 
     @Override
     public List<Solicitud> listarTodas() {
@@ -572,12 +578,32 @@ public class SolicitudServiceImpl implements SolicitudService {
         for (Incidencia incidencia : incidenciaRepository.findBySolicitudId(id)) {
             documentoIds.addAll(documentoRepository.findByIncidenciaId(incidencia.getId()).stream().map(Documento::getId).toList());
         }
-        documentoIds.stream().distinct().toList().forEach(documentoService::eliminar);
+        for (Long documentoId : documentoIds.stream().distinct().toList()) {
+            eliminarDocumentoSolicitud(documentoId);
+        }
 
         incidenciaRepository.deleteAll(incidenciaRepository.findBySolicitudId(id));
         mensajeRepository.deleteBySolicitudId(id);
         historialCambioRepository.deleteBySolicitudId(id);
         solicitudRepository.delete(solicitud);
+    }
+
+    private void eliminarDocumentoSolicitud(Long documentoId) {
+        Documento documento = documentoRepository.findById(documentoId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Documento no encontrado"));
+        Path carpetaUploads = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Path rutaArchivo = carpetaUploads.resolve(documento.getNombreArchivo()).normalize();
+        if (!rutaArchivo.startsWith(carpetaUploads)) {
+            throw new OperacionInvalidaException("Ruta de archivo no permitida");
+        }
+        try {
+            if (Files.exists(rutaArchivo)) {
+                Files.delete(rutaArchivo);
+            }
+        } catch (IOException exception) {
+            throw new RuntimeException("Error al borrar el archivo fisico", exception);
+        }
+        documentoRepository.delete(documento);
     }
 
     private void normalizarSolicitud(Solicitud solicitud) {
