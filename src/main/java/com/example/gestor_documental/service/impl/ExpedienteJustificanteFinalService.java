@@ -28,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -42,6 +43,7 @@ public class ExpedienteJustificanteFinalService {
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
 
+    @Transactional(readOnly = true)
     public void escribirZipJustificantesFinales(List<Long> expedienteIds, Usuario admin, OutputStream outputStream) throws IOException {
         Map<String, List<Documento>> documentosPorCarpeta = new LinkedHashMap<>();
         for (Long id : expedienteIds) {
@@ -73,6 +75,7 @@ public class ExpedienteJustificanteFinalService {
         }
     }
 
+    @Transactional(readOnly = true)
     public boolean tieneJustificantesFinales(Long expedienteId, String estado) {
         if (!"FINALIZADO".equals(estado)) {
             return false;
@@ -81,6 +84,7 @@ public class ExpedienteJustificanteFinalService {
         return justificantesPendientes(expedienteId, documentos).isEmpty();
     }
 
+    @Transactional(readOnly = true)
     public List<String> justificantesFinalesPendientes(Long expedienteId, String estado) {
         if (!"FINALIZADO".equals(estado)) {
             return List.of();
