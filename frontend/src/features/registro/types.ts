@@ -16,6 +16,11 @@ export interface InteresadoRegistro {
   nombre: string;
   telefono?: string | null;
   direccion?: string | null;
+  tipoVia?: string | null;
+  nombreVia?: string | null;
+  codigoPostal?: string | null;
+  municipio?: string | null;
+  provincia?: string | null;
   tipoPersona?: string | null;
   habitual?: boolean;
   documentos?: DocumentoExpediente[];
@@ -29,6 +34,11 @@ export interface InteresadoRegistroUpdateInput {
   nombre?: string | null;
   telefono?: string | null;
   direccion?: string | null;
+  tipoVia?: string | null;
+  nombreVia?: string | null;
+  codigoPostal?: string | null;
+  municipio?: string | null;
+  provincia?: string | null;
   tipoPersona?: string | null;
 }
 

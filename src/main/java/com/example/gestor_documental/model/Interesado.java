@@ -31,6 +31,21 @@ public class Interesado {
     @Column (length = 200)
     private String direccion;
 
+    @Column(length = 30)
+    private String tipoVia;
+
+    @Column(length = 120)
+    private String nombreVia;
+
+    @Column(length = 10)
+    private String codigoPostal;
+
+    @Column(length = 80)
+    private String municipio;
+
+    @Column(length = 80)
+    private String provincia;
+
     @Column (length = 20)
     private String telefono;
 

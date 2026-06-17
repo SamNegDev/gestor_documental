@@ -9,6 +9,7 @@ import {
 import type { ExpedienteDetail, ExpedienteEditCatalogs, ExpedienteEditInput, InteresadoSearchResult } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
 import { cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
+import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 import { InteresadoAutocomplete } from "../components/InteresadoAutocomplete";
 import "../styles/expedienteDetail.css";
 
@@ -19,7 +20,7 @@ const BATECOM_LABELS = ["Vendedor inicial", "Comprador final", "Compraventa"];
 type InteresadoForm = ExpedienteEditInput["interesados"][number];
 
 function emptyInteresado(): InteresadoForm {
-  return { nombre: "", dni: "", telefono: "", direccion: "", rol: "" };
+  return { nombre: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
 }
 
 function ensureBatecomInteresados(interesados: InteresadoForm[]) {
@@ -34,7 +35,12 @@ function hasInteresadoData(interesado: InteresadoForm) {
     interesado.nombre?.trim()
       || interesado.dni?.trim()
       || interesado.telefono?.trim()
-      || interesado.direccion?.trim(),
+      || interesado.direccion?.trim()
+      || interesado.tipoVia?.trim()
+      || interesado.nombreVia?.trim()
+      || interesado.codigoPostal?.trim()
+      || interesado.municipio?.trim()
+      || interesado.provincia?.trim(),
   );
 }
 
@@ -60,6 +66,11 @@ function buildInitialForm(expediente: ExpedienteDetail): ExpedienteEditInput {
           dni: uppercaseInput(interesado.dni || ""),
           telefono: uppercaseInput(interesado.telefono || ""),
           direccion: uppercaseInput(interesado.direccion || ""),
+          tipoVia: uppercaseInput(interesado.tipoVia || ""),
+          nombreVia: uppercaseInput(interesado.nombreVia || ""),
+          codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
+          municipio: uppercaseInput(interesado.municipio || ""),
+          provincia: uppercaseInput(interesado.provincia || ""),
           rol: interesado.rol || "",
         }
       : emptyInteresado();
@@ -88,6 +99,11 @@ function buildSavePayload(form: ExpedienteEditInput): ExpedienteEditInput {
       dni: cleanText(interesado.dni),
       telefono: cleanText(interesado.telefono),
       direccion: cleanText(interesado.direccion),
+      tipoVia: cleanText(interesado.tipoVia),
+      nombreVia: cleanText(interesado.nombreVia),
+      codigoPostal: cleanText(interesado.codigoPostal),
+      municipio: cleanText(interesado.municipio),
+      provincia: cleanText(interesado.provincia),
       rol: cleanText(interesado.rol),
     })),
   };
@@ -156,6 +172,15 @@ export function ExpedienteEditPage() {
     });
   };
 
+  const updateInteresadoAddress = (index: number, value: AddressValue) => {
+    setForm((current) => {
+      if (!current) return current;
+      const interesados = [...current.interesados];
+      interesados[index] = { ...interesados[index], ...value, direccion: "" };
+      return { ...current, interesados };
+    });
+  };
+
   const selectInteresado = (index: number, interesado: InteresadoSearchResult) => {
     setForm((current) => {
       if (!current) return current;
@@ -166,6 +191,11 @@ export function ExpedienteEditPage() {
         dni: uppercaseInput(interesado.dni || ""),
         telefono: uppercaseInput(interesado.telefono || ""),
         direccion: uppercaseInput(interesado.direccion || ""),
+        tipoVia: uppercaseInput(interesado.tipoVia || ""),
+        nombreVia: uppercaseInput(interesado.nombreVia || ""),
+        codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
+        municipio: uppercaseInput(interesado.municipio || ""),
+        provincia: uppercaseInput(interesado.provincia || ""),
       };
       return { ...current, interesados };
     });
@@ -319,10 +349,11 @@ export function ExpedienteEditPage() {
                   Telefono
                   <input value={interesado.telefono || ""} onChange={(event) => updateInteresado(index, "telefono", event.target.value)} />
                 </label>
-                <label>
-                  Direccion
-                  <input value={interesado.direccion || ""} onChange={(event) => updateInteresado(index, "direccion", event.target.value)} />
-                </label>
+                <AddressFields
+                  idPrefix={`expediente-edit-${index}`}
+                  value={interesado}
+                  onChange={(value) => updateInteresadoAddress(index, value)}
+                />
               </article>
             ))}
           </div>

@@ -43,6 +43,7 @@ import {
 } from "../services/requisitosApi";
 import { ApiError } from "../../../shared/api/http";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
+import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 import { uppercaseInput } from "../../../shared/utils/text";
 import type {
   DocumentoExpediente,
@@ -84,7 +85,7 @@ const INTERESADO_ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
 type InteresadoCorrection = ExpedienteEditInput["interesados"][number];
 
 function emptyInteresadoCorrection(): InteresadoCorrection {
-  return { nombre: "", dni: "", telefono: "", direccion: "", rol: "" };
+  return { nombre: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
 }
 
 function hasInteresadoCorrectionData(interesado: InteresadoCorrection) {
@@ -93,6 +94,11 @@ function hasInteresadoCorrectionData(interesado: InteresadoCorrection) {
       || interesado.dni?.trim()
       || interesado.telefono?.trim()
       || interesado.direccion?.trim()
+      || interesado.tipoVia?.trim()
+      || interesado.nombreVia?.trim()
+      || interesado.codigoPostal?.trim()
+      || interesado.municipio?.trim()
+      || interesado.provincia?.trim()
       || interesado.rol?.trim(),
   );
 }
@@ -494,6 +500,11 @@ function InterestedPartiesCorrectionDialog({
             dni: uppercaseInput(interesado.dni || ""),
             telefono: uppercaseInput(interesado.telefono || ""),
             direccion: uppercaseInput(interesado.direccion || ""),
+            tipoVia: uppercaseInput(interesado.tipoVia || ""),
+            nombreVia: uppercaseInput(interesado.nombreVia || ""),
+            codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
+            municipio: uppercaseInput(interesado.municipio || ""),
+            provincia: uppercaseInput(interesado.provincia || ""),
             rol: interesado.rol || "",
           }
         : emptyInteresadoCorrection();
@@ -511,7 +522,16 @@ function InterestedPartiesCorrectionDialog({
       dni: uppercaseInput(interesado.dni || ""),
       telefono: uppercaseInput(interesado.telefono || ""),
       direccion: uppercaseInput(interesado.direccion || ""),
+      tipoVia: uppercaseInput(interesado.tipoVia || ""),
+      nombreVia: uppercaseInput(interesado.nombreVia || ""),
+      codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
+      municipio: uppercaseInput(interesado.municipio || ""),
+      provincia: uppercaseInput(interesado.provincia || ""),
     } : row)));
+  };
+
+  const updateAddress = (index: number, value: AddressValue) => {
+    setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...value, direccion: "" } : row)));
   };
 
   const removeRow = (index: number) => {
@@ -576,10 +596,12 @@ function InterestedPartiesCorrectionDialog({
                 <span>Telefono</span>
                 <input value={row.telefono || ""} onChange={(event) => updateRow(index, "telefono", event.target.value)} />
               </label>
-              <label className="interesados-correction-row__wide">
-                <span>Direccion</span>
-                <input value={row.direccion || ""} onChange={(event) => updateRow(index, "direccion", event.target.value)} />
-              </label>
+              <AddressFields
+                idPrefix={`expediente-correction-${index}`}
+                value={row}
+                onChange={(value) => updateAddress(index, value)}
+                wideClassName="interesados-correction-row__wide"
+              />
             </article>
           ))}
         </div>

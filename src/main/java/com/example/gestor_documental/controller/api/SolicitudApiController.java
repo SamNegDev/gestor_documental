@@ -291,11 +291,21 @@ public class SolicitudApiController {
         solicitud.setInteresado1Dni(TextNormalizer.upperOrNull(request.getInteresado1Dni()));
         solicitud.setInteresado1Telefono(TextNormalizer.upperOrNull(request.getInteresado1Telefono()));
         solicitud.setInteresado1Direccion(TextNormalizer.upperOrNull(request.getInteresado1Direccion()));
+        solicitud.setInteresado1TipoVia(TextNormalizer.upperOrNull(request.getInteresado1TipoVia()));
+        solicitud.setInteresado1NombreVia(TextNormalizer.upperOrNull(request.getInteresado1NombreVia()));
+        solicitud.setInteresado1CodigoPostal(TextNormalizer.upperOrNull(request.getInteresado1CodigoPostal()));
+        solicitud.setInteresado1Municipio(TextNormalizer.upperOrNull(request.getInteresado1Municipio()));
+        solicitud.setInteresado1Provincia(TextNormalizer.upperOrNull(request.getInteresado1Provincia()));
         solicitud.setInteresado2Rol(request.getInteresado2Rol());
         solicitud.setInteresado2Nombre(TextNormalizer.upperOrNull(request.getInteresado2Nombre()));
         solicitud.setInteresado2Dni(TextNormalizer.upperOrNull(request.getInteresado2Dni()));
         solicitud.setInteresado2Telefono(TextNormalizer.upperOrNull(request.getInteresado2Telefono()));
         solicitud.setInteresado2Direccion(TextNormalizer.upperOrNull(request.getInteresado2Direccion()));
+        solicitud.setInteresado2TipoVia(TextNormalizer.upperOrNull(request.getInteresado2TipoVia()));
+        solicitud.setInteresado2NombreVia(TextNormalizer.upperOrNull(request.getInteresado2NombreVia()));
+        solicitud.setInteresado2CodigoPostal(TextNormalizer.upperOrNull(request.getInteresado2CodigoPostal()));
+        solicitud.setInteresado2Municipio(TextNormalizer.upperOrNull(request.getInteresado2Municipio()));
+        solicitud.setInteresado2Provincia(TextNormalizer.upperOrNull(request.getInteresado2Provincia()));
         return solicitud;
     }
 
@@ -426,6 +436,11 @@ public class SolicitudApiController {
                 solicitud.getInteresado1Dni(),
                 solicitud.getInteresado1Telefono(),
                 solicitud.getInteresado1Direccion(),
+                solicitud.getInteresado1TipoVia(),
+                solicitud.getInteresado1NombreVia(),
+                solicitud.getInteresado1CodigoPostal(),
+                solicitud.getInteresado1Municipio(),
+                solicitud.getInteresado1Provincia(),
                 solicitud.getInteresado1Rol() != null ? solicitud.getInteresado1Rol().name() : null)) {
             interesados.add(InteresadoSolicitudResponse.builder()
                     .nombre(solicitud.getInteresado1Nombre())
@@ -433,6 +448,11 @@ public class SolicitudApiController {
                     .dni(solicitud.getInteresado1Dni())
                     .telefono(solicitud.getInteresado1Telefono())
                     .direccion(solicitud.getInteresado1Direccion())
+                    .tipoVia(solicitud.getInteresado1TipoVia())
+                    .nombreVia(solicitud.getInteresado1NombreVia())
+                    .codigoPostal(solicitud.getInteresado1CodigoPostal())
+                    .municipio(solicitud.getInteresado1Municipio())
+                    .provincia(solicitud.getInteresado1Provincia())
                     .build());
         }
         if (hasInteresadoData(
@@ -440,6 +460,11 @@ public class SolicitudApiController {
                 solicitud.getInteresado2Dni(),
                 solicitud.getInteresado2Telefono(),
                 solicitud.getInteresado2Direccion(),
+                solicitud.getInteresado2TipoVia(),
+                solicitud.getInteresado2NombreVia(),
+                solicitud.getInteresado2CodigoPostal(),
+                solicitud.getInteresado2Municipio(),
+                solicitud.getInteresado2Provincia(),
                 solicitud.getInteresado2Rol() != null ? solicitud.getInteresado2Rol().name() : null)) {
             interesados.add(InteresadoSolicitudResponse.builder()
                     .nombre(solicitud.getInteresado2Nombre())
@@ -447,6 +472,11 @@ public class SolicitudApiController {
                     .dni(solicitud.getInteresado2Dni())
                     .telefono(solicitud.getInteresado2Telefono())
                     .direccion(solicitud.getInteresado2Direccion())
+                    .tipoVia(solicitud.getInteresado2TipoVia())
+                    .nombreVia(solicitud.getInteresado2NombreVia())
+                    .codigoPostal(solicitud.getInteresado2CodigoPostal())
+                    .municipio(solicitud.getInteresado2Municipio())
+                    .provincia(solicitud.getInteresado2Provincia())
                     .build());
         }
         return interesados;

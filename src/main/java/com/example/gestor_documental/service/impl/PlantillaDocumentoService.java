@@ -141,6 +141,7 @@ public class PlantillaDocumentoService {
                 valores.put("vendedorId", vendedor);
                 valores.put("fechaMatriculacion", "");
                 valores.put("servicio", "B-00");
+                valores.put("tipoVia", "");
                 valores.put("domicilioVehiculo", "");
                 valores.put("codigoPostal", "");
                 valores.put("numero", "");
@@ -170,20 +171,30 @@ public class PlantillaDocumentoService {
             List<ExpedienteInteresado> relaciones) {
         if (plantilla == TipoPlantilla.MANDATO && vacio(valores.get("direccionMandante"))) {
             Interesado mandante = interesado(relaciones, valores.get("mandanteId"), false);
-            if (mandante != null) valores.put("direccionMandante", limpiar(mandante.getDireccion()));
+            if (mandante != null) valores.put("direccionMandante", direccion(mandante));
         }
-        if (plantilla == TipoPlantilla.CAMBIO_TITULARIDAD && vacio(valores.get("domicilioVehiculo"))) {
+        if (plantilla == TipoPlantilla.CAMBIO_TITULARIDAD) {
             Interesado comprador = interesado(relaciones, valores.get("compradorId"), false);
-            if (comprador != null) valores.put("domicilioVehiculo", limpiar(comprador.getDireccion()));
+            if (comprador != null) {
+                if (vacio(valores.get("tipoVia"))) valores.put("tipoVia", limpiar(comprador.getTipoVia()));
+                if (vacio(valores.get("domicilioVehiculo"))) valores.put("domicilioVehiculo", nombreVia(comprador));
+                if (vacio(valores.get("codigoPostal"))) valores.put("codigoPostal", limpiar(comprador.getCodigoPostal()));
+                if (vacio(valores.get("municipio"))) valores.put("municipio", limpiar(comprador.getMunicipio()));
+                if (vacio(valores.get("poblacion"))) valores.put("poblacion", limpiar(comprador.getMunicipio()));
+                if (vacio(valores.get("provincia")) || "SANTA CRUZ DE TENERIFE".equals(valores.get("provincia"))) {
+                    String provincia = limpiar(comprador.getProvincia());
+                    if (!vacio(provincia)) valores.put("provincia", provincia);
+                }
+            }
         }
         if (plantilla == TipoPlantilla.CONTRATO_COMPRAVENTA) {
             Interesado comprador = interesado(relaciones, valores.get("compradorId"), false);
             Interesado vendedor = interesado(relaciones, valores.get("vendedorId"), false);
             if (comprador != null && vacio(valores.get("direccionComprador"))) {
-                valores.put("direccionComprador", limpiar(comprador.getDireccion()));
+                valores.put("direccionComprador", direccion(comprador));
             }
             if (vendedor != null && vacio(valores.get("direccionVendedor"))) {
-                valores.put("direccionVendedor", limpiar(vendedor.getDireccion()));
+                valores.put("direccionVendedor", direccion(vendedor));
             }
         }
     }
@@ -201,7 +212,8 @@ public class PlantillaDocumentoService {
                     campo("vendedorId", "Vendedor", valores, true, "INTERESADO", null),
                     campo("fechaMatriculacion", "Fecha de matriculacion", valores, false, "DATE", "Formato DD/MM/AAAA."),
                     campo("servicio", "Servicio del vehiculo", valores, false, "TEXT", "Por defecto, B-00 sin especificar."),
-                    campo("domicilioVehiculo", "Domicilio del vehiculo", valores, true, "TEXT", "Se propone el domicilio del comprador."),
+                    campo("tipoVia", "Tipo de via", valores, false, "TEXT", null),
+                    campo("domicilioVehiculo", "Nombre de la via", valores, true, "TEXT", "Se propone la via del comprador."),
                     campo("codigoPostal", "Codigo postal", valores, false, "TEXT", null),
                     campo("numero", "Numero", valores, false, "TEXT", null),
                     campo("municipio", "Municipio", valores, false, "TEXT", null),
@@ -285,6 +297,7 @@ public class PlantillaDocumentoService {
         set(form, "Nombre o Razón social vendedor", vendedor.getNombre());
         set(form, "NIF NIE CIF vendedor", vendedor.getDni());
         set(form, "Otros datos", valores.get("otrosDatos"));
+        set(form, "Tipo de vía", valores.get("tipoVia"));
         LocalDate hoy = LocalDate.now();
         set(form, "En", valores.get("localidad"));
         set(form, "a", String.valueOf(hoy.getDayOfMonth()));
@@ -378,6 +391,26 @@ public class PlantillaDocumentoService {
         return new PlantillaDestinatarioResponse(
                 interesado.getId(), valor(interesado.getNombre()), valor(interesado.getDni()),
                 relacion.getRol() != null ? relacion.getRol().name() : null, valor(interesado.getDireccion()));
+    }
+
+    private String direccion(Interesado interesado) {
+        String via = nombreVia(interesado);
+        String cp = limpiar(interesado.getCodigoPostal());
+        String municipio = limpiar(interesado.getMunicipio());
+        String provincia = limpiar(interesado.getProvincia());
+        String compuesta = java.util.stream.Stream.of(via, cp, municipio, provincia)
+                .filter(parte -> !vacio(parte))
+                .collect(java.util.stream.Collectors.joining(", "));
+        return !vacio(compuesta) ? compuesta : limpiar(interesado.getDireccion());
+    }
+
+    private String nombreVia(Interesado interesado) {
+        String tipoVia = limpiar(interesado.getTipoVia());
+        String nombreVia = limpiar(interesado.getNombreVia());
+        String compuesta = java.util.stream.Stream.of(tipoVia, nombreVia)
+                .filter(parte -> !vacio(parte))
+                .collect(java.util.stream.Collectors.joining(" "));
+        return !vacio(compuesta) ? compuesta : limpiar(interesado.getDireccion());
     }
 
     private PlantillaDocumentoItemResponse mapPlantilla(TipoPlantilla plantilla) {

@@ -13,6 +13,11 @@ public class InteresadoRegistroResponse {
     private String nombre;
     private String telefono;
     private String direccion;
+    private String tipoVia;
+    private String nombreVia;
+    private String codigoPostal;
+    private String municipio;
+    private String provincia;
     private String tipoPersona;
     private boolean habitual;
     private long totalTramites;

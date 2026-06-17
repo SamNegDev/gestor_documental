@@ -7,6 +7,7 @@ import { createInteresadoHabitual, getInteresadosRegistro } from "../services/re
 import { RegistroFilters } from "../components/RegistroFilters";
 import type { InteresadoRegistroUpdateInput } from "../types";
 import { uppercaseInput } from "../../../shared/utils/text";
+import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 import { ApiError } from "../../../shared/api/http";
 import "../../expedientes/styles/expedienteDetail.css";
 
@@ -32,6 +33,7 @@ export function InteresadosRegistroPage() {
   const interesados = query.data ?? [];
   const canCreateHabitual = user?.rol === "CLIENTE";
   const updateField = (field: keyof InteresadoRegistroUpdateInput, value: string) => setForm((current) => ({ ...current, [field]: uppercaseInput(value) }));
+  const updateAddress = (value: AddressValue) => setForm((current) => ({ ...current, ...value, direccion: "" }));
   return <main className="records-page registry-page">
     <header className="records-header"><div><p className="eyebrow">Registro relacionado</p><h2>Interesados</h2><p>Personas y empresas vinculadas a los tramites accesibles.</p></div><div className="records-header__actions">{canCreateHabitual ? <button className="primary-button primary-button--compact" type="button" onClick={() => setCreating(true)}><Plus size={16} />Nuevo habitual</button> : null}<span className="records-count">{interesados.length} registros</span></div></header>
     <RegistroFilters search={search} periodo={periodo} fechaDesde={fechaDesde} fechaHasta={fechaHasta} placeholder="Buscar por DNI, CIF o nombre" onSearch={setSearch} onPeriodo={setPeriodo} onFechaDesde={setFechaDesde} onFechaHasta={setFechaHasta} />
@@ -60,7 +62,7 @@ export function InteresadosRegistroPage() {
             <label><span>Nombre</span><input required value={form.nombre || ""} onChange={(event) => updateField("nombre", event.target.value)} /></label>
             <label><span>Telefono</span><input value={form.telefono || ""} onChange={(event) => updateField("telefono", event.target.value)} /></label>
             <label><span>Tipo</span><select value={form.tipoPersona || "PARTICULAR"} onChange={(event) => updateField("tipoPersona", event.target.value)}><option value="PARTICULAR">PARTICULAR</option><option value="EMPRESA">EMPRESA</option></select></label>
-            <label className="vehicle-edit-form__wide"><span>Direccion</span><textarea value={form.direccion || ""} onChange={(event) => updateField("direccion", event.target.value)} /></label>
+            <AddressFields idPrefix="interesado-habitual" value={form} onChange={updateAddress} wideClassName="vehicle-edit-form__wide" />
             {mutation.isError ? <p className="form-error">{mutation.error instanceof ApiError ? mutation.error.details || "No se pudo crear el interesado." : "No se pudo crear el interesado."}</p> : null}
             <div className="vehicle-edit-form__actions">
               <button className="soft-button" type="button" onClick={() => setCreating(false)}>Cancelar</button>

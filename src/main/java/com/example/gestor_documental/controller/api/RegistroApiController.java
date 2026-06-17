@@ -140,6 +140,11 @@ public class RegistroApiController {
             nuevo.setNombre(request.nombre());
             nuevo.setTelefono(request.telefono());
             nuevo.setDireccion(request.direccion());
+            nuevo.setTipoVia(request.tipoVia());
+            nuevo.setNombreVia(request.nombreVia());
+            nuevo.setCodigoPostal(request.codigoPostal());
+            nuevo.setMunicipio(request.municipio());
+            nuevo.setProvincia(request.provincia());
             nuevo.setTipoPersona(request.tipoPersona());
             return interesadoService.guardar(nuevo);
         });
@@ -233,6 +238,11 @@ public class RegistroApiController {
         return InteresadoRegistroResponse.builder()
                 .id(interesado.getId()).dni(interesado.getDni()).nombre(interesado.getNombre())
                 .telefono(interesado.getTelefono()).direccion(interesado.getDireccion())
+                .tipoVia(interesado.getTipoVia())
+                .nombreVia(interesado.getNombreVia())
+                .codigoPostal(interesado.getCodigoPostal())
+                .municipio(interesado.getMunicipio())
+                .provincia(interesado.getProvincia())
                 .tipoPersona(interesado.getTipoPersona() != null ? interesado.getTipoPersona().name() : null)
                 .habitual(habitual)
                 .totalTramites(tramites.size())

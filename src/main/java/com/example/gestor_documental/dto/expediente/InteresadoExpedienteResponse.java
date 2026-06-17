@@ -18,4 +18,9 @@ public class InteresadoExpedienteResponse {
     private String dni;
     private String telefono;
     private String direccion;
+    private String tipoVia;
+    private String nombreVia;
+    private String codigoPostal;
+    private String municipio;
+    private String provincia;
 }

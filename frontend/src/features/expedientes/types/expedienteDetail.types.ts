@@ -44,6 +44,11 @@ export interface InteresadoExpediente {
   dni?: string;
   telefono?: string;
   direccion?: string;
+  tipoVia?: string | null;
+  nombreVia?: string | null;
+  codigoPostal?: string | null;
+  municipio?: string | null;
+  provincia?: string | null;
 }
 
 export interface InteresadoSearchResult {
@@ -52,6 +57,11 @@ export interface InteresadoSearchResult {
   dni?: string | null;
   telefono?: string | null;
   direccion?: string | null;
+  tipoVia?: string | null;
+  nombreVia?: string | null;
+  codigoPostal?: string | null;
+  municipio?: string | null;
+  provincia?: string | null;
   tipoPersona?: string | null;
 }
 
@@ -142,6 +152,11 @@ export interface ExpedienteEditInput {
     dni?: string | null;
     telefono?: string | null;
     direccion?: string | null;
+    tipoVia?: string | null;
+    nombreVia?: string | null;
+    codigoPostal?: string | null;
+    municipio?: string | null;
+    provincia?: string | null;
     rol?: string | null;
   }>;
 }
@@ -199,6 +214,11 @@ export interface PlantillaInteresado {
   dni: string;
   rol?: string | null;
   direccion?: string | null;
+  tipoVia?: string | null;
+  nombreVia?: string | null;
+  codigoPostal?: string | null;
+  municipio?: string | null;
+  provincia?: string | null;
 }
 
 export interface PlantillaCampo {

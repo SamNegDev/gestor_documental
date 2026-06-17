@@ -67,6 +67,11 @@ export interface InteresadoSolicitud {
   dni?: string | null;
   telefono?: string | null;
   direccion?: string | null;
+  tipoVia?: string | null;
+  nombreVia?: string | null;
+  codigoPostal?: string | null;
+  municipio?: string | null;
+  provincia?: string | null;
 }
 
 export interface SolicitudDetail {
@@ -109,11 +114,21 @@ export interface SolicitudUpsertInput {
   interesado1Dni?: string | null;
   interesado1Telefono?: string | null;
   interesado1Direccion?: string | null;
+  interesado1TipoVia?: string | null;
+  interesado1NombreVia?: string | null;
+  interesado1CodigoPostal?: string | null;
+  interesado1Municipio?: string | null;
+  interesado1Provincia?: string | null;
   interesado2Rol?: string | null;
   interesado2Nombre?: string | null;
   interesado2Dni?: string | null;
   interesado2Telefono?: string | null;
   interesado2Direccion?: string | null;
+  interesado2TipoVia?: string | null;
+  interesado2NombreVia?: string | null;
+  interesado2CodigoPostal?: string | null;
+  interesado2Municipio?: string | null;
+  interesado2Provincia?: string | null;
 }
 
 export interface SolicitudBulkConvertResult {

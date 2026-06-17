@@ -9,6 +9,7 @@ import { RegistroSummary } from "../components/RegistroSummary";
 import type { DocumentoExpediente } from "../../expedientes/types/expedienteDetail.types";
 import type { InteresadoRegistroUpdateInput } from "../types";
 import { uppercaseInput } from "../../../shared/utils/text";
+import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 import { ApiError } from "../../../shared/api/http";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import "../../expedientes/styles/expedienteDetail.css";
@@ -69,6 +70,11 @@ export function InteresadoRegistroDetailPage() {
       nombre: query.data.nombre || "",
       telefono: query.data.telefono || "",
       direccion: query.data.direccion || "",
+      tipoVia: query.data.tipoVia || "",
+      nombreVia: query.data.nombreVia || "",
+      codigoPostal: query.data.codigoPostal || "",
+      municipio: query.data.municipio || "",
+      provincia: query.data.provincia || "",
       tipoPersona: query.data.tipoPersona || "PARTICULAR",
     });
   }, [query.data]);
@@ -81,6 +87,9 @@ export function InteresadoRegistroDetailPage() {
 
   const updateField = (field: keyof InteresadoRegistroUpdateInput, value: string) => {
     setForm((current) => ({ ...current, [field]: uppercaseInput(value) }));
+  };
+  const updateAddress = (value: AddressValue) => {
+    setForm((current) => ({ ...current, ...value, direccion: "" }));
   };
   const handleDocumentFile = (archivo?: File) => {
     setDocumentError(null);
@@ -122,7 +131,7 @@ export function InteresadoRegistroDetailPage() {
           <label><span>Nombre</span><input required value={form.nombre || ""} onChange={(event) => updateField("nombre", event.target.value)} /></label>
           <label><span>Telefono</span><input value={form.telefono || ""} onChange={(event) => updateField("telefono", event.target.value)} /></label>
           <label><span>Tipo</span><select value={form.tipoPersona || "PARTICULAR"} onChange={(event) => updateField("tipoPersona", event.target.value)}><option value="PARTICULAR">PARTICULAR</option><option value="EMPRESA">EMPRESA</option></select></label>
-          <label className="vehicle-edit-form__wide"><span>Direccion</span><textarea value={form.direccion || ""} onChange={(event) => updateField("direccion", event.target.value)} /></label>
+          <AddressFields idPrefix="interesado-registro" value={form} onChange={updateAddress} wideClassName="vehicle-edit-form__wide" />
           {mutation.isError ? <p className="form-error">{mutation.error instanceof ApiError ? mutation.error.details || "No se pudo guardar el interesado." : "No se pudo guardar el interesado."}</p> : null}
           <div className="vehicle-edit-form__actions">
             <button className="soft-button" onClick={() => setEditing(false)} type="button">Cancelar</button>

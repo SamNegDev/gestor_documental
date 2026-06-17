@@ -22,6 +22,16 @@ public class InteresadoFormDto {
     private String telefono;
     @Size(max = 200, message = "La direccion no puede superar los 200 caracteres")
     private String direccion;
+    @Size(max = 30, message = "El tipo de via no puede superar los 30 caracteres")
+    private String tipoVia;
+    @Size(max = 120, message = "El nombre de la via no puede superar los 120 caracteres")
+    private String nombreVia;
+    @Size(max = 10, message = "El codigo postal no puede superar los 10 caracteres")
+    private String codigoPostal;
+    @Size(max = 80, message = "El municipio no puede superar los 80 caracteres")
+    private String municipio;
+    @Size(max = 80, message = "La provincia no puede superar los 80 caracteres")
+    private String provincia;
     private RolInteresado rol;
 
 

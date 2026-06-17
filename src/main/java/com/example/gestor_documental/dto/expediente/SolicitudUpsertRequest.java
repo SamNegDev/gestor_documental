@@ -15,9 +15,19 @@ public class SolicitudUpsertRequest {
     private String interesado1Dni;
     private String interesado1Telefono;
     private String interesado1Direccion;
+    private String interesado1TipoVia;
+    private String interesado1NombreVia;
+    private String interesado1CodigoPostal;
+    private String interesado1Municipio;
+    private String interesado1Provincia;
     private RolInteresado interesado2Rol;
     private String interesado2Nombre;
     private String interesado2Dni;
     private String interesado2Telefono;
     private String interesado2Direccion;
+    private String interesado2TipoVia;
+    private String interesado2NombreVia;
+    private String interesado2CodigoPostal;
+    private String interesado2Municipio;
+    private String interesado2Provincia;
 }

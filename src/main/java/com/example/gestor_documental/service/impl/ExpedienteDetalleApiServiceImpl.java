@@ -657,6 +657,11 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .dni(interesado != null ? interesado.getDni() : null)
                 .telefono(interesado != null ? interesado.getTelefono() : null)
                 .direccion(interesado != null ? interesado.getDireccion() : null)
+                .tipoVia(interesado != null ? interesado.getTipoVia() : null)
+                .nombreVia(interesado != null ? interesado.getNombreVia() : null)
+                .codigoPostal(interesado != null ? interesado.getCodigoPostal() : null)
+                .municipio(interesado != null ? interesado.getMunicipio() : null)
+                .provincia(interesado != null ? interesado.getProvincia() : null)
                 .build();
     }
 

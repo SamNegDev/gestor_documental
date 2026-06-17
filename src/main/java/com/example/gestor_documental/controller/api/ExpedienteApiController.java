@@ -11,6 +11,7 @@ import com.example.gestor_documental.dto.expediente.ExpedienteEditCatalogsRespon
 import com.example.gestor_documental.dto.expediente.ExpedienteListItemResponse;
 import com.example.gestor_documental.dto.expediente.HitoAccionResponse;
 import com.example.gestor_documental.dto.expediente.HitoExpedienteResponse;
+import com.example.gestor_documental.dto.expediente.InteresadoExpedienteRequest;
 import com.example.gestor_documental.dto.expediente.InteresadoSearchResponse;
 import com.example.gestor_documental.enums.CodigoHitoExpediente;
 import com.example.gestor_documental.enums.EstadoExpediente;
@@ -220,6 +221,11 @@ public class ExpedienteApiController {
                         .dni(interesado.getDni())
                         .telefono(interesado.getTelefono())
                         .direccion(interesado.getDireccion())
+                        .tipoVia(interesado.getTipoVia())
+                        .nombreVia(interesado.getNombreVia())
+                        .codigoPostal(interesado.getCodigoPostal())
+                        .municipio(interesado.getMunicipio())
+                        .provincia(interesado.getProvincia())
                         .tipoPersona(interesado.getTipoPersona() != null ? interesado.getTipoPersona().name() : null)
                         .build())
                 .toList();
@@ -432,44 +438,36 @@ public class ExpedienteApiController {
         if (request.getInteresados() == null || request.getInteresados().size() <= index) {
             return new InteresadoFormDto();
         }
-        var source = request.getInteresados().get(index);
-        InteresadoFormDto dto = new InteresadoFormDto();
-        dto.setNombre(TextNormalizer.upperOrNull(source.getNombre()));
-        dto.setDni(TextNormalizer.upperOrNull(source.getDni()));
-        dto.setTelefono(TextNormalizer.upperOrNull(source.getTelefono()));
-        dto.setDireccion(TextNormalizer.upperOrNull(source.getDireccion()));
-        dto.setRol(source.getRol());
-        return dto;
+        return mapInteresado(request.getInteresados().get(index));
     }
 
     private List<InteresadoFormDto> mapInteresados(ActualizarExpedienteRequest request) {
         if (request.getInteresados() == null || request.getInteresados().isEmpty()) {
             return List.of(mapInteresado(request, 0), mapInteresado(request, 1));
         }
-        return request.getInteresados().stream().map(interesado -> {
-            InteresadoFormDto dto = new InteresadoFormDto();
-            dto.setNombre(TextNormalizer.upperOrNull(interesado.getNombre()));
-            dto.setDni(TextNormalizer.upperOrNull(interesado.getDni()));
-            dto.setTelefono(TextNormalizer.upperOrNull(interesado.getTelefono()));
-            dto.setDireccion(TextNormalizer.upperOrNull(interesado.getDireccion()));
-            dto.setRol(interesado.getRol());
-            return dto;
-        }).toList();
+        return request.getInteresados().stream().map(this::mapInteresado).toList();
     }
 
     private List<InteresadoFormDto> mapInteresados(ActualizarInteresadosExpedienteRequest request) {
         if (request.getInteresados() == null) {
             return List.of();
         }
-        return request.getInteresados().stream().map(interesado -> {
-            InteresadoFormDto dto = new InteresadoFormDto();
-            dto.setNombre(TextNormalizer.upperOrNull(interesado.getNombre()));
-            dto.setDni(TextNormalizer.upperOrNull(interesado.getDni()));
-            dto.setTelefono(TextNormalizer.upperOrNull(interesado.getTelefono()));
-            dto.setDireccion(TextNormalizer.upperOrNull(interesado.getDireccion()));
-            dto.setRol(interesado.getRol());
-            return dto;
-        }).toList();
+        return request.getInteresados().stream().map(this::mapInteresado).toList();
+    }
+
+    private InteresadoFormDto mapInteresado(InteresadoExpedienteRequest interesado) {
+        InteresadoFormDto dto = new InteresadoFormDto();
+        dto.setNombre(TextNormalizer.upperOrNull(interesado.getNombre()));
+        dto.setDni(TextNormalizer.upperOrNull(interesado.getDni()));
+        dto.setTelefono(TextNormalizer.upperOrNull(interesado.getTelefono()));
+        dto.setDireccion(TextNormalizer.upperOrNull(interesado.getDireccion()));
+        dto.setTipoVia(TextNormalizer.upperOrNull(interesado.getTipoVia()));
+        dto.setNombreVia(TextNormalizer.upperOrNull(interesado.getNombreVia()));
+        dto.setCodigoPostal(TextNormalizer.upperOrNull(interesado.getCodigoPostal()));
+        dto.setMunicipio(TextNormalizer.upperOrNull(interesado.getMunicipio()));
+        dto.setProvincia(TextNormalizer.upperOrNull(interesado.getProvincia()));
+        dto.setRol(interesado.getRol());
+        return dto;
     }
 
     private ExpedienteListItemResponse mapExpedienteListItem(Expediente expediente, Usuario usuario) {

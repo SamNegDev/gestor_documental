@@ -17,6 +17,7 @@ import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.VehiculoService;
+import com.example.gestor_documental.util.DireccionFormatter;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -151,7 +152,15 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                     nuevoInteresado.setNombre(TextNormalizer.upperOrNull(dto.getNombre()));
                     nuevoInteresado.setDni(TextNormalizer.upperOrNull(dto.getDni()));
                     nuevoInteresado.setTelefono(TextNormalizer.upperOrNull(dto.getTelefono()));
-                    nuevoInteresado.setDireccion(TextNormalizer.upperOrNull(dto.getDireccion()));
+                    nuevoInteresado.setTipoVia(TextNormalizer.upperOrNull(dto.getTipoVia()));
+                    nuevoInteresado.setNombreVia(TextNormalizer.upperOrNull(dto.getNombreVia()));
+                    nuevoInteresado.setCodigoPostal(TextNormalizer.upperOrNull(dto.getCodigoPostal()));
+                    nuevoInteresado.setMunicipio(TextNormalizer.upperOrNull(dto.getMunicipio()));
+                    nuevoInteresado.setProvincia(TextNormalizer.upperOrNull(dto.getProvincia()));
+                    String direccion = TextNormalizer.upperOrNull(dto.getDireccion());
+                    nuevoInteresado.setDireccion(direccion != null
+                            ? direccion
+                            : DireccionFormatter.componer(dto.getTipoVia(), dto.getNombreVia(), dto.getCodigoPostal(), dto.getMunicipio(), dto.getProvincia()));
                     return interesadoService.guardar(nuevoInteresado);
                 });
 
@@ -359,7 +368,12 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 || ((dto.getNombre() == null || dto.getNombre().isBlank())
                         && (dto.getDni() == null || dto.getDni().isBlank())
                         && (dto.getTelefono() == null || dto.getTelefono().isBlank())
-                        && (dto.getDireccion() == null || dto.getDireccion().isBlank()));
+                        && (dto.getDireccion() == null || dto.getDireccion().isBlank())
+                        && (dto.getTipoVia() == null || dto.getTipoVia().isBlank())
+                        && (dto.getNombreVia() == null || dto.getNombreVia().isBlank())
+                        && (dto.getCodigoPostal() == null || dto.getCodigoPostal().isBlank())
+                        && (dto.getMunicipio() == null || dto.getMunicipio().isBlank())
+                        && (dto.getProvincia() == null || dto.getProvincia().isBlank()));
     }
 
     /**

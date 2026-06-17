@@ -5,6 +5,7 @@ import { ArrowLeft, FilePlus2, Loader2, Save } from "lucide-react";
 import { InteresadoAutocomplete } from "../../expedientes/components/InteresadoAutocomplete";
 import { humanizeEnum } from "../../expedientes/utils/formatters";
 import { cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
+import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 import { createSolicitud, getSolicitudDetail, getSolicitudListCatalogs, updateSolicitud } from "../services/listadosApi";
 import type { InteresadoSearchResult } from "../../expedientes/types/expedienteDetail.types";
 import type { SolicitudDetail, SolicitudUpsertInput } from "../types";
@@ -21,11 +22,21 @@ function emptyForm(): SolicitudUpsertInput {
     interesado1Dni: "",
     interesado1Telefono: "",
     interesado1Direccion: "",
+    interesado1TipoVia: "",
+    interesado1NombreVia: "",
+    interesado1CodigoPostal: "",
+    interesado1Municipio: "",
+    interesado1Provincia: "",
     interesado2Rol: "",
     interesado2Nombre: "",
     interesado2Dni: "",
     interesado2Telefono: "",
     interesado2Direccion: "",
+    interesado2TipoVia: "",
+    interesado2NombreVia: "",
+    interesado2CodigoPostal: "",
+    interesado2Municipio: "",
+    interesado2Provincia: "",
   };
 }
 
@@ -41,11 +52,21 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     interesado1Dni: uppercaseInput(interesado1?.dni || ""),
     interesado1Telefono: uppercaseInput(interesado1?.telefono || ""),
     interesado1Direccion: uppercaseInput(interesado1?.direccion || ""),
+    interesado1TipoVia: uppercaseInput(interesado1?.tipoVia || ""),
+    interesado1NombreVia: uppercaseInput(interesado1?.nombreVia || ""),
+    interesado1CodigoPostal: uppercaseInput(interesado1?.codigoPostal || ""),
+    interesado1Municipio: uppercaseInput(interesado1?.municipio || ""),
+    interesado1Provincia: uppercaseInput(interesado1?.provincia || ""),
     interesado2Rol: interesado2?.rol || "",
     interesado2Nombre: uppercaseInput(interesado2?.nombre || ""),
     interesado2Dni: uppercaseInput(interesado2?.dni || ""),
     interesado2Telefono: uppercaseInput(interesado2?.telefono || ""),
     interesado2Direccion: uppercaseInput(interesado2?.direccion || ""),
+    interesado2TipoVia: uppercaseInput(interesado2?.tipoVia || ""),
+    interesado2NombreVia: uppercaseInput(interesado2?.nombreVia || ""),
+    interesado2CodigoPostal: uppercaseInput(interesado2?.codigoPostal || ""),
+    interesado2Municipio: uppercaseInput(interesado2?.municipio || ""),
+    interesado2Provincia: uppercaseInput(interesado2?.provincia || ""),
   };
 }
 
@@ -59,11 +80,21 @@ function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
     interesado1Dni: cleanUpperText(form.interesado1Dni),
     interesado1Telefono: cleanUpperText(form.interesado1Telefono),
     interesado1Direccion: cleanUpperText(form.interesado1Direccion),
+    interesado1TipoVia: cleanUpperText(form.interesado1TipoVia),
+    interesado1NombreVia: cleanUpperText(form.interesado1NombreVia),
+    interesado1CodigoPostal: cleanUpperText(form.interesado1CodigoPostal),
+    interesado1Municipio: cleanUpperText(form.interesado1Municipio),
+    interesado1Provincia: cleanUpperText(form.interesado1Provincia),
     interesado2Rol: cleanUpperText(form.interesado2Rol),
     interesado2Nombre: cleanUpperText(form.interesado2Nombre),
     interesado2Dni: cleanUpperText(form.interesado2Dni),
     interesado2Telefono: cleanUpperText(form.interesado2Telefono),
     interesado2Direccion: cleanUpperText(form.interesado2Direccion),
+    interesado2TipoVia: cleanUpperText(form.interesado2TipoVia),
+    interesado2NombreVia: cleanUpperText(form.interesado2NombreVia),
+    interesado2CodigoPostal: cleanUpperText(form.interesado2CodigoPostal),
+    interesado2Municipio: cleanUpperText(form.interesado2Municipio),
+    interesado2Provincia: cleanUpperText(form.interesado2Provincia),
   };
 }
 
@@ -220,6 +251,24 @@ function InteresadoFields({
 }) {
   const prefix = `interesado${index}` as "interesado1" | "interesado2";
   const field = (name: string) => `${prefix}${name}` as keyof SolicitudUpsertInput;
+  const addressValue: AddressValue = {
+    tipoVia: form[field("TipoVia")] as string,
+    nombreVia: form[field("NombreVia")] as string,
+    codigoPostal: form[field("CodigoPostal")] as string,
+    municipio: form[field("Municipio")] as string,
+    provincia: form[field("Provincia")] as string,
+  };
+  const updateAddress = (value: AddressValue) => {
+    onChange({
+      ...form,
+      [field("TipoVia")]: value.tipoVia,
+      [field("NombreVia")]: value.nombreVia,
+      [field("CodigoPostal")]: value.codigoPostal,
+      [field("Municipio")]: value.municipio,
+      [field("Provincia")]: value.provincia,
+      [field("Direccion")]: "",
+    });
+  };
   const applyInteresado = (interesado: InteresadoSearchResult) => {
     onChange({
       ...form,
@@ -227,6 +276,11 @@ function InteresadoFields({
       [field("Dni")]: uppercaseInput(interesado.dni || ""),
       [field("Telefono")]: uppercaseInput(interesado.telefono || ""),
       [field("Direccion")]: uppercaseInput(interesado.direccion || ""),
+      [field("TipoVia")]: uppercaseInput(interesado.tipoVia || ""),
+      [field("NombreVia")]: uppercaseInput(interesado.nombreVia || ""),
+      [field("CodigoPostal")]: uppercaseInput(interesado.codigoPostal || ""),
+      [field("Municipio")]: uppercaseInput(interesado.municipio || ""),
+      [field("Provincia")]: uppercaseInput(interesado.provincia || ""),
     });
   };
 
@@ -268,10 +322,7 @@ function InteresadoFields({
         Telefono
         <input value={(form[field("Telefono")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Telefono")]: uppercaseInput(event.target.value) })} />
       </label>
-      <label className="edit-form-grid__wide">
-        Direccion
-        <input value={(form[field("Direccion")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Direccion")]: uppercaseInput(event.target.value) })} />
-      </label>
+      <AddressFields idPrefix={`solicitud-${prefix}`} value={addressValue} onChange={updateAddress} wideClassName="edit-form-grid__wide" />
     </div>
   );
 }

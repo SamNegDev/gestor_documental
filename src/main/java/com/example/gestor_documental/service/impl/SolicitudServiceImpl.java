@@ -19,6 +19,7 @@ import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
+import com.example.gestor_documental.util.DireccionFormatter;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -270,6 +271,11 @@ public class SolicitudServiceImpl implements SolicitudService {
          interesado1dto.setRol(solicitud.getInteresado1Rol());
          interesado1dto.setDireccion(solicitud.getInteresado1Direccion());
          interesado1dto.setTelefono(solicitud.getInteresado1Telefono());
+         interesado1dto.setTipoVia(solicitud.getInteresado1TipoVia());
+         interesado1dto.setNombreVia(solicitud.getInteresado1NombreVia());
+         interesado1dto.setCodigoPostal(solicitud.getInteresado1CodigoPostal());
+         interesado1dto.setMunicipio(solicitud.getInteresado1Municipio());
+         interesado1dto.setProvincia(solicitud.getInteresado1Provincia());
 
          InteresadoFormDto interesado2dto = new InteresadoFormDto();
          interesado2dto.setDni(solicitud.getInteresado2Dni());
@@ -277,6 +283,11 @@ public class SolicitudServiceImpl implements SolicitudService {
          interesado2dto.setRol(solicitud.getInteresado2Rol());
          interesado2dto.setDireccion(solicitud.getInteresado2Direccion());
          interesado2dto.setTelefono(solicitud.getInteresado2Telefono());
+         interesado2dto.setTipoVia(solicitud.getInteresado2TipoVia());
+         interesado2dto.setNombreVia(solicitud.getInteresado2NombreVia());
+         interesado2dto.setCodigoPostal(solicitud.getInteresado2CodigoPostal());
+         interesado2dto.setMunicipio(solicitud.getInteresado2Municipio());
+         interesado2dto.setProvincia(solicitud.getInteresado2Provincia());
 
         expedienteService.validarInteresados(interesado1dto, interesado2dto);
 
@@ -310,14 +321,26 @@ public class SolicitudServiceImpl implements SolicitudService {
                                 solicitud.getInteresado1Dni(),
                                 solicitud.getInteresado1Nombre(),
                                 solicitud.getInteresado1Telefono(),
-                                solicitud.getInteresado1Direccion()
+                                direccionSolicitud(
+                                        solicitud.getInteresado1Direccion(),
+                                        solicitud.getInteresado1TipoVia(),
+                                        solicitud.getInteresado1NombreVia(),
+                                        solicitud.getInteresado1CodigoPostal(),
+                                        solicitud.getInteresado1Municipio(),
+                                        solicitud.getInteresado1Provincia())
                         ),
                         construirCoincidenciaSiHayDiferencias(
                                 solicitud.getInteresado2Rol(),
                                 solicitud.getInteresado2Dni(),
                                 solicitud.getInteresado2Nombre(),
                                 solicitud.getInteresado2Telefono(),
-                                solicitud.getInteresado2Direccion()
+                                direccionSolicitud(
+                                        solicitud.getInteresado2Direccion(),
+                                        solicitud.getInteresado2TipoVia(),
+                                        solicitud.getInteresado2NombreVia(),
+                                        solicitud.getInteresado2CodigoPostal(),
+                                        solicitud.getInteresado2Municipio(),
+                                        solicitud.getInteresado2Provincia())
                         )
                 ).stream()
                 .flatMap(Optional::stream)
@@ -473,13 +496,35 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitudBase.setInteresado1Nombre(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Nombre()));
         solicitudBase.setInteresado1Dni(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Dni()));
         solicitudBase.setInteresado1Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Telefono()));
-        solicitudBase.setInteresado1Direccion(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Direccion()));
+        solicitudBase.setInteresado1TipoVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1TipoVia()));
+        solicitudBase.setInteresado1NombreVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1NombreVia()));
+        solicitudBase.setInteresado1CodigoPostal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1CodigoPostal()));
+        solicitudBase.setInteresado1Municipio(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Municipio()));
+        solicitudBase.setInteresado1Provincia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Provincia()));
+        solicitudBase.setInteresado1Direccion(direccionSolicitud(
+                solicitudActualizada.getInteresado1Direccion(),
+                solicitudActualizada.getInteresado1TipoVia(),
+                solicitudActualizada.getInteresado1NombreVia(),
+                solicitudActualizada.getInteresado1CodigoPostal(),
+                solicitudActualizada.getInteresado1Municipio(),
+                solicitudActualizada.getInteresado1Provincia()));
 
         solicitudBase.setInteresado2Rol(solicitudActualizada.getInteresado2Rol());
         solicitudBase.setInteresado2Nombre(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Nombre()));
         solicitudBase.setInteresado2Dni(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Dni()));
         solicitudBase.setInteresado2Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Telefono()));
-        solicitudBase.setInteresado2Direccion(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Direccion()));
+        solicitudBase.setInteresado2TipoVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2TipoVia()));
+        solicitudBase.setInteresado2NombreVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2NombreVia()));
+        solicitudBase.setInteresado2CodigoPostal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2CodigoPostal()));
+        solicitudBase.setInteresado2Municipio(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Municipio()));
+        solicitudBase.setInteresado2Provincia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Provincia()));
+        solicitudBase.setInteresado2Direccion(direccionSolicitud(
+                solicitudActualizada.getInteresado2Direccion(),
+                solicitudActualizada.getInteresado2TipoVia(),
+                solicitudActualizada.getInteresado2NombreVia(),
+                solicitudActualizada.getInteresado2CodigoPostal(),
+                solicitudActualizada.getInteresado2Municipio(),
+                solicitudActualizada.getInteresado2Provincia()));
 
         solicitudBase.setObservaciones(TextNormalizer.upperOrNull(solicitudActualizada.getObservaciones()));
 
@@ -509,11 +554,41 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado1Nombre(TextNormalizer.upperOrNull(solicitud.getInteresado1Nombre()));
         solicitud.setInteresado1Dni(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()));
         solicitud.setInteresado1Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado1Telefono()));
-        solicitud.setInteresado1Direccion(TextNormalizer.upperOrNull(solicitud.getInteresado1Direccion()));
+        solicitud.setInteresado1TipoVia(TextNormalizer.upperOrNull(solicitud.getInteresado1TipoVia()));
+        solicitud.setInteresado1NombreVia(TextNormalizer.upperOrNull(solicitud.getInteresado1NombreVia()));
+        solicitud.setInteresado1CodigoPostal(TextNormalizer.upperOrNull(solicitud.getInteresado1CodigoPostal()));
+        solicitud.setInteresado1Municipio(TextNormalizer.upperOrNull(solicitud.getInteresado1Municipio()));
+        solicitud.setInteresado1Provincia(TextNormalizer.upperOrNull(solicitud.getInteresado1Provincia()));
+        solicitud.setInteresado1Direccion(direccionSolicitud(
+                solicitud.getInteresado1Direccion(),
+                solicitud.getInteresado1TipoVia(),
+                solicitud.getInteresado1NombreVia(),
+                solicitud.getInteresado1CodigoPostal(),
+                solicitud.getInteresado1Municipio(),
+                solicitud.getInteresado1Provincia()));
         solicitud.setInteresado2Nombre(TextNormalizer.upperOrNull(solicitud.getInteresado2Nombre()));
         solicitud.setInteresado2Dni(TextNormalizer.upperOrNull(solicitud.getInteresado2Dni()));
         solicitud.setInteresado2Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado2Telefono()));
-        solicitud.setInteresado2Direccion(TextNormalizer.upperOrNull(solicitud.getInteresado2Direccion()));
+        solicitud.setInteresado2TipoVia(TextNormalizer.upperOrNull(solicitud.getInteresado2TipoVia()));
+        solicitud.setInteresado2NombreVia(TextNormalizer.upperOrNull(solicitud.getInteresado2NombreVia()));
+        solicitud.setInteresado2CodigoPostal(TextNormalizer.upperOrNull(solicitud.getInteresado2CodigoPostal()));
+        solicitud.setInteresado2Municipio(TextNormalizer.upperOrNull(solicitud.getInteresado2Municipio()));
+        solicitud.setInteresado2Provincia(TextNormalizer.upperOrNull(solicitud.getInteresado2Provincia()));
+        solicitud.setInteresado2Direccion(direccionSolicitud(
+                solicitud.getInteresado2Direccion(),
+                solicitud.getInteresado2TipoVia(),
+                solicitud.getInteresado2NombreVia(),
+                solicitud.getInteresado2CodigoPostal(),
+                solicitud.getInteresado2Municipio(),
+                solicitud.getInteresado2Provincia()));
+    }
+
+    private String direccionSolicitud(String direccion, String tipoVia, String nombreVia, String codigoPostal, String municipio, String provincia) {
+        String direccionNormalizada = TextNormalizer.upperOrNull(direccion);
+        if (direccionNormalizada != null) {
+            return direccionNormalizada;
+        }
+        return DireccionFormatter.componer(tipoVia, nombreVia, codigoPostal, municipio, provincia);
     }
 }
 

@@ -7,6 +7,11 @@ public record InteresadoHabitualRequest(
         String nombre,
         String telefono,
         String direccion,
+        String tipoVia,
+        String nombreVia,
+        String codigoPostal,
+        String municipio,
+        String provincia,
         TipoPersona tipoPersona
 ) {
 }
