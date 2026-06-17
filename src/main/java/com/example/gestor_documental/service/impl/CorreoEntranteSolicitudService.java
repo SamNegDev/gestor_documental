@@ -276,7 +276,6 @@ public class CorreoEntranteSolicitudService {
                         .scheme("https")
                         .host("graph.microsoft.com")
                         .pathSegment("v1.0", "users", graphMailbox.trim(), "messages", messageId, "attachments")
-                        .queryParam("$select", "name,contentType,contentBytes")
                         .build())
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
