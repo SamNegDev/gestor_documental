@@ -65,7 +65,7 @@ export function bulkConvertSolicitudes(solicitudIds: number[]) {
 }
 
 export function checkInboundSolicitudEmail() {
-  return apiPostJson<void>("/api/solicitudes/correo-entrante/comprobar", {});
+  return apiPostJson<{ ejecutada: boolean; mensaje: string }>("/api/solicitudes/correo-entrante/comprobar", {});
 }
 
 export function cambiarEstadoSolicitud(id: number, nuevoEstado: string) {

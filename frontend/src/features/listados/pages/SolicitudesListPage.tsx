@@ -75,9 +75,12 @@ export function SolicitudesListPage() {
   async function handleCheckInboundEmail() {
     setCheckingEmail(true);
     try {
-      await checkInboundSolicitudEmail();
+      const response = await checkInboundSolicitudEmail();
       await queryClient.invalidateQueries({ queryKey: ["solicitudes"] });
       await queryClient.invalidateQueries({ queryKey: ["tareas"] });
+      if (!response.ejecutada) {
+        alert(response.mensaje);
+      }
     } catch (cause) {
       alert(cause instanceof Error ? cause.message : "No se pudo comprobar el buzon.");
     } finally {

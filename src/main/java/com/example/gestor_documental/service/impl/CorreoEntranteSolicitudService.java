@@ -108,12 +108,16 @@ public class CorreoEntranteSolicitudService {
 
     @Scheduled(fixedDelayString = "${app.mail.inbound.poll-delay-ms:300000}", initialDelayString = "${app.mail.inbound.initial-delay-ms:60000}")
     public void procesarBuzon() {
+        intentarProcesarBuzon();
+    }
+
+    public boolean intentarProcesarBuzon() {
         if (!enabled) {
-            return;
+            return false;
         }
         if (!processing.compareAndSet(false, true)) {
             log.info("Comprobacion de buzon entrante omitida porque ya hay una en curso.");
-            return;
+            return false;
         }
         try {
             if ("graph".equalsIgnoreCase(inboundProvider)) {
@@ -121,6 +125,7 @@ public class CorreoEntranteSolicitudService {
             } else {
                 procesarBuzonImap();
             }
+            return true;
         } finally {
             processing.set(false);
         }

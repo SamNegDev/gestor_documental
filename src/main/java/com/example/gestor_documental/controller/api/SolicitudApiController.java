@@ -202,10 +202,15 @@ public class SolicitudApiController {
     }
 
     @PostMapping("/correo-entrante/comprobar")
-    public ResponseEntity<Void> comprobarCorreoEntrante(Authentication authentication) {
+    public ResponseEntity<java.util.Map<String, Object>> comprobarCorreoEntrante(Authentication authentication) {
         requireAdmin(authentication);
-        correoEntranteSolicitudService.procesarBuzon();
-        return ResponseEntity.accepted().build();
+        boolean ejecutada = correoEntranteSolicitudService.intentarProcesarBuzon();
+        return ResponseEntity.ok(java.util.Map.of(
+                "ejecutada", ejecutada,
+                "mensaje", ejecutada
+                        ? "Comprobacion completada."
+                        : "La comprobacion no se ejecuto porque el buzon esta desactivado o ya hay otra comprobacion en curso."
+        ));
     }
 
     @PostMapping
