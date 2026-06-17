@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useOutletContext, useSearchParams } from "react-router-dom";
-import { ArrowRight, CheckCircle2, ClipboardCheck, Plus } from "lucide-react";
+import { ArrowRight, CheckCircle2, ClipboardCheck, MailCheck, Plus, RefreshCw } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { ApiError } from "../../../shared/api/http";
-import { bulkConvertSolicitudes, getSolicitudListCatalogs, getSolicitudes } from "../services/listadosApi";
+import { bulkConvertSolicitudes, checkInboundSolicitudEmail, getSolicitudListCatalogs, getSolicitudes } from "../services/listadosApi";
 import { ListFiltersBar } from "../components/ListFiltersBar";
 import { ListPageChrome } from "../components/ListPageChrome";
 import type { ListCatalogs, ListFilters, SolicitudListItem } from "../types";
@@ -20,6 +20,7 @@ export function SolicitudesListPage() {
   const [appliedFilters, setAppliedFilters] = useState<ListFilters>(() => readFilters(searchParams));
   const [draftFilters, setDraftFilters] = useState<ListFilters>(() => readFilters(searchParams));
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
 
@@ -71,6 +72,19 @@ export function SolicitudesListPage() {
     }
   }
 
+  async function handleCheckInboundEmail() {
+    setCheckingEmail(true);
+    try {
+      await checkInboundSolicitudEmail();
+      await queryClient.invalidateQueries({ queryKey: ["solicitudes"] });
+      await queryClient.invalidateQueries({ queryKey: ["tareas"] });
+    } catch (cause) {
+      alert(cause instanceof Error ? cause.message : "No se pudo comprobar el buzon.");
+    } finally {
+      setCheckingEmail(false);
+    }
+  }
+
   return (
     <ListPageChrome
       eyebrow={isAdmin ? "Gestión interna" : "Portal cliente"}
@@ -82,12 +96,17 @@ export function SolicitudesListPage() {
       }
       count={`${pageData?.totalElementos ?? 0} ${(pageData?.totalElementos ?? 0) === 1 ? "solicitud" : "solicitudes"}`}
       action={
-        !isAdmin ? (
+        isAdmin ? (
+          <button className="soft-button soft-button--compact" disabled={checkingEmail} onClick={handleCheckInboundEmail} type="button">
+            {checkingEmail ? <RefreshCw size={16} /> : <MailCheck size={16} />}
+            {checkingEmail ? "Comprobando" : "Comprobar buzon"}
+          </button>
+        ) : (
           <Link className="primary-button primary-button--compact" to="/cliente/solicitudes/nuevo">
             <Plus size={16} />
             Nueva solicitud
           </Link>
-        ) : null
+        )
       }
     >
       <ListFiltersBar

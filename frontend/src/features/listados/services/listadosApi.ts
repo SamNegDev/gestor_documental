@@ -64,6 +64,10 @@ export function bulkConvertSolicitudes(solicitudIds: number[]) {
   return apiPostJson<SolicitudBulkConvertResponse>("/api/solicitudes/convertir-masivo", { solicitudIds });
 }
 
+export function checkInboundSolicitudEmail() {
+  return apiPostJson<void>("/api/solicitudes/correo-entrante/comprobar", {});
+}
+
 export function cambiarEstadoSolicitud(id: number, nuevoEstado: string) {
   return apiPostJson<void>(`/api/solicitudes/${id}/estado`, { nuevoEstado });
 }

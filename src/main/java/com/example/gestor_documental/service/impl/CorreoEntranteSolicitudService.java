@@ -51,6 +51,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -70,6 +71,7 @@ public class CorreoEntranteSolicitudService {
     private final OcrPdfService ocrPdfService;
     private final HistorialCambioService historialCambioService;
     private final RestClient restClient = RestClient.create();
+    private final AtomicBoolean processing = new AtomicBoolean(false);
 
     @Value("${app.mail.inbound.enabled:false}")
     private boolean enabled;
@@ -109,10 +111,18 @@ public class CorreoEntranteSolicitudService {
         if (!enabled) {
             return;
         }
-        if ("graph".equalsIgnoreCase(inboundProvider)) {
-            procesarBuzonGraph();
-        } else {
-            procesarBuzonImap();
+        if (!processing.compareAndSet(false, true)) {
+            log.info("Comprobacion de buzon entrante omitida porque ya hay una en curso.");
+            return;
+        }
+        try {
+            if ("graph".equalsIgnoreCase(inboundProvider)) {
+                procesarBuzonGraph();
+            } else {
+                procesarBuzonImap();
+            }
+        } finally {
+            processing.set(false);
         }
     }
 

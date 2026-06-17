@@ -37,6 +37,7 @@ import com.example.gestor_documental.service.IncidenciaService;
 import com.example.gestor_documental.service.MensajeService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
+import com.example.gestor_documental.service.impl.CorreoEntranteSolicitudService;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.util.TextNormalizer;
 import java.time.LocalDateTime;
@@ -77,6 +78,7 @@ public class SolicitudApiController {
     private final HistorialCambioService historialCambioService;
     private final MensajeService mensajeService;
     private final CurrentUserService currentUserService;
+    private final CorreoEntranteSolicitudService correoEntranteSolicitudService;
 
     @GetMapping
     public PagedResponse<SolicitudListItemResponse> listarSolicitudes(
@@ -197,6 +199,13 @@ public class SolicitudApiController {
                 .fallidas(resultados.size() - convertidas)
                 .resultados(resultados)
                 .build());
+    }
+
+    @PostMapping("/correo-entrante/comprobar")
+    public ResponseEntity<Void> comprobarCorreoEntrante(Authentication authentication) {
+        requireAdmin(authentication);
+        correoEntranteSolicitudService.procesarBuzon();
+        return ResponseEntity.accepted().build();
     }
 
     @PostMapping
