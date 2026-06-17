@@ -75,8 +75,8 @@ public class TareaApiController {
                 .filter(tarea -> ambito == null || ambito.isBlank() || ambito.equals(tarea.getAmbito()))
                 .filter(tarea -> tipo == null || tipo.isBlank() || tipo.equals(tarea.getTipo()))
                 .filter(tarea -> prioridad == null || prioridad.isBlank() || prioridad.equals(tarea.getPrioridad()))
-                .sorted(Comparator.comparingInt((TareaResponse tarea) -> ordenPrioridad(tarea.getPrioridad()))
-                        .thenComparing(TareaResponse::getDiasPendiente, Comparator.reverseOrder()))
+                .sorted(Comparator.comparing(TareaResponse::getDiasPendiente, Comparator.reverseOrder())
+                        .thenComparingInt(tarea -> ordenPrioridad(tarea.getPrioridad())))
                 .toList();
         return PagedResponse.of(tareas, pagina, tamanio);
     }
