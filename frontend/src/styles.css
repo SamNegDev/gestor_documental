@@ -2375,6 +2375,8 @@ input.records-table-filter {
 
 .records-final-doc-warnings > span {
   display: grid;
+  width: 18px;
+  height: 18px;
   place-items: center;
   gap: 1px;
   color: oklch(51% 0.14 72);

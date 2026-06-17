@@ -360,12 +360,9 @@ function ExpedientesTable({
                   ) : null}
                   {expediente.justificantesFinalesPendientes?.length ? (
                     <div className="records-final-doc-warnings" aria-label="Justificantes finales pendientes">
-                      {expediente.justificantesFinalesPendientes.map((tipo) => (
-                        <span key={tipo} title={`Falta justificante ${tipo}`}>
-                          <AlertTriangle size={14} />
-                          <small>{tipo}</small>
-                        </span>
-                      ))}
+                      <span title={`Faltan justificantes finales: ${expediente.justificantesFinalesPendientes.join(", ")}`}>
+                        <AlertTriangle size={14} />
+                      </span>
                     </div>
                   ) : null}
                 </div>
@@ -725,7 +722,7 @@ function NextStepSummary({ expediente }: { expediente: ExpedienteListItem }) {
 
   if (expediente.estado === "FINALIZADO") {
     label = expediente.justificantesFinalesPendientes?.length
-      ? `Adjuntar ${expediente.justificantesFinalesPendientes.join(" y ")}`
+      ? "Adjuntar justificantes"
       : "Sin acciones pendientes";
   } else if (expediente.estado === "PENDIENTE_DOCUMENTACION") {
     label = "Esperar documentacion";

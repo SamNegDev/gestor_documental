@@ -172,17 +172,11 @@ public class ExpedienteJustificanteFinalService {
     }
 
     private String etiquetaPendiente(RequisitoDocumentalResponse requisito) {
-        String base = "MODELO_620".equals(requisito.getTipoDocumento()) ? "620" : "DGT";
-        return requisito.getOperacionLabel() != null && !requisito.getOperacionLabel().isBlank()
-                ? base + " " + requisito.getOperacionLabel()
-                : base;
+        return "MODELO_620".equals(requisito.getTipoDocumento()) ? "620" : "DGT";
     }
 
     private String etiquetaPendiente(RequisitoDocumentalExpediente requisito) {
-        String base = requisito.getTipoDocumento() == TipoDocumento.MODELO_620 ? "620" : "DGT";
-        return requisito.getOperacion() != null && requisito.getOperacion().getTipo() != null
-                ? base + " " + requisito.getOperacion().getTipo().getLabel()
-                : base;
+        return requisito.getTipoDocumento() == TipoDocumento.MODELO_620 ? "620" : "DGT";
     }
 
     private boolean esJustificanteDgt(Documento documento) {
