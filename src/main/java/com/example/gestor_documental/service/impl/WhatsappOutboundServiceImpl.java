@@ -156,7 +156,7 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
                     "type", "interactive",
                     "interactive", Map.of(
                             "type", "list",
-                            "body", Map.of("text", "Hola, soy GestApp. Elige que necesitas:"),
+                            "body", Map.of("text", "👋 Hola, soy *GestApp*.\n\nElige que necesitas:"),
                             "action", Map.of(
                                     "button", "Abrir menu",
                                     "sections", java.util.List.of(Map.of(
@@ -298,7 +298,7 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
                     "type", "interactive",
                     "interactive", Map.of(
                             "type", "list",
-                            "body", Map.of("text", "Vamos a crear una solicitud nueva. Elige el tipo de tramite:"),
+                            "body", Map.of("text", "📝 *Nueva solicitud*\n\nElige el tipo de tramite:"),
                             "action", Map.of(
                                     "button", "Elegir tramite",
                                     "sections", java.util.List.of(Map.of(
@@ -381,32 +381,32 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
             String tramite = expediente.getTipoTramite() != null && StringUtils.hasText(expediente.getTipoTramite().getDescripcion())
                     ? expediente.getTipoTramite().getDescripcion()
                     : "Tramite";
-            builder.append("Expediente activo: ").append(matricula).append("\n");
-            builder.append("Tramite: ").append(tramite).append("\n\n");
+            builder.append("📁 *Expediente activo:* ").append(matricula).append("\n");
+            builder.append("🧾 *Tramite:* ").append(tramite).append("\n\n");
         }
         if (StringUtils.hasText(mensaje)) {
             builder.append(mensaje.trim()).append("\n\n");
         }
-        builder.append("Que quieres hacer ahora?");
+        builder.append("➡️ *Que quieres hacer ahora?*");
         return builder.toString();
     }
 
     private String textoMenuContinuacionSolicitud(Solicitud solicitud, String mensaje) {
         StringBuilder builder = new StringBuilder();
         if (solicitud != null) {
-            builder.append("Solicitud activa: SOL-").append(solicitud.getId()).append("\n");
+            builder.append("📝 *Solicitud activa:* SOL-").append(solicitud.getId()).append("\n");
             if (StringUtils.hasText(solicitud.getMatricula())) {
-                builder.append("Matricula: ").append(solicitud.getMatricula().trim().toUpperCase()).append("\n");
+                builder.append("🚗 *Matricula:* ").append(solicitud.getMatricula().trim().toUpperCase()).append("\n");
             }
             if (solicitud.getTipoTramite() != null) {
-                builder.append("Tramite: ").append(tituloTipoTramite(solicitud.getTipoTramite())).append("\n");
+                builder.append("🧾 *Tramite:* ").append(tituloTipoTramite(solicitud.getTipoTramite())).append("\n");
             }
             builder.append("\n");
         }
         if (StringUtils.hasText(mensaje)) {
             builder.append(mensaje.trim()).append("\n\n");
         }
-        builder.append("Que quieres hacer ahora?");
+        builder.append("➡️ *Que quieres hacer ahora?*");
         return builder.toString();
     }
 

@@ -10,6 +10,7 @@ import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.EstadoWhatsappEvento;
+import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.TipoTramite;
 import com.example.gestor_documental.repository.ClienteRepository;
@@ -211,7 +212,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         }
         if ("gestapp_salir".equals(accion)) {
             whatsappOutboundService.enviarTexto(evento.getTelefono(),
-                    "Perfecto, lo dejamos aqui. Cuando necesites cualquier cosa, escribe menu y seguimos.");
+                    "👍 Perfecto, lo dejamos aqui.\n\nCuando necesites cualquier cosa, escribe *menu* y seguimos.");
             marcarRevisado(evento);
             return true;
         }
@@ -357,7 +358,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         historialCambioService.registrarCambioSolicitud(solicitud, null, "WHATSAPP SOLICITUD",
                 "Solicitud creada desde WhatsApp para la matricula " + matricula + ".");
         whatsappOutboundService.enviarMenuContinuacionSolicitud(evento.getTelefono(), solicitud,
-                "Solicitud SOL-" + solicitud.getId() + " creada con exito.");
+                "✅ *Solicitud SOL-" + solicitud.getId() + " creada con exito.*");
         marcarRevisado(evento);
         return true;
     }
@@ -396,14 +397,94 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
                 ? expediente.getTipoTramite().getDescripcion()
                 : "Tramite";
         String fecha = expediente.getFechaUltimaModificacion() != null
-                ? "\nUltima actualizacion: " + expediente.getFechaUltimaModificacion().format(FECHA_ESTADO_FORMATTER)
+                ? "\n\n🕒 *Ultima actualizacion:* " + expediente.getFechaUltimaModificacion().format(FECHA_ESTADO_FORMATTER)
                 : "";
-        return "Estado del tramite\n"
-                + "Matricula: " + matricula + "\n"
-                + "Tramite: " + tramite + "\n"
-                + "Fase actual: " + faseActualWhatsapp(expediente) + "\n"
-                + "Siguiente paso: " + siguientePasoWhatsapp(expediente)
+        return "📄 *Estado del tramite*\n\n"
+                + "🚗 *Matricula:* " + matricula + "\n"
+                + "🧾 *Tramite:* " + tramite + "\n"
+                + "📍 *Fase actual:* " + faseActualWhatsapp(expediente)
+                + detallePendienteWhatsapp(expediente)
+                + "\n\n✅ *Siguiente paso:* " + siguientePasoWhatsapp(expediente)
                 + fecha;
+    }
+
+    private String detallePendienteWhatsapp(Expediente expediente) {
+        StringBuilder builder = new StringBuilder();
+
+        List<Incidencia> incidencias = incidenciaRepository.findByExpedienteIdAndResueltaFalse(expediente.getId()).stream()
+                .sorted(Comparator.comparing(
+                        (Incidencia incidencia) -> incidencia.getFechaCreacion() != null ? incidencia.getFechaCreacion() : LocalDateTime.MIN)
+                        .reversed())
+                .limit(3)
+                .toList();
+        if (!incidencias.isEmpty()) {
+            builder.append("\n\n⚠️ *Pendiente de resolver:*");
+            incidencias.forEach(incidencia -> builder
+                    .append("\n- *").append(tipoIncidenciaWhatsapp(incidencia)).append("*")
+                    .append(": ").append(detalleIncidenciaWhatsapp(incidencia)));
+        }
+
+        List<String> pendientes = requisitosPendientesWhatsapp(expediente);
+        if (!pendientes.isEmpty()) {
+            builder.append("\n\n📎 *Documentacion solicitada:*");
+            pendientes.forEach(item -> builder.append("\n- ").append(item));
+        } else if (expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL && incidencias.isEmpty()) {
+            builder.append("\n\n⚠️ *Pendiente de resolver:*\n- Responder a la informacion adicional solicitada por la gestoria.");
+        }
+
+        return builder.toString();
+    }
+
+    private List<String> requisitosPendientesWhatsapp(Expediente expediente) {
+        if (expediente.getEstadoExpediente() != EstadoExpediente.PENDIENTE_DOCUMENTACION
+                && expediente.getEstadoExpediente() != EstadoExpediente.INCIDENCIA
+                && expediente.getEstadoExpediente() != EstadoExpediente.REVISANDO_INCIDENCIAS) {
+            return List.of();
+        }
+        return requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
+                .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                .map(this::descripcionRequisito)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .limit(5)
+                .toList();
+    }
+
+    private String tipoIncidenciaWhatsapp(Incidencia incidencia) {
+        if (incidencia.getTipoIncidencia() != null) {
+            if (StringUtils.hasText(incidencia.getTipoIncidencia().getDescripcion())) {
+                return incidencia.getTipoIncidencia().getDescripcion().trim();
+            }
+            TipoIncidenciaEnum tipo = incidencia.getTipoIncidencia().getNombre();
+            if (tipo != null) {
+                return tipo.name().replace('_', ' ');
+            }
+        }
+        return "Incidencia";
+    }
+
+    private String detalleIncidenciaWhatsapp(Incidencia incidencia) {
+        if (StringUtils.hasText(incidencia.getObservaciones())) {
+            return limitarTextoWhatsapp(incidencia.getObservaciones().trim(), 350);
+        }
+        TipoIncidenciaEnum tipo = incidencia.getTipoIncidencia() != null ? incidencia.getTipoIncidencia().getNombre() : null;
+        if (tipo == TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION && incidencia.getExpediente() != null) {
+            List<String> pendientes = requisitosPendientesWhatsapp(incidencia.getExpediente());
+            if (!pendientes.isEmpty()) {
+                return "Aportar " + String.join(", ", pendientes);
+            }
+        }
+        if (tipo == TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL) {
+            return "Responder a la informacion solicitada.";
+        }
+        return "Revisar el detalle con la gestoria.";
+    }
+
+    private String limitarTextoWhatsapp(String texto, int maximo) {
+        if (texto.length() <= maximo) {
+            return texto;
+        }
+        return texto.substring(0, Math.max(0, maximo - 3)).trim() + "...";
     }
 
     private String faseActualWhatsapp(Expediente expediente) {
@@ -518,18 +599,18 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             return;
         }
         whatsappOutboundService.enviarMenuContinuacion(evento.getTelefono(), evento.getExpediente(),
-                "Documento recibido correctamente.");
+                "✅ *Documento recibido correctamente.*");
     }
 
     private void confirmarContactoGeneral(WhatsappWebhookEvento evento) {
         whatsappOutboundService.enviarTexto(evento.getTelefono(),
-                "Perfecto, paso el aviso a la gestoria para que contacten contigo.");
+                "✅ Perfecto, paso el aviso a la gestoria para que contacten contigo.");
         whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
     }
 
     private void confirmarContactoSolicitud(WhatsappWebhookEvento evento) {
         whatsappOutboundService.enviarTexto(evento.getTelefono(),
-                "Perfecto, paso el aviso a la gestoria para que revisen tu solicitud.");
+                "✅ Perfecto, paso el aviso a la gestoria para que revisen tu solicitud.");
         Solicitud solicitud = evento.getCliente() != null
                 ? solicitudRepository.findByClienteIdOrderByFechaReferenciaDesc(evento.getCliente().getId()).stream().findFirst().orElse(null)
                 : null;
@@ -542,7 +623,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
 
     private void confirmarContactoExpediente(WhatsappWebhookEvento evento) {
         whatsappOutboundService.enviarTexto(evento.getTelefono(),
-                "Perfecto, paso el aviso a la gestoria para que contacten contigo.");
+                "✅ Perfecto, paso el aviso a la gestoria para que contacten contigo.");
         if (evento.getExpediente() != null) {
             whatsappOutboundService.enviarMenuContinuacion(evento.getTelefono(), evento.getExpediente(), "Te dejo las opciones del expediente.");
         } else {
