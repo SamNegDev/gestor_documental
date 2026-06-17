@@ -1315,9 +1315,14 @@
 .primary-button:disabled,
 .primary-button--disabled,
 .soft-button:disabled,
-.icon-button:disabled {
+.icon-button:disabled,
+.icon-button--disabled {
   opacity: 0.48;
   cursor: not-allowed;
+}
+
+.icon-button--disabled {
+  pointer-events: none;
 }
 
 .soft-button {
@@ -1520,6 +1525,10 @@
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.requirement-row__notice {
+  color: var(--warning);
 }
 
 .milestones-list--compact {

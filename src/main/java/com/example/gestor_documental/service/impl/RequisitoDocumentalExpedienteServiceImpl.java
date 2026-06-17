@@ -1,9 +1,12 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.enums.CodigoHitoExpediente;
+import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.OrigenRequisitoDocumental;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.enums.TipoOperacionExpediente;
 import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
@@ -13,10 +16,13 @@ import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Interesado;
+import com.example.gestor_documental.model.OperacionExpediente;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.repository.HitoExpedienteRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
+import com.example.gestor_documental.repository.OperacionExpedienteRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
@@ -39,6 +45,8 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     private final DocumentoService documentoService;
     private final InteresadoRepository interesadoRepository;
     private final DocumentoRepository documentoRepository;
+    private final HitoExpedienteRepository hitoRepository;
+    private final OperacionExpedienteRepository operacionRepository;
 
     @Override
     @Transactional
@@ -49,6 +57,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             Usuario usuario
     ) {
         generarRequisitosBase(expediente, interesados, usuario);
+        generarRequisitosPosteriores(expediente, usuario);
         reconciliarConDocumentos(expediente, documentos, usuario);
         return requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId());
     }
@@ -127,6 +136,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         if (documento.getExpediente() == null || !documento.getExpediente().getId().equals(requisito.getExpediente().getId())) {
             throw new OperacionInvalidaException("El documento no pertenece al expediente del requisito");
         }
+        validarDocumentoOperacion(requisito, documento);
         return marcarAportado(requisito, documento, usuario);
     }
 
@@ -138,6 +148,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                 requisito.getExpediente().getId(),
                 archivo,
                 requisito.getTipoDocumento(),
+                requisito.getOperacion() != null ? requisito.getOperacion().getId() : null,
                 usuario
         );
         if (documento == null) {
@@ -175,6 +186,20 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         RequisitoDocumentalExpediente guardado = requisitoRepository.save(requisito);
         expedienteService.reanudarTrasDocumentacion(requisito.getExpediente().getId(), usuario);
         return guardado;
+    }
+
+    private void validarDocumentoOperacion(RequisitoDocumentalExpediente requisito, Documento documento) {
+        if (requisito.getOperacion() == null) {
+            return;
+        }
+        if (requisito.getOperacion().getTipo() == TipoOperacionExpediente.TRASPASO_DIRECTO && documento.getOperacion() == null) {
+            return;
+        }
+        if (documento.getOperacion() == null
+                || documento.getOperacion().getId() == null
+                || !documento.getOperacion().getId().equals(requisito.getOperacion().getId())) {
+            throw new OperacionInvalidaException("El documento no pertenece a la operacion del requisito");
+        }
     }
 
     private void reconciliarConDocumentos(Expediente expediente, List<Documento> documentos, Usuario usuario) {
@@ -226,7 +251,72 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         }
 
         crearGlobalSiNoExiste(expediente, TipoDocumento.MANDATO, "Mandato o autorizacion de gestion", EstadoRequisitoDocumental.REQUERIDO, usuario);
-        eliminarModelo620Automatico(expediente);
+        if (!requiereModelo620(expediente)) {
+            eliminarModelos620DeReglaSinResolver(expediente);
+        }
+    }
+
+    private void generarRequisitosPosteriores(Expediente expediente, Usuario usuario) {
+        TipoTramiteEnum tramite = expediente.getTipoTramite() != null ? expediente.getTipoTramite().getNombre() : null;
+        if (tramite == TipoTramiteEnum.BATECOM) {
+            generarRequisitosOperacion(
+                    expediente,
+                    TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE,
+                    CodigoHitoExpediente.BATE_TRAMITE_PROGRAMA_GESTION,
+                    CodigoHitoExpediente.BATE_FINALIZADO,
+                    "Modelo 620 de Entrega a compraventa (BATE)",
+                    "Comprobante DGT de Entrega a compraventa (BATE)",
+                    usuario
+            );
+            generarRequisitosOperacion(
+                    expediente,
+                    TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM,
+                    CodigoHitoExpediente.COM_TRAMITE_PROGRAMA_GESTION,
+                    CodigoHitoExpediente.COM_FINALIZADO,
+                    "Modelo 620 de Finalizacion entrega a compraventa (COM)",
+                    "Comprobante DGT de Finalizacion entrega a compraventa (COM)",
+                    usuario
+            );
+            return;
+        }
+
+        generarRequisitosOperacion(
+                expediente,
+                TipoOperacionExpediente.TRASPASO_DIRECTO,
+                CodigoHitoExpediente.TRAMITE_PROGRAMA_GESTION,
+                null,
+                "Modelo 620",
+                "Comprobante DGT o huella del tramite",
+                usuario
+        );
+    }
+
+    private void generarRequisitosOperacion(
+            Expediente expediente,
+            TipoOperacionExpediente tipoOperacion,
+            CodigoHitoExpediente hitoTramite,
+            CodigoHitoExpediente hitoFinalizacion,
+            String descripcionModelo,
+            String descripcionComprobante,
+            Usuario usuario
+    ) {
+        OperacionExpediente operacion = operacionRepository.findByExpedienteIdAndTipo(expediente.getId(), tipoOperacion)
+                .orElse(null);
+        if (operacion == null) {
+            return;
+        }
+
+        boolean tramiteAvanzado = hitoRepository.existsByExpedienteIdAndCodigo(expediente.getId(), hitoTramite);
+        if (tramiteAvanzado && requiereModelo620(expediente)) {
+            crearPorOperacionSiNoExiste(expediente, TipoDocumento.MODELO_620, operacion, descripcionModelo, EstadoRequisitoDocumental.REQUERIDO, usuario);
+        }
+
+        boolean finalizado = expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
+                || (hitoFinalizacion != null && hitoRepository.existsByExpedienteIdAndCodigo(expediente.getId(), hitoFinalizacion));
+        if (tramiteAvanzado || finalizado) {
+            EstadoRequisitoDocumental estado = finalizado ? EstadoRequisitoDocumental.REQUERIDO : EstadoRequisitoDocumental.POSTERIOR;
+            crearPorOperacionSiNoExiste(expediente, TipoDocumento.COMPROBANTE_DGT, operacion, descripcionComprobante, estado, usuario);
+        }
     }
 
     private void generarIdentificacion(Expediente expediente, Interesado interesado, RolInteresado rol, Usuario usuario) {
@@ -317,6 +407,24 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         }
     }
 
+    private void actualizarRegla(RequisitoDocumentalExpediente requisito, String descripcion, EstadoRequisitoDocumental estado) {
+        if (requisito.getOrigen() != OrigenRequisitoDocumental.REGLA) {
+            return;
+        }
+        boolean modificado = false;
+        if (!descripcion.equals(requisito.getDescripcion())) {
+            requisito.setDescripcion(descripcion);
+            modificado = true;
+        }
+        if (requisito.getEstado() == EstadoRequisitoDocumental.POSTERIOR && estado == EstadoRequisitoDocumental.REQUERIDO) {
+            requisito.setEstado(EstadoRequisitoDocumental.REQUERIDO);
+            modificado = true;
+        }
+        if (modificado) {
+            requisitoRepository.save(requisito);
+        }
+    }
+
     private void crearGlobalSiNoExiste(
             Expediente expediente,
             TipoDocumento tipoDocumento,
@@ -339,7 +447,47 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                 );
     }
 
+    private void crearPorOperacionSiNoExiste(
+            Expediente expediente,
+            TipoDocumento tipoDocumento,
+            OperacionExpediente operacion,
+            String descripcion,
+            EstadoRequisitoDocumental estado,
+            Usuario usuario
+    ) {
+        requisitoRepository.findFirstByExpedienteIdAndTipoDocumentoAndOperacionIdOrderByIdAsc(
+                        expediente.getId(),
+                        tipoDocumento,
+                        operacion.getId()
+                )
+                .ifPresentOrElse(
+                        requisito -> actualizarRegla(requisito, descripcion, estado),
+                        () -> {
+                            RequisitoDocumentalExpediente requisito = nuevoRequisito(
+                                    expediente,
+                                    tipoDocumento,
+                                    descripcion,
+                                    estado,
+                                    null,
+                                    null,
+                                    usuario
+                            );
+                            requisito.setOperacion(operacion);
+                            requisitoRepository.save(requisito);
+                        }
+                );
+    }
+
     private boolean documentoCubreRequisito(Documento documento, RequisitoDocumentalExpediente requisito) {
+        if (requisito.getOperacion() != null) {
+            if (documento.getOperacion() == null || documento.getOperacion().getId() == null) {
+                if (requisito.getOperacion().getTipo() != TipoOperacionExpediente.TRASPASO_DIRECTO) {
+                    return false;
+                }
+            } else if (!documento.getOperacion().getId().equals(requisito.getOperacion().getId())) {
+                return false;
+            }
+        }
         if (documento.getTipoDocumento() == requisito.getTipoDocumento()) {
             return true;
         }
@@ -401,14 +549,17 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         return !nifCliente.isBlank() && nifCliente.equals(dniInteresado);
     }
 
-    private void eliminarModelo620Automatico(Expediente expediente) {
-        requisitoRepository.findFirstByExpedienteIdAndTipoDocumentoAndInteresadoIsNullAndRolInteresadoIsNullOrderByIdAsc(
-                        expediente.getId(),
-                        TipoDocumento.MODELO_620
-                )
+    private boolean requiereModelo620(Expediente expediente) {
+        TipoTramiteEnum tramite = expediente.getTipoTramite() != null ? expediente.getTipoTramite().getNombre() : null;
+        return tramite != TipoTramiteEnum.NOTIFICACION_VENTA;
+    }
+
+    private void eliminarModelos620DeReglaSinResolver(Expediente expediente) {
+        requisitoRepository.findByExpedienteIdAndTipoDocumento(expediente.getId(), TipoDocumento.MODELO_620).stream()
                 .filter(requisito -> requisito.getOrigen() == OrigenRequisitoDocumental.REGLA)
                 .filter(requisito -> requisito.getDocumento() == null)
-                .ifPresent(requisitoRepository::delete);
+                .filter(requisito -> requisito.getEstado() != EstadoRequisitoDocumental.OMITIDO)
+                .forEach(requisitoRepository::delete);
     }
 
     private RequisitoDocumentalExpediente nuevoRequisito(

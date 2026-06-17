@@ -1,10 +1,16 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.expediente.ExpedienteDetailResponse;
+import com.example.gestor_documental.dto.expediente.RequisitoDocumentalResponse;
+import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.repository.ExpedienteRepository;
+import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -30,6 +36,8 @@ public class ExpedienteJustificanteFinalService {
 
     private final ExpedienteDetalleApiService expedienteDetalleApiService;
     private final DocumentoRepository documentoRepository;
+    private final ExpedienteRepository expedienteRepository;
+    private final RequisitoDocumentalExpedienteRepository requisitoRepository;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -42,8 +50,9 @@ public class ExpedienteJustificanteFinalService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solo se pueden descargar justificantes de expedientes finalizados");
             }
             List<Documento> documentos = documentosFinales(id);
-            if (!tieneJustificanteDgt(documentos) || !tieneModelo620(documentos)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Faltan justificantes finales en el expediente " + id);
+            List<String> pendientes = justificantesPendientes(detalle, documentos);
+            if (!pendientes.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Faltan justificantes finales en el expediente " + id + ": " + String.join(", ", pendientes));
             }
             documentosPorCarpeta.put(carpetaZipExpediente(detalle, id, documentosPorCarpeta.keySet()), documentos);
         }
@@ -69,7 +78,7 @@ public class ExpedienteJustificanteFinalService {
             return false;
         }
         List<Documento> documentos = documentosFinales(expedienteId);
-        return tieneJustificanteDgt(documentos) && tieneModelo620(documentos);
+        return justificantesPendientes(expedienteId, documentos).isEmpty();
     }
 
     public List<String> justificantesFinalesPendientes(Long expedienteId, String estado) {
@@ -77,14 +86,7 @@ public class ExpedienteJustificanteFinalService {
             return List.of();
         }
         List<Documento> documentos = documentosFinales(expedienteId);
-        java.util.ArrayList<String> pendientes = new java.util.ArrayList<>();
-        if (!tieneJustificanteDgt(documentos)) {
-            pendientes.add("DGT");
-        }
-        if (!tieneModelo620(documentos)) {
-            pendientes.add("620");
-        }
-        return pendientes;
+        return justificantesPendientes(expedienteId, documentos);
     }
 
     private List<Documento> documentosFinales(Long expedienteId) {
@@ -100,6 +102,83 @@ public class ExpedienteJustificanteFinalService {
 
     private boolean tieneModelo620(List<Documento> documentos) {
         return documentos.stream().anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.MODELO_620);
+    }
+
+    private List<String> justificantesPendientes(ExpedienteDetailResponse detalle, List<Documento> documentos) {
+        java.util.ArrayList<String> pendientes = new java.util.ArrayList<>();
+        List<RequisitoDocumentalResponse> requisitosFinales = detalle.getRequisitosDocumentales().stream()
+                .filter(requisito -> "MODELO_620".equals(requisito.getTipoDocumento())
+                        || "COMPROBANTE_DGT".equals(requisito.getTipoDocumento())
+                        || "HUELLA_TRAMITE".equals(requisito.getTipoDocumento()))
+                .toList();
+
+        if (!requisitosFinales.isEmpty()) {
+            for (RequisitoDocumentalResponse requisito : requisitosFinales) {
+                if ("OMITIDO".equals(requisito.getEstado())) {
+                    continue;
+                }
+                if (!"APORTADO".equals(requisito.getEstado())) {
+                    pendientes.add(etiquetaPendiente(requisito));
+                }
+            }
+            return pendientes.stream().distinct().toList();
+        }
+
+        if (!tieneJustificanteDgt(documentos)) {
+            pendientes.add("DGT");
+        }
+        if (!"NOTIFICACION_VENTA".equals(detalle.getTipoTramite()) && !tieneModelo620(documentos)) {
+            pendientes.add("620");
+        }
+        return pendientes;
+    }
+
+    private List<String> justificantesPendientes(Long expedienteId, List<Documento> documentos) {
+        java.util.ArrayList<String> pendientes = new java.util.ArrayList<>();
+        List<RequisitoDocumentalExpediente> requisitosFinales = requisitoRepository.findByExpedienteIdOrderByIdAsc(expedienteId).stream()
+                .filter(requisito -> requisito.getTipoDocumento() == TipoDocumento.MODELO_620
+                        || requisito.getTipoDocumento() == TipoDocumento.COMPROBANTE_DGT
+                        || requisito.getTipoDocumento() == TipoDocumento.HUELLA_TRAMITE)
+                .toList();
+
+        if (!requisitosFinales.isEmpty()) {
+            for (RequisitoDocumentalExpediente requisito : requisitosFinales) {
+                if (requisito.getEstado() == EstadoRequisitoDocumental.OMITIDO) {
+                    continue;
+                }
+                if (requisito.getEstado() != EstadoRequisitoDocumental.APORTADO) {
+                    pendientes.add(etiquetaPendiente(requisito));
+                }
+            }
+            return pendientes.stream().distinct().toList();
+        }
+
+        Expediente expediente = expedienteRepository.findById(expedienteId).orElse(null);
+        boolean requiereModelo = expediente == null
+                || expediente.getTipoTramite() == null
+                || expediente.getTipoTramite().getNombre() == null
+                || !"NOTIFICACION_VENTA".equals(expediente.getTipoTramite().getNombre().name());
+        if (!tieneJustificanteDgt(documentos)) {
+            pendientes.add("DGT");
+        }
+        if (requiereModelo && !tieneModelo620(documentos)) {
+            pendientes.add("620");
+        }
+        return pendientes;
+    }
+
+    private String etiquetaPendiente(RequisitoDocumentalResponse requisito) {
+        String base = "MODELO_620".equals(requisito.getTipoDocumento()) ? "620" : "DGT";
+        return requisito.getOperacionLabel() != null && !requisito.getOperacionLabel().isBlank()
+                ? base + " " + requisito.getOperacionLabel()
+                : base;
+    }
+
+    private String etiquetaPendiente(RequisitoDocumentalExpediente requisito) {
+        String base = requisito.getTipoDocumento() == TipoDocumento.MODELO_620 ? "620" : "DGT";
+        return requisito.getOperacion() != null && requisito.getOperacion().getTipo() != null
+                ? base + " " + requisito.getOperacion().getTipo().getLabel()
+                : base;
     }
 
     private boolean esJustificanteDgt(Documento documento) {

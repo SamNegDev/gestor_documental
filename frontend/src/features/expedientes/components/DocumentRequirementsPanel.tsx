@@ -35,7 +35,12 @@ const DOCUMENT_TYPES = [
   "OTROS",
 ];
 
-const OMIT_REASONS = ["No aplica para este tramite", "Ya cubierto por otro documento"];
+const OMIT_REASONS = [
+  "No aplica para este tramite",
+  "Ya cubierto por otro documento",
+  "Exento de presentar Modelo 620",
+  "Se presenta por otro impuesto",
+];
 
 function RequirementIcon({ estado }: { estado: RequisitoDocumental["estado"] }) {
   if (estado === "APORTADO") return <CheckCircle2 size={16} />;
@@ -62,6 +67,7 @@ export function DocumentRequirementsPanel({
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
   const [omittingRequirement, setOmittingRequirement] = useState<RequisitoDocumental | null>(null);
   const [omitReason, setOmitReason] = useState(OMIT_REASONS[0]);
+  const requisitosVisibles = requisitos.filter((requisito) => requisito.estado === "REQUERIDO" || requisito.estado === "POSTERIOR");
   const requisitosPendientes = requisitos.filter((requisito) => requisito.estado === "REQUERIDO");
   const pendientes = requisitosPendientes.length;
   const documentosSubidos = documentos.filter((documento) => documento.id);
@@ -136,7 +142,10 @@ export function DocumentRequirementsPanel({
         </div>
       </div>
       <div className="requirements-list">
-        {requisitosPendientes.map((requisito) => (
+        {requisitosVisibles.map((requisito) => {
+          const bloqueado = requisito.estado === "POSTERIOR";
+          const esModelo620 = requisito.tipoDocumento === "MODELO_620";
+          return (
           <article className={`requirement-row requirement-row--${requisito.estado.toLowerCase()}`} key={requisito.id}>
             <div className="requirement-row__icon">
               <RequirementIcon estado={requisito.estado} />
@@ -145,21 +154,24 @@ export function DocumentRequirementsPanel({
               <strong>{requisito.descripcion}</strong>
               <small>
                 {formatDocumentType(requisito.tipoDocumento)}
+                {requisito.operacionLabel ? ` - ${requisito.operacionLabel}` : ""}
                 {requisito.interesadoNombre ? ` · ${requisito.interesadoNombre}` : ""}
                 {requisito.documentoNombre ? ` · ${requisito.documentoNombre}` : ""}
               </small>
+              {bloqueado ? <small className="requirement-row__notice">Disponible cuando finalice esta fase del tramite.</small> : null}
             </div>
             <span className="document-state">{humanizeEnum(requisito.estado)}</span>
             <div className="requirement-row__actions">
-              <button className="icon-button" type="button" title="Vincular documento" onClick={() => linkDocument(requisito)}>
+              <button className="icon-button" type="button" title="Vincular documento" disabled={bloqueado} onClick={() => linkDocument(requisito)}>
                 <Link2 size={16} />
               </button>
-              <label className="icon-button" title="Subir documento">
+              <label className={`icon-button ${bloqueado ? "icon-button--disabled" : ""}`} title={bloqueado ? "Disponible cuando finalice el tramite" : "Subir documento"}>
                 <Upload size={16} />
                 <input
                   hidden
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
+                  disabled={bloqueado}
                   onChange={(event) => {
                     const file = event.currentTarget.files?.[0];
                     event.currentTarget.value = "";
@@ -167,15 +179,22 @@ export function DocumentRequirementsPanel({
                   }}
                 />
               </label>
-              <button className="icon-button" type="button" title="Omitir requisito" onClick={() => omitRequirement(requisito)}>
+              <button
+                className="icon-button"
+                type="button"
+                title={esModelo620 ? "Marcar que no lleva modelo" : "Omitir requisito"}
+                disabled={bloqueado}
+                onClick={() => omitRequirement(requisito)}
+              >
                 <Slash size={16} />
               </button>
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
 
-      {requisitosPendientes.length === 0 ? (
+      {requisitosVisibles.length === 0 ? (
         <p className="exp-empty">
           <FileText size={16} /> No hay documentos pendientes de aportar.
         </p>

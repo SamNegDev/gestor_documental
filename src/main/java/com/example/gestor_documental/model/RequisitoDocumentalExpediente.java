@@ -30,7 +30,8 @@ import java.time.LocalDateTime;
 @Table(name = "requisito_documental_expediente", indexes = {
         @Index(name = "idx_requisito_expediente_estado", columnList = "expediente_id, estado"),
         @Index(name = "idx_requisito_documento", columnList = "documento_id"),
-        @Index(name = "idx_requisito_interesado_rol", columnList = "interesado_id, rol_interesado")
+        @Index(name = "idx_requisito_interesado_rol", columnList = "interesado_id, rol_interesado"),
+        @Index(name = "idx_requisito_operacion", columnList = "operacion_id")
 })
 public class RequisitoDocumentalExpediente {
 
@@ -68,6 +69,10 @@ public class RequisitoDocumentalExpediente {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "documento_id")
     private Documento documento;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "operacion_id")
+    private OperacionExpediente operacion;
 
     @Column(length = 300)
     private String motivoOmision;

@@ -89,6 +89,8 @@ export interface RequisitoDocumental {
   interesadoId?: number | null;
   interesadoNombre?: string | null;
   rolInteresado?: string | null;
+  operacionId?: number | null;
+  operacionLabel?: string | null;
   documentoId?: number | null;
   documentoNombre?: string | null;
   motivoOmision?: string | null;

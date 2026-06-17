@@ -5,6 +5,7 @@ import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoOperacionExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoOperacionExpediente;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
@@ -61,10 +62,10 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
             validarDocumentacionCompleta(expedienteId);
         }
         if (codigo == CodigoHitoExpediente.ENVIADO_DGT || codigo == CodigoHitoExpediente.COM_ENVIADO_DGT) {
-            validarHitoCompletado(expedienteId, codigo == CodigoHitoExpediente.COM_ENVIADO_DGT
-                            ? CodigoHitoExpediente.COM_MODELO_620_PRESENTADO
-                            : CodigoHitoExpediente.MODELO_620_PRESENTADO,
-                    "Primero debe marcarse el Modelo 620 como presentado.");
+            TipoOperacionExpediente tipoOperacion = codigo == CodigoHitoExpediente.COM_ENVIADO_DGT
+                    ? TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM
+                    : TipoOperacionExpediente.TRASPASO_DIRECTO;
+            validarModelo620Resuelto(expediente, tipoOperacion, "Primero debe resolverse el Modelo 620.");
         }
         if (codigo == CodigoHitoExpediente.MODELO_620_PRESENTADO
                 || codigo == CodigoHitoExpediente.BATE_MODELO_620_PRESENTADO
@@ -77,12 +78,12 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
                     "Primero debe finalizarse la operacion Entrega a compraventa (BATE).");
         }
         if (codigo == CodigoHitoExpediente.BATE_FINALIZADO) {
-            validarHitoCompletado(expedienteId, CodigoHitoExpediente.BATE_MODELO_620_PRESENTADO,
-                    "Primero debe marcarse el Modelo 620 de la operacion BATE como presentado.");
+            validarModelo620Resuelto(expediente, TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE,
+                    "Primero debe resolverse el Modelo 620 de la operacion BATE.");
         }
         if (codigo == CodigoHitoExpediente.COM_FINALIZADO) {
-            validarHitoCompletado(expedienteId, CodigoHitoExpediente.COM_MODELO_620_PRESENTADO,
-                    "Primero debe marcarse el Modelo 620 de la operacion COM como presentado.");
+            validarModelo620Resuelto(expediente, TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM,
+                    "Primero debe resolverse el Modelo 620 de la operacion COM.");
         }
 
         HitoExpediente hito = hitoExpedienteRepository
@@ -185,6 +186,33 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
         if (!hitoExpedienteRepository.existsByExpedienteIdAndCodigo(expedienteId, codigo)) {
             throw new OperacionInvalidaException(mensaje);
         }
+    }
+
+    private void validarModelo620Resuelto(Expediente expediente, TipoOperacionExpediente tipoOperacion, String mensaje) {
+        if (!requiereModelo620(expediente)) {
+            return;
+        }
+        CodigoHitoExpediente codigoModelo = switch (tipoOperacion) {
+            case ENTREGA_COMPRAVENTA_BATE -> CodigoHitoExpediente.BATE_MODELO_620_PRESENTADO;
+            case FINALIZACION_ENTREGA_COMPRAVENTA_COM -> CodigoHitoExpediente.COM_MODELO_620_PRESENTADO;
+            default -> CodigoHitoExpediente.MODELO_620_PRESENTADO;
+        };
+        if (hitoExpedienteRepository.existsByExpedienteIdAndCodigo(expediente.getId(), codigoModelo)) {
+            return;
+        }
+        boolean resuelto = requisitoRepository.findByExpedienteIdAndTipoDocumento(expediente.getId(), TipoDocumento.MODELO_620).stream()
+                .filter(requisito -> tipoOperacion == TipoOperacionExpediente.TRASPASO_DIRECTO
+                        || (requisito.getOperacion() != null && requisito.getOperacion().getTipo() == tipoOperacion))
+                .anyMatch(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.APORTADO
+                        || requisito.getEstado() == EstadoRequisitoDocumental.OMITIDO);
+        if (!resuelto) {
+            throw new OperacionInvalidaException(mensaje);
+        }
+    }
+
+    private boolean requiereModelo620(Expediente expediente) {
+        TipoTramiteEnum tramite = expediente.getTipoTramite() != null ? expediente.getTipoTramite().getNombre() : null;
+        return tramite != TipoTramiteEnum.NOTIFICACION_VENTA;
     }
 
     private CodigoHitoExpediente tramitePrevio(CodigoHitoExpediente codigo) {

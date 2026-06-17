@@ -20,6 +20,7 @@ import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.enums.TipoOperacionExpediente;
+import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Cliente;
@@ -99,8 +100,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         List<HistorialCambio> historial = historialCambioService.listarPorExpediente(expedienteId);
         List<Mensaje> mensajes = mensajeService.listarPorExpediente(expedienteId);
         List<WhatsappWebhookEvento> whatsappMensajes = whatsappWebhookEventoRepository.findMensajesClienteByExpedienteId(expedienteId);
-        List<RequisitoDocumentalExpediente> requisitos = requisitoDocumentalService.sincronizarYListar(expediente, interesados, documentos, usuarioLogueado);
         List<OperacionExpediente> operaciones = operacionExpedienteService.sincronizarYListar(expediente);
+        List<RequisitoDocumentalExpediente> requisitos = requisitoDocumentalService.sincronizarYListar(expediente, interesados, documentos, usuarioLogueado);
         Map<CodigoHitoExpediente, HitoExpediente> hitosPersistidos = hitoExpedienteService.listarPorExpediente(expedienteId)
                 .stream()
                 .collect(Collectors.toMap(HitoExpediente::getCodigo, hito -> hito, (actual, repetido) -> actual));
@@ -175,15 +176,17 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         boolean informacionSolicitada = expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL;
         boolean informacionRecibida = expediente.getEstadoExpediente() == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA;
         boolean requisitosInicialesPendientes = !documentacionBaseCompleta;
-        boolean modelo620Subido = tiposSubidos.contains(TipoDocumento.MODELO_620)
-                || hitosPersistidos.containsKey(CodigoHitoExpediente.MODELO_620_PRESENTADO);
+        boolean modelo620Subido = !requiereModelo620(expediente)
+                || tiposSubidos.contains(TipoDocumento.MODELO_620)
+                || hitosPersistidos.containsKey(CodigoHitoExpediente.MODELO_620_PRESENTADO)
+                || requisitoModeloResuelto(requisitos, null);
         boolean tramiteSubido = finalizado || hitosPersistidos.containsKey(CodigoHitoExpediente.TRAMITE_PROGRAMA_GESTION);
         boolean enviadoDgt = finalizado
                 || expediente.getEstadoExpediente() == EstadoExpediente.ENVIADO_DGT
                 || hitosPersistidos.containsKey(CodigoHitoExpediente.ENVIADO_DGT);
         return new EstadoDetalle(tiposSubidos, documentacionBaseCompleta, expedienteCompletoSubido, modelo620Subido,
                 requisitosInicialesPendientes, finalizado, conIncidencia, documentacionSolicitada, informacionSolicitada, informacionRecibida,
-                tramiteSubido, enviadoDgt, hitosPersistidos);
+                tramiteSubido, enviadoDgt, hitosPersistidos, requisitos);
     }
 
     private String calcularFaseActual(Expediente expediente, EstadoDetalle estadoDetalle) {
@@ -224,6 +227,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         List<HitoExpedienteResponse> hitos = new ArrayList<>();
         boolean finalizado = estadoDetalle.finalizado();
         boolean documentacionLista = finalizado || estadoDetalle.documentacionBaseCompleta();
+        boolean requiereModelo620 = requiereModelo620(expediente);
         boolean modelo620Completado = finalizado || estadoDetalle.modelo620Subido();
         boolean tramiteSubido = finalizado || estadoDetalle.tramiteSubido();
         boolean enviadoDgt = finalizado || estadoDetalle.enviadoDgt();
@@ -273,19 +277,25 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
 
         hitos.add(HitoExpedienteResponse.builder()
                 .id("modelo-620-presentado")
-                .titulo(modelo620Completado
+                .titulo(!requiereModelo620
+                        ? "Modelo 620 no requerido"
+                        : modelo620Completado
                         ? "Impuesto 620 presentado"
                         : tramiteSubido
                                 ? "Tramite subido, pendiente de pasar el impuesto 620"
                                 : "Pendiente de pasar el impuesto 620")
-                .descripcion("Documento de fase posterior, despues de subir el tramite en el programa de gestion.")
+                .descripcion(!requiereModelo620
+                        ? "Este tipo de tramite no requiere Modelo 620."
+                        : "Documento de fase posterior, despues de subir el tramite en el programa de gestion.")
                 .estado(modelo620Completado ? "COMPLETADO" : tramiteSubido ? "ACTUAL" : "BLOQUEADO")
                 .tipo("MANUAL")
                 .fecha(fechaHito(modelo620Persistido, null))
                 .usuario(usuarioHito(modelo620Persistido))
-                .nota(modelo620Completado ? "Modelo 620 presentado" : tramiteSubido ? "Pendiente de confirmacion manual" : "Primero debe subirse el tramite al programa de gestion")
-                .accion(!modelo620Completado && tramiteSubido ? "COMPLETAR_HITO" : null)
-                .accionLabel(!modelo620Completado && tramiteSubido ? "Marcar presentado" : null)
+                .nota(!requiereModelo620
+                        ? "No aplica para este tramite"
+                        : modelo620Completado ? "Modelo 620 presentado" : tramiteSubido ? "Pendiente de confirmacion manual" : "Primero debe subirse el tramite al programa de gestion")
+                .accion(requiereModelo620 && !modelo620Completado && tramiteSubido ? "COMPLETAR_HITO" : null)
+                .accionLabel(requiereModelo620 && !modelo620Completado && tramiteSubido ? "Marcar presentado" : null)
                 .completado(modelo620Completado)
                 .bloqueado(!modelo620Completado && !tramiteSubido)
                 .build());
@@ -351,7 +361,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 : null;
 
         boolean tramite = estadoDetalle.hitosPersistidos().containsKey(tramiteCodigo);
-        boolean modelo = estadoDetalle.hitosPersistidos().containsKey(modeloCodigo);
+        boolean modelo = estadoDetalle.hitosPersistidos().containsKey(modeloCodigo)
+                || requisitoModeloResuelto(estadoDetalle.requisitos(), tipoOperacion);
         boolean cierre = estadoDetalle.hitosPersistidos().containsKey(cierreCodigo);
         boolean envio = envioCodigo != null && estadoDetalle.hitosPersistidos().containsKey(envioCodigo);
         HitoExpediente tramitePersistido = estadoDetalle.hitosPersistidos().get(tramiteCodigo);
@@ -460,6 +471,20 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
             return "Hay un expediente completo subido; revisa y clasifica la documentacion base antes de avanzar";
         }
         return "Faltan documentos base requeridos";
+    }
+
+    private boolean requiereModelo620(Expediente expediente) {
+        TipoTramiteEnum tramite = expediente.getTipoTramite() != null ? expediente.getTipoTramite().getNombre() : null;
+        return tramite != TipoTramiteEnum.NOTIFICACION_VENTA;
+    }
+
+    private boolean requisitoModeloResuelto(List<RequisitoDocumentalExpediente> requisitos, TipoOperacionExpediente tipoOperacion) {
+        return requisitos.stream()
+                .filter(requisito -> requisito.getTipoDocumento() == TipoDocumento.MODELO_620)
+                .filter(requisito -> tipoOperacion == null
+                        || (requisito.getOperacion() != null && requisito.getOperacion().getTipo() == tipoOperacion))
+                .anyMatch(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.APORTADO
+                        || requisito.getEstado() == EstadoRequisitoDocumental.OMITIDO);
     }
 
     private List<HitoAccionResponse> accionesCierre(boolean finalizado, boolean conIncidencia, boolean modelo620Completado, boolean enviadoDgt) {
@@ -640,6 +665,10 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .interesadoId(requisito.getInteresado() != null ? requisito.getInteresado().getId() : null)
                 .interesadoNombre(requisito.getInteresado() != null ? requisito.getInteresado().getNombre() : null)
                 .rolInteresado(requisito.getRolInteresado() != null ? requisito.getRolInteresado().name() : null)
+                .operacionId(requisito.getOperacion() != null ? requisito.getOperacion().getId() : null)
+                .operacionLabel(requisito.getOperacion() != null && requisito.getOperacion().getTipo() != null
+                        ? requisito.getOperacion().getTipo().getLabel()
+                        : null)
                 .documentoId(requisito.getDocumento() != null ? requisito.getDocumento().getId() : null)
                 .documentoNombre(requisito.getDocumento() != null ? requisito.getDocumento().getNombreArchivoOriginal() : null)
                 .motivoOmision(requisito.getMotivoOmision())
@@ -782,7 +811,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
             boolean informacionRecibida,
             boolean tramiteSubido,
             boolean enviadoDgt,
-            Map<CodigoHitoExpediente, HitoExpediente> hitosPersistidos
+            Map<CodigoHitoExpediente, HitoExpediente> hitosPersistidos,
+            List<RequisitoDocumentalExpediente> requisitos
     ) {
     }
 }

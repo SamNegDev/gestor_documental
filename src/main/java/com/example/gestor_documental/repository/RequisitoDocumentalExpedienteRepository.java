@@ -30,4 +30,15 @@ public interface RequisitoDocumentalExpedienteRepository extends JpaRepository<R
             Long expedienteId,
             TipoDocumento tipoDocumento
     );
+
+    Optional<RequisitoDocumentalExpediente> findFirstByExpedienteIdAndTipoDocumentoAndOperacionIdOrderByIdAsc(
+            Long expedienteId,
+            TipoDocumento tipoDocumento,
+            Long operacionId
+    );
+
+    List<RequisitoDocumentalExpediente> findByExpedienteIdAndTipoDocumento(
+            Long expedienteId,
+            TipoDocumento tipoDocumento
+    );
 }
