@@ -5,6 +5,7 @@ import com.example.gestor_documental.dto.whatsapp.WhatsappAdjuntoResponse;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoWhatsappEvento;
 import com.example.gestor_documental.enums.EstadoWhatsappAdjunto;
+import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.dto.PagedResponse;
 import com.example.gestor_documental.dto.whatsapp.WhatsappEventoAsociarRequest;
 import com.example.gestor_documental.dto.whatsapp.WhatsappEventoResponse;
@@ -19,6 +20,7 @@ import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
+import com.example.gestor_documental.repository.UsuarioRepository;
 import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.security.CurrentUserService;
@@ -50,6 +52,7 @@ public class WhatsappInboxApiController {
     private final WhatsappAdjuntoRepository adjuntoRepository;
     private final DocumentoRepository documentoRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
+    private final UsuarioRepository usuarioRepository;
     private final ClienteRepository clienteRepository;
     private final ExpedienteRepository expedienteRepository;
     private final CurrentUserService currentUserService;
@@ -144,7 +147,7 @@ public class WhatsappInboxApiController {
                 ? adjunto.getNombreArchivoOriginal()
                 : "Documento recibido por WhatsApp");
         documento.setDescripcionArchivo("Recibido por WhatsApp desde " + nullSafe(adjunto.getTelefono()) + ".");
-        documento.setSubidoPor(admin);
+        documento.setSubidoPor(usuarioCliente(expediente.getCliente()));
         documentoRepository.save(documento);
         marcarRequisitoAportado(expediente, tipoDocumento, documento);
 
@@ -269,6 +272,14 @@ public class WhatsappInboxApiController {
                     requisito.setEstado(EstadoRequisitoDocumental.APORTADO);
                     requisitoRepository.save(requisito);
                 });
+    }
+
+    private Usuario usuarioCliente(Cliente cliente) {
+        if (cliente == null || cliente.getId() == null) {
+            return null;
+        }
+        return usuarioRepository.findFirstByClienteIdAndRolUsuarioAndActivoTrueOrderByIdAsc(cliente.getId(), RolUsuario.CLIENTE)
+                .orElse(null);
     }
 
     private String estadoPermitido(String estado) {

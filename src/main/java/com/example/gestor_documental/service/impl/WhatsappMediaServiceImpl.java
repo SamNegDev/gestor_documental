@@ -2,15 +2,18 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoWhatsappAdjunto;
+import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.dto.DocumentoDetectadoDto;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
+import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.model.WhatsappAdjunto;
 import com.example.gestor_documental.model.WhatsappWebhookEvento;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
+import com.example.gestor_documental.repository.UsuarioRepository;
 import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.OcrPdfService;
@@ -47,6 +50,7 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
     private final WhatsappAdjuntoRepository adjuntoRepository;
     private final DocumentoRepository documentoRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
+    private final UsuarioRepository usuarioRepository;
     private final HistorialCambioService historialCambioService;
     private final OcrPdfService ocrPdfService;
 
@@ -154,6 +158,7 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
                 ? adjunto.getNombreArchivoOriginal()
                 : "Documento recibido por WhatsApp");
         documento.setDescripcionArchivo("Recibido y clasificado automaticamente desde WhatsApp.");
+        documento.setSubidoPor(usuarioCliente(expediente));
         documentoRepository.save(documento);
 
         requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
@@ -239,6 +244,14 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
                 .limit(2)
                 .toList();
         return detectados.size() == 1 ? Optional.of(detectados.get(0)) : Optional.empty();
+    }
+
+    private Usuario usuarioCliente(Expediente expediente) {
+        if (expediente == null || expediente.getCliente() == null || expediente.getCliente().getId() == null) {
+            return null;
+        }
+        return usuarioRepository.findFirstByClienteIdAndRolUsuarioAndActivoTrueOrderByIdAsc(expediente.getCliente().getId(), RolUsuario.CLIENTE)
+                .orElse(null);
     }
 
     private record PathMultipartFile(Path path, String originalFilename, String contentType) implements MultipartFile {

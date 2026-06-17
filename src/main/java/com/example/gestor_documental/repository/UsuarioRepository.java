@@ -15,6 +15,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     boolean existsByRolUsuario(RolUsuario rolUsuario);
 
+    Optional<Usuario> findFirstByClienteIdAndRolUsuarioAndActivoTrueOrderByIdAsc(Long clienteId, RolUsuario rolUsuario);
+
     @EntityGraph(attributePaths = "cliente")
     Optional<Usuario> findWithClienteByEmail(String email);
 

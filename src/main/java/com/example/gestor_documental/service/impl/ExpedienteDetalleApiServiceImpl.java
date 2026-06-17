@@ -98,7 +98,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         List<Incidencia> incidencias = incidenciaService.listarPorExpediente(expedienteId);
         List<HistorialCambio> historial = historialCambioService.listarPorExpediente(expedienteId);
         List<Mensaje> mensajes = mensajeService.listarPorExpediente(expedienteId);
-        List<WhatsappWebhookEvento> whatsappMensajes = whatsappWebhookEventoRepository.findByExpedienteIdAndMessageIdIsNotNullOrderByFechaRecepcionDesc(expedienteId);
+        List<WhatsappWebhookEvento> whatsappMensajes = whatsappWebhookEventoRepository.findMensajesClienteByExpedienteId(expedienteId);
         List<RequisitoDocumentalExpediente> requisitos = requisitoDocumentalService.sincronizarYListar(expediente, interesados, documentos, usuarioLogueado);
         List<OperacionExpediente> operaciones = operacionExpedienteService.sincronizarYListar(expediente);
         Map<CodigoHitoExpediente, HitoExpediente> hitosPersistidos = hitoExpedienteService.listarPorExpediente(expedienteId)
