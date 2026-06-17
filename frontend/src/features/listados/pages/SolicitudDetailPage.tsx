@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Circle, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, Send, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Circle, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, Scissors, Send, UserRound } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { uppercaseInput } from "../../../shared/utils/text";
@@ -205,6 +205,11 @@ export function SolicitudDetailPage() {
     }
   };
 
+  const handleOpenDocumentReview = () => {
+    setOcrReviewDocuments(solicitudQuery.data?.documentos.filter((documento) => documento.id) ?? []);
+    setOcrReviewOpen(true);
+  };
+
   const handleConvertSolicitud = async () => {
     const solicitudActual = solicitudQuery.data;
     if (!solicitudActual) return;
@@ -367,6 +372,15 @@ export function SolicitudDetailPage() {
         <section className="panel">
           <div className="panel-heading">
             <h2>Documentos</h2>
+            <button
+              className="soft-button soft-button--compact"
+              disabled={!solicitud.documentos.some((documento) => documento.id)}
+              onClick={handleOpenDocumentReview}
+              type="button"
+            >
+              <Scissors size={16} />
+              Revisar documentos
+            </button>
           </div>
           <div className="document-table">
             {solicitud.documentos.length === 0 ? <div className="document-table__empty">No hay documentos asociados.</div> : null}

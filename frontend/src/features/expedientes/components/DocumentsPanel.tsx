@@ -1,18 +1,20 @@
-import { Eye, FilePlus2, FileText, Pencil, Trash2, Upload } from "lucide-react";
+import { Eye, FilePlus2, FileText, Scissors, Pencil, Trash2, Upload } from "lucide-react";
 import type { DocumentoExpediente } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 
 type Props = {
   documentos: DocumentoExpediente[];
   onOpenChecklist: () => void;
+  onOpenReview: () => void;
   onOpenTemplates: () => void;
   onUploadDocument: (documento: DocumentoExpediente, archivo: File) => void;
   onEditDocument: (documento: DocumentoExpediente) => void;
   onDeleteDocument: (documento: DocumentoExpediente) => void;
 };
 
-export function DocumentsPanel({ documentos, onOpenChecklist, onOpenTemplates, onUploadDocument, onEditDocument, onDeleteDocument }: Props) {
+export function DocumentsPanel({ documentos, onOpenChecklist, onOpenReview, onOpenTemplates, onUploadDocument, onEditDocument, onDeleteDocument }: Props) {
   const pendientesActuales = documentos.filter((documento) => documento.estado === "PENDIENTE" && documento.requeridoAhora);
+  const hasEditableDocuments = documentos.some((documento) => documento.id);
 
   return (
     <section className="exp-panel">
@@ -23,6 +25,10 @@ export function DocumentsPanel({ documentos, onOpenChecklist, onOpenTemplates, o
         </div>
         <div className="exp-panel__heading-actions">
           <button className="soft-button" onClick={onOpenChecklist} type="button">Checklist</button>
+          <button className="soft-button" disabled={!hasEditableDocuments} onClick={onOpenReview} type="button">
+            <Scissors size={16} />
+            Revisar documentos
+          </button>
           <button className="primary-button" onClick={onOpenTemplates} type="button">
             <FilePlus2 size={16} />
             Generar documento

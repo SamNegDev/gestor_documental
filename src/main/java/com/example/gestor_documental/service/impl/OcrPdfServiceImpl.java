@@ -135,6 +135,24 @@ public class OcrPdfServiceImpl implements OcrPdfService {
         return detectados.size() == 1 ? Optional.of(detectados.get(0)) : Optional.empty();
     }
 
+    @Override
+    public String extraerTextoCompleto(MultipartFile archivo) {
+        if (archivo == null || archivo.isEmpty()) {
+            return "";
+        }
+        try (PDDocument document = PDDocument.load(archivo.getBytes())) {
+            PDFRenderer renderer = new PDFRenderer(document);
+            StringBuilder texto = new StringBuilder();
+            for (int i = 0; i < document.getNumberOfPages(); i++) {
+                texto.append(' ').append(extraerTextoPagina(document, renderer, i));
+            }
+            return normalizar(texto.toString());
+        } catch (IOException exception) {
+            log.warn("No se pudo extraer texto completo del PDF: {}", exception.getMessage());
+            return "";
+        }
+    }
+
     private String extraerTextoPagina(PDDocument document, PDFRenderer renderer, int pageIndex) throws IOException {
         String textoEmbebido = extraerTextoEmbebido(document, pageIndex);
         if (!textoEmbebido.isBlank()) {

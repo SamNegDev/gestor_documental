@@ -797,6 +797,12 @@ export function ExpedienteDetailPage() {
     }
   };
 
+  const handleOpenDocumentReview = () => {
+    if (!expediente) return;
+    setOcrReviewDocuments(expediente.documentos.filter((documento) => documento.id));
+    setOcrReviewOpen(true);
+  };
+
   const handleCorrectInteresados = async (interesados: InteresadoCorrection[]) => {
     if (!expediente) return;
     setSavingInteresadosCorrection(true);
@@ -1216,6 +1222,7 @@ export function ExpedienteDetailPage() {
             onDeleteDocument={handleDeleteDocument}
             onEditDocument={setEditingDocument}
             onOpenChecklist={() => setChecklistOpen(true)}
+            onOpenReview={handleOpenDocumentReview}
             onOpenTemplates={() => setTemplateDialogOpen(true)}
             onUploadDocument={handleUploadDocument}
           />

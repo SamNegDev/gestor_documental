@@ -12,4 +12,6 @@ public interface OcrPdfService {
     List<DocumentoDetectadoDto> detectarDocumentos(MultipartFile archivo);
 
     Optional<TipoDocumento> detectarTipoDocumento(MultipartFile archivo);
+
+    String extraerTextoCompleto(MultipartFile archivo);
 }

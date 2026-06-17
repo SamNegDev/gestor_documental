@@ -32,6 +32,7 @@ type Props = {
   onExtractPages: (documento: DocumentoExpediente, rangoPaginas: string, tipoDocumento: string, operacionId?: number | null) => Promise<void>;
   onMergeDocuments: (documento: DocumentoExpediente, documentoIds: number[], tipoDocumento: string, nombreSinExtension: string, operacionId?: number | null) => Promise<void>;
   onSaveDocument: (documento: DocumentoExpediente, tipoDocumento: string, operacionId?: number | null) => void;
+  title?: string;
 };
 
 function nombreSinExtension(nombre: string) {
@@ -39,7 +40,7 @@ function nombreSinExtension(nombre: string) {
   return index > 0 ? nombre.slice(0, index) : nombre;
 }
 
-export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, onDeleteDocument, onDeletePages, onExtractPages, onMergeDocuments, onSaveDocument }: Props) {
+export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, onDeleteDocument, onDeletePages, onExtractPages, onMergeDocuments, onSaveDocument, title = "Editor documental" }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editType, setEditType] = useState("");
   const [editOperationId, setEditOperationId] = useState("");
@@ -117,7 +118,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
   const startMerge = (documento: DocumentoExpediente) => {
     const candidatos = documentos.filter((item) => item.id && item.id !== documento.id);
     if (candidatos.length === 0) {
-      alert("No hay otros documentos de esta revision para juntar.");
+      alert("No hay otros documentos del tramite para juntar.");
       return;
     }
     setMergingId(documento.id ?? null);
@@ -194,8 +195,8 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
       <section className="exp-modal__panel">
         <div className="exp-modal__header">
           <div>
-            <p className="eyebrow">Resultado OCR</p>
-            <h3>Documentos separados</h3>
+            <p className="eyebrow">Revision documental</p>
+            <h3>{title}</h3>
           </div>
           <button className="icon-button" type="button" onClick={onClose} title="Cerrar">
             <X size={16} />
