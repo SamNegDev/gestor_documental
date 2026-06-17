@@ -56,4 +56,6 @@ public interface SolicitudService {
     void cambiarEstadoSolicitud(Long id, EstadoSolicitud nuevoEstado, Usuario admin);
 
     Solicitud actualizarSolicitud(Long id, Solicitud solicitudActualizada, Usuario usuarioLogueado, Long tipoTramiteId);
+
+    void eliminarSolicitudErronea(Long id, Usuario admin);
 }

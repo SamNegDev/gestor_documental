@@ -10,4 +10,5 @@ import java.util.List;
 public interface MensajeRepository extends JpaRepository<Mensaje, Long> {
     List<Mensaje> findByExpedienteIdOrderByFechaCreacionAsc(Long expedienteId);
     List<Mensaje> findBySolicitudIdOrderByFechaCreacionAsc(Long solicitudId);
+    void deleteBySolicitudId(Long solicitudId);
 }

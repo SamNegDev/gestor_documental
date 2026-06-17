@@ -12,8 +12,11 @@ import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
+import com.example.gestor_documental.repository.HistorialCambioRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
+import com.example.gestor_documental.repository.MensajeRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
+import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
@@ -40,6 +43,9 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final ExpedienteService expedienteService;
     private final DocumentoRepository documentoRepository;
     private final IncidenciaRepository incidenciaRepository;
+    private final HistorialCambioRepository historialCambioRepository;
+    private final MensajeRepository mensajeRepository;
+    private final DocumentoService documentoService;
     private final HistorialCambioService historialCambioService;
     private final InteresadoService interesadoService;
 
@@ -546,6 +552,32 @@ public class SolicitudServiceImpl implements SolicitudService {
         );
 
         return solicitudGuardada;
+    }
+
+    @Override
+    @Transactional
+    public void eliminarSolicitudErronea(Long id, Usuario admin) {
+        if (admin == null || admin.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo el administrador puede eliminar solicitudes");
+        }
+
+        Solicitud solicitud = solicitudRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA || solicitud.getExpediente() != null) {
+            throw new OperacionInvalidaException("No se puede eliminar una solicitud convertida o con expediente asociado");
+        }
+
+        List<Long> documentoIds = new java.util.ArrayList<>();
+        documentoIds.addAll(documentoRepository.findBySolicitudId(id).stream().map(Documento::getId).toList());
+        for (Incidencia incidencia : incidenciaRepository.findBySolicitudId(id)) {
+            documentoIds.addAll(documentoRepository.findByIncidenciaId(incidencia.getId()).stream().map(Documento::getId).toList());
+        }
+        documentoIds.stream().distinct().toList().forEach(documentoService::eliminar);
+
+        incidenciaRepository.deleteAll(incidenciaRepository.findBySolicitudId(id));
+        mensajeRepository.deleteBySolicitudId(id);
+        historialCambioRepository.deleteBySolicitudId(id);
+        solicitudRepository.delete(solicitud);
     }
 
     private void normalizarSolicitud(Solicitud solicitud) {

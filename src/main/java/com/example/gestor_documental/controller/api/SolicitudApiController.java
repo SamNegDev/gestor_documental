@@ -52,6 +52,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -241,6 +242,13 @@ public class SolicitudApiController {
         Usuario usuarioLogueado = usuario(authentication);
         validarSolicitudRequest(request);
         solicitudService.actualizarSolicitud(id, mapSolicitudRequest(request), usuarioLogueado, request.getTipoTramiteId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable Long id, Authentication authentication) {
+        Usuario usuarioLogueado = requireAdmin(authentication);
+        solicitudService.eliminarSolicitudErronea(id, usuarioLogueado);
         return ResponseEntity.noContent().build();
     }
 

@@ -10,4 +10,5 @@ import java.util.List;
 public interface HistorialCambioRepository extends JpaRepository<HistorialCambio, Long> {
     List<HistorialCambio> findByExpedienteIdOrderByFechaCambioDesc(Long expedienteId);
     List<HistorialCambio> findBySolicitudIdOrderByFechaCambioDesc(Long solicitudId);
+    void deleteBySolicitudId(Long solicitudId);
 }

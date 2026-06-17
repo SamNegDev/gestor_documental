@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useOutletContext, useSearchParams } from "react-router-dom";
-import { ArrowRight, CheckCircle2, ClipboardCheck, MailCheck, Plus, RefreshCw } from "lucide-react";
+import { ArrowRight, CheckCircle2, ClipboardCheck, MailCheck, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { ApiError } from "../../../shared/api/http";
-import { bulkConvertSolicitudes, checkInboundSolicitudEmail, getSolicitudListCatalogs, getSolicitudes } from "../services/listadosApi";
+import { bulkConvertSolicitudes, checkInboundSolicitudEmail, deleteSolicitud, getSolicitudListCatalogs, getSolicitudes } from "../services/listadosApi";
 import { ListFiltersBar } from "../components/ListFiltersBar";
 import { ListPageChrome } from "../components/ListPageChrome";
 import type { ListCatalogs, ListFilters, SolicitudListItem } from "../types";
@@ -21,6 +21,7 @@ export function SolicitudesListPage() {
   const [draftFilters, setDraftFilters] = useState<ListFilters>(() => readFilters(searchParams));
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [checkingEmail, setCheckingEmail] = useState(false);
+  const [deletingSolicitudId, setDeletingSolicitudId] = useState<number | null>(null);
   const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
 
@@ -85,6 +86,31 @@ export function SolicitudesListPage() {
       alert(cause instanceof Error ? cause.message : "No se pudo comprobar el buzon.");
     } finally {
       setCheckingEmail(false);
+    }
+  }
+
+  async function handleDeleteSolicitud(solicitud: SolicitudListItem) {
+    const confirmed = await confirm({
+      title: "Eliminar solicitud",
+      description: `Se eliminara la solicitud SOL-${solicitud.id}${solicitud.matricula ? ` (${solicitud.matricula})` : ""}. Esta operacion no se puede deshacer.`,
+      confirmLabel: "Eliminar",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setDeletingSolicitudId(solicitud.id);
+    try {
+      await deleteSolicitud(solicitud.id);
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(solicitud.id);
+        return next;
+      });
+      await queryClient.invalidateQueries({ queryKey: ["solicitudes"] });
+      await queryClient.invalidateQueries({ queryKey: ["tareas"] });
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || cause.message : "No se pudo eliminar la solicitud.");
+    } finally {
+      setDeletingSolicitudId(null);
     }
   }
 
@@ -159,6 +185,8 @@ export function SolicitudesListPage() {
               applyFilters(nextFilters);
             }}
             onSelectionChange={setSelectedIds}
+            onDelete={handleDeleteSolicitud}
+            deletingId={deletingSolicitudId}
           />
         ) : null}
         <PaginationBar page={pageData?.pagina ?? 0} totalPages={pageData?.totalPaginas ?? 0} totalItems={pageData?.totalElementos ?? 0} pageSize={pageData?.tamanio ?? 25} onPageChange={(pagina) => applyFilters({ ...draftFilters, pagina: String(pagina) })} onPageSizeChange={(tamanio) => applyFilters({ ...draftFilters, pagina: "0", tamanio: String(tamanio) })} />
@@ -177,6 +205,8 @@ function SolicitudesTable({
   showClient,
   onFilterChange,
   onSelectionChange,
+  onDelete,
+  deletingId,
 }: {
   solicitudes: SolicitudListItem[];
   catalogs?: ListCatalogs;
@@ -186,6 +216,8 @@ function SolicitudesTable({
   showClient: boolean;
   onFilterChange: (filters: ListFilters) => void;
   onSelectionChange: (ids: Set<number>) => void;
+  onDelete: (solicitud: SolicitudListItem) => void;
+  deletingId: number | null;
 }) {
   function nextFilter(key: keyof ListFilters, value: string) {
     onFilterChange({ ...filters, [key]: value });
@@ -346,6 +378,18 @@ function SolicitudesTable({
                 <td className="records-col-date">{fechaReferencia(solicitud) || "Sin fecha"}</td>
               )}
               <td className="records-col-actions">
+                {isAdmin ? (
+                  <button
+                    aria-label="Eliminar solicitud"
+                    className="icon-button icon-button--danger"
+                    disabled={deletingId === solicitud.id || solicitud.estado === "CONVERTIDA" || Boolean(solicitud.expedienteId)}
+                    title="Eliminar solicitud"
+                    type="button"
+                    onClick={() => onDelete(solicitud)}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                ) : null}
                 <Link aria-label="Ver solicitud" className="icon-button" title="Ver solicitud" to={`/solicitudes/${solicitud.id}`}>
                   <ArrowRight size={16} />
                 </Link>

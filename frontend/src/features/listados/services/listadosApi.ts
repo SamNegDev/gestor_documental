@@ -1,4 +1,4 @@
-import { apiGet, apiPostJson, apiPutJson } from "../../../shared/api/http";
+import { apiDelete, apiGet, apiPostJson, apiPutJson } from "../../../shared/api/http";
 import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudInteresadoCoincidencia, SolicitudListItem, SolicitudUpsertInput } from "../types";
 
 function buildQuery(filters: ListFilters) {
@@ -50,6 +50,10 @@ export function createSolicitud(input: SolicitudUpsertInput) {
 
 export function updateSolicitud(id: string | number, input: SolicitudUpsertInput) {
   return apiPutJson(`/api/solicitudes/${id}`, input);
+}
+
+export function deleteSolicitud(id: string | number) {
+  return apiDelete(`/api/solicitudes/${id}`);
 }
 
 export function convertirSolicitud(id: number) {
