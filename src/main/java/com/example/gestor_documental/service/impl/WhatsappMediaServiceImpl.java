@@ -4,7 +4,6 @@ import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoWhatsappAdjunto;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
-import com.example.gestor_documental.dto.DocumentoDetectadoDto;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
@@ -15,6 +14,7 @@ import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.UsuarioRepository;
 import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
+import com.example.gestor_documental.service.AvisoAdminService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.OcrPdfService;
 import com.example.gestor_documental.service.WhatsappMediaService;
@@ -53,6 +53,7 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
     private final UsuarioRepository usuarioRepository;
     private final HistorialCambioService historialCambioService;
     private final OcrPdfService ocrPdfService;
+    private final AvisoAdminService avisoAdminService;
 
     @Value("${app.whatsapp.access-token:}")
     private String accessToken;
@@ -175,6 +176,16 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
         historialCambioService.registrarCambioExpediente(expediente, null, "WHATSAPP DOCUMENTO",
                 "Adjunto de WhatsApp clasificado automaticamente como " + tipo.name().replace('_', ' ')
                         + ": " + documento.getNombreArchivoOriginal() + ".");
+        avisoAdminService.crear(
+                "WHATSAPP_DOCUMENTO_AUTO",
+                "Documento WhatsApp clasificado",
+                "Se ha clasificado automaticamente como " + tipo.name().replace('_', ' ')
+                        + " y se ha adjuntado al expediente "
+                        + (StringUtils.hasText(expediente.getMatricula()) ? expediente.getMatricula().trim().toUpperCase(Locale.ROOT) : expediente.getId())
+                        + ": " + documento.getNombreArchivoOriginal() + ".",
+                "WhatsApp",
+                expediente,
+                expediente.getCliente());
     }
 
     private Optional<TipoDocumento> tipoPorRequisitoUnico(Expediente expediente) {
@@ -188,7 +199,7 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
     }
 
     private Optional<TipoDocumento> tipoPorOcr(WhatsappAdjunto adjunto) {
-        if (!esPdf(adjunto) || !StringUtils.hasText(adjunto.getNombreArchivo())) {
+        if (!StringUtils.hasText(adjunto.getNombreArchivo())) {
             return Optional.empty();
         }
         Path archivo = Paths.get(uploadDir).toAbsolutePath().normalize().resolve(adjunto.getNombreArchivo()).normalize();
@@ -196,25 +207,13 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
             return Optional.empty();
         }
         try {
-            List<TipoDocumento> detectados = ocrPdfService.detectarDocumentos(new PathMultipartFile(
-                            archivo,
-                            adjunto.getNombreArchivoOriginal(),
-                            adjunto.getMimeType()))
-                    .stream()
-                    .map(DocumentoDetectadoDto::getTipoDocumento)
-                    .filter(tipo -> tipo != null && tipo != TipoDocumento.OTROS)
-                    .distinct()
-                    .toList();
-            return detectados.size() == 1 ? Optional.of(detectados.get(0)) : Optional.empty();
+            return ocrPdfService.detectarTipoDocumento(new PathMultipartFile(
+                    archivo,
+                    adjunto.getNombreArchivoOriginal(),
+                    adjunto.getMimeType()));
         } catch (RuntimeException exception) {
             return Optional.empty();
         }
-    }
-
-    private boolean esPdf(WhatsappAdjunto adjunto) {
-        return "application/pdf".equalsIgnoreCase(adjunto.getMimeType())
-                || (StringUtils.hasText(adjunto.getNombreArchivoOriginal())
-                && adjunto.getNombreArchivoOriginal().toLowerCase(Locale.ROOT).endsWith(".pdf"));
     }
 
     private Optional<TipoDocumento> tipoPorNombre(String nombre) {

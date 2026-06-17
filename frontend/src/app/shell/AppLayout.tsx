@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getTareasResumen } from "../../features/tareas/services/tareasApi";
 import { GlobalSearch } from "../../features/busqueda/components/GlobalSearch";
 import { clientInitials } from "../../shared/utils/clientBranding";
+import { AvisosBell } from "../../features/avisos/components/AvisosBell";
 
 export type AppOutletContext = {
   sessionLoading: boolean;
@@ -200,6 +201,7 @@ export function AppLayout() {
           </div>
           <GlobalSearch />
           <div className="topbar__user">
+            {user?.rol === "ADMIN" ? <AvisosBell /> : null}
             <div>
               <strong>{user?.nombreCompleto || (sessionExpired ? "Sesión caducada" : "Usuario")}</strong>
               <span>{roleLabel}</span>

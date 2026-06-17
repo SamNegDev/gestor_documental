@@ -166,6 +166,7 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
                                                     menuRow("gestapp_nueva_solicitud", "Nueva solicitud", "Iniciar un tramite nuevo"),
                                                     menuRow("gestapp_enviar_documentacion", "Enviar documentos", "Abrir el portal de subida"),
                                                     menuRow("gestapp_menu_pendiente", "Documentacion pendiente", "Ver que falta aportar"),
+                                                    menuRow("gestapp_mensaje_general", "Enviar mensaje", "Dejar una nota a gestoria"),
                                                     menuRow("gestapp_contactar_general", "Hablar con gestoria", "Solicitar contacto")
                                             )
                                     ))

@@ -104,6 +104,10 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             asociarClienteYExpediente(evento);
             boolean media = esMedia(message);
             if (media) {
+                aplicarContextoExpedientePrevio(evento);
+                if (evento.getExpediente() != null && !StringUtils.hasText(evento.getAccionCodigo())) {
+                    evento.setAccionCodigo("gestapp_contexto_expediente");
+                }
                 evento.setEstado(EstadoWhatsappEvento.REVISADO);
                 evento.setFechaRevision(LocalDateTime.now());
             } else if (!procesarMenuPrioritario(evento) && !procesarAccion(evento) && !procesarMensajeCliente(evento) && !procesarRespuestaEstadoTramite(evento) && !procesarRespuestaNuevaSolicitud(evento)) {
@@ -158,12 +162,6 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
                 .filter(item -> coincideTelefono(evento.getTelefono(), item.getTelefono()))
                 .findFirst();
         cliente.ifPresent(evento::setCliente);
-        cliente.ifPresent(item -> {
-            List<Expediente> expedientes = expedienteRepository.findByClienteIdOrderByFechaReferenciaDesc(item.getId());
-            if (!expedientes.isEmpty()) {
-                evento.setExpediente(expedientes.get(0));
-            }
-        });
     }
 
     private boolean coincideTelefono(String origen, String telefonoCliente) {
@@ -172,6 +170,38 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             return false;
         }
         return origen.endsWith(cliente) || cliente.endsWith(origen);
+    }
+
+    private void aplicarContextoExpedientePrevio(WhatsappWebhookEvento evento) {
+        if (evento.getExpediente() != null || !StringUtils.hasText(evento.getTelefono())) {
+            return;
+        }
+        eventoRepository.findTopByTelefonoAndMessageIdIsNotNullOrderByFechaRecepcionDesc(evento.getTelefono())
+                .filter(this::eventoMantieneContextoExpediente)
+                .map(WhatsappWebhookEvento::getExpediente)
+                .ifPresent(evento::setExpediente);
+    }
+
+    private boolean eventoMantieneContextoExpediente(WhatsappWebhookEvento evento) {
+        return evento != null
+                && evento.getExpediente() != null
+                && ("gestapp_contexto_expediente".equals(evento.getAccionCodigo())
+                    || "gestapp_mensaje_cliente".equals(evento.getAccionCodigo())
+                    || accionAdmiteContextoExpediente(evento.getAccionCodigo()));
+    }
+
+    private boolean accionAdmiteContextoExpediente(String accion) {
+        return List.of(
+                "gestapp_contactar",
+                "gestapp_enviar_mensaje",
+                "gestapp_estado_actual",
+                "gestapp_subir_mas_documentacion",
+                "gestapp_ver_pendientes",
+                "gestapp_recordar_manana",
+                "gestapp_enviar_documentacion",
+                "gestapp_ver_expediente",
+                "gestapp_ya_lo_envie"
+        ).contains(accion);
     }
 
     private boolean procesarAccion(WhatsappWebhookEvento evento) {
@@ -208,15 +238,20 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             return true;
         }
         if ("gestapp_menu_principal".equals(accion)) {
+            evento.setExpediente(null);
             whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
             marcarRevisado(evento);
             return true;
         }
         if ("gestapp_salir".equals(accion)) {
+            evento.setExpediente(null);
             whatsappOutboundService.enviarTexto(evento.getTelefono(),
                     "👍 Perfecto, lo dejamos aqui.\n\nCuando necesites cualquier cosa, escribe *menu* y seguimos.");
             marcarRevisado(evento);
             return true;
+        }
+        if (accionAdmiteContextoExpediente(accion)) {
+            aplicarContextoExpedientePrevio(evento);
         }
         if ("gestapp_cambiar_expediente".equals(accion) || "gestapp_consultar_otro".equals(accion)) {
             solicitarMatriculaEstadoTramite(evento);
@@ -224,6 +259,10 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         }
         if ("gestapp_contactar_general".equals(accion)) {
             confirmarContactoGeneral(evento);
+            return true;
+        }
+        if ("gestapp_mensaje_general".equals(accion)) {
+            solicitarMensajeClienteGeneral(evento);
             return true;
         }
         if ("gestapp_contactar_solicitud".equals(accion)) {
@@ -292,6 +331,13 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         marcarRevisado(evento);
     }
 
+    private void solicitarMensajeClienteGeneral(WhatsappWebhookEvento evento) {
+        evento.setExpediente(null);
+        whatsappOutboundService.enviarTexto(evento.getTelefono(),
+                "Escribe ahora el mensaje que quieres dejar a la gestoria.");
+        marcarRevisado(evento);
+    }
+
     private boolean procesarMensajeCliente(WhatsappWebhookEvento evento) {
         if (!"text".equals(evento.getTipo()) || evento.getCliente() == null || !StringUtils.hasText(evento.getTexto())) {
             return false;
@@ -301,7 +347,9 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             return false;
         }
         String accionAnterior = anterior.get().getAccionCodigo();
-        if (!"gestapp_enviar_mensaje".equals(accionAnterior) && !"gestapp_solicitud_mensaje".equals(accionAnterior)) {
+        if (!"gestapp_enviar_mensaje".equals(accionAnterior)
+                && !"gestapp_solicitud_mensaje".equals(accionAnterior)
+                && !"gestapp_mensaje_general".equals(accionAnterior)) {
             return false;
         }
         evento.setAccionCodigo("gestapp_mensaje_cliente");
@@ -348,6 +396,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         }
         Expediente expediente = expedientes.get(0);
         evento.setExpediente(expediente);
+        evento.setAccionCodigo("gestapp_contexto_expediente");
         whatsappOutboundService.enviarMenuContinuacion(evento.getTelefono(), expediente, mensajeEstadoTramite(expediente));
         marcarRevisado(evento);
         historialCambioService.registrarCambioExpediente(expediente, expediente.getModificadoPor(), "WHATSAPP ESTADO",
@@ -700,6 +749,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         evento.setFechaRevision(LocalDateTime.now());
         historialCambioService.registrarCambioExpediente(evento.getExpediente(), evento.getExpediente().getModificadoPor(), "WHATSAPP ACCION",
                 "Se envio al cliente un enlace al portal tras pulsar un boton de WhatsApp.");
+        whatsappOutboundService.enviarMenuContinuacion(evento.getTelefono(), evento.getExpediente(), "Te dejo las opciones del expediente.");
     }
 
     private void enviarEnlacePortalSinHistorial(WhatsappWebhookEvento evento, String introduccion) {
@@ -712,6 +762,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         String base = publicUrl != null ? publicUrl : "";
         String enlace = (StringUtils.hasText(base) ? base.replaceAll("/$", "") : "") + "/cliente/expedientes";
         whatsappOutboundService.enviarTexto(evento.getTelefono(), introduccion + "\n" + enlace);
+        whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
         evento.setEstado(EstadoWhatsappEvento.REVISADO);
         evento.setFechaRevision(LocalDateTime.now());
     }

@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -107,6 +108,31 @@ public class OcrPdfServiceImpl implements OcrPdfService {
         } catch (IOException e) {
             throw new RuntimeException("Error leyendo el PDF para OCR", e);
         }
+    }
+
+    @Override
+    public Optional<TipoDocumento> detectarTipoDocumento(MultipartFile archivo) {
+        if (archivo == null || archivo.isEmpty()) {
+            return Optional.empty();
+        }
+        if (esImagen(archivo)) {
+            try {
+                BufferedImage imagen = javax.imageio.ImageIO.read(archivo.getInputStream());
+                if (imagen == null) {
+                    return Optional.empty();
+                }
+                return Optional.ofNullable(detectarTipoDocumento(extraerTexto(imagen)));
+            } catch (IOException exception) {
+                log.debug("No se pudo leer la imagen para OCR", exception);
+                return Optional.empty();
+            }
+        }
+        List<TipoDocumento> detectados = detectarDocumentos(archivo).stream()
+                .map(DocumentoDetectadoDto::getTipoDocumento)
+                .filter(tipo -> tipo != null && tipo != TipoDocumento.OTROS)
+                .distinct()
+                .toList();
+        return detectados.size() == 1 ? Optional.of(detectados.get(0)) : Optional.empty();
     }
 
     private String extraerTextoPagina(PDDocument document, PDFRenderer renderer, int pageIndex) throws IOException {
@@ -241,6 +267,8 @@ public class OcrPdfServiceImpl implements OcrPdfService {
 
         // Mandato / representación
         if (t.contains("mandato con representacion") ||
+                t.contains("mandato de representacion") ||
+                (t.contains("mandato") && t.contains("representacion")) ||
                 t.contains("gestor administrativo") ||
                 t.contains("mandante") ||
                 t.contains("mandatario")) {
@@ -277,7 +305,9 @@ public class OcrPdfServiceImpl implements OcrPdfService {
             return "";
         }
 
-        return (" " + texto.toLowerCase() + " ")
+        String limpio = java.text.Normalizer.normalize(texto.toLowerCase(), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return (" " + limpio + " ")
                 .replace("á", "a")
                 .replace("é", "e")
                 .replace("í", "i")
@@ -285,5 +315,14 @@ public class OcrPdfServiceImpl implements OcrPdfService {
                 .replace("ú", "u")
                 .replaceAll("\\s+", " ")
                 .trim();
+    }
+
+    private boolean esImagen(MultipartFile archivo) {
+        String contentType = archivo.getContentType();
+        if (contentType != null && contentType.toLowerCase().startsWith("image/")) {
+            return true;
+        }
+        String nombre = archivo.getOriginalFilename();
+        return nombre != null && nombre.toLowerCase().matches(".*\\.(jpg|jpeg|png|webp)$");
     }
 }

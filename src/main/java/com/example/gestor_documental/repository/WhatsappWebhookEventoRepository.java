@@ -21,7 +21,8 @@ public interface WhatsappWebhookEventoRepository extends JpaRepository<WhatsappW
                     left join fetch evento.expediente expediente
                     where evento.messageId is not null
                       and (:estado = 'TODOS'
-                           or (:estado = 'PENDIENTES' and evento.estado = com.example.gestor_documental.enums.EstadoWhatsappEvento.PENDIENTE)
+                           or (:estado = 'PENDIENTES' and evento.estado = com.example.gestor_documental.enums.EstadoWhatsappEvento.PENDIENTE
+                               and (cliente is null or evento.accionCodigo in ('gestapp_ya_lo_envie', 'gestapp_contactar', 'gestapp_contactar_general', 'gestapp_contactar_solicitud', 'gestapp_mensaje_cliente')))
                            or (:estado = 'REVISADOS' and evento.estado = com.example.gestor_documental.enums.EstadoWhatsappEvento.REVISADO)
                            or (:estado = 'ARCHIVADOS' and evento.estado = com.example.gestor_documental.enums.EstadoWhatsappEvento.ARCHIVADO)
                            or (:estado = 'ASOCIADOS' and cliente is not null)
@@ -35,7 +36,8 @@ public interface WhatsappWebhookEventoRepository extends JpaRepository<WhatsappW
                     left join evento.cliente cliente
                     where evento.messageId is not null
                       and (:estado = 'TODOS'
-                           or (:estado = 'PENDIENTES' and evento.estado = com.example.gestor_documental.enums.EstadoWhatsappEvento.PENDIENTE)
+                           or (:estado = 'PENDIENTES' and evento.estado = com.example.gestor_documental.enums.EstadoWhatsappEvento.PENDIENTE
+                               and (cliente is null or evento.accionCodigo in ('gestapp_ya_lo_envie', 'gestapp_contactar', 'gestapp_contactar_general', 'gestapp_contactar_solicitud', 'gestapp_mensaje_cliente')))
                            or (:estado = 'REVISADOS' and evento.estado = com.example.gestor_documental.enums.EstadoWhatsappEvento.REVISADO)
                            or (:estado = 'ARCHIVADOS' and evento.estado = com.example.gestor_documental.enums.EstadoWhatsappEvento.ARCHIVADO)
                            or (:estado = 'ASOCIADOS' and cliente is not null)
@@ -55,6 +57,7 @@ public interface WhatsappWebhookEventoRepository extends JpaRepository<WhatsappW
             where evento.messageId is not null
               and evento.estado = :estado
               and expediente is not null
+              and evento.accionCodigo in ('gestapp_ya_lo_envie', 'gestapp_contactar', 'gestapp_contactar_general', 'gestapp_contactar_solicitud', 'gestapp_mensaje_cliente')
             order by evento.fechaRecepcion asc
             """)
     List<WhatsappWebhookEvento> findByEstadoWithExpediente(@Param("estado") EstadoWhatsappEvento estado);
@@ -77,6 +80,7 @@ public interface WhatsappWebhookEventoRepository extends JpaRepository<WhatsappW
               and evento.estado = :estado
               and cliente is not null
               and expediente is null
+              and evento.accionCodigo in ('gestapp_ya_lo_envie', 'gestapp_contactar', 'gestapp_contactar_general', 'gestapp_contactar_solicitud', 'gestapp_mensaje_cliente')
             order by evento.fechaRecepcion asc
             """)
     List<WhatsappWebhookEvento> findByEstadoWithClienteWithoutExpediente(@Param("estado") EstadoWhatsappEvento estado);
