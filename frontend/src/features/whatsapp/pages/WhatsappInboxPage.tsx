@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArrowRight, CheckCircle2, Link2, MessageCircle, RefreshCw, Search, Smartphone, X } from "lucide-react";
+import { Archive, ArrowRight, CheckCircle2, FileCheck2, FileUp, Link2, MessageCircle, RefreshCw, Search, Smartphone, Trash2, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ApiError } from "../../../shared/api/http";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { PaginationBar } from "../../listados/components/PaginationBar";
 import { getExpedienteListCatalogs } from "../../listados/services/listadosApi";
-import { archivarWhatsappEvento, asociarWhatsappEvento, getWhatsappEventos, revisarWhatsappEvento } from "../services/whatsappApi";
-import type { WhatsappEvento } from "../types";
+import { formatDocumentType } from "../../expedientes/utils/formatters";
+import { archivarWhatsappEvento, asociarWhatsappEvento, clasificarWhatsappAdjunto, descartarWhatsappAdjunto, getWhatsappAdjuntos, getWhatsappEventos, revisarWhatsappEvento } from "../services/whatsappApi";
+import type { WhatsappAdjunto, WhatsappEvento } from "../types";
 
 const estados = [
   { value: "PENDIENTES", label: "Pendientes" },
@@ -19,19 +20,50 @@ const estados = [
   { value: "TODOS", label: "Todos" },
 ];
 
+const documentTypes = [
+  "DNI",
+  "CIF",
+  "CONTRATO_COMPRAVENTA",
+  "PERMISO_CIRCULACION",
+  "FICHA_TECNICA",
+  "MANDATO",
+  "FACTURA",
+  "EXPEDIENTE_COMPLETO",
+  "MANDATO_REPRESENTACION",
+  "CAMBIO_TITULARIDAD",
+  "AUTORIZACION_SERAFIN",
+  "HUELLA_TRAMITE",
+  "COMPROBANTE_DGT",
+  "MODELO_620",
+  "DOCUMENTO_INCIDENCIA",
+  "OTROS",
+];
+
 export function WhatsappInboxPage() {
   const [estado, setEstado] = useState("PENDIENTES");
   const [telefono, setTelefono] = useState("");
   const [pagina, setPagina] = useState(0);
   const [tamanio, setTamanio] = useState(25);
   const [eventoParaAsociar, setEventoParaAsociar] = useState<WhatsappEvento | null>(null);
+  const [adjuntoParaClasificar, setAdjuntoParaClasificar] = useState<WhatsappAdjunto | null>(null);
   const qc = useQueryClient();
   const query = useQuery({
     queryKey: ["whatsapp-eventos", estado, telefono, pagina, tamanio],
     queryFn: () => getWhatsappEventos({ estado, telefono, pagina, tamanio }),
   });
+  const adjuntosQuery = useQuery({
+    queryKey: ["whatsapp-adjuntos", "PENDIENTE_CLASIFICAR"],
+    queryFn: () => getWhatsappAdjuntos({ estado: "PENDIENTE_CLASIFICAR", pagina: 0, tamanio: 8 }),
+  });
   const reviewMutation = useMutation({ mutationFn: revisarWhatsappEvento, onSuccess: () => qc.invalidateQueries({ queryKey: ["whatsapp-eventos"] }) });
   const archiveMutation = useMutation({ mutationFn: archivarWhatsappEvento, onSuccess: () => qc.invalidateQueries({ queryKey: ["whatsapp-eventos"] }) });
+  const discardAttachmentMutation = useMutation({
+    mutationFn: descartarWhatsappAdjunto,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["whatsapp-adjuntos"] });
+      qc.invalidateQueries({ queryKey: ["tareas"] });
+    },
+  });
   const data = query.data;
 
   return (
@@ -66,6 +98,37 @@ export function WhatsappInboxPage() {
           </div>
         </label>
       </div>
+
+      <section className="records-panel whatsapp-attachments">
+        <header className="whatsapp-attachments__header">
+          <div>
+            <p className="eyebrow">Documentos recibidos</p>
+            <h3>Adjuntos pendientes de clasificar</h3>
+          </div>
+          <button className="soft-button soft-button--compact" type="button" onClick={() => adjuntosQuery.refetch()}>
+            <RefreshCw size={15} />
+            Actualizar
+          </button>
+        </header>
+        {adjuntosQuery.isLoading ? <div className="records-skeleton"><span /><span /></div> : null}
+        {adjuntosQuery.data?.contenido.length === 0 ? (
+          <div className="records-empty records-empty--compact">
+            <FileCheck2 size={22} />
+            <strong>No hay adjuntos pendientes.</strong>
+          </div>
+        ) : null}
+        <div className="whatsapp-attachment-list">
+          {adjuntosQuery.data?.contenido.map((adjunto) => (
+            <WhatsappAttachmentRow
+              adjunto={adjunto}
+              discardPending={discardAttachmentMutation.isPending}
+              key={adjunto.id}
+              onClassify={setAdjuntoParaClasificar}
+              onDiscard={(id) => discardAttachmentMutation.mutate(id)}
+            />
+          ))}
+        </div>
+      </section>
 
       <section className="records-panel records-panel--ledger">
         {query.isLoading ? <div className="records-skeleton"><span /><span /><span /></div> : null}
@@ -105,7 +168,57 @@ export function WhatsappInboxPage() {
           qc.invalidateQueries({ queryKey: ["whatsapp-eventos"] });
         }}
       />
+      <ClassifyAttachmentDialog
+        adjunto={adjuntoParaClasificar}
+        onClose={() => setAdjuntoParaClasificar(null)}
+        onDone={() => {
+          setAdjuntoParaClasificar(null);
+          qc.invalidateQueries({ queryKey: ["whatsapp-adjuntos"] });
+          qc.invalidateQueries({ queryKey: ["whatsapp-eventos"] });
+          qc.invalidateQueries({ queryKey: ["tareas"] });
+        }}
+      />
     </main>
+  );
+}
+
+function WhatsappAttachmentRow({
+  adjunto,
+  onClassify,
+  onDiscard,
+  discardPending,
+}: {
+  adjunto: WhatsappAdjunto;
+  onClassify: (adjunto: WhatsappAdjunto) => void;
+  onDiscard: (id: number) => void;
+  discardPending: boolean;
+}) {
+  return (
+    <article className="whatsapp-attachment-row">
+      <span className="whatsapp-row__icon"><FileUp size={18} /></span>
+      <div>
+        <div className="whatsapp-row__badges">
+          <StatusBadge tone={adjunto.errorDescarga ? "danger" : "warning"}>{adjunto.estado || "PENDIENTE"}</StatusBadge>
+          {adjunto.mimeType ? <StatusBadge tone="info">{adjunto.mimeType}</StatusBadge> : null}
+        </div>
+        <strong>{adjunto.nombreArchivoOriginal || "Adjunto sin nombre"}</strong>
+        <small>{adjunto.cliente || adjunto.telefono || "Sin cliente"} {adjunto.fechaRecepcion ? `· ${adjunto.fechaRecepcion}` : ""}</small>
+      </div>
+      <div>
+        <small>Destino sugerido</small>
+        <strong>{adjunto.matricula || (adjunto.expedienteId ? `EXP-${adjunto.expedienteId}` : "Sin expediente")}</strong>
+        {adjunto.errorDescarga ? <span>{adjunto.errorDescarga}</span> : null}
+      </div>
+      <div className="whatsapp-row__actions">
+        <button className="soft-button soft-button--compact" onClick={() => onClassify(adjunto)} type="button">
+          <FileCheck2 size={15} />
+          Clasificar
+        </button>
+        <button className="icon-button" disabled={discardPending} onClick={() => onDiscard(adjunto.id)} title="Descartar adjunto" type="button">
+          <Trash2 size={16} />
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -160,6 +273,65 @@ function WhatsappRow({
         {evento.expedienteId ? <Link className="icon-button" title="Ver expediente" to={`/expedientes/${evento.expedienteId}`}><ArrowRight size={16} /></Link> : null}
       </div>
     </article>
+  );
+}
+
+function ClassifyAttachmentDialog({ adjunto, onClose, onDone }: { adjunto: WhatsappAdjunto | null; onClose: () => void; onDone: () => void }) {
+  const [expedienteId, setExpedienteId] = useState("");
+  const [tipoDocumento, setTipoDocumento] = useState("OTROS");
+  const mutation = useMutation({
+    mutationFn: () => clasificarWhatsappAdjunto(adjunto!.id, {
+      expedienteId: Number(expedienteId),
+      tipoDocumento,
+    }),
+    onSuccess: onDone,
+  });
+
+  useEffect(() => {
+    if (!adjunto) return;
+    setExpedienteId(adjunto.expedienteId ? String(adjunto.expedienteId) : "");
+    setTipoDocumento("OTROS");
+  }, [adjunto]);
+
+  if (!adjunto) return null;
+  const message = mutation.error instanceof ApiError ? mutation.error.details || mutation.error.message : null;
+
+  return (
+    <div className="mail-dialog whatsapp-associate-dialog" role="dialog" aria-modal="true" aria-labelledby="whatsapp-attachment-title">
+      <button className="mail-dialog__backdrop" type="button" aria-label="Cerrar clasificacion" onClick={onClose} />
+      <section className="mail-dialog__panel whatsapp-associate-dialog__panel">
+        <header className="mail-dialog__header">
+          <div className="mail-dialog__mark"><FileCheck2 size={20} /></div>
+          <div><p>WhatsApp</p><h3 id="whatsapp-attachment-title">Clasificar adjunto</h3></div>
+          <button className="icon-button" title="Cerrar" type="button" onClick={onClose}><X size={17} /></button>
+        </header>
+        <div className="mail-dialog__body">
+          <div className="mail-dialog__route">
+            <span>Archivo</span>
+            <strong>{adjunto.nombreArchivoOriginal || "Adjunto sin nombre"}</strong>
+            <small>{adjunto.cliente || adjunto.telefono || "Origen sin identificar"}</small>
+          </div>
+          <label>
+            <span>ID expediente destino</span>
+            <input inputMode="numeric" min="1" placeholder="Ej. 124" type="number" value={expedienteId} onChange={(event) => setExpedienteId(event.target.value)} />
+          </label>
+          <label>
+            <span>Tipo documental</span>
+            <select value={tipoDocumento} onChange={(event) => setTipoDocumento(event.target.value)}>
+              {documentTypes.map((type) => <option key={type} value={type}>{formatDocumentType(type)}</option>)}
+            </select>
+          </label>
+          {message ? <div className="mail-dialog__error">{message}</div> : null}
+        </div>
+        <footer className="mail-dialog__actions">
+          <button className="soft-button" type="button" onClick={onClose}>Cancelar</button>
+          <button className="primary-button" disabled={!expedienteId || mutation.isPending} type="button" onClick={() => mutation.mutate()}>
+            <FileCheck2 size={16} />
+            {mutation.isPending ? "Clasificando..." : "Guardar en expediente"}
+          </button>
+        </footer>
+      </section>
+    </div>
   );
 }
 

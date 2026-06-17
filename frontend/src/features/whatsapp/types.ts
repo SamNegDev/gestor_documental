@@ -21,3 +21,22 @@ export interface WhatsappEvento {
 }
 
 export type WhatsappEventosPage = PagedResponse<WhatsappEvento>;
+
+export interface WhatsappAdjunto {
+  id: number;
+  telefono?: string | null;
+  tipo?: string | null;
+  mimeType?: string | null;
+  nombreArchivoOriginal?: string | null;
+  tamanioBytes?: number | null;
+  estado?: "PENDIENTE_CLASIFICAR" | "CLASIFICADO" | "DESCARTADO" | string | null;
+  errorDescarga?: string | null;
+  fechaRecepcion?: string | null;
+  clienteId?: number | null;
+  cliente?: string | null;
+  expedienteId?: number | null;
+  matricula?: string | null;
+  eventoId?: number | null;
+}
+
+export type WhatsappAdjuntosPage = PagedResponse<WhatsappAdjunto>;

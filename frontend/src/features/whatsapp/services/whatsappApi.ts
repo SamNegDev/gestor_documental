@@ -1,5 +1,5 @@
 import { apiGet, apiPostJson } from "../../../shared/api/http";
-import type { WhatsappEvento, WhatsappEventosPage } from "../types";
+import type { WhatsappAdjunto, WhatsappAdjuntosPage, WhatsappEvento, WhatsappEventosPage } from "../types";
 
 type Filters = {
   estado?: string;
@@ -33,4 +33,16 @@ export function revisarWhatsappEvento(id: number) {
 
 export function archivarWhatsappEvento(id: number) {
   return apiPostJson<WhatsappEvento>(`/api/whatsapp/eventos/${id}/archivar`, {});
+}
+
+export function getWhatsappAdjuntos(filters: { estado?: string; pagina?: number; tamanio?: number }) {
+  return apiGet<WhatsappAdjuntosPage>(`/api/whatsapp/adjuntos${query(filters)}`);
+}
+
+export function clasificarWhatsappAdjunto(id: number, body: { expedienteId: number; tipoDocumento: string }) {
+  return apiPostJson<WhatsappAdjunto>(`/api/whatsapp/adjuntos/${id}/clasificar`, body);
+}
+
+export function descartarWhatsappAdjunto(id: number) {
+  return apiPostJson<WhatsappAdjunto>(`/api/whatsapp/adjuntos/${id}/descartar`, {});
 }

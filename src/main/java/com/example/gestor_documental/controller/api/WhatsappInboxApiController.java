@@ -1,15 +1,25 @@
 package com.example.gestor_documental.controller.api;
 
+import com.example.gestor_documental.dto.whatsapp.WhatsappAdjuntoClasificarRequest;
+import com.example.gestor_documental.dto.whatsapp.WhatsappAdjuntoResponse;
+import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoWhatsappEvento;
+import com.example.gestor_documental.enums.EstadoWhatsappAdjunto;
 import com.example.gestor_documental.dto.PagedResponse;
 import com.example.gestor_documental.dto.whatsapp.WhatsappEventoAsociarRequest;
 import com.example.gestor_documental.dto.whatsapp.WhatsappEventoResponse;
+import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Cliente;
+import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.WhatsappAdjunto;
 import com.example.gestor_documental.model.WhatsappWebhookEvento;
 import com.example.gestor_documental.repository.ClienteRepository;
+import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
+import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
+import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.HistorialCambioService;
@@ -37,6 +47,9 @@ import java.time.format.DateTimeFormatter;
 public class WhatsappInboxApiController {
     private static final DateTimeFormatter FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private final WhatsappWebhookEventoRepository eventoRepository;
+    private final WhatsappAdjuntoRepository adjuntoRepository;
+    private final DocumentoRepository documentoRepository;
+    private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final ClienteRepository clienteRepository;
     private final ExpedienteRepository expedienteRepository;
     private final CurrentUserService currentUserService;
@@ -78,6 +91,7 @@ public class WhatsappInboxApiController {
             }
             evento.setCliente(expediente.getCliente());
             evento.setExpediente(expediente);
+            asociarAdjuntosDelEvento(evento, expediente.getCliente(), expediente);
             historialCambioService.registrarCambioExpediente(expediente, admin, "WHATSAPP ASOCIADO",
                     "Mensaje de WhatsApp asociado al expediente desde el telefono " + nullSafe(evento.getTelefono()) + ".");
         } else {
@@ -85,8 +99,80 @@ public class WhatsappInboxApiController {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado."));
             evento.setCliente(cliente);
             evento.setExpediente(null);
+            asociarAdjuntosDelEvento(evento, cliente, null);
         }
         return map(eventoRepository.save(evento));
+    }
+
+    @GetMapping("/adjuntos")
+    public PagedResponse<WhatsappAdjuntoResponse> listarAdjuntos(@RequestParam(defaultValue = "PENDIENTE_CLASIFICAR") String estado,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "20") int tamanio,
+            Authentication authentication) {
+        requireAdmin(authentication);
+        EstadoWhatsappAdjunto filtro = estadoAdjunto(estado);
+        return PagedResponse.of(adjuntoRepository.buscarBandeja(filtro,
+                PageRequest.of(Math.max(0, pagina), Math.max(1, Math.min(tamanio, 100)), Sort.by(Sort.Direction.DESC, "fechaRecepcion")))
+                .map(this::mapAdjunto));
+    }
+
+    @PostMapping("/adjuntos/{id}/clasificar")
+    @Transactional
+    public WhatsappAdjuntoResponse clasificarAdjunto(@PathVariable Long id,
+            @RequestBody WhatsappAdjuntoClasificarRequest request,
+            Authentication authentication) {
+        Usuario admin = requireAdmin(authentication);
+        WhatsappAdjunto adjunto = adjuntoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Adjunto de WhatsApp no encontrado."));
+        if (!StringUtils.hasText(adjunto.getNombreArchivo())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El adjunto no tiene archivo descargado. Revisa el error de descarga antes de clasificarlo.");
+        }
+        if (request == null || request.expedienteId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecciona el expediente destino.");
+        }
+        Expediente expediente = expedienteRepository.findById(request.expedienteId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Expediente no encontrado."));
+        TipoDocumento tipoDocumento = request.tipoDocumento() != null ? request.tipoDocumento() : TipoDocumento.OTROS;
+
+        Documento documento = new Documento();
+        documento.setExpediente(expediente);
+        documento.setCliente(expediente.getCliente());
+        documento.setTipoDocumento(tipoDocumento);
+        documento.setNombreArchivo(adjunto.getNombreArchivo());
+        documento.setNombreArchivoOriginal(StringUtils.hasText(adjunto.getNombreArchivoOriginal())
+                ? adjunto.getNombreArchivoOriginal()
+                : "Documento recibido por WhatsApp");
+        documento.setDescripcionArchivo("Recibido por WhatsApp desde " + nullSafe(adjunto.getTelefono()) + ".");
+        documento.setSubidoPor(admin);
+        documentoRepository.save(documento);
+        marcarRequisitoAportado(expediente, tipoDocumento, documento);
+
+        adjunto.setCliente(expediente.getCliente());
+        adjunto.setExpediente(expediente);
+        adjunto.setEstado(EstadoWhatsappAdjunto.CLASIFICADO);
+        adjuntoRepository.save(adjunto);
+
+        if (adjunto.getEvento() != null) {
+            WhatsappWebhookEvento evento = adjunto.getEvento();
+            evento.setCliente(expediente.getCliente());
+            evento.setExpediente(expediente);
+            eventoRepository.save(evento);
+        }
+        historialCambioService.registrarCambioExpediente(expediente, admin, "WHATSAPP DOCUMENTO",
+                "Adjunto de WhatsApp clasificado como " + tipoDocumento.name().replace('_', ' ')
+                        + ": " + documento.getNombreArchivoOriginal() + ".");
+        return mapAdjunto(adjunto);
+    }
+
+    @PostMapping("/adjuntos/{id}/descartar")
+    @Transactional
+    public WhatsappAdjuntoResponse descartarAdjunto(@PathVariable Long id, Authentication authentication) {
+        requireAdmin(authentication);
+        WhatsappAdjunto adjunto = adjuntoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Adjunto de WhatsApp no encontrado."));
+        adjunto.setEstado(EstadoWhatsappAdjunto.DESCARTADO);
+        return mapAdjunto(adjuntoRepository.save(adjunto));
     }
 
     @PostMapping("/eventos/{id}/revisar")
@@ -143,12 +229,65 @@ public class WhatsappInboxApiController {
                 .build();
     }
 
+    private WhatsappAdjuntoResponse mapAdjunto(WhatsappAdjunto adjunto) {
+        return WhatsappAdjuntoResponse.builder()
+                .id(adjunto.getId())
+                .telefono(adjunto.getTelefono())
+                .tipo(adjunto.getTipo())
+                .mimeType(adjunto.getMimeType())
+                .nombreArchivoOriginal(adjunto.getNombreArchivoOriginal())
+                .tamanioBytes(adjunto.getTamanioBytes())
+                .estado(adjunto.getEstado() != null ? adjunto.getEstado().name() : null)
+                .errorDescarga(adjunto.getErrorDescarga())
+                .fechaRecepcion(adjunto.getFechaRecepcion() != null ? adjunto.getFechaRecepcion().format(FORMAT) : null)
+                .clienteId(adjunto.getCliente() != null ? adjunto.getCliente().getId() : null)
+                .cliente(adjunto.getCliente() != null ? adjunto.getCliente().getNombre() : null)
+                .expedienteId(adjunto.getExpediente() != null ? adjunto.getExpediente().getId() : null)
+                .matricula(adjunto.getExpediente() != null ? adjunto.getExpediente().getMatricula() : null)
+                .eventoId(adjunto.getEvento() != null ? adjunto.getEvento().getId() : null)
+                .build();
+    }
+
+    private void asociarAdjuntosDelEvento(WhatsappWebhookEvento evento, Cliente cliente, Expediente expediente) {
+        if (evento == null || evento.getId() == null) {
+            return;
+        }
+        adjuntoRepository.findByEventoId(evento.getId()).forEach(adjunto -> {
+            adjunto.setCliente(cliente);
+            adjunto.setExpediente(expediente);
+            adjuntoRepository.save(adjunto);
+        });
+    }
+
+    private void marcarRequisitoAportado(Expediente expediente, TipoDocumento tipoDocumento, Documento documento) {
+        requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
+                .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                .filter(requisito -> requisito.getTipoDocumento() == tipoDocumento)
+                .findFirst()
+                .ifPresent(requisito -> {
+                    requisito.setDocumento(documento);
+                    requisito.setEstado(EstadoRequisitoDocumental.APORTADO);
+                    requisitoRepository.save(requisito);
+                });
+    }
+
     private String estadoPermitido(String estado) {
         if ("PENDIENTES".equals(estado) || "REVISADOS".equals(estado) || "ARCHIVADOS".equals(estado)
                 || "ASOCIADOS".equals(estado) || "NO_ASOCIADOS".equals(estado) || "ERRORES".equals(estado)) {
             return estado;
         }
         return "TODOS";
+    }
+
+    private EstadoWhatsappAdjunto estadoAdjunto(String estado) {
+        if (!StringUtils.hasText(estado) || "TODOS".equals(estado)) {
+            return null;
+        }
+        try {
+            return EstadoWhatsappAdjunto.valueOf(estado);
+        } catch (IllegalArgumentException exception) {
+            return EstadoWhatsappAdjunto.PENDIENTE_CLASIFICAR;
+        }
     }
 
     private String normalizarTelefono(String value) {
