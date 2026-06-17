@@ -244,12 +244,14 @@ public class CorreoEntranteSolicitudService {
         Cliente cliente = resolverCliente(remitente)
                 .orElseThrow(() -> new IllegalStateException("No se encontro cliente para el remitente ni cliente por defecto configurado."));
         Usuario admin = resolverAdmin();
-        TipoTramite tipoTramite = tipoTramiteRepository.findByNombre(defaultTipoTramite)
-                .orElseThrow(() -> new IllegalStateException("No existe el tipo de tramite configurado: " + defaultTipoTramite));
 
         MultipartFile archivo = new BytesMultipartFile(adjunto.nombre(), adjunto.contenido(), "application/pdf");
-        String matricula = detectarMatricula(asunto + " " + adjunto.nombre() + " " + ocrPdfService.extraerTextoCompleto(archivo))
+        String textoDeteccion = asunto + " " + adjunto.nombre() + " " + ocrPdfService.extraerTextoCompleto(archivo);
+        String matricula = detectarMatricula(textoDeteccion)
                 .orElseThrow(() -> new IllegalStateException("No se pudo detectar matricula en el correo " + messageId));
+        TipoTramiteEnum tramiteDetectado = detectarTipoTramite(textoDeteccion);
+        TipoTramite tipoTramite = tipoTramiteRepository.findByNombre(tramiteDetectado)
+                .orElseThrow(() -> new IllegalStateException("No existe el tipo de tramite configurado: " + tramiteDetectado));
 
         Solicitud solicitud = new Solicitud();
         solicitud.setCliente(cliente);
@@ -268,6 +270,18 @@ public class CorreoEntranteSolicitudService {
         );
         documentoService.guardarParaSolicitud(guardada.getId(), archivo, TipoDocumento.EXPEDIENTE_COMPLETO, admin);
         registrarProcesado(messageId, asunto, remitente, matricula, guardada.getId(), "PROCESADO", "Solicitud creada desde PDF adjunto.");
+    }
+
+    private TipoTramiteEnum detectarTipoTramite(String texto) {
+        String normalizado = TextNormalizer.upperOrNull(texto);
+        if (normalizado == null) {
+            return defaultTipoTramite;
+        }
+        String compacto = normalizado.replaceAll("[^A-Z0-9]", "");
+        if (compacto.contains("BATECOM") || compacto.contains("BATECOMP")) {
+            return TipoTramiteEnum.BATECOM;
+        }
+        return defaultTipoTramite;
     }
 
     private List<AdjuntoPdf> extraerAdjuntosPdfGraph(String token, String messageId) {
