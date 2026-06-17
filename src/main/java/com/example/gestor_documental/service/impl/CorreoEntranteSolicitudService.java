@@ -34,17 +34,21 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.regex.Matcher;
@@ -65,9 +69,12 @@ public class CorreoEntranteSolicitudService {
     private final DocumentoService documentoService;
     private final OcrPdfService ocrPdfService;
     private final HistorialCambioService historialCambioService;
+    private final RestClient restClient = RestClient.create();
 
     @Value("${app.mail.inbound.enabled:false}")
     private boolean enabled;
+    @Value("${app.mail.inbound.provider:${app.mail.provider:imap}}")
+    private String inboundProvider;
     @Value("${app.mail.inbound.host:}")
     private String host;
     @Value("${app.mail.inbound.port:993}")
@@ -88,14 +95,30 @@ public class CorreoEntranteSolicitudService {
     private TipoTramiteEnum defaultTipoTramite;
     @Value("${app.mail.inbound.max-messages:10}")
     private int maxMessages;
+    @Value("${app.mail.graph.tenant-id:}")
+    private String graphTenantId;
+    @Value("${app.mail.graph.client-id:}")
+    private String graphClientId;
+    @Value("${app.mail.graph.client-secret:}")
+    private String graphClientSecret;
+    @Value("${app.mail.inbound.graph.mailbox:${app.mail.graph.sender:${app.mail.from:}}}")
+    private String graphMailbox;
 
     @Scheduled(fixedDelayString = "${app.mail.inbound.poll-delay-ms:300000}", initialDelayString = "${app.mail.inbound.initial-delay-ms:60000}")
     public void procesarBuzon() {
         if (!enabled) {
             return;
         }
+        if ("graph".equalsIgnoreCase(inboundProvider)) {
+            procesarBuzonGraph();
+        } else {
+            procesarBuzonImap();
+        }
+    }
+
+    private void procesarBuzonImap() {
         if (isBlank(host) || isBlank(username) || isBlank(password)) {
-            log.warn("Buzon entrante no configurado: host, usuario o password vacios.");
+            log.warn("Buzon entrante IMAP no configurado: host, usuario o password vacios.");
             return;
         }
 
@@ -115,7 +138,7 @@ public class CorreoEntranteSolicitudService {
                     Message[] mensajes = folder.search(new FlagTerm(new Flags(Flags.Flag.SEEN), false));
                     for (int i = 0; i < Math.min(mensajes.length, maxMessages); i++) {
                         try {
-                            procesarMensaje(mensajes[i]);
+                            procesarMensajeImap(mensajes[i]);
                         } catch (Exception exception) {
                             registrarErrorMensaje(mensajes[i], exception.getMessage());
                             mensajes[i].setFlag(Flags.Flag.SEEN, true);
@@ -127,12 +150,48 @@ public class CorreoEntranteSolicitudService {
                 }
             }
         } catch (Exception exception) {
-            log.warn("No se pudo procesar el buzon entrante: {}", exception.getMessage(), exception);
+            log.warn("No se pudo procesar el buzon entrante IMAP: {}", exception.getMessage(), exception);
         }
     }
 
-    @Transactional
-    protected void procesarMensaje(Message mensaje) throws MessagingException, IOException {
+    private void procesarBuzonGraph() {
+        if (isBlank(graphMailbox) || isBlank(graphTenantId) || isBlank(graphClientId) || isBlank(graphClientSecret)) {
+            log.warn("Buzon entrante Graph no configurado: mailbox, tenant, client id o client secret vacios.");
+            return;
+        }
+        try {
+            String token = obtenerTokenGraph();
+            String folder = "INBOX".equalsIgnoreCase(folderName) ? "inbox" : folderName;
+            Map<?, ?> response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .scheme("https")
+                            .host("graph.microsoft.com")
+                            .pathSegment("v1.0", "users", graphMailbox.trim(), "mailFolders", folder, "messages")
+                            .queryParam("$top", Math.max(1, maxMessages))
+                            .queryParam("$filter", "isRead eq false")
+                            .queryParam("$select", "id,internetMessageId,subject,from,hasAttachments")
+                            .build())
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .body(Map.class);
+
+            Object value = response != null ? response.get("value") : null;
+            if (!(value instanceof List<?> mensajes)) {
+                return;
+            }
+            for (Object item : mensajes) {
+                if (item instanceof Map<?, ?> mensaje) {
+                    procesarMensajeGraph(token, mensaje);
+                }
+            }
+        } catch (RestClientResponseException exception) {
+            log.warn("Microsoft Graph rechazo la lectura del buzon entrante ({}): {}", exception.getStatusCode().value(), exception.getResponseBodyAsString());
+        } catch (Exception exception) {
+            log.warn("No se pudo procesar el buzon entrante Graph: {}", exception.getMessage(), exception);
+        }
+    }
+
+    private void procesarMensajeImap(Message mensaje) throws MessagingException, IOException {
         String messageId = resolverMessageId(mensaje);
         if (procesadoRepository.existsByMessageId(messageId)) {
             mensaje.setFlag(Flags.Flag.SEEN, true);
@@ -148,13 +207,46 @@ public class CorreoEntranteSolicitudService {
             return;
         }
 
-        Usuario admin = resolverAdmin();
+        crearSolicitudDesdeAdjunto(messageId, asunto, remitente, adjuntos.get(0));
+        mensaje.setFlag(Flags.Flag.SEEN, true);
+    }
+
+    private void procesarMensajeGraph(String token, Map<?, ?> mensaje) {
+        String graphId = valor(mensaje.get("id"));
+        String messageId = !isBlank(valor(mensaje.get("internetMessageId"))) ? valor(mensaje.get("internetMessageId")) : graphId;
+        if (isBlank(graphId) || isBlank(messageId)) {
+            return;
+        }
+        if (procesadoRepository.existsByMessageId(limitar(messageId, 255))) {
+            marcarLeidoGraph(token, graphId);
+            return;
+        }
+
+        String asunto = valor(mensaje.get("subject"));
+        String remitente = remitenteGraph(mensaje.get("from"));
+        try {
+            List<AdjuntoPdf> adjuntos = extraerAdjuntosPdfGraph(token, graphId);
+            if (adjuntos.isEmpty()) {
+                registrarProcesado(messageId, asunto, remitente, null, null, "IGNORADO", "No contiene adjuntos PDF.");
+                marcarLeidoGraph(token, graphId);
+                return;
+            }
+            crearSolicitudDesdeAdjunto(messageId, asunto, remitente, adjuntos.get(0));
+            marcarLeidoGraph(token, graphId);
+        } catch (Exception exception) {
+            registrarProcesado(messageId, asunto, remitente, null, null, "ERROR", exception.getMessage());
+            marcarLeidoGraph(token, graphId);
+            log.warn("Correo entrante Graph ignorado por error de procesamiento: {}", exception.getMessage(), exception);
+        }
+    }
+
+    private void crearSolicitudDesdeAdjunto(String messageId, String asunto, String remitente, AdjuntoPdf adjunto) {
         Cliente cliente = resolverCliente(remitente)
                 .orElseThrow(() -> new IllegalStateException("No se encontro cliente para el remitente ni cliente por defecto configurado."));
+        Usuario admin = resolverAdmin();
         TipoTramite tipoTramite = tipoTramiteRepository.findByNombre(defaultTipoTramite)
                 .orElseThrow(() -> new IllegalStateException("No existe el tipo de tramite configurado: " + defaultTipoTramite));
 
-        AdjuntoPdf adjunto = adjuntos.get(0);
         MultipartFile archivo = new BytesMultipartFile(adjunto.nombre(), adjunto.contenido(), "application/pdf");
         String matricula = detectarMatricula(asunto + " " + adjunto.nombre() + " " + ocrPdfService.extraerTextoCompleto(archivo))
                 .orElseThrow(() -> new IllegalStateException("No se pudo detectar matricula en el correo " + messageId));
@@ -176,8 +268,75 @@ public class CorreoEntranteSolicitudService {
         );
         documentoService.guardarParaSolicitud(guardada.getId(), archivo, TipoDocumento.EXPEDIENTE_COMPLETO, admin);
         registrarProcesado(messageId, asunto, remitente, matricula, guardada.getId(), "PROCESADO", "Solicitud creada desde PDF adjunto.");
+    }
 
-        mensaje.setFlag(Flags.Flag.SEEN, true);
+    private List<AdjuntoPdf> extraerAdjuntosPdfGraph(String token, String messageId) {
+        Map<?, ?> response = restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .scheme("https")
+                        .host("graph.microsoft.com")
+                        .pathSegment("v1.0", "users", graphMailbox.trim(), "messages", messageId, "attachments")
+                        .queryParam("$select", "name,contentType,contentBytes")
+                        .build())
+                .header("Authorization", "Bearer " + token)
+                .retrieve()
+                .body(Map.class);
+        Object value = response != null ? response.get("value") : null;
+        if (!(value instanceof List<?> attachments)) {
+            return List.of();
+        }
+        List<AdjuntoPdf> adjuntos = new ArrayList<>();
+        for (Object item : attachments) {
+            if (!(item instanceof Map<?, ?> attachment)) {
+                continue;
+            }
+            String nombre = valor(attachment.get("name"));
+            String contentType = valor(attachment.get("contentType"));
+            String contentBytes = valor(attachment.get("contentBytes"));
+            boolean pdf = nombre.toLowerCase(Locale.ROOT).endsWith(".pdf") || "application/pdf".equalsIgnoreCase(contentType);
+            if (pdf && !isBlank(contentBytes)) {
+                adjuntos.add(new AdjuntoPdf(nombre, Base64.getDecoder().decode(contentBytes)));
+            }
+        }
+        return adjuntos;
+    }
+
+    private void marcarLeidoGraph(String token, String messageId) {
+        try {
+            restClient.patch()
+                    .uri(uriBuilder -> uriBuilder
+                            .scheme("https")
+                            .host("graph.microsoft.com")
+                            .pathSegment("v1.0", "users", graphMailbox.trim(), "messages", messageId)
+                            .build())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("Authorization", "Bearer " + token)
+                    .body(Map.of("isRead", true))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception exception) {
+            log.warn("No se pudo marcar como leido el correo entrante Graph {}: {}", messageId, exception.getMessage());
+        }
+    }
+
+    private String obtenerTokenGraph() {
+        var form = new org.springframework.util.LinkedMultiValueMap<String, String>();
+        form.add("client_id", graphClientId.trim());
+        form.add("client_secret", graphClientSecret.trim());
+        form.add("scope", "https://graph.microsoft.com/.default");
+        form.add("grant_type", "client_credentials");
+
+        Map<?, ?> response = restClient.post()
+                .uri("https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token", graphTenantId.trim())
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(form)
+                .retrieve()
+                .body(Map.class);
+        Object token = response != null ? response.get("access_token") : null;
+        if (token == null || token.toString().isBlank()) {
+            throw new IllegalStateException("Microsoft Graph no devolvio access_token.");
+        }
+        return token.toString();
     }
 
     private Optional<Cliente> resolverCliente(String remitente) {
@@ -238,11 +397,12 @@ public class CorreoEntranteSolicitudService {
     }
 
     private void registrarProcesado(String messageId, String asunto, String remitente, String matricula, Long solicitudId, String estado, String detalle) {
-        if (procesadoRepository.existsByMessageId(messageId)) {
+        String id = limitar(messageId, 255);
+        if (procesadoRepository.existsByMessageId(id)) {
             return;
         }
         CorreoEntranteProcesado procesado = new CorreoEntranteProcesado();
-        procesado.setMessageId(messageId);
+        procesado.setMessageId(id);
         procesado.setAsunto(limitar(asunto, 500));
         procesado.setRemitente(limitar(remitente, 250));
         procesado.setMatricula(matricula);
@@ -279,6 +439,19 @@ public class CorreoEntranteSolicitudService {
         return from[0].toString();
     }
 
+    private String remitenteGraph(Object from) {
+        if (!(from instanceof Map<?, ?> fromMap)) {
+            return "";
+        }
+        Object emailAddress = fromMap.get("emailAddress");
+        if (!(emailAddress instanceof Map<?, ?> emailMap)) {
+            return "";
+        }
+        String address = valor(emailMap.get("address"));
+        String name = valor(emailMap.get("name"));
+        return !isBlank(address) && !isBlank(name) ? name + " <" + address + ">" : address;
+    }
+
     private String extraerEmail(String remitente) {
         if (isBlank(remitente)) {
             return "";
@@ -291,6 +464,10 @@ public class CorreoEntranteSolicitudService {
         } catch (MessagingException ignored) {
         }
         return remitente.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String valor(Object value) {
+        return value != null ? value.toString() : "";
     }
 
     private String limitar(String valor, int max) {
