@@ -106,7 +106,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             if (media) {
                 evento.setEstado(EstadoWhatsappEvento.REVISADO);
                 evento.setFechaRevision(LocalDateTime.now());
-            } else if (!procesarAccion(evento) && !procesarRespuestaEstadoTramite(evento) && !procesarRespuestaNuevaSolicitud(evento)) {
+            } else if (!procesarMenuPrioritario(evento) && !procesarAccion(evento) && !procesarRespuestaEstadoTramite(evento) && !procesarRespuestaNuevaSolicitud(evento)) {
                 procesarMenuEspontaneo(evento);
             }
             evento.setProcesado(true);
@@ -569,6 +569,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         if (!esSolicitudMenu(evento.getTexto())) {
             return;
         }
+        evento.setExpediente(null);
         if (evento.getCliente() == null) {
             enviarIdentificacionNecesaria(evento);
             return;
@@ -576,6 +577,14 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
         evento.setEstado(EstadoWhatsappEvento.REVISADO);
         evento.setFechaRevision(LocalDateTime.now());
+    }
+
+    private boolean procesarMenuPrioritario(WhatsappWebhookEvento evento) {
+        if (!"text".equals(evento.getTipo()) || !esSolicitudMenu(evento.getTexto())) {
+            return false;
+        }
+        procesarMenuEspontaneo(evento);
+        return true;
     }
 
     private void posponerSeguimiento(WhatsappWebhookEvento evento) {
