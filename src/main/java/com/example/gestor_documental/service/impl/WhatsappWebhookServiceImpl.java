@@ -219,8 +219,17 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             solicitarMatriculaEstadoTramite(evento);
             return true;
         }
+        if ("gestapp_contactar_general".equals(accion)) {
+            confirmarContactoGeneral(evento);
+            return true;
+        }
+        if ("gestapp_contactar_solicitud".equals(accion)) {
+            confirmarContactoSolicitud(evento);
+            return true;
+        }
         if ("gestapp_contactar".equals(accion)) {
-            return false;
+            confirmarContactoExpediente(evento);
+            return true;
         }
         if (evento.getExpediente() == null) {
             enviarEnlacePortalCliente(evento, "Puedes continuar desde el portal de GestApp:");
@@ -510,6 +519,35 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         }
         whatsappOutboundService.enviarMenuContinuacion(evento.getTelefono(), evento.getExpediente(),
                 "Documento recibido correctamente.");
+    }
+
+    private void confirmarContactoGeneral(WhatsappWebhookEvento evento) {
+        whatsappOutboundService.enviarTexto(evento.getTelefono(),
+                "Perfecto, paso el aviso a la gestoria para que contacten contigo.");
+        whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
+    }
+
+    private void confirmarContactoSolicitud(WhatsappWebhookEvento evento) {
+        whatsappOutboundService.enviarTexto(evento.getTelefono(),
+                "Perfecto, paso el aviso a la gestoria para que revisen tu solicitud.");
+        Solicitud solicitud = evento.getCliente() != null
+                ? solicitudRepository.findByClienteIdOrderByFechaReferenciaDesc(evento.getCliente().getId()).stream().findFirst().orElse(null)
+                : null;
+        if (solicitud != null) {
+            whatsappOutboundService.enviarMenuContinuacionSolicitud(evento.getTelefono(), solicitud, "Te dejo las opciones de la solicitud.");
+        } else {
+            whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
+        }
+    }
+
+    private void confirmarContactoExpediente(WhatsappWebhookEvento evento) {
+        whatsappOutboundService.enviarTexto(evento.getTelefono(),
+                "Perfecto, paso el aviso a la gestoria para que contacten contigo.");
+        if (evento.getExpediente() != null) {
+            whatsappOutboundService.enviarMenuContinuacion(evento.getTelefono(), evento.getExpediente(), "Te dejo las opciones del expediente.");
+        } else {
+            whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
+        }
     }
 
     private void enviarEnlacePortal(WhatsappWebhookEvento evento, String introduccion) {

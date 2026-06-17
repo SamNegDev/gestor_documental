@@ -1,4 +1,4 @@
-import { apiGet } from "../../../shared/api/http";
+import { apiGet, apiPostJson } from "../../../shared/api/http";
 import type { TareasPage, TareasResumen } from "../types";
 
 export function getTareas(filters: { tipo?: string; prioridad?: string; ambito?: string; pagina?: number; tamanio?: number }) {
@@ -6,3 +6,4 @@ export function getTareas(filters: { tipo?: string; prioridad?: string; ambito?:
   return apiGet<TareasPage>(`/api/tareas?${params.toString()}`);
 }
 export const getTareasResumen = () => apiGet<TareasResumen>("/api/tareas/resumen");
+export const revisarTareaWhatsapp = (id: number) => apiPostJson(`/api/whatsapp/eventos/${id}/revisar`, {});

@@ -300,7 +300,9 @@ public class TareaApiController {
         if ("gestapp_ya_lo_envie".equals(evento.getAccionCodigo())) {
             return "WHATSAPP_APORTACION_INDICADA";
         }
-        if ("gestapp_contactar".equals(evento.getAccionCodigo())) {
+        if ("gestapp_contactar".equals(evento.getAccionCodigo())
+                || "gestapp_contactar_general".equals(evento.getAccionCodigo())
+                || "gestapp_contactar_solicitud".equals(evento.getAccionCodigo())) {
             return "WHATSAPP_CONTACTO_SOLICITADO";
         }
         if ("gestapp_estado_tramite".equals(evento.getAccionCodigo()) || "gestapp_menu_expedientes".equals(evento.getAccionCodigo())) {

@@ -7,7 +7,7 @@ import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { PaginationBar } from "../../listados/components/PaginationBar";
 import { archivarSeguimiento, prepararNotificacionExpediente } from "../../seguimiento/services/seguimientoApi";
 import { NotificationEmailDialog } from "../components/NotificationEmailDialog";
-import { getTareas, getTareasResumen } from "../services/tareasApi";
+import { getTareas, getTareasResumen, revisarTareaWhatsapp } from "../services/tareasApi";
 import type { Tarea } from "../types";
 
 export function TareasPage() {
@@ -30,6 +30,7 @@ export function TareasPage() {
     queryClient.invalidateQueries({ queryKey: ["seguimiento"] });
   };
   const archiveMutation = useMutation({ mutationFn: archivarSeguimiento, onSuccess: refresh });
+  const whatsappReviewMutation = useMutation({ mutationFn: revisarTareaWhatsapp, onSuccess: refresh });
   async function notify(tarea: Tarea, canal: "email" | "whatsapp") {
     if (tarea.entidad === "INCIDENCIA") {
       setNotificacion({ incidenciaId: tarea.entidadId, canal });
@@ -109,6 +110,7 @@ export function TareasPage() {
               archivePending={archiveMutation.isPending}
               key={tarea.id}
               onArchive={(id) => archiveMutation.mutate(id)}
+              onWhatsappReview={(id) => whatsappReviewMutation.mutate(id)}
               onNotify={notify}
               showClient={isAdmin}
               tarea={tarea}
@@ -134,12 +136,14 @@ function TaskRow({
   tarea,
   archivePending,
   onArchive,
+  onWhatsappReview,
   onNotify,
   showClient,
 }: {
   tarea: Tarea;
   archivePending: boolean;
   onArchive: (id: number) => void;
+  onWhatsappReview: (id: number) => void;
   onNotify: (tarea: Tarea, canal: "email" | "whatsapp") => void;
   showClient: boolean;
 }) {
@@ -194,6 +198,12 @@ function TaskRow({
           <button className="soft-button soft-button--compact" disabled={archivePending} onClick={() => onArchive(tarea.entidadId)} type="button">
             <Archive size={15} />
             Archivar
+          </button>
+        ) : null}
+        {tarea.tipo.startsWith("WHATSAPP_") ? (
+          <button className="soft-button soft-button--compact" onClick={() => onWhatsappReview(tarea.entidadId)} type="button">
+            <CheckSquare2 size={15} />
+            Realizada
           </button>
         ) : null}
         <Link className="icon-button" title="Abrir" to={tarea.enlace}><ArrowRight size={17} /></Link>

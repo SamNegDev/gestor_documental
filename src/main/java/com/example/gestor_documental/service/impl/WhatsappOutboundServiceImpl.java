@@ -166,7 +166,7 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
                                                     menuRow("gestapp_nueva_solicitud", "Nueva solicitud", "Iniciar un tramite nuevo"),
                                                     menuRow("gestapp_enviar_documentacion", "Enviar documentos", "Abrir el portal de subida"),
                                                     menuRow("gestapp_menu_pendiente", "Documentacion pendiente", "Ver que falta aportar"),
-                                                    menuRow("gestapp_contactar", "Hablar con gestoria", "Solicitar contacto")
+                                                    menuRow("gestapp_contactar_general", "Hablar con gestoria", "Solicitar contacto")
                                             )
                                     ))
                             )
@@ -254,7 +254,7 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
                                             "rows", java.util.List.of(
                                                     menuRow("gestapp_solicitud_aportar_documentos", "Aportar documentos", "Enviar documentacion"),
                                                     menuRow("gestapp_solicitud_estado", "Consultar estado", "Ver estado de la solicitud"),
-                                                    menuRow("gestapp_contactar", "Hablar con gestoria", "Solicitar contacto"),
+                                                    menuRow("gestapp_contactar_solicitud", "Hablar con gestoria", "Solicitar contacto"),
                                                     menuRow("gestapp_menu_principal", "Menu principal", "Volver al inicio"),
                                                     menuRow("gestapp_salir", "Salir", "Cerrar esta consulta")
                                             )
