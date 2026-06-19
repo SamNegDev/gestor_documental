@@ -72,6 +72,13 @@ export interface InteresadoSolicitud {
   codigoPostal?: string | null;
   municipio?: string | null;
   provincia?: string | null;
+  personaJuridica?: boolean;
+  documentoIdentidadAportado?: boolean;
+  documentoIdentidadOrigen?: string | null;
+  requiereRepresentanteLegal?: boolean;
+  representanteLegalAportado?: boolean;
+  representanteLegalNombre?: string | null;
+  representanteLegalDni?: string | null;
 }
 
 export interface SolicitudDetail {

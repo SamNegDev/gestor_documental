@@ -23,13 +23,18 @@ import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
+import com.example.gestor_documental.model.ClienteInteresado;
 import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.HistorialCambio;
 import com.example.gestor_documental.model.Incidencia;
+import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Mensaje;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
+import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.HistorialCambioService;
@@ -46,6 +51,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +77,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class SolicitudApiController {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final double CONFIANZA_MINIMA_IDENTIDAD_SOLICITUD = 0.80;
 
     private final SolicitudService solicitudService;
     private final ClienteService clienteService;
@@ -82,6 +89,8 @@ public class SolicitudApiController {
     private final CurrentUserService currentUserService;
     private final CorreoEntranteSolicitudService correoEntranteSolicitudService;
     private final SolicitudDocumentacionIaService solicitudDocumentacionIaService;
+    private final DocumentoIdentidadLecturaRepository documentoIdentidadLecturaRepository;
+    private final ClienteInteresadoRepository clienteInteresadoRepository;
 
     @GetMapping
     public PagedResponse<SolicitudListItemResponse> listarSolicitudes(
@@ -346,6 +355,7 @@ public class SolicitudApiController {
 
     private SolicitudListItemResponse mapSolicitudListItem(Solicitud solicitud) {
         List<Documento> documentos = documentoService.listarPorSolicitud(solicitud.getId());
+        List<InteresadoSolicitudResponse> interesados = mapInteresados(solicitud, documentos, false);
         return SolicitudListItemResponse.builder()
                 .id(solicitud.getId())
                 .matricula(solicitud.getMatricula())
@@ -366,17 +376,17 @@ public class SolicitudApiController {
                         : null)
                 .modificadoPor(mapUsuario(solicitud.getModificadoPor()))
                 .expedienteId(solicitud.getExpediente() != null ? solicitud.getExpediente().getId() : null)
-                .interesados(mapInteresados(solicitud))
-                .situacionDocumental(situacionDocumental(solicitud, documentos))
+                .interesados(interesados)
+                .situacionDocumental(situacionDocumental(solicitud, documentos, interesados))
                 .build();
     }
 
-    private String situacionDocumental(Solicitud solicitud, List<Documento> documentos) {
+    private String situacionDocumental(Solicitud solicitud, List<Documento> documentos, List<InteresadoSolicitudResponse> interesados) {
         if (solicitudArchivada(solicitud)) {
             return "ARCHIVADA";
         }
         if (documentos.isEmpty()) return "SIN DOCUMENTACION";
-        int pendientes = contarDocumentosBasicosPendientes(solicitud, documentos);
+        int pendientes = contarDocumentosBasicosPendientes(solicitud, documentos, interesados);
         if (pendientes > 0) return pendientes == 1 ? "FALTA 1 DOCUMENTO" : "FALTAN " + pendientes + " DOCUMENTOS";
         return "DOCUMENTACION COMPLETA";
     }
@@ -387,7 +397,7 @@ public class SolicitudApiController {
                 || solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO;
     }
 
-    private int contarDocumentosBasicosPendientes(Solicitud solicitud, List<Documento> documentos) {
+    private int contarDocumentosBasicosPendientes(Solicitud solicitud, List<Documento> documentos, List<InteresadoSolicitudResponse> interesados) {
         Set<TipoDocumento> tipos = documentos.stream().map(Documento::getTipoDocumento).collect(Collectors.toSet());
         int pendientes = 0;
         TipoTramiteEnum tramite = solicitud.getTipoTramite() != null ? solicitud.getTipoTramite().getNombre() : null;
@@ -396,7 +406,17 @@ public class SolicitudApiController {
                 .filter(documento -> documento.getTipoDocumento() == TipoDocumento.DNI
                         || documento.getTipoDocumento() == TipoDocumento.CIF)
                 .count();
-        pendientes += Math.max(0, identidadesEsperadas - (int) identidadesAportadas);
+        long identidadesCubiertas = interesados.stream()
+                .filter(InteresadoSolicitudResponse::isDocumentoIdentidadAportado)
+                .count();
+        int identidadesValidas = Math.max(
+                Math.min(identidadesEsperadas, (int) identidadesAportadas),
+                Math.min(identidadesEsperadas, (int) identidadesCubiertas)
+        );
+        pendientes += Math.max(0, identidadesEsperadas - identidadesValidas);
+        pendientes += (int) interesados.stream()
+                .filter(interesado -> interesado.isRequiereRepresentanteLegal() && !interesado.isRepresentanteLegalAportado())
+                .count();
 
         boolean requiereContrato = tramite == TipoTramiteEnum.TRASPASO
                 || tramite == TipoTramiteEnum.BATECOM
@@ -450,6 +470,7 @@ public class SolicitudApiController {
 
     private SolicitudDetailResponse mapSolicitudDetail(Solicitud solicitud) {
         List<Documento> documentos = documentoService.listarPorSolicitud(solicitud.getId());
+        List<InteresadoSolicitudResponse> interesados = mapInteresados(solicitud, documentos, true);
         return SolicitudDetailResponse.builder()
                 .id(solicitud.getId())
                 .matricula(solicitud.getMatricula())
@@ -460,7 +481,7 @@ public class SolicitudApiController {
                 .fechaCreacion(formatDate(solicitud.getFechaCreacion()))
                 .fechaUltimaModificacion(formatDate(solicitud.getFechaUltimaModificacion()))
                 .observaciones(solicitud.getObservaciones())
-                .situacionDocumental(situacionDocumental(solicitud, documentos))
+                .situacionDocumental(situacionDocumental(solicitud, documentos, interesados))
                 .expedienteId(solicitud.getExpediente() != null ? solicitud.getExpediente().getId() : null)
                 .cliente(solicitud.getCliente() != null
                         ? ClienteResumenResponse.builder()
@@ -473,7 +494,7 @@ public class SolicitudApiController {
                         : null)
                 .creadoPor(mapUsuario(solicitud.getCreadoPor()))
                 .modificadoPor(mapUsuario(solicitud.getModificadoPor()))
-                .interesados(mapInteresados(solicitud))
+                .interesados(interesados)
                 .documentos(documentos.stream().map(this::mapDocumento).toList())
                 .incidencias(incidenciaService.listarPorSolicitud(solicitud.getId()).stream().map(this::mapIncidencia).toList())
                 .historial(historialCambioService.listarPorSolicitud(solicitud.getId()).stream()
@@ -484,7 +505,7 @@ public class SolicitudApiController {
                 .build();
     }
 
-    private List<InteresadoSolicitudResponse> mapInteresados(Solicitud solicitud) {
+    private List<InteresadoSolicitudResponse> mapInteresados(Solicitud solicitud, List<Documento> documentos, boolean incluirSoporteCliente) {
         java.util.ArrayList<InteresadoSolicitudResponse> interesados = new java.util.ArrayList<>();
         if (hasInteresadoData(
                 solicitud.getInteresado1Nombre(),
@@ -497,18 +518,20 @@ public class SolicitudApiController {
                 solicitud.getInteresado1Municipio(),
                 solicitud.getInteresado1Provincia(),
                 solicitud.getInteresado1Rol() != null ? solicitud.getInteresado1Rol().name() : null)) {
-            interesados.add(InteresadoSolicitudResponse.builder()
-                    .nombre(solicitud.getInteresado1Nombre())
-                    .rol(solicitud.getInteresado1Rol() != null ? solicitud.getInteresado1Rol().name() : null)
-                    .dni(solicitud.getInteresado1Dni())
-                    .telefono(solicitud.getInteresado1Telefono())
-                    .direccion(solicitud.getInteresado1Direccion())
-                    .tipoVia(solicitud.getInteresado1TipoVia())
-                    .nombreVia(solicitud.getInteresado1NombreVia())
-                    .codigoPostal(solicitud.getInteresado1CodigoPostal())
-                    .municipio(solicitud.getInteresado1Municipio())
-                    .provincia(solicitud.getInteresado1Provincia())
-                    .build());
+            interesados.add(mapInteresadoSolicitud(
+                    solicitud,
+                    documentos,
+                    solicitud.getInteresado1Nombre(),
+                    solicitud.getInteresado1Rol() != null ? solicitud.getInteresado1Rol().name() : null,
+                    solicitud.getInteresado1Dni(),
+                    solicitud.getInteresado1Telefono(),
+                    solicitud.getInteresado1Direccion(),
+                    solicitud.getInteresado1TipoVia(),
+                    solicitud.getInteresado1NombreVia(),
+                    solicitud.getInteresado1CodigoPostal(),
+                    solicitud.getInteresado1Municipio(),
+                    solicitud.getInteresado1Provincia(),
+                    incluirSoporteCliente));
         }
         if (hasInteresadoData(
                 solicitud.getInteresado2Nombre(),
@@ -521,24 +544,181 @@ public class SolicitudApiController {
                 solicitud.getInteresado2Municipio(),
                 solicitud.getInteresado2Provincia(),
                 solicitud.getInteresado2Rol() != null ? solicitud.getInteresado2Rol().name() : null)) {
-            interesados.add(InteresadoSolicitudResponse.builder()
-                    .nombre(solicitud.getInteresado2Nombre())
-                    .rol(solicitud.getInteresado2Rol() != null ? solicitud.getInteresado2Rol().name() : null)
-                    .dni(solicitud.getInteresado2Dni())
-                    .telefono(solicitud.getInteresado2Telefono())
-                    .direccion(solicitud.getInteresado2Direccion())
-                    .tipoVia(solicitud.getInteresado2TipoVia())
-                    .nombreVia(solicitud.getInteresado2NombreVia())
-                    .codigoPostal(solicitud.getInteresado2CodigoPostal())
-                    .municipio(solicitud.getInteresado2Municipio())
-                    .provincia(solicitud.getInteresado2Provincia())
-                    .build());
+            interesados.add(mapInteresadoSolicitud(
+                    solicitud,
+                    documentos,
+                    solicitud.getInteresado2Nombre(),
+                    solicitud.getInteresado2Rol() != null ? solicitud.getInteresado2Rol().name() : null,
+                    solicitud.getInteresado2Dni(),
+                    solicitud.getInteresado2Telefono(),
+                    solicitud.getInteresado2Direccion(),
+                    solicitud.getInteresado2TipoVia(),
+                    solicitud.getInteresado2NombreVia(),
+                    solicitud.getInteresado2CodigoPostal(),
+                    solicitud.getInteresado2Municipio(),
+                    solicitud.getInteresado2Provincia(),
+                    incluirSoporteCliente));
         }
         return interesados;
     }
 
     private boolean hasInteresadoData(String... values) {
         return java.util.Arrays.stream(values).anyMatch(value -> value != null && !value.trim().isEmpty());
+    }
+
+    private InteresadoSolicitudResponse mapInteresadoSolicitud(
+            Solicitud solicitud,
+            List<Documento> documentos,
+            String nombre,
+            String rol,
+            String dni,
+            String telefono,
+            String direccion,
+            String tipoVia,
+            String nombreVia,
+            String codigoPostal,
+            String municipio,
+            String provincia,
+            boolean incluirSoporteCliente
+    ) {
+        boolean personaJuridica = esPersonaJuridica(dni);
+        DocumentoSoporte identidad = soporteIdentidad(solicitud, documentos, dni, personaJuridica, incluirSoporteCliente);
+        RepresentanteSoporte representante = personaJuridica && incluirSoporteCliente
+                ? soporteRepresentanteLegal(solicitud, dni)
+                : RepresentanteSoporte.noAplica();
+
+        return InteresadoSolicitudResponse.builder()
+                .nombre(nombre)
+                .rol(rol)
+                .dni(dni)
+                .telefono(telefono)
+                .direccion(direccion)
+                .tipoVia(tipoVia)
+                .nombreVia(nombreVia)
+                .codigoPostal(codigoPostal)
+                .municipio(municipio)
+                .provincia(provincia)
+                .personaJuridica(personaJuridica)
+                .documentoIdentidadAportado(identidad.aportado())
+                .documentoIdentidadOrigen(identidad.origen())
+                .requiereRepresentanteLegal(personaJuridica)
+                .representanteLegalAportado(representante.aportado())
+                .representanteLegalNombre(representante.nombre())
+                .representanteLegalDni(representante.dni())
+                .build();
+    }
+
+    private DocumentoSoporte soporteIdentidad(
+            Solicitud solicitud,
+            List<Documento> documentos,
+            String dni,
+            boolean personaJuridica,
+            boolean incluirSoporteCliente
+    ) {
+        String identificador = normalizarIdentificador(dni);
+        if (identificador.isBlank()) {
+            return DocumentoSoporte.noAportado();
+        }
+        if (documentos.stream().anyMatch(documento -> documentoIdentidadCoincide(documento, identificador))) {
+            return new DocumentoSoporte(true, "SOLICITUD");
+        }
+        if (!incluirSoporteCliente) {
+            return DocumentoSoporte.noAportado();
+        }
+        if (solicitud.getCliente() == null || solicitud.getCliente().getId() == null) {
+            return DocumentoSoporte.noAportado();
+        }
+        String nifCliente = normalizarIdentificador(solicitud.getCliente().getNif());
+        if (!identificador.equals(nifCliente)) {
+            return DocumentoSoporte.noAportado();
+        }
+        TipoDocumento tipoEsperado = personaJuridica ? TipoDocumento.CIF : TipoDocumento.DNI;
+        boolean existeEnFichaCliente = documentoService.listarPorCliente(solicitud.getCliente().getId()).stream()
+                .anyMatch(documento -> documento.getTipoDocumento() == tipoEsperado
+                        && (documento.getInteresado() == null || documentoIdentidadCoincide(documento, identificador)));
+        return existeEnFichaCliente ? new DocumentoSoporte(true, "FICHA_CLIENTE") : DocumentoSoporte.noAportado();
+    }
+
+    private RepresentanteSoporte soporteRepresentanteLegal(Solicitud solicitud, String dniEmpresa) {
+        if (solicitud.getCliente() == null || solicitud.getCliente().getId() == null) {
+            return RepresentanteSoporte.noAportado();
+        }
+        String nifCliente = normalizarIdentificador(solicitud.getCliente().getNif());
+        String nifEmpresa = normalizarIdentificador(dniEmpresa);
+        if (nifCliente.isBlank() || !nifCliente.equals(nifEmpresa)) {
+            return RepresentanteSoporte.noAportado();
+        }
+        List<ClienteInteresado> representantes = clienteInteresadoRepository
+                .findByClienteIdAndRepresentanteLegalTrueOrderByInteresadoNombreAsc(solicitud.getCliente().getId());
+        RepresentanteSoporte registradoSinDocumento = RepresentanteSoporte.noAportado();
+        for (ClienteInteresado relacion : representantes) {
+            Interesado representante = relacion.getInteresado();
+            if (representante == null || representante.getId() == null) {
+                continue;
+            }
+            String nombre = representante.getNombre();
+            String dni = representante.getDni();
+            if (registradoSinDocumento.nombre() == null) {
+                registradoSinDocumento = new RepresentanteSoporte(false, nombre, dni);
+            }
+            boolean tieneDni = documentoService
+                    .listarPorInteresadoHabitual(solicitud.getCliente().getId(), representante.getId()).stream()
+                    .anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.DNI
+                            && documentoIdentidadCoincide(documento, normalizarIdentificador(dni)));
+            if (tieneDni) {
+                return new RepresentanteSoporte(true, nombre, dni);
+            }
+        }
+        return registradoSinDocumento;
+    }
+
+    private boolean documentoIdentidadCoincide(Documento documento, String identificador) {
+        if (documento == null || identificador == null || identificador.isBlank()) {
+            return false;
+        }
+        if (documento.getInteresado() != null
+                && identificador.equals(normalizarIdentificador(documento.getInteresado().getDni()))) {
+            return true;
+        }
+        if (documento.getCliente() != null
+                && identificador.equals(normalizarIdentificador(documento.getCliente().getNif()))) {
+            return true;
+        }
+        if (documento.getId() == null) {
+            return false;
+        }
+        DocumentoIdentidadLectura lectura = documentoIdentidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
+        if (lectura == null || lectura.getConfianzaGlobal() == null || lectura.getConfianzaGlobal() < CONFIANZA_MINIMA_IDENTIDAD_SOLICITUD) {
+            return false;
+        }
+        return identificador.equals(normalizarIdentificador(lectura.getIdentificador()));
+    }
+
+    private boolean esPersonaJuridica(String identificador) {
+        return normalizarIdentificador(identificador).matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
+    }
+
+    private String normalizarIdentificador(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+    }
+
+    private record DocumentoSoporte(boolean aportado, String origen) {
+        private static DocumentoSoporte noAportado() {
+            return new DocumentoSoporte(false, null);
+        }
+    }
+
+    private record RepresentanteSoporte(boolean aportado, String nombre, String dni) {
+        private static RepresentanteSoporte noAportado() {
+            return new RepresentanteSoporte(false, null, null);
+        }
+
+        private static RepresentanteSoporte noAplica() {
+            return new RepresentanteSoporte(false, null, null);
+        }
     }
 
     private DocumentoExpedienteResponse mapDocumento(Documento documento) {

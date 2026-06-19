@@ -22,4 +22,11 @@ public class InteresadoSolicitudResponse {
     private String codigoPostal;
     private String municipio;
     private String provincia;
+    private boolean personaJuridica;
+    private boolean documentoIdentidadAportado;
+    private String documentoIdentidadOrigen;
+    private boolean requiereRepresentanteLegal;
+    private boolean representanteLegalAportado;
+    private String representanteLegalNombre;
+    private String representanteLegalDni;
 }

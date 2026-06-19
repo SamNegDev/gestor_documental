@@ -510,18 +510,20 @@ type SolicitudPreparationItem = {
   key: string;
   label: string;
   detail: string;
+  missing?: string | null;
   ready: boolean;
 };
 
 function SolicitudPreparationPanel({ items }: { items: SolicitudPreparationItem[] }) {
-  const pending = items.filter((item) => !item.ready).length;
+  const pendingItems = items.filter((item) => !item.ready);
+  const pending = pendingItems.length;
   return (
     <section className="request-document-guide request-preparation-panel" aria-label="Preparacion documental de la solicitud">
       <div className="request-document-guide__heading">
         {pending > 0 ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
         <div>
           <strong>Preparacion antes de convertir</strong>
-          <span>{pending > 0 ? `${pending} punto(s) por completar antes de dejar el expediente limpio.` : "Interesados, vehiculo y documentos base listos para convertir."}</span>
+          <span>{pending > 0 ? `Falta completar: ${formatReadableList(pendingItems.map((item) => item.label))}.` : "Interesados, vehiculo y documentos base listos para convertir."}</span>
         </div>
       </div>
       <ul className="request-preparation-list">
@@ -531,6 +533,7 @@ function SolicitudPreparationPanel({ items }: { items: SolicitudPreparationItem[
             <span>
               <strong>{item.label}</strong>
               <small>{item.detail}</small>
+              {!item.ready && item.missing ? <em>{item.missing}</em> : null}
             </span>
           </li>
         ))}
@@ -748,39 +751,68 @@ function buildSolicitudPreparationItems(solicitud: SolicitudDetail): SolicitudPr
   const expectedIdentityCount = expectedIdentities(solicitud.tipoTramite);
   const uploadedIdentityCount = solicitud.documentos.filter((documento) => documento.tipo === "DNI" || documento.tipo === "CIF").length;
   const interesados = solicitud.interesados.filter(hasInteresadoData);
+  const expectedRoleLabels = expectedRoles(solicitud.tipoTramite).map(roleLabel);
+  const missingRoleLabels = expectedRoles(solicitud.tipoTramite)
+    .filter((rol) => !interesados.some((item) => item.rol === rol && item.nombre && item.dni))
+    .map(roleLabel);
+  const incompleteLabels = interesados
+    .filter((item) => !item.nombre || !item.dni || !item.rol)
+    .map(interesadoLabel);
+  const identityCoveredCount = Math.max(
+    Math.min(uploadedIdentityCount, expectedIdentityCount),
+    interesados.filter((item) => item.documentoIdentidadAportado).length,
+  );
+  const missingIdentityCount = Math.max(0, expectedIdentityCount - identityCoveredCount);
+  const representativesMissing = interesados.filter((item) => item.requiereRepresentanteLegal && !item.representanteLegalAportado);
+  const representativesCovered = interesados.filter((item) => item.requiereRepresentanteLegal && item.representanteLegalAportado);
+  const identityReady = missingIdentityCount === 0 && representativesMissing.length === 0;
   const roleDocsReady = uploadedTypes.has("CONTRATO_COMPRAVENTA") || uploadedTypes.has("FACTURA");
   const mandateReady = uploadedTypes.has("MANDATO") || uploadedTypes.has("MANDATO_REPRESENTACION");
   const circulationReady = uploadedTypes.has("INFORME_DGT") || uploadedTypes.has("PERMISO_CIRCULACION");
   const fichaReady = uploadedTypes.has("INFORME_DGT") || uploadedTypes.has("FICHA_TECNICA");
+  const interesadosReady = missingRoleLabels.length === 0 && incompleteLabels.length === 0;
   return [
     {
       key: "interesados",
       label: "Interesados y roles",
-      detail: `${interesados.length}/${expectedIdentityCount} bloque(s) con nombre, DNI/CIF o rol.`,
-      ready: interesados.length >= expectedIdentityCount && interesados.every((item) => item.nombre && item.dni && item.rol),
+      detail: interesadosReady
+        ? `${formatReadableList(expectedRoleLabels)} identificados con nombre, DNI/CIF y rol.`
+        : `${interesados.length}/${expectedIdentityCount} bloque(s) informados.`,
+      missing: missingRoleLabels.length > 0
+        ? `Falta bloque de ${formatReadableList(missingRoleLabels)}.`
+        : incompleteLabels.length > 0
+          ? `Completa nombre, DNI/CIF y rol de ${formatReadableList(incompleteLabels)}.`
+          : null,
+      ready: interesadosReady,
     },
     {
       key: "identidades",
-      label: "DNI/CIF",
-      detail: `${uploadedIdentityCount}/${expectedIdentityCount} identidad(es) aportadas.`,
-      ready: uploadedIdentityCount >= expectedIdentityCount,
+      label: representativesMissing.length > 0 || representativesCovered.length > 0 ? "DNI/CIF y administrador" : "DNI/CIF",
+      detail: identityReady
+        ? identityReadyDetail(identityCoveredCount, expectedIdentityCount, representativesCovered)
+        : `${identityCoveredCount}/${expectedIdentityCount} identidad(es) cubiertas.`,
+      missing: identityMissingDetail(missingIdentityCount, representativesMissing, interesados),
+      ready: identityReady,
     },
     {
       key: "contrato",
       label: "Factura o contrato",
       detail: roleDocsReady ? "Disponible para leer comprador y vendedor." : "Necesario para fijar roles con seguridad.",
+      missing: roleDocsReady || solicitud.tipoTramite === "CAMBIO_DOMICILIO" ? null : "Falta factura o contrato para confirmar comprador y vendedor.",
       ready: roleDocsReady || solicitud.tipoTramite === "CAMBIO_DOMICILIO",
     },
     {
       key: "mandato",
       label: "Mandato",
       detail: mandateReady ? "Autorizacion aportada." : "Falta mandato o representacion.",
+      missing: mandateReady ? null : "Sube mandato o mandato de representacion.",
       ready: mandateReady,
     },
     {
       key: "vehiculo",
       label: "Vehiculo",
       detail: circulationReady && fichaReady ? "Informe DGT o documentacion tecnica disponible." : "Falta permiso, ficha o Informe DGT.",
+      missing: circulationReady && fichaReady ? null : "Aporta Informe DGT o permiso + ficha tecnica.",
       ready: circulationReady && fichaReady,
     },
   ];
@@ -790,6 +822,72 @@ function expectedIdentities(tipoTramite?: string | null) {
   if (tipoTramite === "BATECOM") return 3;
   if (tipoTramite === "TRASPASO" || tipoTramite === "NOTIFICACION_VENTA") return 2;
   return 1;
+}
+
+function expectedRoles(tipoTramite?: string | null) {
+  if (tipoTramite === "BATECOM") return ["VENDEDOR", "COMPRAVENTA", "COMPRADOR"];
+  if (tipoTramite === "TRASPASO" || tipoTramite === "NOTIFICACION_VENTA") return ["VENDEDOR", "COMPRADOR"];
+  return ["TITULAR"];
+}
+
+function roleLabel(rol?: string | null) {
+  const labels: Record<string, string> = {
+    VENDEDOR: "vendedor",
+    COMPRADOR: "comprador",
+    COMPRAVENTA: "compraventa",
+    TITULAR: "titular",
+  };
+  return rol ? labels[rol] || formatEnum(rol).toLowerCase() : "interesado";
+}
+
+function interesadoLabel(interesado: { rol?: string | null; nombre?: string | null }) {
+  return roleLabel(interesado.rol) || interesado.nombre || "interesado";
+}
+
+function identityReadyDetail(
+  identityCoveredCount: number,
+  expectedIdentityCount: number,
+  representativesCovered: Array<{ representanteLegalNombre?: string | null }>,
+) {
+  if (representativesCovered.length > 0) {
+    const names = representativesCovered.map((item) => item.representanteLegalNombre).filter(Boolean) as string[];
+    return names.length > 0
+      ? `Identidades cubiertas y administrador detectado: ${formatReadableList(names)}.`
+      : "Identidades y administrador cubiertos.";
+  }
+  return `${identityCoveredCount}/${expectedIdentityCount} identidad(es) cubiertas.`;
+}
+
+function identityMissingDetail(
+  missingIdentityCount: number,
+  representativesMissing: Array<{
+    nombre?: string | null;
+    rol?: string | null;
+    representanteLegalNombre?: string | null;
+    representanteLegalDni?: string | null;
+  }>,
+  interesados: Array<{ rol?: string | null; nombre?: string | null }>,
+) {
+  const parts: string[] = [];
+  if (missingIdentityCount > 0) {
+    const roles = interesados.length > 0 ? formatReadableList(interesados.map(interesadoLabel)) : "los interesados";
+    parts.push(`Falta ${missingIdentityCount} DNI/CIF adicional. Revisa ${roles}.`);
+  }
+  representativesMissing.forEach((item) => {
+    const representante = item.representanteLegalNombre
+      ? `${item.representanteLegalNombre}${item.representanteLegalDni ? ` (${item.representanteLegalDni})` : ""}`
+      : `la empresa ${item.nombre || roleLabel(item.rol)}`;
+    parts.push(`Falta DNI del administrador ${representante}.`);
+  });
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
+function formatReadableList(values: string[]) {
+  const clean = values.map((value) => value.trim()).filter(Boolean);
+  if (clean.length === 0) return "";
+  if (clean.length === 1) return clean[0];
+  if (clean.length === 2) return `${clean[0]} y ${clean[1]}`;
+  return `${clean.slice(0, -1).join(", ")} y ${clean[clean.length - 1]}`;
 }
 
 function buildCoincidenciasDescription(coincidencias: Array<{

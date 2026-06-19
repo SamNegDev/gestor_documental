@@ -5851,6 +5851,11 @@ input.records-table-filter {
   background: var(--panel);
 }
 
+.request-preparation-list li.is-pending {
+  border-color: oklch(82% 0.08 70);
+  background: oklch(99% 0.018 86);
+}
+
 .request-preparation-list li > svg {
   flex: 0 0 auto;
   margin-top: 1px;
@@ -5866,7 +5871,8 @@ input.records-table-filter {
 
 .request-preparation-list span,
 .request-preparation-list strong,
-.request-preparation-list small {
+.request-preparation-list small,
+.request-preparation-list em {
   display: block;
 }
 
@@ -5879,6 +5885,15 @@ input.records-table-filter {
   margin-top: 3px;
   color: var(--muted);
   font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.request-preparation-list em {
+  margin-top: 5px;
+  color: oklch(43% 0.12 56);
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 760;
   line-height: 1.35;
 }
 
