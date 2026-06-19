@@ -14,4 +14,6 @@ public class OcrProperties {
     private String tessdataPath;
     private String language = "spa";
     private float dpi = 300;
+    private int pageTimeoutSeconds = 20;
+    private int maxProcessingSeconds = 180;
 }

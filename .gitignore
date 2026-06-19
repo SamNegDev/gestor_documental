@@ -50,6 +50,15 @@ backups/
 .DS_Store
 Thumbs.db
 
-# Archivos temporales
+# Archivos temporales y artefactos locales
+tmp/
 *.tmp
 *.temp
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Python local
+__pycache__/
+*.py[cod]
