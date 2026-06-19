@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Circle, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, Scissors, Send, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, Scissors, Send, UserRound } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { ApiError } from "../../../shared/api/http";
@@ -40,6 +40,7 @@ export function SolicitudDetailPage() {
   const [ocrReviewDocuments, setOcrReviewDocuments] = useState<DocumentoExpediente[]>([]);
   const [completeSolicitudProcessing, setCompleteSolicitudProcessing] = useState(false);
   const [checkingInteresados, setCheckingInteresados] = useState(false);
+  const [iaResult, setIaResult] = useState<SolicitudDocumentacionIaResponse | null>(null);
   const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
 
@@ -253,9 +254,10 @@ export function SolicitudDetailPage() {
     });
     if (!confirmed) return;
     try {
+      setIaResult(null);
       const response = await procesarDocumentacionMutation.mutateAsync(solicitudActual.id);
       await refreshSolicitud();
-      alert(buildSolicitudIaResultMessage(response));
+      setIaResult(response);
     } catch (cause) {
       alert(cause instanceof ApiError ? cause.details || "No se pudo procesar la documentacion." : "No se pudo procesar la documentacion.");
     }
@@ -272,7 +274,7 @@ export function SolicitudDetailPage() {
   const solicitud = solicitudQuery.data;
   const isClosed = solicitud.estado === "CONVERTIDA" || solicitud.estado === "RECHAZADO";
   const interesadosVisibles = solicitud.interesados.filter(hasInteresadoData);
-  const documentosOrientativosPendientes = getInformativeMissingDocuments(solicitud);
+  const preparationItems = buildSolicitudPreparationItems(solicitud);
 
   return (
     <section className="request-page">
@@ -318,6 +320,8 @@ export function SolicitudDetailPage() {
         />
       ) : null}
 
+      {iaResult ? <SolicitudIaResultPanel response={iaResult} onDismiss={() => setIaResult(null)} /> : null}
+
       {!isAdmin ? <ClientStatusCallout solicitud={solicitud} expedientePath={isAdmin ? undefined : "/cliente/expedientes"} /> : null}
 
       {!isClosed ? (
@@ -328,30 +332,7 @@ export function SolicitudDetailPage() {
             title="Aportar documentacion completa"
             description="Sube el PDF completo de la solicitud y el sistema intentara separar automaticamente los documentos detectados."
           />
-          <section className="request-document-guide" aria-label="Documentacion orientativa pendiente">
-            <div className="request-document-guide__heading">
-              <Info size={18} />
-              <div>
-                <strong>Documentacion orientativa</strong>
-                <span>Esta lista es informativa y no bloquea la solicitud.</span>
-              </div>
-            </div>
-            {documentosOrientativosPendientes.length > 0 ? (
-              <ul>
-                {documentosOrientativosPendientes.map((documento) => (
-                  <li key={documento}>
-                    <Circle size={9} />
-                    <span>{documento}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="request-document-guide__complete">
-                <CheckCircle2 size={16} />
-                No se detectan documentos basicos pendientes.
-              </p>
-            )}
-          </section>
+          <SolicitudPreparationPanel items={preparationItems} />
         </>
       ) : null}
 
@@ -370,6 +351,10 @@ export function SolicitudDetailPage() {
             <div>
               <dt>Ultimo cambio</dt>
               <dd>{solicitud.fechaUltimaModificacion || "Sin cambios"}</dd>
+            </div>
+            <div>
+              <dt>Documentacion</dt>
+              <dd>{solicitud.situacionDocumental ? formatEnum(solicitud.situacionDocumental) : "Sin revisar"}</dd>
             </div>
           </dl>
           {solicitud.observaciones ? <p className="note">{solicitud.observaciones}</p> : null}
@@ -429,7 +414,7 @@ export function SolicitudDetailPage() {
                 <FileText size={20} />
                 <div>
                   <strong>{documento.nombreOriginal || documento.nombre}</strong>
-                  <span>{formatDocumentType(documento.tipo)}</span>
+                  <span>{formatDocumentType(documento.tipo)}{documento.interesadoNombre ? ` - ${documento.interesadoNombre}` : ""}</span>
                 </div>
                 <small>{documento.fechaSubida || "Sin fecha"}</small>
                 <a className="soft-button soft-button--compact" href={`/documentos/ver/${documento.id}`} target="_blank" rel="noreferrer">
@@ -517,6 +502,71 @@ export function SolicitudDetailPage() {
       ) : null}
       {procesarDocumentacionMutation.isPending ? <SolicitudIaProgressModal /> : null}
       {dialog}
+    </section>
+  );
+}
+
+type SolicitudPreparationItem = {
+  key: string;
+  label: string;
+  detail: string;
+  ready: boolean;
+};
+
+function SolicitudPreparationPanel({ items }: { items: SolicitudPreparationItem[] }) {
+  const pending = items.filter((item) => !item.ready).length;
+  return (
+    <section className="request-document-guide request-preparation-panel" aria-label="Preparacion documental de la solicitud">
+      <div className="request-document-guide__heading">
+        {pending > 0 ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+        <div>
+          <strong>Preparacion antes de convertir</strong>
+          <span>{pending > 0 ? `${pending} punto(s) por completar antes de dejar el expediente limpio.` : "Interesados, vehiculo y documentos base listos para convertir."}</span>
+        </div>
+      </div>
+      <ul className="request-preparation-list">
+        {items.map((item) => (
+          <li className={item.ready ? "is-ready" : "is-pending"} key={item.key}>
+            {item.ready ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+            <span>
+              <strong>{item.label}</strong>
+              <small>{item.detail}</small>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function SolicitudIaResultPanel({ response, onDismiss }: { response: SolicitudDocumentacionIaResponse; onDismiss: () => void }) {
+  const tone = response.requiereRevision ? "warning" : response.datosAplicados || response.yaEstabaCorrecta ? "success" : "info";
+  const title = response.requiereRevision
+    ? "Lectura completada con revision pendiente"
+    : response.yaEstabaCorrecta
+      ? "La solicitud ya estaba correcta"
+      : response.datosAplicados
+        ? "Datos aplicados a la solicitud"
+        : "Lectura completada";
+  return (
+    <section className={`solicitud-ia-result solicitud-ia-result--${tone}`} role="status" aria-live="polite">
+      <div className="solicitud-ia-result__heading">
+        {tone === "warning" ? <AlertTriangle size={20} /> : tone === "success" ? <CheckCircle2 size={20} /> : <Info size={20} />}
+        <div>
+          <strong>{title}</strong>
+          <span>{response.mensaje || "Proceso finalizado."}</span>
+        </div>
+        <button className="soft-button soft-button--compact" type="button" onClick={onDismiss}>Cerrar</button>
+      </div>
+      <div className="solicitud-ia-result__metrics">
+        <span>Identidades: {response.lecturasIdentidadNuevas} nuevas / {response.lecturasIdentidadReutilizadas} reutilizadas</span>
+        <span>Roles: {response.lecturasRolesNuevas} nuevas / {response.lecturasRolesReutilizadas} reutilizadas</span>
+      </div>
+      {response.detalles?.length ? (
+        <ul>
+          {response.detalles.slice(0, 5).map((detalle) => <li key={detalle}>{detalle}</li>)}
+        </ul>
+      ) : null}
     </section>
   );
 }
@@ -693,6 +743,55 @@ function hasInteresadoData(interesado: { nombre?: string | null; rol?: string | 
   );
 }
 
+function buildSolicitudPreparationItems(solicitud: SolicitudDetail): SolicitudPreparationItem[] {
+  const uploadedTypes = new Set(solicitud.documentos.map((documento) => documento.tipo));
+  const expectedIdentityCount = expectedIdentities(solicitud.tipoTramite);
+  const uploadedIdentityCount = solicitud.documentos.filter((documento) => documento.tipo === "DNI" || documento.tipo === "CIF").length;
+  const interesados = solicitud.interesados.filter(hasInteresadoData);
+  const roleDocsReady = uploadedTypes.has("CONTRATO_COMPRAVENTA") || uploadedTypes.has("FACTURA");
+  const mandateReady = uploadedTypes.has("MANDATO") || uploadedTypes.has("MANDATO_REPRESENTACION");
+  const circulationReady = uploadedTypes.has("INFORME_DGT") || uploadedTypes.has("PERMISO_CIRCULACION");
+  const fichaReady = uploadedTypes.has("INFORME_DGT") || uploadedTypes.has("FICHA_TECNICA");
+  return [
+    {
+      key: "interesados",
+      label: "Interesados y roles",
+      detail: `${interesados.length}/${expectedIdentityCount} bloque(s) con nombre, DNI/CIF o rol.`,
+      ready: interesados.length >= expectedIdentityCount && interesados.every((item) => item.nombre && item.dni && item.rol),
+    },
+    {
+      key: "identidades",
+      label: "DNI/CIF",
+      detail: `${uploadedIdentityCount}/${expectedIdentityCount} identidad(es) aportadas.`,
+      ready: uploadedIdentityCount >= expectedIdentityCount,
+    },
+    {
+      key: "contrato",
+      label: "Factura o contrato",
+      detail: roleDocsReady ? "Disponible para leer comprador y vendedor." : "Necesario para fijar roles con seguridad.",
+      ready: roleDocsReady || solicitud.tipoTramite === "CAMBIO_DOMICILIO",
+    },
+    {
+      key: "mandato",
+      label: "Mandato",
+      detail: mandateReady ? "Autorizacion aportada." : "Falta mandato o representacion.",
+      ready: mandateReady,
+    },
+    {
+      key: "vehiculo",
+      label: "Vehiculo",
+      detail: circulationReady && fichaReady ? "Informe DGT o documentacion tecnica disponible." : "Falta permiso, ficha o Informe DGT.",
+      ready: circulationReady && fichaReady,
+    },
+  ];
+}
+
+function expectedIdentities(tipoTramite?: string | null) {
+  if (tipoTramite === "BATECOM") return 3;
+  if (tipoTramite === "TRASPASO" || tipoTramite === "NOTIFICACION_VENTA") return 2;
+  return 1;
+}
+
 function buildCoincidenciasDescription(coincidencias: Array<{
   rol?: string | null;
   dni?: string | null;
@@ -712,50 +811,4 @@ function buildCoincidenciasDescription(coincidencias: Array<{
       return `${item.rol ? formatEnum(item.rol) + " - " : ""}${item.dni}: cambian ${diferencias}. Registro: ${registrado || "sin datos"}. Solicitud: ${declarado || "sin datos"}.`;
     })
     .join("\n");
-}
-
-function buildSolicitudIaResultMessage(response: SolicitudDocumentacionIaResponse) {
-  const consumo = `Lecturas nuevas: identidad ${response.lecturasIdentidadNuevas}, roles ${response.lecturasRolesNuevas}. Reutilizadas: identidad ${response.lecturasIdentidadReutilizadas}, roles ${response.lecturasRolesReutilizadas}.`;
-  const estado = response.requiereRevision
-    ? "Requiere revision manual."
-    : response.yaEstabaCorrecta
-      ? "No se han hecho cambios."
-      : response.datosAplicados
-        ? "Datos aplicados."
-        : "Proceso completado.";
-  const detalles = response.detalles?.length ? `\n\n${response.detalles.slice(0, 6).join("\n")}` : "";
-  return `${response.mensaje || "Proceso completado."}\n${estado}\n${consumo}${detalles}`;
-}
-
-function getInformativeMissingDocuments(solicitud: SolicitudDetail) {
-  const uploadedTypes = new Set(solicitud.documentos.map((documento) => documento.tipo));
-  const missing: string[] = [];
-  const expectedIdentityCount =
-    solicitud.tipoTramite === "BATECOM"
-      ? 3
-      : solicitud.tipoTramite === "TRASPASO" || solicitud.tipoTramite === "NOTIFICACION_VENTA"
-        ? 2
-        : 1;
-  const uploadedIdentityCount = solicitud.documentos.filter((documento) => documento.tipo === "DNI" || documento.tipo === "CIF").length;
-
-  if (uploadedIdentityCount < expectedIdentityCount) {
-    missing.push(expectedIdentityCount === 1 ? "DNI o CIF del interesado" : "DNI o CIF de los interesados");
-  }
-  if (
-    (solicitud.tipoTramite === "TRASPASO" || solicitud.tipoTramite === "BATECOM" || solicitud.tipoTramite === "NOTIFICACION_VENTA")
-    && !uploadedTypes.has("CONTRATO_COMPRAVENTA")
-    && !uploadedTypes.has("FACTURA")
-  ) {
-    missing.push("Contrato de compraventa o factura de venta");
-  }
-  if (!uploadedTypes.has("MANDATO") && !uploadedTypes.has("MANDATO_REPRESENTACION")) {
-    missing.push("Mandato o autorizacion de gestion");
-  }
-  if (!uploadedTypes.has("INFORME_DGT") && !uploadedTypes.has("PERMISO_CIRCULACION")) {
-    missing.push("Permiso de circulacion o Informe DGT");
-  }
-  if (!uploadedTypes.has("INFORME_DGT") && !uploadedTypes.has("FICHA_TECNICA")) {
-    missing.push("Ficha tecnica o Informe DGT");
-  }
-  return missing;
 }

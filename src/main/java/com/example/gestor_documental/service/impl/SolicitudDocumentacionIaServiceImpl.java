@@ -21,6 +21,7 @@ import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
+import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -234,7 +235,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         DocumentoIdentidadLectura identidad = identificador != null ? identidades.get(identificador) : null;
         String nombreIdentidad = nombreCompletoIdentidad(identidad);
         String direccionIdentidad = identidad != null ? normalizarTexto(identidad.getDireccionTexto()) : null;
-        String nombreRoles = normalizarTexto(vendedor ? lectura.getVendedorNombre() : lectura.getCompradorNombre());
+        String nombreRoles = normalizarNombre(vendedor ? lectura.getVendedorNombre() : lectura.getCompradorNombre());
         String direccionRoles = normalizarTexto(vendedor ? lectura.getVendedorDireccion() : lectura.getCompradorDireccion());
         return new PersonaSolicitud(
                 identificador,
@@ -272,12 +273,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             PersonaSolicitud persona,
             RolInteresado rolEsperado
     ) {
-        String nombreNormalizado = normalizarTexto(nombreActual);
+        String nombreNormalizado = normalizarNombre(nombreActual);
         String direccionNormalizada = normalizarTexto(direccionActual);
         return rolActual == rolEsperado
                 && normalizarIdentificador(dniActual) != null
                 && normalizarIdentificador(dniActual).equals(persona.identificador())
-                && persona.nombre().equals(nombreNormalizado)
+                && NombrePersonaNormalizer.equivalentes(persona.nombre(), nombreNormalizado)
                 && (persona.direccion() == null || persona.direccion().equals(direccionNormalizada));
     }
 
@@ -408,7 +409,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         if (lectura == null) {
             return null;
         }
-        String razonSocial = normalizarTexto(lectura.getRazonSocial());
+        String razonSocial = normalizarNombre(lectura.getRazonSocial());
         if (razonSocial != null) {
             return razonSocial;
         }
@@ -418,7 +419,11 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                         lectura.getApellido1() != null ? lectura.getApellido1() : "",
                         lectura.getApellido2() != null ? lectura.getApellido2() : ""
                 )).replaceAll("\\s+", " ").trim();
-        return normalizarTexto(joined);
+        return normalizarNombre(joined);
+    }
+
+    private String normalizarNombre(String value) {
+        return NombrePersonaNormalizer.normalizar(value);
     }
 
     private String normalizarTexto(String value) {

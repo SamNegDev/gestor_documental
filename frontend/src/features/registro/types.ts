@@ -23,6 +23,7 @@ export interface InteresadoRegistro {
   provincia?: string | null;
   tipoPersona?: string | null;
   habitual?: boolean;
+  representanteLegal?: boolean;
   documentos?: DocumentoExpediente[];
   totalTramites: number;
   ultimaActividad?: string | null;

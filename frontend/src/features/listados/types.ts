@@ -82,6 +82,7 @@ export interface SolicitudDetail {
   fechaCreacion?: string | null;
   fechaUltimaModificacion?: string | null;
   observaciones?: string | null;
+  situacionDocumental?: string | null;
   expedienteId?: number | null;
   cliente?: ClienteResumen | null;
   creadoPor?: UsuarioResumen | null;

@@ -808,7 +808,8 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             return false;
         }
         if (documento.getInteresado() != null) {
-            return catalogoRepresentante(requisito.getInteresadoRepresentado(), documento.getInteresado().getDni()).isPresent();
+            return catalogoRepresentante(requisito.getInteresadoRepresentado(), documento.getInteresado().getDni()).isPresent()
+                    || representanteLegalHabitual(requisito, documento.getInteresado());
         }
         DocumentoIdentidadLectura lectura = identidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
         if (lectura == null || lectura.getConfianzaGlobal() == null || lectura.getConfianzaGlobal() < CONFIANZA_MINIMA_IDENTIDAD) {
@@ -818,7 +819,8 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         if (tipoDetectado != null && !tipoDocumentoCubreRequisito(tipoDetectado, requisito.getTipoDocumento())) {
             return false;
         }
-        return catalogoRepresentante(requisito.getInteresadoRepresentado(), lectura.getIdentificador()).isPresent();
+        return catalogoRepresentante(requisito.getInteresadoRepresentado(), lectura.getIdentificador()).isPresent()
+                || documentoClientePuedeSerRepresentante(requisito, documento, lectura);
     }
 
     private void vincularDocumentoRepresentanteEmpresa(Documento documento, RequisitoDocumentalExpediente requisito) {
@@ -830,7 +832,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                 requisito.getInteresadoRepresentado(),
                 lectura.getIdentificador()
         ).orElse(null);
-        if (catalogo == null) {
+        if (catalogo == null && !documentoClientePuedeSerRepresentante(requisito, documento, lectura)) {
             return;
         }
         Interesado representante = obtenerOCrearRepresentante(lectura, catalogo);
@@ -858,6 +860,49 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                 .filter(catalogo -> nifRepresentante.equals(normalizarIdentificador(catalogo.getRepresentanteNifNormalizado()))
                         || nifRepresentante.equals(normalizarIdentificador(catalogo.getRepresentanteNif())))
                 .findFirst();
+    }
+
+    private boolean representanteLegalHabitual(RequisitoDocumentalExpediente requisito, Interesado representante) {
+        if (requisito.getExpediente() == null
+                || requisito.getExpediente().getCliente() == null
+                || requisito.getInteresadoRepresentado() == null
+                || representante == null
+                || representante.getId() == null) {
+            return false;
+        }
+        String nifCliente = normalizarIdentificador(requisito.getExpediente().getCliente().getNif());
+        String nifEmpresa = normalizarIdentificador(requisito.getInteresadoRepresentado().getDni());
+        return !nifCliente.isBlank()
+                && nifCliente.equals(nifEmpresa)
+                && clienteInteresadoRepository.existsByClienteIdAndInteresadoIdAndRepresentanteLegalTrue(
+                requisito.getExpediente().getCliente().getId(),
+                representante.getId()
+        );
+    }
+
+    private boolean documentoClientePuedeSerRepresentante(
+            RequisitoDocumentalExpediente requisito,
+            Documento documento,
+            DocumentoIdentidadLectura lectura
+    ) {
+        if (requisito.getExpediente() == null
+                || requisito.getExpediente().getCliente() == null
+                || requisito.getInteresadoRepresentado() == null
+                || documento.getCliente() == null
+                || lectura == null) {
+            return false;
+        }
+        String clienteNif = normalizarIdentificador(requisito.getExpediente().getCliente().getNif());
+        String documentoClienteNif = normalizarIdentificador(documento.getCliente().getNif());
+        String empresaNif = normalizarIdentificador(requisito.getInteresadoRepresentado().getDni());
+        String representanteNif = normalizarIdentificador(lectura.getIdentificador());
+        TipoDocumento tipoDetectado = lectura.getTipoDocumentoDetectado();
+        return !clienteNif.isBlank()
+                && clienteNif.equals(documentoClienteNif)
+                && clienteNif.equals(empresaNif)
+                && !clienteNif.equals(representanteNif)
+                && representanteNif.matches("([0-9]{8}[A-Z]|[XYZ][0-9]{7}[A-Z])")
+                && (tipoDetectado == null || tipoDocumentoCubreRequisito(tipoDetectado, TipoDocumento.DNI));
     }
 
     private Interesado obtenerOCrearRepresentante(
@@ -902,6 +947,9 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         if (lecturaNombre != null) {
             return lecturaNombre;
         }
+        if (catalogo == null) {
+            return null;
+        }
         return unirNombre(
                 catalogo.getRepresentanteNombre(),
                 catalogo.getRepresentanteApellido1RazonSocial(),
@@ -919,6 +967,9 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     }
 
     private String direccionRepresentanteCatalogo(GestionPersonaRepresentanteCatalogo catalogo) {
+        if (catalogo == null) {
+            return null;
+        }
         return normalizarDireccionCompleta(String.join(" ", List.of(
                 catalogo.getRepresentanteDirSiglas() != null ? catalogo.getRepresentanteDirSiglas() : "",
                 catalogo.getRepresentanteDirCalle() != null ? catalogo.getRepresentanteDirCalle() : "",
@@ -932,13 +983,18 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     }
 
     private void asociarRepresentanteACliente(Expediente expediente, Interesado representante) {
-        if (expediente.getCliente() == null || representante.getId() == null
-                || clienteInteresadoRepository.existsByClienteIdAndInteresadoId(expediente.getCliente().getId(), representante.getId())) {
+        if (expediente.getCliente() == null || representante.getId() == null) {
             return;
         }
-        ClienteInteresado relacion = new ClienteInteresado();
-        relacion.setCliente(expediente.getCliente());
-        relacion.setInteresado(representante);
+        ClienteInteresado relacion = clienteInteresadoRepository
+                .findByClienteIdAndInteresadoId(expediente.getCliente().getId(), representante.getId())
+                .orElseGet(() -> {
+                    ClienteInteresado nueva = new ClienteInteresado();
+                    nueva.setCliente(expediente.getCliente());
+                    nueva.setInteresado(representante);
+                    return nueva;
+                });
+        relacion.setRepresentanteLegal(true);
         clienteInteresadoRepository.save(relacion);
     }
 

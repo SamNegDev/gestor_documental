@@ -20,8 +20,9 @@ import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.UsuarioService;
 import com.example.gestor_documental.service.WhatsappOutboundService;
-import com.example.gestor_documental.util.TextNormalizer;
 import com.example.gestor_documental.util.ClienteBrandingUrls;
+import com.example.gestor_documental.util.NombrePersonaNormalizer;
+import com.example.gestor_documental.util.TextNormalizer;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
@@ -257,7 +258,7 @@ public class AdminManagementApiController {
 
     private Cliente mapCliente(ClienteUpsertRequest request, Cliente cliente) {
         cliente.setNif(TextNormalizer.upperOrNull(request.getNif()));
-        cliente.setNombre(TextNormalizer.upperOrNull(request.getNombre()));
+        cliente.setNombre(NombrePersonaNormalizer.normalizar(request.getNombre()));
         cliente.setEmail(TextNormalizer.lowerOrNull(request.getEmail()));
         cliente.setDireccion(TextNormalizer.upperOrNull(request.getDireccion()));
         cliente.setTelefono(TextNormalizer.upperOrNull(request.getTelefono()));
@@ -298,6 +299,8 @@ public class AdminManagementApiController {
                 .descripcion(documento.getDescripcionArchivo())
                 .fechaSubida(documento.getFechaSubida() != null ? documento.getFechaSubida().toString() : null)
                 .subidoPor(documento.getSubidoPor() != null ? nombreCompleto(documento.getSubidoPor()) : null)
+                .interesadoId(documento.getInteresado() != null ? documento.getInteresado().getId() : null)
+                .interesadoNombre(documento.getInteresado() != null ? documento.getInteresado().getNombre() : null)
                 .estado("SUBIDO")
                 .subido(true)
                 .requeridoAhora(false)

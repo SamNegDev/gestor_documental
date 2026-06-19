@@ -25,6 +25,7 @@ import com.example.gestor_documental.service.RequisitoDocumentalExpedienteServic
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.util.DireccionFormatter;
+import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
@@ -402,7 +403,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         return interesadoService.buscarInteresadoPorDNI(dni)
                 .flatMap(interesado -> {
                     List<String> diferencias = new java.util.ArrayList<>();
-                    if (valorAportadoDiferente(nombreDeclarado, interesado.getNombre())) {
+                    if (valorNombreAportadoDiferente(nombreDeclarado, interesado.getNombre())) {
                         diferencias.add("Nombre completo/Razon social");
                     }
                     if (valorAportadoDiferente(telefonoDeclarado, interesado.getTelefono())) {
@@ -434,6 +435,15 @@ public class SolicitudServiceImpl implements SolicitudService {
             return false;
         }
         String registradoNormalizado = TextNormalizer.upperOrNull(registrado);
+        return !declaradoNormalizado.equals(registradoNormalizado);
+    }
+
+    private boolean valorNombreAportadoDiferente(String declarado, String registrado) {
+        String declaradoNormalizado = NombrePersonaNormalizer.normalizar(declarado);
+        if (declaradoNormalizado == null || declaradoNormalizado.isBlank()) {
+            return false;
+        }
+        String registradoNormalizado = NombrePersonaNormalizer.normalizar(registrado);
         return !declaradoNormalizado.equals(registradoNormalizado);
     }
 
@@ -535,7 +545,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitudBase.setMatricula(TextNormalizer.upperOrNull(solicitudActualizada.getMatricula()));
 
         solicitudBase.setInteresado1Rol(solicitudActualizada.getInteresado1Rol());
-        solicitudBase.setInteresado1Nombre(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Nombre()));
+        solicitudBase.setInteresado1Nombre(NombrePersonaNormalizer.normalizar(solicitudActualizada.getInteresado1Nombre()));
         solicitudBase.setInteresado1Dni(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Dni()));
         solicitudBase.setInteresado1Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Telefono()));
         solicitudBase.setInteresado1TipoVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1TipoVia()));
@@ -552,7 +562,7 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitudActualizada.getInteresado1Provincia()));
 
         solicitudBase.setInteresado2Rol(solicitudActualizada.getInteresado2Rol());
-        solicitudBase.setInteresado2Nombre(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Nombre()));
+        solicitudBase.setInteresado2Nombre(NombrePersonaNormalizer.normalizar(solicitudActualizada.getInteresado2Nombre()));
         solicitudBase.setInteresado2Dni(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Dni()));
         solicitudBase.setInteresado2Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Telefono()));
         solicitudBase.setInteresado2TipoVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2TipoVia()));
@@ -639,7 +649,7 @@ public class SolicitudServiceImpl implements SolicitudService {
     private void normalizarSolicitud(Solicitud solicitud) {
         solicitud.setMatricula(TextNormalizer.upperOrNull(solicitud.getMatricula()));
         solicitud.setObservaciones(TextNormalizer.upperOrNull(solicitud.getObservaciones()));
-        solicitud.setInteresado1Nombre(TextNormalizer.upperOrNull(solicitud.getInteresado1Nombre()));
+        solicitud.setInteresado1Nombre(NombrePersonaNormalizer.normalizar(solicitud.getInteresado1Nombre()));
         solicitud.setInteresado1Dni(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()));
         solicitud.setInteresado1Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado1Telefono()));
         solicitud.setInteresado1TipoVia(TextNormalizer.upperOrNull(solicitud.getInteresado1TipoVia()));
@@ -654,7 +664,7 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitud.getInteresado1CodigoPostal(),
                 solicitud.getInteresado1Municipio(),
                 solicitud.getInteresado1Provincia()));
-        solicitud.setInteresado2Nombre(TextNormalizer.upperOrNull(solicitud.getInteresado2Nombre()));
+        solicitud.setInteresado2Nombre(NombrePersonaNormalizer.normalizar(solicitud.getInteresado2Nombre()));
         solicitud.setInteresado2Dni(TextNormalizer.upperOrNull(solicitud.getInteresado2Dni()));
         solicitud.setInteresado2Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado2Telefono()));
         solicitud.setInteresado2TipoVia(TextNormalizer.upperOrNull(solicitud.getInteresado2TipoVia()));

@@ -21,6 +21,7 @@ public class SolicitudDetailResponse {
     private String fechaCreacion;
     private String fechaUltimaModificacion;
     private String observaciones;
+    private String situacionDocumental;
     private Long expedienteId;
     private ClienteResumenResponse cliente;
     private UsuarioResumenResponse creadoPor;

@@ -42,6 +42,8 @@ public class ClienteInteresado {
     @JoinColumn(name = "interesado_id", nullable = false)
     private Interesado interesado;
 
+    private Boolean representanteLegal = false;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime fechaAlta;

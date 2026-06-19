@@ -43,7 +43,7 @@ export function InteresadosRegistroPage() {
       {!query.isLoading && !query.error ? <div className="registry-list">
         {interesados.length === 0 ? <div className="records-empty">No hay interesados que coincidan con la busqueda.</div> : null}
         {interesados.map((item) => <Link className="registry-row" key={item.id} to={`/interesados/${item.id}`}>
-          <span className="registry-row__icon"><UserRound size={19} /></span><span className="registry-row__identity"><strong>{item.nombre}</strong><small>{item.dni}</small></span>
+          <span className="registry-row__icon"><UserRound size={19} /></span><span className="registry-row__identity"><strong>{item.nombre}</strong><small>{item.dni}{item.representanteLegal ? " - representante legal" : ""}</small></span>
           <span><small>Contacto</small><strong>{item.telefono || "Sin telefono"}</strong></span><span><small>Tramites</small><strong>{item.totalTramites}{item.habitual ? " · habitual" : ""}</strong></span>
           <span><small>Ultima actividad</small><strong>{item.ultimaActividad || "Sin actividad"}</strong></span><ChevronRight size={18} />
         </Link>)}

@@ -3,19 +3,25 @@ package com.example.gestor_documental.service.impl;
 import com.example.gestor_documental.config.OpenAiProperties;
 import com.example.gestor_documental.dto.expediente.DocumentoIdentidadLecturaResponse;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
+import com.example.gestor_documental.model.Cliente;
+import com.example.gestor_documental.model.ClienteInteresado;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
+import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
+import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,6 +67,8 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
     private final DocumentoRepository documentoRepository;
     private final DocumentoIdentidadLecturaRepository lecturaRepository;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final InteresadoRepository interesadoRepository;
+    private final ClienteInteresadoRepository clienteInteresadoRepository;
     private final RequisitoDocumentalExpedienteService requisitoDocumentalExpedienteService;
     private final OpenAiProperties openAiProperties;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -228,8 +236,8 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         String identificador = normalizarIdentificador(texto(resultado, "identificador"));
         Double confianza = numero(resultado, "confianzaGlobal");
         boolean revisionIa = booleano(resultado, "requiereRevision");
-        Interesado interesadoVinculado = resolverInteresadoVinculado(documento, identificador);
         TipoDocumento tipoDetectado = tipoDetectado(resultado, documento.getTipoDocumento());
+        Interesado interesadoVinculado = resolverInteresadoVinculado(documento, identificador, resultado, tipoDetectado);
         boolean conflictoInteresado = documento.getInteresado() != null
                 && identificador != null
                 && !coincideIdentificador(documento.getInteresado(), identificador);
@@ -288,7 +296,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
     }
 
     private String nombreCompletoLectura(DocumentoIdentidadLectura lectura) {
-        String razonSocial = TextNormalizer.upperOrNull(lectura.getRazonSocial());
+        String razonSocial = NombrePersonaNormalizer.normalizar(lectura.getRazonSocial());
         if (razonSocial != null) {
             return razonSocial;
         }
@@ -298,7 +306,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                         lectura.getApellido1() != null ? lectura.getApellido1() : "",
                         lectura.getApellido2() != null ? lectura.getApellido2() : ""
                 )).replaceAll("\\s+", " ").trim();
-        return TextNormalizer.upperOrNull(joined);
+        return NombrePersonaNormalizer.normalizar(joined);
     }
 
     private String normalizarDireccionCompleta(String direccion) {
@@ -319,7 +327,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         );
     }
 
-    private Interesado resolverInteresadoVinculado(Documento documento, String identificador) {
+    private Interesado resolverInteresadoVinculado(Documento documento, String identificador, JsonNode resultado, TipoDocumento tipoDetectado) {
         if (identificador == null) {
             return null;
         }
@@ -327,7 +335,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             return coincideIdentificador(documento.getInteresado(), identificador) ? documento.getInteresado() : null;
         }
         if (documento.getExpediente() == null || documento.getExpediente().getId() == null) {
-            return null;
+            return resolverInteresadoCliente(documento, identificador, resultado, tipoDetectado);
         }
         List<Interesado> coincidencias = expedienteInteresadoRepository.findByExpedienteId(documento.getExpediente().getId())
                 .stream()
@@ -336,6 +344,69 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 .distinct()
                 .toList();
         return coincidencias.size() == 1 ? coincidencias.get(0) : null;
+    }
+
+    private Interesado resolverInteresadoCliente(Documento documento, String identificador, JsonNode resultado, TipoDocumento tipoDetectado) {
+        Cliente cliente = documento.getCliente();
+        if (cliente == null || cliente.getId() == null) {
+            return null;
+        }
+        Interesado interesado = interesadoRepository.findByDni(identificador).orElse(null);
+        if (interesado == null) {
+            interesado = new Interesado();
+            interesado.setDni(identificador);
+            interesado.setNombre(nombreCompletoResultado(resultado, identificador));
+            interesado.setTipoPersona(inferirTipoPersona(identificador, tipoDetectado));
+            interesado.setDireccion(normalizarDireccionCompleta(texto(resultado, "direccionTexto")));
+            interesado = interesadoRepository.save(interesado);
+        }
+        Interesado interesadoFinal = interesado;
+        ClienteInteresado relacion = clienteInteresadoRepository
+                .findByClienteIdAndInteresadoId(cliente.getId(), interesadoFinal.getId())
+                .orElseGet(() -> {
+                    ClienteInteresado nueva = new ClienteInteresado();
+                    nueva.setCliente(cliente);
+                    nueva.setInteresado(interesadoFinal);
+                    return nueva;
+                });
+        boolean representanteLegal = esRepresentanteLegalCliente(cliente, identificador, tipoDetectado);
+        if (representanteLegal && !Boolean.TRUE.equals(relacion.getRepresentanteLegal())) {
+            relacion.setRepresentanteLegal(true);
+        }
+        if (relacion.getId() == null || representanteLegal) {
+            clienteInteresadoRepository.save(relacion);
+        }
+        return interesado;
+    }
+
+    private String nombreCompletoResultado(JsonNode resultado, String fallback) {
+        String razonSocial = NombrePersonaNormalizer.normalizar(texto(resultado, "razonSocial"));
+        if (razonSocial != null) {
+            return razonSocial;
+        }
+        String joined = String.join(" ",
+                List.of(
+                        texto(resultado, "nombre") != null ? texto(resultado, "nombre") : "",
+                        texto(resultado, "apellido1") != null ? texto(resultado, "apellido1") : "",
+                        texto(resultado, "apellido2") != null ? texto(resultado, "apellido2") : ""
+                )).replaceAll("\\s+", " ").trim();
+        String nombre = NombrePersonaNormalizer.normalizar(joined);
+        return nombre != null ? nombre : fallback;
+    }
+
+    private TipoPersona inferirTipoPersona(String identificador, TipoDocumento tipoDetectado) {
+        if (tipoDetectado == TipoDocumento.CIF || identificador.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]")) {
+            return TipoPersona.EMPRESA;
+        }
+        return TipoPersona.PARTICULAR;
+    }
+
+    private boolean esRepresentanteLegalCliente(Cliente cliente, String identificador, TipoDocumento tipoDetectado) {
+        String nifCliente = normalizarIdentificador(cliente.getNif());
+        return tipoDetectado == TipoDocumento.DNI
+                && nifCliente != null
+                && !nifCliente.equals(identificador)
+                && nifCliente.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
     }
 
     private boolean coincideIdentificador(Interesado interesado, String identificador) {

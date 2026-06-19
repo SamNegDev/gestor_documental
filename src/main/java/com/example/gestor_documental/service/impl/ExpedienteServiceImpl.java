@@ -18,6 +18,7 @@ import com.example.gestor_documental.service.InteresadoService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.VehiculoService;
 import com.example.gestor_documental.util.DireccionFormatter;
+import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -149,7 +150,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         Interesado interesado = interesadoService.buscarInteresadoPorDNI(dto.getDni())
                 .orElseGet(() -> {
                     Interesado nuevoInteresado = new Interesado();
-                    nuevoInteresado.setNombre(TextNormalizer.upperOrNull(dto.getNombre()));
+                    nuevoInteresado.setNombre(NombrePersonaNormalizer.normalizar(dto.getNombre()));
                     nuevoInteresado.setDni(TextNormalizer.upperOrNull(dto.getDni()));
                     nuevoInteresado.setTelefono(TextNormalizer.upperOrNull(dto.getTelefono()));
                     nuevoInteresado.setTipoVia(TextNormalizer.upperOrNull(dto.getTipoVia()));

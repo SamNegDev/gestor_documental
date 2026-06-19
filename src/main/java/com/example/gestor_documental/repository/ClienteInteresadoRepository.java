@@ -12,7 +12,12 @@ public interface ClienteInteresadoRepository extends JpaRepository<ClienteIntere
     @EntityGraph(attributePaths = "interesado")
     List<ClienteInteresado> findByClienteIdOrderByInteresadoNombreAsc(Long clienteId);
 
+    @EntityGraph(attributePaths = "interesado")
+    List<ClienteInteresado> findByClienteIdAndRepresentanteLegalTrueOrderByInteresadoNombreAsc(Long clienteId);
+
     Optional<ClienteInteresado> findByClienteIdAndInteresadoId(Long clienteId, Long interesadoId);
 
     boolean existsByClienteIdAndInteresadoId(Long clienteId, Long interesadoId);
+
+    boolean existsByClienteIdAndInteresadoIdAndRepresentanteLegalTrue(Long clienteId, Long interesadoId);
 }

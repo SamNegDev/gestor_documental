@@ -449,6 +449,7 @@ public class SolicitudApiController {
     }
 
     private SolicitudDetailResponse mapSolicitudDetail(Solicitud solicitud) {
+        List<Documento> documentos = documentoService.listarPorSolicitud(solicitud.getId());
         return SolicitudDetailResponse.builder()
                 .id(solicitud.getId())
                 .matricula(solicitud.getMatricula())
@@ -459,6 +460,7 @@ public class SolicitudApiController {
                 .fechaCreacion(formatDate(solicitud.getFechaCreacion()))
                 .fechaUltimaModificacion(formatDate(solicitud.getFechaUltimaModificacion()))
                 .observaciones(solicitud.getObservaciones())
+                .situacionDocumental(situacionDocumental(solicitud, documentos))
                 .expedienteId(solicitud.getExpediente() != null ? solicitud.getExpediente().getId() : null)
                 .cliente(solicitud.getCliente() != null
                         ? ClienteResumenResponse.builder()
@@ -472,7 +474,7 @@ public class SolicitudApiController {
                 .creadoPor(mapUsuario(solicitud.getCreadoPor()))
                 .modificadoPor(mapUsuario(solicitud.getModificadoPor()))
                 .interesados(mapInteresados(solicitud))
-                .documentos(documentoService.listarPorSolicitud(solicitud.getId()).stream().map(this::mapDocumento).toList())
+                .documentos(documentos.stream().map(this::mapDocumento).toList())
                 .incidencias(incidenciaService.listarPorSolicitud(solicitud.getId()).stream().map(this::mapIncidencia).toList())
                 .historial(historialCambioService.listarPorSolicitud(solicitud.getId()).stream()
                         .filter(cambio -> !"CARGAR DOCUMENTO".equals(cambio.getAccion()))
@@ -548,6 +550,8 @@ public class SolicitudApiController {
                 .descripcion(documento.getDescripcionArchivo())
                 .fechaSubida(formatDate(documento.getFechaSubida()))
                 .subidoPor(documento.getSubidoPor() != null ? nombreCompleto(documento.getSubidoPor()) : null)
+                .interesadoId(documento.getInteresado() != null ? documento.getInteresado().getId() : null)
+                .interesadoNombre(documento.getInteresado() != null ? documento.getInteresado().getNombre() : null)
                 .estado("SUBIDO")
                 .subido(true)
                 .requeridoAhora(false)

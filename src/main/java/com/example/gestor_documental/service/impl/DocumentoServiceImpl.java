@@ -383,7 +383,7 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     @Override
     public List<Documento> listarPorCliente(Long id) {
-        return documentoRepository.findByClienteIdAndInteresadoIsNullOrderByFechaSubidaDesc(id);
+        return documentoRepository.findByClienteIdOrderByFechaSubidaDesc(id);
     }
 
     @Override

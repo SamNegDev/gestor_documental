@@ -73,6 +73,8 @@ export interface DocumentoExpediente {
   descripcion?: string | null;
   fechaSubida?: string | null;
   subidoPor?: string | null;
+  interesadoId?: number | null;
+  interesadoNombre?: string | null;
   operacionId?: number | null;
   operacionLabel?: string | null;
   estado: DocumentoEstado;

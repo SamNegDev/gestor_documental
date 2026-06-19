@@ -5827,6 +5827,132 @@ input.records-table-filter {
   color: oklch(43% 0.1 154);
 }
 
+.request-preparation-panel {
+  border-color: oklch(83% 0.05 88);
+  background: oklch(99% 0.01 94);
+}
+
+.request-preparation-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.request-preparation-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.request-preparation-list li > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.request-preparation-list li.is-ready > svg {
+  color: oklch(45% 0.11 154);
+}
+
+.request-preparation-list li.is-pending > svg {
+  color: oklch(58% 0.14 58);
+}
+
+.request-preparation-list span,
+.request-preparation-list strong,
+.request-preparation-list small {
+  display: block;
+}
+
+.request-preparation-list strong {
+  color: var(--ink);
+  font-size: 0.84rem;
+}
+
+.request-preparation-list small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.solicitud-ia-result {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.solicitud-ia-result--success {
+  border-color: oklch(78% 0.09 154);
+  background: oklch(98% 0.02 154);
+}
+
+.solicitud-ia-result--warning {
+  border-color: oklch(78% 0.12 65);
+  background: oklch(98% 0.02 82);
+}
+
+.solicitud-ia-result--info {
+  border-color: oklch(80% 0.08 236);
+  background: oklch(98% 0.02 236);
+}
+
+.solicitud-ia-result__heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.solicitud-ia-result__heading > svg {
+  margin-top: 2px;
+}
+
+.solicitud-ia-result__heading strong,
+.solicitud-ia-result__heading span {
+  display: block;
+}
+
+.solicitud-ia-result__heading span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.solicitud-ia-result__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.solicitud-ia-result__metrics span {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--panel) 85%, white);
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 720;
+}
+
+.solicitud-ia-result ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+
 .request-document-draft {
   display: grid;
   grid-template-columns: minmax(180px, 240px) minmax(0, 1fr) auto;

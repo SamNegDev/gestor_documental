@@ -753,6 +753,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .descripcion(documento.getDescripcionArchivo())
                 .fechaSubida(formatearFecha(documento.getFechaSubida()))
                 .subidoPor(documento.getSubidoPor() != null ? nombreCompleto(documento.getSubidoPor()) : null)
+                .interesadoId(documento.getInteresado() != null ? documento.getInteresado().getId() : null)
+                .interesadoNombre(documento.getInteresado() != null ? documento.getInteresado().getNombre() : null)
                 .operacionId(documento.getOperacion() != null ? documento.getOperacion().getId() : null)
                 .operacionLabel(documento.getOperacion() != null && documento.getOperacion().getTipo() != null
                         ? documento.getOperacion().getTipo().getLabel()

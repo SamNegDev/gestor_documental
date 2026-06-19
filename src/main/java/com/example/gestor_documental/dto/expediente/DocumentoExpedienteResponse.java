@@ -19,6 +19,8 @@ public class DocumentoExpedienteResponse {
     private String descripcion;
     private String fechaSubida;
     private String subidoPor;
+    private Long interesadoId;
+    private String interesadoNombre;
     private Long operacionId;
     private String operacionLabel;
     private String estado;

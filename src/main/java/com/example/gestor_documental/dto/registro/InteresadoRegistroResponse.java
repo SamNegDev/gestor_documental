@@ -20,6 +20,7 @@ public class InteresadoRegistroResponse {
     private String provincia;
     private String tipoPersona;
     private boolean habitual;
+    private boolean representanteLegal;
     private long totalTramites;
     private String ultimaActividad;
     private List<DocumentoExpedienteResponse> documentos;

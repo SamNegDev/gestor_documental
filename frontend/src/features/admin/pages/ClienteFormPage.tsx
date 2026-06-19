@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Building2, ExternalLink, FileText, Image, MessageCircle, Save, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Building2, ExternalLink, FileText, Image, MessageCircle, Save, Trash2, Upload, UserRound } from "lucide-react";
 import {
   createCliente,
   deleteClienteDocumento,
@@ -14,6 +14,7 @@ import {
 } from "../services/adminApi";
 import type { ClienteInput } from "../types";
 import type { DocumentoExpediente } from "../../expedientes/types/expedienteDetail.types";
+import { readDocumentIdentity } from "../../expedientes/services/documentosApi";
 import { cleanLowerText, cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 
@@ -131,6 +132,18 @@ export function ClienteFormPage() {
       setDocumentFeedback({ tone: "success", text: "Documento del cliente eliminado." });
     },
     onError: (cause) => setDocumentFeedback({ tone: "danger", text: errorMessage(cause, "No se pudo eliminar el documento.") }),
+  });
+
+  const readIdentityMutation = useMutation({
+    mutationFn: (documentoId: number) => readDocumentIdentity(documentoId, false),
+    onSuccess: async (lectura) => {
+      await clienteQuery.refetch();
+      setDocumentFeedback({
+        tone: lectura.requiereRevision ? "danger" : "success",
+        text: lectura.mensaje || "Lectura de identidad completada.",
+      });
+    },
+    onError: (cause) => setDocumentFeedback({ tone: "danger", text: errorMessage(cause, "No se pudo leer la identidad.") }),
   });
 
   const iniciarWhatsappMutation = useMutation({
@@ -385,7 +398,9 @@ export function ClienteFormPage() {
               <ClientDocumentsList
                 busyId={deleteDocumentMutation.variables}
                 documentos={documentos}
+                readingId={readIdentityMutation.variables}
                 onDelete={handleDeleteDocument}
+                onReadIdentity={(documento) => documento.id && readIdentityMutation.mutate(documento.id)}
               />
             </>
           ) : (
@@ -472,11 +487,15 @@ function LogoEditor({
 function ClientDocumentsList({
   documentos,
   busyId,
+  readingId,
   onDelete,
+  onReadIdentity,
 }: {
   documentos: DocumentoExpediente[];
   busyId?: number;
+  readingId?: number;
   onDelete: (documento: DocumentoExpediente) => void;
+  onReadIdentity: (documento: DocumentoExpediente) => void;
 }) {
   if (!documentos.length) {
     return (
@@ -494,10 +513,22 @@ function ClientDocumentsList({
           <div className="client-document-row__icon"><FileText size={17} /></div>
           <div className="client-document-row__main">
             <strong>{documento.nombreOriginal || documento.nombre}</strong>
+            {documento.interesadoNombre ? <span>Vinculado a {documento.interesadoNombre}</span> : null}
             <span>{documentTypeLabel(documento.tipo)} · {formatDate(documento.fechaSubida)}</span>
           </div>
           {documento.id ? (
             <div className="client-document-row__actions">
+              {isIdentityDocument(documento.tipo) ? (
+                <button
+                  className="icon-button"
+                  disabled={readingId === documento.id}
+                  type="button"
+                  title="Leer identidad"
+                  onClick={() => onReadIdentity(documento)}
+                >
+                  <UserRound size={15} />
+                </button>
+              ) : null}
               <a className="icon-button" href={`/documentos/ver/${documento.id}`} target="_blank" rel="noreferrer" title="Ver PDF">
                 <ExternalLink size={15} />
               </a>
@@ -539,6 +570,10 @@ function errorMessage(cause: unknown, fallback: string) {
 
 function documentTypeLabel(tipo: string) {
   return CLIENT_DOCUMENT_TYPES.find((item) => item.value === tipo)?.label || tipo.replaceAll("_", " ");
+}
+
+function isIdentityDocument(tipo: string) {
+  return tipo === "DNI" || tipo === "CIF";
 }
 
 function formatDate(value?: string | null) {

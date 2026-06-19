@@ -8,6 +8,7 @@ import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.service.InteresadoService;
 import com.example.gestor_documental.util.DireccionFormatter;
+import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,7 +29,7 @@ public class InteresadoServiceImpl implements InteresadoService {
 
     @Override
     public Interesado guardar(Interesado nuevoInteresado) {
-        nuevoInteresado.setNombre(TextNormalizer.upperOrNull(nuevoInteresado.getNombre()));
+        nuevoInteresado.setNombre(NombrePersonaNormalizer.normalizar(nuevoInteresado.getNombre()));
         nuevoInteresado.setDni(TextNormalizer.upperOrNull(nuevoInteresado.getDni()));
         nuevoInteresado.setTelefono(TextNormalizer.upperOrNull(nuevoInteresado.getTelefono()));
         nuevoInteresado.setTipoVia(TextNormalizer.upperOrNull(nuevoInteresado.getTipoVia()));
@@ -53,7 +54,7 @@ public class InteresadoServiceImpl implements InteresadoService {
         Interesado interesado = interesadoRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Interesado no encontrado"));
         String dni = TextNormalizer.upperOrNull(request.dni());
-        String nombre = TextNormalizer.upperOrNull(request.nombre());
+        String nombre = NombrePersonaNormalizer.normalizar(request.nombre());
         if (dni == null || nombre == null) {
             throw new OperacionInvalidaException("DNI y nombre son obligatorios");
         }
