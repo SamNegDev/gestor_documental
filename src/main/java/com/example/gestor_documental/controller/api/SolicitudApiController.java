@@ -619,7 +619,7 @@ public class SolicitudApiController {
         if (identificador.isBlank()) {
             return DocumentoSoporte.noAportado();
         }
-        if (documentos.stream().anyMatch(documento -> documentoIdentidadCoincide(documento, identificador))) {
+        if (documentos.stream().anyMatch(documento -> documentoLecturaCoincide(documento, identificador))) {
             return new DocumentoSoporte(true, "SOLICITUD");
         }
         if (!incluirSoporteCliente) {
@@ -635,7 +635,7 @@ public class SolicitudApiController {
         TipoDocumento tipoEsperado = personaJuridica ? TipoDocumento.CIF : TipoDocumento.DNI;
         boolean existeEnFichaCliente = documentoService.listarPorCliente(solicitud.getCliente().getId()).stream()
                 .anyMatch(documento -> documento.getTipoDocumento() == tipoEsperado
-                        && (documento.getInteresado() == null || documentoIdentidadCoincide(documento, identificador)));
+                        && (personaJuridica || documentoLecturaCoincide(documento, identificador)));
         return existeEnFichaCliente ? new DocumentoSoporte(true, "FICHA_CLIENTE") : DocumentoSoporte.noAportado();
     }
 
@@ -663,8 +663,7 @@ public class SolicitudApiController {
             }
             boolean tieneDni = documentoService
                     .listarPorInteresadoHabitual(solicitud.getCliente().getId(), representante.getId()).stream()
-                    .anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.DNI
-                            && documentoIdentidadCoincide(documento, normalizarIdentificador(dni)));
+                    .anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.DNI);
             if (tieneDni) {
                 return new RepresentanteSoporte(true, nombre, dni);
             }
@@ -672,17 +671,9 @@ public class SolicitudApiController {
         return registradoSinDocumento;
     }
 
-    private boolean documentoIdentidadCoincide(Documento documento, String identificador) {
+    private boolean documentoLecturaCoincide(Documento documento, String identificador) {
         if (documento == null || identificador == null || identificador.isBlank()) {
             return false;
-        }
-        if (documento.getInteresado() != null
-                && identificador.equals(normalizarIdentificador(documento.getInteresado().getDni()))) {
-            return true;
-        }
-        if (documento.getCliente() != null
-                && identificador.equals(normalizarIdentificador(documento.getCliente().getNif()))) {
-            return true;
         }
         if (documento.getId() == null) {
             return false;

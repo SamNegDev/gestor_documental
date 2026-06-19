@@ -23,6 +23,7 @@ import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
+import com.example.gestor_documental.validation.DniNieValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -71,6 +72,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
     private final ClienteInteresadoRepository clienteInteresadoRepository;
     private final RequisitoDocumentalExpedienteService requisitoDocumentalExpedienteService;
     private final OpenAiProperties openAiProperties;
+    private final DniNieValidator dniNieValidator;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.upload.dir:uploads}")
@@ -237,12 +239,16 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         Double confianza = numero(resultado, "confianzaGlobal");
         boolean revisionIa = booleano(resultado, "requiereRevision");
         TipoDocumento tipoDetectado = tipoDetectado(resultado, documento.getTipoDocumento());
-        Interesado interesadoVinculado = resolverInteresadoVinculado(documento, identificador, resultado, tipoDetectado);
+        boolean identificadorInvalido = identificador != null && !identificadorValido(identificador);
+        Interesado interesadoVinculado = identificadorInvalido
+                ? null
+                : resolverInteresadoVinculado(documento, identificador, resultado, tipoDetectado);
         boolean conflictoInteresado = documento.getInteresado() != null
                 && identificador != null
                 && !coincideIdentificador(documento.getInteresado(), identificador);
         boolean requiereRevision = revisionIa
                 || identificador == null
+                || identificadorInvalido
                 || confianza == null
                 || confianza < CONFIANZA_MINIMA_AUTOMATICA
                 || interesadoVinculado == null
@@ -264,7 +270,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         lectura.setModelo(modeloIdentidad());
         lectura.setFechaLectura(LocalDateTime.now());
         lectura.setResultadoJson(resultado.toString());
-        lectura.setMensaje(mensajeLectura(identificador, interesadoVinculado, conflictoInteresado, requiereRevision));
+        lectura.setMensaje(mensajeLectura(identificador, identificadorInvalido, interesadoVinculado, conflictoInteresado, requiereRevision));
 
         if (interesadoVinculado != null && !conflictoInteresado) {
             boolean documentoActualizado = false;
@@ -414,9 +420,18 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 && identificador.equals(normalizarIdentificador(interesado.getDni()));
     }
 
-    private String mensajeLectura(String identificador, Interesado interesado, boolean conflictoInteresado, boolean requiereRevision) {
+    private String mensajeLectura(
+            String identificador,
+            boolean identificadorInvalido,
+            Interesado interesado,
+            boolean conflictoInteresado,
+            boolean requiereRevision
+    ) {
         if (identificador == null) {
             return "No se pudo leer un DNI/CIF con seguridad.";
+        }
+        if (identificadorInvalido) {
+            return "El DNI/NIE leido no supera la validacion de letra; revisar documento.";
         }
         if (conflictoInteresado) {
             return "El documento ya estaba asociado a otro interesado; revisar antes de validar.";
@@ -573,6 +588,17 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         }
         String normalizado = value.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
         return normalizado.isBlank() ? null : normalizado;
+    }
+
+    private boolean identificadorValido(String value) {
+        String identificador = normalizarIdentificador(value);
+        if (identificador == null) {
+            return false;
+        }
+        if (identificador.matches("[0-9]{8}[A-Z]") || identificador.matches("[XYZ][0-9]{7}[A-Z]")) {
+            return dniNieValidator.esValido(identificador);
+        }
+        return identificador.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
     }
 
     private String limitar(String value, int max) {

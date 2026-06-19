@@ -23,7 +23,9 @@ import com.example.gestor_documental.service.DocumentoRolesLecturaService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
+import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
+import com.example.gestor_documental.validation.DniNieValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -47,14 +49,17 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaService {
 
-    private static final double CONFIANZA_MINIMA_AUTOMATICA = 0.78;
+    private static final double CONFIANZA_MINIMA_AUTOMATICA = 0.90;
+    private static final double CONFIANZA_MINIMA_IDENTIDAD_CORROBORACION = 0.80;
 
     private final DocumentoService documentoService;
     private final DocumentoRepository documentoRepository;
@@ -65,6 +70,7 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
     private final HistorialCambioService historialCambioService;
     private final RequisitoDocumentalExpedienteService requisitoDocumentalExpedienteService;
     private final OpenAiProperties openAiProperties;
+    private final DniNieValidator dniNieValidator;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.upload.dir:uploads}")
@@ -114,6 +120,7 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
             throw new OperacionInvalidaException("El documento no pertenece a un expediente.");
         }
         validarLecturaAplicable(lectura);
+        validarIdentidadesCorroboradas(documento, lectura);
 
         Interesado vendedor = obtenerOCrearInteresado(
                 lectura.getVendedorIdentificador(),
@@ -247,9 +254,11 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         Interesado vendedorInteresado = resolverInteresadoVinculado(documento, vendedorIdentificador);
         Interesado compradorInteresado = resolverInteresadoVinculado(documento, compradorIdentificador);
         boolean revisionIa = booleano(resultado, "requiereRevision");
+        boolean identificadoresValidos = identificadorValido(vendedorIdentificador) && identificadorValido(compradorIdentificador);
         boolean requiereRevision = revisionIa
                 || confianza == null
                 || confianza < CONFIANZA_MINIMA_AUTOMATICA
+                || !identificadoresValidos
                 || vendedorIdentificador == null
                 || compradorIdentificador == null
                 || texto(resultado, "vendedorNombre") == null
@@ -289,6 +298,9 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         if (lectura.getConfianzaGlobal() == null || lectura.getConfianzaGlobal() < CONFIANZA_MINIMA_AUTOMATICA) {
             throw new OperacionInvalidaException("La confianza de la lectura no es suficiente para aplicar datos.");
         }
+        if (!identificadorValido(lectura.getVendedorIdentificador()) || !identificadorValido(lectura.getCompradorIdentificador())) {
+            throw new OperacionInvalidaException("El DNI/NIE/CIF leido no supera las validaciones basicas.");
+        }
         if (enBlanco(lectura.getVendedorIdentificador()) || enBlanco(lectura.getVendedorNombre())) {
             throw new OperacionInvalidaException("Faltan datos suficientes del vendedor.");
         }
@@ -298,6 +310,101 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         if (lectura.getVendedorIdentificador().equalsIgnoreCase(lectura.getCompradorIdentificador())) {
             throw new OperacionInvalidaException("Comprador y vendedor tienen el mismo DNI/CIF.");
         }
+    }
+
+    private void validarIdentidadesCorroboradas(Documento documento, DocumentoRolesLectura lectura) {
+        Expediente expediente = documento.getExpediente();
+        if (expediente == null || expediente.getId() == null) {
+            return;
+        }
+        Set<String> identidades = identidadesConfirmadasExpediente(expediente);
+        validarRolCorroborado("vendedor", lectura.getVendedorIdentificador(), lectura.getVendedorNombre(), identidades, expediente);
+        validarRolCorroborado("comprador", lectura.getCompradorIdentificador(), lectura.getCompradorNombre(), identidades, expediente);
+    }
+
+    private Set<String> identidadesConfirmadasExpediente(Expediente expediente) {
+        Set<String> identidades = new HashSet<>();
+        if (expediente.getCliente() != null) {
+            String nifCliente = normalizarIdentificador(expediente.getCliente().getNif());
+            if (nifCliente != null) {
+                identidades.add(nifCliente);
+            }
+        }
+        List<Long> documentoIds = documentoRepository.findByExpedienteId(expediente.getId()).stream()
+                .filter(documento -> esDocumentoIdentidad(documento.getTipoDocumento()))
+                .map(Documento::getId)
+                .filter(id -> id != null)
+                .toList();
+        if (documentoIds.isEmpty()) {
+            return identidades;
+        }
+        identidadLecturaRepository.findByDocumentoIdIn(documentoIds).stream()
+                .filter(this::identidadConfirmada)
+                .map(DocumentoIdentidadLectura::getIdentificador)
+                .map(this::normalizarIdentificador)
+                .filter(identificador -> identificador != null)
+                .forEach(identidades::add);
+        return identidades;
+    }
+
+    private boolean identidadConfirmada(DocumentoIdentidadLectura lectura) {
+        String identificador = lectura != null ? normalizarIdentificador(lectura.getIdentificador()) : null;
+        return identificador != null
+                && identificadorValido(identificador)
+                && lectura.getConfianzaGlobal() != null
+                && lectura.getConfianzaGlobal() >= CONFIANZA_MINIMA_IDENTIDAD_CORROBORACION;
+    }
+
+    private void validarRolCorroborado(
+            String etiqueta,
+            String identificador,
+            String nombre,
+            Set<String> identidades,
+            Expediente expediente
+    ) {
+        String normalizado = normalizarIdentificador(identificador);
+        if (normalizado == null || !identidades.contains(normalizado)) {
+            throw new OperacionInvalidaException("No se aplica el " + etiqueta + ": falta DNI/CIF leido que corrobore el rol.");
+        }
+        DocumentoIdentidadLectura lecturaIdentidad = lecturaIdentidadPorIdentificador(expediente, normalizado);
+        if (lecturaIdentidad == null) {
+            return;
+        }
+        String nombreIdentidad = nombreCompletoIdentidad(lecturaIdentidad);
+        String nombreRol = NombrePersonaNormalizer.normalizar(nombre);
+        if (nombreIdentidad != null && nombreRol != null && !NombrePersonaNormalizer.equivalentes(nombreIdentidad, nombreRol)) {
+            throw new OperacionInvalidaException("No se aplica el " + etiqueta + ": el nombre del DNI/CIF no coincide con el contrato/factura.");
+        }
+    }
+
+    private DocumentoIdentidadLectura lecturaIdentidadPorIdentificador(Expediente expediente, String identificador) {
+        List<Long> documentoIds = documentoRepository.findByExpedienteId(expediente.getId()).stream()
+                .filter(documento -> esDocumentoIdentidad(documento.getTipoDocumento()))
+                .map(Documento::getId)
+                .filter(id -> id != null)
+                .toList();
+        if (documentoIds.isEmpty()) {
+            return null;
+        }
+        return identidadLecturaRepository.findByDocumentoIdIn(documentoIds).stream()
+                .filter(this::identidadConfirmada)
+                .filter(lectura -> identificador.equals(normalizarIdentificador(lectura.getIdentificador())))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String nombreCompletoIdentidad(DocumentoIdentidadLectura lectura) {
+        String razonSocial = NombrePersonaNormalizer.normalizar(lectura.getRazonSocial());
+        if (razonSocial != null) {
+            return razonSocial;
+        }
+        String joined = String.join(" ",
+                List.of(
+                        lectura.getNombre() != null ? lectura.getNombre() : "",
+                        lectura.getApellido1() != null ? lectura.getApellido1() : "",
+                        lectura.getApellido2() != null ? lectura.getApellido2() : ""
+                )).replaceAll("\\s+", " ").trim();
+        return NombrePersonaNormalizer.normalizar(joined);
     }
 
     private Interesado obtenerOCrearInteresado(String identificador, String nombre, String direccion) {
@@ -642,6 +749,17 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         }
         String normalizado = value.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
         return normalizado.isBlank() ? null : normalizado;
+    }
+
+    private boolean identificadorValido(String value) {
+        String identificador = normalizarIdentificador(value);
+        if (identificador == null) {
+            return false;
+        }
+        if (identificador.matches("[0-9]{8}[A-Z]") || identificador.matches("[XYZ][0-9]{7}[A-Z]")) {
+            return dniNieValidator.esValido(identificador);
+        }
+        return identificador.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
     }
 
     private String normalizarMatricula(String value) {

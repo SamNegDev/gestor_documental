@@ -23,6 +23,7 @@ import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
+import com.example.gestor_documental.validation.DniNieValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +41,7 @@ import java.util.Map;
 public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentacionIaService {
 
     private static final double CONFIANZA_MINIMA_IDENTIDAD = 0.80;
-    private static final double CONFIANZA_MINIMA_ROLES = 0.78;
+    private static final double CONFIANZA_MINIMA_ROLES = 0.90;
 
     private final SolicitudRepository solicitudRepository;
     private final DocumentoRepository documentoRepository;
@@ -49,6 +50,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private final DocumentoIdentidadLecturaService documentoIdentidadLecturaService;
     private final DocumentoRolesLecturaService documentoRolesLecturaService;
     private final HistorialCambioService historialCambioService;
+    private final DniNieValidator dniNieValidator;
 
     @Override
     @Transactional
@@ -94,6 +96,18 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         validarPersona(comprador, "comprador");
         if (vendedor.identificador().equals(comprador.identificador())) {
             throw new OperacionInvalidaException("Comprador y vendedor tienen el mismo DNI/CIF.");
+        }
+        List<String> faltasCorroboracion = faltasCorroboracionIdentidad(solicitud, vendedor, comprador, identidades);
+        if (!faltasCorroboracion.isEmpty()) {
+            detalles.addAll(faltasCorroboracion);
+            return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, false, false, true,
+                    "Lecturas realizadas, pero falta validar identidad antes de actualizar datos.", detalles);
+        }
+        List<String> incompatibilidadesNombre = incompatibilidadesNombreIdentidad(lecturaRoles, identidades);
+        if (!incompatibilidadesNombre.isEmpty()) {
+            detalles.addAll(incompatibilidadesNombre);
+            return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, false, false, true,
+                    "Lecturas realizadas, pero hay diferencias entre DNI/CIF y contrato.", detalles);
         }
 
         boolean yaCorrecta = solicitudYaCoincide(solicitud, vendedor, comprador);
@@ -208,6 +222,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private boolean identidadUsable(DocumentoIdentidadLectura lectura) {
         return lectura != null
                 && normalizarIdentificador(lectura.getIdentificador()) != null
+                && identificadorValido(normalizarIdentificador(lectura.getIdentificador()))
                 && confianza(lectura.getConfianzaGlobal()) >= CONFIANZA_MINIMA_IDENTIDAD;
     }
 
@@ -221,9 +236,70 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 && confianza(lectura.getConfianzaGlobal()) >= CONFIANZA_MINIMA_ROLES
                 && vendedor != null
                 && comprador != null
+                && identificadorValido(vendedor)
+                && identificadorValido(comprador)
                 && !vendedor.equals(comprador)
                 && !enBlanco(lectura.getVendedorNombre())
                 && !enBlanco(lectura.getCompradorNombre());
+    }
+
+    private List<String> faltasCorroboracionIdentidad(
+            Solicitud solicitud,
+            PersonaSolicitud vendedor,
+            PersonaSolicitud comprador,
+            Map<String, DocumentoIdentidadLectura> identidades
+    ) {
+        List<String> faltas = new ArrayList<>();
+        if (!identidadCorroboraRol(solicitud, vendedor.identificador(), identidades)) {
+            faltas.add("No se aplica el vendedor: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
+        }
+        if (!identidadCorroboraRol(solicitud, comprador.identificador(), identidades)) {
+            faltas.add("No se aplica el comprador: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
+        }
+        return faltas;
+    }
+
+    private boolean identidadCorroboraRol(Solicitud solicitud, String identificador, Map<String, DocumentoIdentidadLectura> identidades) {
+        if (identificador == null) {
+            return false;
+        }
+        if (identidades.containsKey(identificador)) {
+            return true;
+        }
+        return solicitud.getCliente() != null
+                && identificador.equals(normalizarIdentificador(solicitud.getCliente().getNif()));
+    }
+
+    private List<String> incompatibilidadesNombreIdentidad(
+            DocumentoRolesLectura lecturaRoles,
+            Map<String, DocumentoIdentidadLectura> identidades
+    ) {
+        List<String> incompatibilidades = new ArrayList<>();
+        validarNombreIdentidad(lecturaRoles.getVendedorIdentificador(), lecturaRoles.getVendedorNombre(), "vendedor", identidades, incompatibilidades);
+        validarNombreIdentidad(lecturaRoles.getCompradorIdentificador(), lecturaRoles.getCompradorNombre(), "comprador", identidades, incompatibilidades);
+        return incompatibilidades;
+    }
+
+    private void validarNombreIdentidad(
+            String identificador,
+            String nombreRoles,
+            String etiqueta,
+            Map<String, DocumentoIdentidadLectura> identidades,
+            List<String> incompatibilidades
+    ) {
+        String identificadorNormalizado = normalizarIdentificador(identificador);
+        if (identificadorNormalizado == null) {
+            return;
+        }
+        DocumentoIdentidadLectura identidad = identidades.get(identificadorNormalizado);
+        if (identidad == null) {
+            return;
+        }
+        String nombreIdentidad = nombreCompletoIdentidad(identidad);
+        String nombreRol = normalizarNombre(nombreRoles);
+        if (nombreIdentidad != null && nombreRol != null && !NombrePersonaNormalizer.equivalentes(nombreIdentidad, nombreRol)) {
+            incompatibilidades.add("No se aplica el " + etiqueta + ": el nombre del DNI/CIF no coincide con el contrato/factura.");
+        }
     }
 
     private PersonaSolicitud personaDesdeLectura(
@@ -437,6 +513,17 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
         String normalizado = value.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
         return normalizado.isBlank() ? null : normalizado;
+    }
+
+    private boolean identificadorValido(String value) {
+        String identificador = normalizarIdentificador(value);
+        if (identificador == null) {
+            return false;
+        }
+        if (identificador.matches("[0-9]{8}[A-Z]") || identificador.matches("[XYZ][0-9]{7}[A-Z]")) {
+            return dniNieValidator.esValido(identificador);
+        }
+        return identificador.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
     }
 
     private String normalizarMatricula(String value) {
