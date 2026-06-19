@@ -31,6 +31,11 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 
 ### Gestion documental avanzada
 
+- Evaluar extraccion IA de datos FORMATO_GA sobre documentacion relevante del expediente, con validacion humana antes de persistir.
+- Guardar datos estructurados validados de clientes y representantes para reutilizarlos sin nueva extraccion IA.
+- Registrar decisiones validadas en revision GA como memoria auxiliar trazable para reutilizar correcciones de personas, direcciones y vehiculos en futuras extracciones.
+- Importar catalogo historico de personas de Gestion Trafico como base auxiliar de autocompletado y deduplicacion.
+- Importar catalogo historico de vehiculos de Gestion Trafico como base auxiliar de cotejo por matricula, bastidor y modelo.
 - Versiones de documentos.
 - Deteccion de duplicados.
 - Fechas de caducidad documental.
