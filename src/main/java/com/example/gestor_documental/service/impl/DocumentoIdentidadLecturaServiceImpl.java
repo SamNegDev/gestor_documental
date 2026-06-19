@@ -103,10 +103,16 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         }
 
         Path ruta = resolverRutaDocumento(documento);
-        JsonNode resultado = llamarOpenAi(documento, ruta);
+        String modeloUsado = modeloIdentidad();
+        JsonNode resultado = llamarOpenAi(documento, ruta, modeloUsado);
+        String modeloAvanzado = modeloAvanzado();
+        if (debeReintentarIdentidad(resultado) && modeloDistinto(modeloUsado, modeloAvanzado)) {
+            modeloUsado = modeloAvanzado;
+            resultado = llamarOpenAi(documento, ruta, modeloUsado);
+        }
         DocumentoIdentidadLectura lectura = lecturaRepository.findByDocumentoId(documentoId).orElseGet(DocumentoIdentidadLectura::new);
         lectura.setDocumento(documento);
-        aplicarResultado(documento, lectura, resultado, usuario);
+        aplicarResultado(documento, lectura, resultado, usuario, modeloUsado);
         lectura = lecturaRepository.save(lectura);
         return DocumentoIdentidadLecturaResponse.from(lectura);
     }
@@ -130,9 +136,8 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         return ruta;
     }
 
-    private JsonNode llamarOpenAi(Documento documento, Path ruta) {
+    private JsonNode llamarOpenAi(Documento documento, Path ruta, String modelo) {
         try {
-            String modelo = modeloIdentidad();
             ObjectNode payload = objectMapper.createObjectNode();
             payload.put("model", modelo);
             payload.set("input", construirInput(documento, ruta));
@@ -194,12 +199,15 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         return """
                 Extrae datos estructurados de un documento de identidad espanol, NIE o CIF.
                 El tipo documental esperado es %s, pero si el contenido muestra otra identidad compatible indicalo.
+                El documento puede ser una foto del anverso, reverso, NIE, CIF o certificado de empresa.
                 No determines comprador, vendedor, titular ni ningun rol de la operacion.
                 Identificador: mayusculas, sin espacios, guiones ni puntos.
-                Personas fisicas: separa nombre, apellido1 y apellido2. Empresas: usa razonSocial y deja nombre/apellidos en null.
+                Personas fisicas: separa nombre, apellido1 y apellido2 exactamente como aparezcan; no cambies el orden.
+                Si el documento tiene campos "Apellidos" y "Nombre", apellido1/apellido2 salen de Apellidos y nombre sale de Nombre.
+                Empresas: usa razonSocial y deja nombre/apellidos en null.
                 Fechas: formato dd/MM/yyyy. Si una fecha no aparece clara, null.
                 Direccion: una sola linea solo si aparece en el documento.
-                No inventes datos. Si el identificador no se lee con seguridad, devuelve null y confianza baja.
+                No inventes datos ni completes segundos nombres si no se ven. Si el identificador no se lee con seguridad, devuelve null y confianza baja.
                 Devuelve solo el JSON del esquema.
                 """.formatted(documento.getTipoDocumento() != null ? documento.getTipoDocumento().name() : "");
     }
@@ -234,7 +242,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         return imagenes;
     }
 
-    private void aplicarResultado(Documento documento, DocumentoIdentidadLectura lectura, JsonNode resultado, Usuario usuario) {
+    private void aplicarResultado(Documento documento, DocumentoIdentidadLectura lectura, JsonNode resultado, Usuario usuario, String modeloUsado) {
         String identificador = normalizarIdentificador(texto(resultado, "identificador"));
         Double confianza = numero(resultado, "confianzaGlobal");
         boolean revisionIa = booleano(resultado, "requiereRevision");
@@ -252,8 +260,9 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 && documento.getInteresado() != null
                 && identificador != null
                 && !coincideIdentificador(documento.getInteresado(), identificador);
+        boolean documentoDeSolicitud = documento.getSolicitud() != null;
         boolean requiereRevision = !lecturaSegura
-                || interesadoVinculado == null
+                || (!documentoDeSolicitud && interesadoVinculado == null)
                 || conflictoInteresado;
 
         lectura.setTipoDocumentoDetectado(tipoDetectado);
@@ -269,7 +278,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         lectura.setInteresadoVinculado(interesadoVinculado);
         lectura.setVinculadoAutomaticamente(!requiereRevision && interesadoVinculado != null);
         lectura.setRequiereRevision(requiereRevision);
-        lectura.setModelo(modeloIdentidad());
+        lectura.setModelo(modeloUsado);
         lectura.setFechaLectura(LocalDateTime.now());
         lectura.setResultadoJson(resultado.toString());
         lectura.setMensaje(mensajeLectura(identificador, identificadorInvalido, interesadoVinculado, conflictoInteresado, requiereRevision));
@@ -443,6 +452,9 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         }
         if (interesado != null) {
             return "Identidad leida y vinculada con interesado existente.";
+        }
+        if (!requiereRevision) {
+            return "Identidad leida con datos suficientes.";
         }
         return "Identidad leida.";
     }
@@ -723,6 +735,26 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             return openAiProperties.getIdentityModel();
         }
         return openAiProperties.getModel();
+    }
+
+    private String modeloAvanzado() {
+        return openAiProperties.getModel() != null && !openAiProperties.getModel().isBlank()
+                ? openAiProperties.getModel()
+                : modeloIdentidad();
+    }
+
+    private boolean modeloDistinto(String actual, String candidato) {
+        return actual != null && candidato != null && !actual.equalsIgnoreCase(candidato);
+    }
+
+    private boolean debeReintentarIdentidad(JsonNode resultado) {
+        String identificador = normalizarIdentificador(texto(resultado, "identificador"));
+        Double confianza = numero(resultado, "confianzaGlobal");
+        return identificador == null
+                || !identificadorValido(identificador)
+                || booleano(resultado, "requiereRevision")
+                || confianza == null
+                || confianza < 0.85;
     }
 
     private record ImagenProcesada(String nombre, byte[] bytes) {

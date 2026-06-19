@@ -17,7 +17,7 @@ import java.time.format.DateTimeFormatter;
 public class DocumentoRolesLecturaResponse {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    private static final double CONFIANZA_MINIMA_APLICACION = 0.78;
+    private static final double CONFIANZA_MINIMA_APLICACION = 0.90;
 
     private Long id;
     private Long documentoId;

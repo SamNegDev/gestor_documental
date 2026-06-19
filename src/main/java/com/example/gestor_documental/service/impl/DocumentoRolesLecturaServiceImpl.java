@@ -23,7 +23,6 @@ import com.example.gestor_documental.service.DocumentoRolesLecturaService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
-import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
 import com.example.gestor_documental.validation.DniNieValidator;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -101,10 +100,16 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         }
 
         Path ruta = resolverRutaDocumento(documento);
-        JsonNode resultado = llamarOpenAi(documento, ruta);
+        String modeloUsado = modeloLectura();
+        JsonNode resultado = llamarOpenAi(documento, ruta, modeloUsado);
+        String modeloAvanzado = modeloAvanzado();
+        if (debeReintentarRoles(resultado) && modeloDistinto(modeloUsado, modeloAvanzado)) {
+            modeloUsado = modeloAvanzado;
+            resultado = llamarOpenAi(documento, ruta, modeloUsado);
+        }
         DocumentoRolesLectura lectura = lecturaRepository.findByDocumentoId(documentoId).orElseGet(DocumentoRolesLectura::new);
         lectura.setDocumento(documento);
-        aplicarResultado(documento, lectura, resultado);
+        aplicarResultado(documento, lectura, resultado, modeloUsado);
         lectura = lecturaRepository.save(lectura);
         return DocumentoRolesLecturaResponse.from(lectura);
     }
@@ -172,10 +177,10 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         return ruta;
     }
 
-    private JsonNode llamarOpenAi(Documento documento, Path ruta) {
+    private JsonNode llamarOpenAi(Documento documento, Path ruta, String modelo) {
         try {
             ObjectNode payload = objectMapper.createObjectNode();
-            payload.put("model", modeloLectura());
+            payload.put("model", modelo);
             payload.set("input", construirInput(documento, ruta));
             payload.set("text", construirFormatoTexto("lectura_roles_documento", esquemaLecturaRoles()));
 
@@ -237,8 +242,12 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
                 Tipo documental esperado: %s.
                 En contrato: vendedor/transmitente/propietario es VENDEDOR; comprador/adquirente es COMPRADOR.
                 En factura: emisor/proveedor/vendedor es VENDEDOR; cliente/receptor/comprador es COMPRADOR.
+                Ignora gestoria, asesor, mandatario, tramitador, datos bancarios, pie legal y cualquier tercero que no sea parte de la compraventa.
+                Si aparece una empresa vendedora, usa su CIF/razon social; no confundas su representante o administrador con el comprador.
+                Si aparecen DNI/NIE/CIF junto a nombre de cliente o destinatario en factura, extraelos aunque el documento no diga literalmente comprador.
                 Extrae tambien matricula, bastidor, fecha y valor si aparecen.
                 Identificadores: DNI/NIE/CIF en mayusculas, sin espacios, guiones ni puntos.
+                Nombres: respeta el orden visible. Si el documento usa "APELLIDOS, NOMBRE", conviertelo a "NOMBRE APELLIDOS".
                 Fechas en formato dd/MM/yyyy. Valor como texto normalizado con coma decimal si aparece.
                 Direcciones: una sola linea por persona si aparecen.
                 No uses datos de DNI sueltos salvo que el contrato/factura los vincule claramente al rol.
@@ -247,7 +256,7 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
                 """.formatted(documento.getTipoDocumento() != null ? documento.getTipoDocumento().name() : "");
     }
 
-    private void aplicarResultado(Documento documento, DocumentoRolesLectura lectura, JsonNode resultado) {
+    private void aplicarResultado(Documento documento, DocumentoRolesLectura lectura, JsonNode resultado, String modeloUsado) {
         String vendedorIdentificador = normalizarIdentificador(texto(resultado, "vendedorIdentificador"));
         String compradorIdentificador = normalizarIdentificador(texto(resultado, "compradorIdentificador"));
         Double confianza = numero(resultado, "confianzaGlobal");
@@ -281,7 +290,7 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         lectura.setConfianzaGlobal(confianza);
         lectura.setRequiereRevision(requiereRevision);
         lectura.setMensaje(mensajeLectura(vendedorIdentificador, compradorIdentificador, vendedorInteresado, compradorInteresado, requiereRevision));
-        lectura.setModelo(modeloLectura());
+        lectura.setModelo(modeloUsado);
         lectura.setFechaLectura(LocalDateTime.now());
         lectura.setAplicadoExpediente(false);
         lectura.setFechaAplicacion(null);
@@ -366,45 +375,6 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         if (normalizado == null || !identidades.contains(normalizado)) {
             throw new OperacionInvalidaException("No se aplica el " + etiqueta + ": falta DNI/CIF leido que corrobore el rol.");
         }
-        DocumentoIdentidadLectura lecturaIdentidad = lecturaIdentidadPorIdentificador(expediente, normalizado);
-        if (lecturaIdentidad == null) {
-            return;
-        }
-        String nombreIdentidad = nombreCompletoIdentidad(lecturaIdentidad);
-        String nombreRol = NombrePersonaNormalizer.normalizar(nombre);
-        if (nombreIdentidad != null && nombreRol != null && !NombrePersonaNormalizer.equivalentes(nombreIdentidad, nombreRol)) {
-            throw new OperacionInvalidaException("No se aplica el " + etiqueta + ": el nombre del DNI/CIF no coincide con el contrato/factura.");
-        }
-    }
-
-    private DocumentoIdentidadLectura lecturaIdentidadPorIdentificador(Expediente expediente, String identificador) {
-        List<Long> documentoIds = documentoRepository.findByExpedienteId(expediente.getId()).stream()
-                .filter(documento -> esDocumentoIdentidad(documento.getTipoDocumento()))
-                .map(Documento::getId)
-                .filter(id -> id != null)
-                .toList();
-        if (documentoIds.isEmpty()) {
-            return null;
-        }
-        return identidadLecturaRepository.findByDocumentoIdIn(documentoIds).stream()
-                .filter(this::identidadConfirmada)
-                .filter(lectura -> identificador.equals(normalizarIdentificador(lectura.getIdentificador())))
-                .findFirst()
-                .orElse(null);
-    }
-
-    private String nombreCompletoIdentidad(DocumentoIdentidadLectura lectura) {
-        String razonSocial = NombrePersonaNormalizer.normalizar(lectura.getRazonSocial());
-        if (razonSocial != null) {
-            return razonSocial;
-        }
-        String joined = String.join(" ",
-                List.of(
-                        lectura.getNombre() != null ? lectura.getNombre() : "",
-                        lectura.getApellido1() != null ? lectura.getApellido1() : "",
-                        lectura.getApellido2() != null ? lectura.getApellido2() : ""
-                )).replaceAll("\\s+", " ").trim();
-        return NombrePersonaNormalizer.normalizar(joined);
     }
 
     private Interesado obtenerOCrearInteresado(String identificador, String nombre, String direccion) {
@@ -810,5 +780,31 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
             return openAiProperties.getIdentityModel();
         }
         return openAiProperties.getModel();
+    }
+
+    private String modeloAvanzado() {
+        return openAiProperties.getModel() != null && !openAiProperties.getModel().isBlank()
+                ? openAiProperties.getModel()
+                : modeloLectura();
+    }
+
+    private boolean modeloDistinto(String actual, String candidato) {
+        return actual != null && candidato != null && !actual.equalsIgnoreCase(candidato);
+    }
+
+    private boolean debeReintentarRoles(JsonNode resultado) {
+        String vendedor = normalizarIdentificador(texto(resultado, "vendedorIdentificador"));
+        String comprador = normalizarIdentificador(texto(resultado, "compradorIdentificador"));
+        Double confianza = numero(resultado, "confianzaGlobal");
+        return booleano(resultado, "requiereRevision")
+                || confianza == null
+                || confianza < CONFIANZA_MINIMA_AUTOMATICA
+                || vendedor == null
+                || comprador == null
+                || !identificadorValido(vendedor)
+                || !identificadorValido(comprador)
+                || vendedor.equals(comprador)
+                || texto(resultado, "vendedorNombre") == null
+                || texto(resultado, "compradorNombre") == null;
     }
 }

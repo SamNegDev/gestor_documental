@@ -412,9 +412,10 @@ export function SolicitudDetailPage() {
             {solicitud.documentos.map((documento) => (
               <div className="document-table__row" key={documento.id}>
                 <FileText size={20} />
-                <div>
+                <div className="document-table__main">
                   <strong>{documento.nombreOriginal || documento.nombre}</strong>
                   <span>{formatDocumentType(documento.tipo)}{documento.interesadoNombre ? ` - ${documento.interesadoNombre}` : ""}</span>
+                  <SolicitudDocumentReading documento={documento} />
                 </div>
                 <small>{documento.fechaSubida || "Sin fecha"}</small>
                 <a className="soft-button soft-button--compact" href={`/documentos/ver/${documento.id}`} target="_blank" rel="noreferrer">
@@ -504,6 +505,38 @@ export function SolicitudDetailPage() {
       {dialog}
     </section>
   );
+}
+
+function SolicitudDocumentReading({ documento }: { documento: DocumentoExpediente }) {
+  const identidad = documento.lecturaIdentidad;
+  const roles = documento.lecturaRoles;
+  if (!identidad && !roles) {
+    return null;
+  }
+  if (identidad) {
+    return (
+      <div className={identidad.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
+        <strong>DNI/CIF detectado</strong>
+        <span>{[identidad.identificador, identidad.nombreCompleto].filter(Boolean).join(" - ") || "Sin identificacion clara"}</span>
+        {identidad.fechaNacimiento ? <small>Nacimiento: {identidad.fechaNacimiento}</small> : null}
+        {identidad.direccionTexto ? <small>{identidad.direccionTexto}</small> : null}
+        <em>{confidenceLabel(identidad.confianzaGlobal)} · {identidad.mensaje || (identidad.requiereRevision ? "Revisar lectura" : "Lectura valida")}</em>
+      </div>
+    );
+  }
+  return (
+    <div className={roles?.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
+      <strong>Roles detectados</strong>
+      <span>Vendedor: {[roles?.vendedorIdentificador, roles?.vendedorNombre].filter(Boolean).join(" - ") || "Sin dato"}</span>
+      <span>Comprador: {[roles?.compradorIdentificador, roles?.compradorNombre].filter(Boolean).join(" - ") || "Sin dato"}</span>
+      {[roles?.matricula, roles?.bastidor].filter(Boolean).length ? <small>{[roles?.matricula, roles?.bastidor].filter(Boolean).join(" · ")}</small> : null}
+      <em>{confidenceLabel(roles?.confianzaGlobal)} · {roles?.mensaje || roles?.motivoAplicacion || "Lectura registrada"}</em>
+    </div>
+  );
+}
+
+function confidenceLabel(value?: number | null) {
+  return typeof value === "number" ? `${Math.round(value * 100)}% confianza` : "Sin confianza";
 }
 
 type SolicitudPreparationItem = {

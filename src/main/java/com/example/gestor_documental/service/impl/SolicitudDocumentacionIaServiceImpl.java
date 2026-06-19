@@ -103,12 +103,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, false, false, true,
                     "Lecturas realizadas, pero falta validar identidad antes de actualizar datos.", detalles);
         }
-        List<String> incompatibilidadesNombre = incompatibilidadesNombreIdentidad(lecturaRoles, identidades);
-        if (!incompatibilidadesNombre.isEmpty()) {
-            detalles.addAll(incompatibilidadesNombre);
-            return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, false, false, true,
-                    "Lecturas realizadas, pero hay diferencias entre DNI/CIF y contrato.", detalles);
-        }
+        detalles.addAll(avisosNombreIdentidad(lecturaRoles, identidades));
 
         boolean yaCorrecta = solicitudYaCoincide(solicitud, vendedor, comprador);
         if (yaCorrecta) {
@@ -153,10 +148,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
 
     private void leerIdentidades(List<Documento> documentos, Usuario admin, Contadores contadores, List<String> detalles) {
         for (Documento documento : documentos) {
-            boolean existente = identidadLecturaRepository.findByDocumentoId(documento.getId()).isPresent();
+            DocumentoIdentidadLectura lecturaExistente = identidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
+            boolean existente = lecturaExistente != null;
+            boolean forzar = existente && !identidadUsable(lecturaExistente);
             try {
-                documentoIdentidadLecturaService.leerIdentidad(documento.getId(), false, admin);
-                if (existente) {
+                documentoIdentidadLecturaService.leerIdentidad(documento.getId(), forzar, admin);
+                if (existente && !forzar) {
                     contadores.identidadReutilizada++;
                 } else {
                     contadores.identidadNueva++;
@@ -169,10 +166,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
 
     private void leerRoles(List<Documento> documentos, Usuario admin, Contadores contadores, List<String> detalles) {
         for (Documento documento : documentos) {
-            boolean existente = rolesLecturaRepository.findByDocumentoId(documento.getId()).isPresent();
+            DocumentoRolesLectura lecturaExistente = rolesLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
+            boolean existente = lecturaExistente != null;
+            boolean forzar = existente && !rolesUsables(lecturaExistente);
             try {
-                documentoRolesLecturaService.leerRoles(documento.getId(), false, admin);
-                if (existente) {
+                documentoRolesLecturaService.leerRoles(documento.getId(), forzar, admin);
+                if (existente && !forzar) {
                     contadores.rolesReutilizada++;
                 } else {
                     contadores.rolesNueva++;
@@ -270,22 +269,22 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 && identificador.equals(normalizarIdentificador(solicitud.getCliente().getNif()));
     }
 
-    private List<String> incompatibilidadesNombreIdentidad(
+    private List<String> avisosNombreIdentidad(
             DocumentoRolesLectura lecturaRoles,
             Map<String, DocumentoIdentidadLectura> identidades
     ) {
-        List<String> incompatibilidades = new ArrayList<>();
-        validarNombreIdentidad(lecturaRoles.getVendedorIdentificador(), lecturaRoles.getVendedorNombre(), "vendedor", identidades, incompatibilidades);
-        validarNombreIdentidad(lecturaRoles.getCompradorIdentificador(), lecturaRoles.getCompradorNombre(), "comprador", identidades, incompatibilidades);
-        return incompatibilidades;
+        List<String> avisos = new ArrayList<>();
+        avisarNombreIdentidad(lecturaRoles.getVendedorIdentificador(), lecturaRoles.getVendedorNombre(), "vendedor", identidades, avisos);
+        avisarNombreIdentidad(lecturaRoles.getCompradorIdentificador(), lecturaRoles.getCompradorNombre(), "comprador", identidades, avisos);
+        return avisos;
     }
 
-    private void validarNombreIdentidad(
+    private void avisarNombreIdentidad(
             String identificador,
             String nombreRoles,
             String etiqueta,
             Map<String, DocumentoIdentidadLectura> identidades,
-            List<String> incompatibilidades
+            List<String> avisos
     ) {
         String identificadorNormalizado = normalizarIdentificador(identificador);
         if (identificadorNormalizado == null) {
@@ -298,7 +297,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         String nombreIdentidad = nombreCompletoIdentidad(identidad);
         String nombreRol = normalizarNombre(nombreRoles);
         if (nombreIdentidad != null && nombreRol != null && !NombrePersonaNormalizer.equivalentes(nombreIdentidad, nombreRol)) {
-            incompatibilidades.add("No se aplica el " + etiqueta + ": el nombre del DNI/CIF no coincide con el contrato/factura.");
+            avisos.add("Aviso: el nombre del " + etiqueta + " difiere entre DNI/CIF y contrato/factura. Se usa el dato del DNI/CIF.");
         }
     }
 

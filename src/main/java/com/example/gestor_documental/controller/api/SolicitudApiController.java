@@ -4,6 +4,8 @@ import com.example.gestor_documental.dto.PagedResponse;
 
 import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoExpedienteResponse;
+import com.example.gestor_documental.dto.expediente.DocumentoIdentidadLecturaResponse;
+import com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaResponse;
 import com.example.gestor_documental.dto.expediente.HistorialExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.IncidenciaExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.InteresadoSolicitudResponse;
@@ -26,6 +28,7 @@ import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.model.ClienteInteresado;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
+import com.example.gestor_documental.model.DocumentoRolesLectura;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.HistorialCambio;
 import com.example.gestor_documental.model.Incidencia;
@@ -35,6 +38,7 @@ import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
+import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.HistorialCambioService;
@@ -90,6 +94,7 @@ public class SolicitudApiController {
     private final CorreoEntranteSolicitudService correoEntranteSolicitudService;
     private final SolicitudDocumentacionIaService solicitudDocumentacionIaService;
     private final DocumentoIdentidadLecturaRepository documentoIdentidadLecturaRepository;
+    private final DocumentoRolesLecturaRepository documentoRolesLecturaRepository;
     private final ClienteInteresadoRepository clienteInteresadoRepository;
 
     @GetMapping
@@ -713,6 +718,12 @@ public class SolicitudApiController {
     }
 
     private DocumentoExpedienteResponse mapDocumento(Documento documento) {
+        DocumentoIdentidadLectura lecturaIdentidad = documento.getId() != null
+                ? documentoIdentidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null)
+                : null;
+        DocumentoRolesLectura lecturaRoles = documento.getId() != null
+                ? documentoRolesLecturaRepository.findByDocumentoId(documento.getId()).orElse(null)
+                : null;
         return DocumentoExpedienteResponse.builder()
                 .id(documento.getId())
                 .nombre(documento.getNombreArchivo())
@@ -726,6 +737,8 @@ public class SolicitudApiController {
                 .estado("SUBIDO")
                 .subido(true)
                 .requeridoAhora(false)
+                .lecturaIdentidad(DocumentoIdentidadLecturaResponse.from(lecturaIdentidad))
+                .lecturaRoles(DocumentoRolesLecturaResponse.from(lecturaRoles))
                 .build();
     }
 
