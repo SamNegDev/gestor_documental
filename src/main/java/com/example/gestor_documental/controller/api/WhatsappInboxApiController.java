@@ -265,13 +265,35 @@ public class WhatsappInboxApiController {
     private void marcarRequisitoAportado(Expediente expediente, TipoDocumento tipoDocumento, Documento documento) {
         requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
                 .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
-                .filter(requisito -> requisito.getTipoDocumento() == tipoDocumento)
+                .filter(requisito -> tipoCubreRequisito(tipoDocumento, requisito.getTipoDocumento()))
+                .filter(requisito -> !esDocumentoIdentidad(requisito.getTipoDocumento()))
                 .findFirst()
                 .ifPresent(requisito -> {
                     requisito.setDocumento(documento);
                     requisito.setEstado(EstadoRequisitoDocumental.APORTADO);
                     requisitoRepository.save(requisito);
                 });
+    }
+
+    private boolean tipoCubreRequisito(TipoDocumento documento, TipoDocumento requisito) {
+        if (documento == null || requisito == null) {
+            return false;
+        }
+        if (documento == requisito) {
+            return true;
+        }
+        if (requisito == TipoDocumento.MANDATO) {
+            return documento == TipoDocumento.MANDATO_REPRESENTACION;
+        }
+        if (requisito == TipoDocumento.CONTRATO_COMPRAVENTA) {
+            return documento == TipoDocumento.FACTURA;
+        }
+        return (requisito == TipoDocumento.PERMISO_CIRCULACION || requisito == TipoDocumento.FICHA_TECNICA)
+                && documento == TipoDocumento.INFORME_DGT;
+    }
+
+    private boolean esDocumentoIdentidad(TipoDocumento tipoDocumento) {
+        return tipoDocumento == TipoDocumento.DNI || tipoDocumento == TipoDocumento.CIF;
     }
 
     private Usuario usuarioCliente(Cliente cliente) {

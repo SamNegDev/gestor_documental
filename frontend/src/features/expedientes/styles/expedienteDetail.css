@@ -1026,6 +1026,13 @@
   border: 0;
 }
 
+.ocr-review-card__preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .ocr-page-editor,
 .ocr-merge-editor {
   grid-column: 1 / -1;
@@ -1723,9 +1730,52 @@
   overflow-wrap: anywhere;
 }
 
+.document-identity,
+.document-roles {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 780;
+  line-height: 1.35;
+}
+
+.document-identity span,
+.document-identity em,
+.document-roles span,
+.document-roles em {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.document-identity em,
+.document-roles em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.document-identity--linked,
+.document-roles--linked {
+  color: var(--success);
+}
+
+.document-identity--review,
+.document-roles--review {
+  color: oklch(42% 0.11 76);
+}
+
 .document-row__actions {
   display: flex;
   gap: 6px;
+}
+
+.document-row__identity-spinner {
+  animation: exp-spin 900ms linear infinite;
 }
 
 .secondary-tabs__list {

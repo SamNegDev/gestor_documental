@@ -427,15 +427,11 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         String texto = mensaje != null && !mensaje.isBlank() ? mensaje.trim() : mensajeWhatsappPorDefecto(incidencia, numero);
         String destinatario = telefonoCliente(incidencia);
         WhatsappOutboundService.ResultadoWhatsapp resultado = whatsappOutboundService.enviarAvisoSeguimiento(destinatario, texto);
-        AvisoIncidencia aviso = new AvisoIncidencia();
-        aviso.setIncidencia(incidencia); aviso.setNumeroAviso(numero); aviso.setEnviadoPor(admin); aviso.setMensaje(texto);
-        aviso.setDestinatario(destinatario); aviso.setAsunto("WhatsApp aviso " + numero); aviso.setCanal("WHATSAPP");
-        aviso.setEstadoEnvio(resultado.exito() ? resultado.simulado() ? "SIMULADO" : "ENVIADO" : "ERROR");
-        aviso.setErrorEnvio(resultado.error());
-        avisoIncidenciaRepository.save(aviso);
         if (!resultado.exito()) return new NotificacionIncidenciaResponse(false, false, resultado.error());
-        registrarAvisoCorrecto(incidencia, numero, texto, config, admin, resultado.simulado(), "WHATSAPP");
-        return new NotificacionIncidenciaResponse(true, resultado.simulado(), resultado.simulado() ? "WhatsApp simulado correctamente." : "WhatsApp enviado correctamente.");
+        return new NotificacionIncidenciaResponse(true, resultado.simulado(),
+                resultado.simulado()
+                        ? "WhatsApp simulado correctamente."
+                        : "WhatsApp enviado correctamente. El seguimiento se actualizara cuando el cliente pulse Recibir info.");
     }
 
     private void validarCanalPermitido(Incidencia incidencia, String canal) {
@@ -611,14 +607,9 @@ public class IncidenciaServiceImpl implements IncidenciaService {
     }
 
     private String mensajeWhatsappPorDefecto(Incidencia incidencia, int numeroAviso) {
-        String matricula = incidencia.getExpediente().getMatricula() != null ? incidencia.getExpediente().getMatricula() : "EXP-" + incidencia.getExpediente().getId();
-        String detalle = detalleCorreo(incidencia);
-        String base = publicUrl != null ? publicUrl.replaceAll("/$", "") : "";
         return "Hola, somos Gestoria Casado Negrin.\n\n"
-                + (numeroAviso == 1 ? "Necesitamos tu respuesta para continuar con el tramite." : "Te recordamos que seguimos pendientes de tu respuesta.")
-                + "\n\nExpediente: " + matricula
-                + "\nPendiente: " + detalle
-                + "\n\nPuedes responder a este WhatsApp o acceder al portal: " + base + "/expedientes/" + incidencia.getExpediente().getId();
+                + (numeroAviso == 1 ? "Tienes informacion pendiente sobre tu expediente." : "Te recordamos que tienes informacion pendiente sobre tu expediente.")
+                + "\n\nPulsa *Recibir info* para ver el detalle por WhatsApp.";
     }
 
     private String detalleCorreo(Incidencia incidencia) {

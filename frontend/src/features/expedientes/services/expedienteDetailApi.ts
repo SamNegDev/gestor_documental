@@ -43,8 +43,18 @@ export function completeExpedienteMilestone(expedienteId: string | number, hitoI
   return apiPost(`/api/expedientes/${expedienteId}/hitos/${codigo}/completar`);
 }
 
+export function rollbackExpedienteMilestone(expedienteId: string | number, hitoId: string): Promise<void> {
+  const codigo = hitoApiCodes[hitoId] ?? hitoId;
+  if (!codigo) return Promise.reject(new Error("Hito no soportado"));
+  return apiPost(`/api/expedientes/${expedienteId}/hitos/${codigo}/retroceder`);
+}
+
 export function finishExpediente(expedienteId: string | number): Promise<void> {
   return apiPost(`/api/expedientes/${expedienteId}/finalizar`);
+}
+
+export function rollbackExpedienteFinalization(expedienteId: string | number): Promise<void> {
+  return apiPost(`/api/expedientes/${expedienteId}/finalizar/retroceder`);
 }
 
 export function getIncidentTypes(): Promise<TipoIncidencia[]> {

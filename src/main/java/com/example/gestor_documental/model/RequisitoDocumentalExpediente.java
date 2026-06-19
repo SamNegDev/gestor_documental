@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_requisito_expediente_estado", columnList = "expediente_id, estado"),
         @Index(name = "idx_requisito_documento", columnList = "documento_id"),
         @Index(name = "idx_requisito_interesado_rol", columnList = "interesado_id, rol_interesado"),
+        @Index(name = "idx_requisito_representado", columnList = "interesado_representado_id, rol_representado"),
         @Index(name = "idx_requisito_operacion", columnList = "operacion_id")
 })
 public class RequisitoDocumentalExpediente {
@@ -62,9 +63,17 @@ public class RequisitoDocumentalExpediente {
     @JoinColumn(name = "interesado_id")
     private Interesado interesado;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interesado_representado_id")
+    private Interesado interesadoRepresentado;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
     private RolInteresado rolInteresado;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50)
+    private RolInteresado rolRepresentado;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "documento_id")

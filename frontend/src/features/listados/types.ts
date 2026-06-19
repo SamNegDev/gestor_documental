@@ -105,6 +105,21 @@ export interface SolicitudInteresadoCoincidencia {
   camposDiferentes: string[];
 }
 
+export interface SolicitudDocumentacionIaResponse {
+  solicitudId: number;
+  documentosIdentidad: number;
+  documentosRoles: number;
+  lecturasIdentidadNuevas: number;
+  lecturasIdentidadReutilizadas: number;
+  lecturasRolesNuevas: number;
+  lecturasRolesReutilizadas: number;
+  datosAplicados: boolean;
+  yaEstabaCorrecta: boolean;
+  requiereRevision: boolean;
+  mensaje?: string | null;
+  detalles: string[];
+}
+
 export interface SolicitudUpsertInput {
   tipoTramiteId: number;
   matricula: string;
@@ -167,6 +182,7 @@ export interface DashboardData {
 export interface ListFilters {
   estado?: string;
   estados?: string;
+  archivo?: string;
   tipoTramiteId?: string;
   clienteId?: string;
   matricula?: string;

@@ -30,6 +30,7 @@ import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -139,6 +140,7 @@ public class TareaApiController {
                             contextoAportacion(expediente))));
 
             tareas.addAll(tareasJustificantesFinales());
+            tareas.addAll(tareasRevisionDocumentosHabituales());
             int diasEstancado = configuracionSeguimientoService.obtener().getDiasExpedienteEstancado();
             expedienteRepository.findEstancados(LocalDateTime.now().minusDays(diasEstancado), List.of(
                             EstadoExpediente.RECHAZADO,
@@ -297,9 +299,6 @@ public class TareaApiController {
     }
 
     private String tipoTareaWhatsapp(WhatsappWebhookEvento evento) {
-        if ("gestapp_ya_lo_envie".equals(evento.getAccionCodigo())) {
-            return "WHATSAPP_APORTACION_INDICADA";
-        }
         if ("gestapp_contactar".equals(evento.getAccionCodigo())
                 || "gestapp_contactar_general".equals(evento.getAccionCodigo())
                 || "gestapp_contactar_solicitud".equals(evento.getAccionCodigo())) {
@@ -315,7 +314,6 @@ public class TareaApiController {
     }
 
     private String tituloTareaWhatsapp(String tipo) {
-        if ("WHATSAPP_APORTACION_INDICADA".equals(tipo)) return "Cliente indica aportacion enviada";
         if ("WHATSAPP_CONTACTO_SOLICITADO".equals(tipo)) return "Cliente solicita contacto";
         if ("WHATSAPP_ESTADO_SOLICITADO".equals(tipo)) return "Cliente solicita estado del tramite";
         if ("WHATSAPP_MENSAJE_CLIENTE".equals(tipo)) return "Mensaje WhatsApp del cliente";
@@ -323,7 +321,6 @@ public class TareaApiController {
     }
 
     private String detalleTareaWhatsapp(String tipo) {
-        if ("WHATSAPP_APORTACION_INDICADA".equals(tipo)) return "El cliente pulso 'Ya lo envie'. Revisa si la documentacion o respuesta ha llegado.";
         if ("WHATSAPP_CONTACTO_SOLICITADO".equals(tipo)) return "El cliente ha pedido que la gestoria contacte con el.";
         if ("WHATSAPP_ESTADO_SOLICITADO".equals(tipo)) return "El cliente ha pedido una revision o actualizacion del estado de su tramite.";
         if ("WHATSAPP_MENSAJE_CLIENTE".equals(tipo)) return "El cliente dejo un mensaje desde la opcion Enviar mensaje.";
@@ -357,6 +354,48 @@ public class TareaApiController {
             }
         }
         return tareas;
+    }
+
+    private List<TareaResponse> tareasRevisionDocumentosHabituales() {
+        return documentoRepository.findDocumentosHabitualesPendientesRevision(
+                        Set.of(
+                                TipoDocumento.DNI,
+                                TipoDocumento.CIF,
+                                TipoDocumento.MANDATO,
+                                TipoDocumento.MANDATO_REPRESENTACION
+                        ),
+                        LocalDateTime.now().minusYears(1),
+                        PageRequest.of(0, 25))
+                .stream()
+                .map(this::tareaRevisionDocumentoHabitual)
+                .toList();
+    }
+
+    private TareaResponse tareaRevisionDocumentoHabitual(Documento documento) {
+        String tipo = documento.getTipoDocumento() != null
+                ? documento.getTipoDocumento().name().replace('_', ' ')
+                : "DOCUMENTO";
+        String interesado = documento.getInteresado() != null ? documento.getInteresado().getNombre() : "Interesado sin nombre";
+        String cliente = documento.getCliente() != null ? documento.getCliente().getNombre() : null;
+        String contexto = tipo + " de " + interesado
+                + ". Ultima copia registrada: " + format(documento.getFechaSubida())
+                + ". Revisa si debe mantenerse esta copia o sustituirse por una mas reciente.";
+        return TareaResponse.builder()
+                .id("DOC-HAB-" + documento.getId() + "-REVISION")
+                .tipo("DOCUMENTO_HABITUAL_REVISION_ANUAL")
+                .ambito("GESTION")
+                .prioridad("BAJA")
+                .titulo("Revision anual de documento habitual")
+                .detalle("Documento reutilizable registrado hace mas de un ano.")
+                .contexto(limitar(contexto))
+                .entidad("DOCUMENTO")
+                .entidadId(documento.getId())
+                .matricula(null)
+                .cliente(cliente)
+                .fechaReferencia(format(documento.getFechaSubida()))
+                .diasPendiente(dias(documento.getFechaSubida()))
+                .enlace(documento.getInteresado() != null ? "/interesados/" + documento.getInteresado().getId() : "/interesados")
+                .build();
     }
 
     private TareaResponse tareaSolicitud(Solicitud solicitud, Usuario usuario) {

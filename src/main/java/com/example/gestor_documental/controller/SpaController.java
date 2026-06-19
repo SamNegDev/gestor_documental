@@ -13,8 +13,7 @@ public class SpaController {
             "/cliente/**",
             "/expedientes/**",
             "/solicitudes/**",
-            "/acceso-denegado",
-            "/error"
+            "/acceso-denegado"
     })
     public String forwardToSpa() {
         return "forward:/index.html";

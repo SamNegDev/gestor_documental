@@ -7,6 +7,7 @@ import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
+import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.model.WhatsappAdjunto;
 import com.example.gestor_documental.model.WhatsappWebhookEvento;
@@ -14,7 +15,6 @@ import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.UsuarioRepository;
 import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
-import com.example.gestor_documental.service.AvisoAdminService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.OcrPdfService;
 import com.example.gestor_documental.service.WhatsappMediaService;
@@ -53,7 +53,6 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
     private final UsuarioRepository usuarioRepository;
     private final HistorialCambioService historialCambioService;
     private final OcrPdfService ocrPdfService;
-    private final AvisoAdminService avisoAdminService;
 
     @Value("${app.whatsapp.access-token:}")
     private String accessToken;
@@ -66,18 +65,19 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
 
     @Override
     @Transactional
-    public void descargarYGuardar(WhatsappWebhookEvento evento, JsonNode message) {
+    public boolean descargarYGuardar(WhatsappWebhookEvento evento, JsonNode message) {
         String tipo = text(message.path("type"));
         JsonNode media = mediaNode(message, tipo);
         String mediaId = text(media.path("id"));
         if (!StringUtils.hasText(mediaId) || adjuntoRepository.existsByMediaId(mediaId)) {
-            return;
+            return false;
         }
 
         WhatsappAdjunto adjunto = new WhatsappAdjunto();
         adjunto.setEvento(evento);
         adjunto.setCliente(evento.getCliente());
         adjunto.setExpediente(evento.getExpediente());
+        adjunto.setSolicitud(evento.getSolicitud());
         adjunto.setTelefono(evento.getTelefono());
         adjunto.setTipo(tipo);
         adjunto.setMediaId(mediaId);
@@ -87,7 +87,7 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
         if (!StringUtils.hasText(accessToken)) {
             adjunto.setErrorDescarga("No hay token de WhatsApp configurado para descargar adjuntos.");
             adjuntoRepository.save(adjunto);
-            return;
+            return false;
         }
 
         try {
@@ -113,7 +113,7 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
             if (!StringUtils.hasText(url)) {
                 adjunto.setErrorDescarga("Meta no devolvio URL de descarga para el adjunto.");
                 adjuntoRepository.save(adjunto);
-                return;
+                return false;
             }
 
             byte[] contenido = restClient.get()
@@ -124,68 +124,71 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
             if (contenido == null || contenido.length == 0) {
                 adjunto.setErrorDescarga("El adjunto descargado esta vacio.");
                 adjuntoRepository.save(adjunto);
-                return;
+                return false;
             }
 
             String nombre = guardarArchivo(contenido, adjunto.getNombreArchivoOriginal());
             adjunto.setNombreArchivo(nombre);
             adjunto.setTamanioBytes((long) contenido.length);
-            clasificarAutomaticamenteSiEsSeguro(adjunto);
+            adjuntarAutomaticamenteSiTieneContexto(adjunto);
             adjuntoRepository.save(adjunto);
+            return adjunto.getEstado() == EstadoWhatsappAdjunto.CLASIFICADO;
         } catch (RestClientException | IllegalArgumentException | IOException exception) {
             adjunto.setErrorDescarga(exception.getMessage());
             adjuntoRepository.save(adjunto);
+            return false;
         }
     }
 
-    private void clasificarAutomaticamenteSiEsSeguro(WhatsappAdjunto adjunto) {
+    private void adjuntarAutomaticamenteSiTieneContexto(WhatsappAdjunto adjunto) {
         Expediente expediente = adjunto.getExpediente();
-        if (expediente == null || !StringUtils.hasText(adjunto.getNombreArchivo())) {
+        Solicitud solicitud = adjunto.getSolicitud();
+        if ((expediente == null && solicitud == null) || !StringUtils.hasText(adjunto.getNombreArchivo())) {
             return;
         }
         TipoDocumento tipo = tipoPorNombre(adjunto.getNombreArchivoOriginal())
                 .or(() -> tipoPorOcr(adjunto))
-                .or(() -> tipoPorRequisitoUnico(expediente))
-                .orElse(null);
-        if (tipo == null) {
-            return;
-        }
+                .or(() -> expediente != null ? tipoPorRequisitoUnico(expediente) : Optional.empty())
+                .orElse(TipoDocumento.OTROS);
         Documento documento = new Documento();
         documento.setExpediente(expediente);
-        documento.setCliente(expediente.getCliente());
+        documento.setSolicitud(solicitud);
+        documento.setCliente(expediente != null ? expediente.getCliente() : solicitud.getCliente());
         documento.setTipoDocumento(tipo);
         documento.setNombreArchivo(adjunto.getNombreArchivo());
         documento.setNombreArchivoOriginal(StringUtils.hasText(adjunto.getNombreArchivoOriginal())
                 ? adjunto.getNombreArchivoOriginal()
                 : "Documento recibido por WhatsApp");
         documento.setDescripcionArchivo("Recibido y clasificado automaticamente desde WhatsApp.");
-        documento.setSubidoPor(usuarioCliente(expediente));
+        documento.setSubidoPor(usuarioCliente(expediente, solicitud));
         documentoRepository.save(documento);
 
-        requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
-                .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
-                .filter(requisito -> requisito.getTipoDocumento() == tipo)
-                .findFirst()
-                .ifPresent(requisito -> {
-                    requisito.setDocumento(documento);
-                    requisito.setEstado(EstadoRequisitoDocumental.APORTADO);
-                    requisitoRepository.save(requisito);
-                });
+        if (expediente != null && tipo != TipoDocumento.OTROS) {
+            requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
+                    .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                    .filter(requisito -> tipoCubreRequisito(tipo, requisito.getTipoDocumento()))
+                    .filter(requisito -> !esDocumentoIdentidad(requisito.getTipoDocumento()))
+                    .findFirst()
+                    .ifPresent(requisito -> {
+                        requisito.setDocumento(documento);
+                        requisito.setEstado(EstadoRequisitoDocumental.APORTADO);
+                        requisitoRepository.save(requisito);
+                    });
+        }
 
         adjunto.setEstado(EstadoWhatsappAdjunto.CLASIFICADO);
-        historialCambioService.registrarCambioExpediente(expediente, null, "WHATSAPP DOCUMENTO",
-                "Adjunto de WhatsApp clasificado automaticamente como " + tipo.name().replace('_', ' ')
-                        + ": " + documento.getNombreArchivoOriginal() + ".");
-        avisoAdminService.crear(
-                "WHATSAPP_DOCUMENTO_AUTO",
-                "Documento WhatsApp clasificado",
-                "Se ha clasificado automaticamente como " + tipo.name().replace('_', ' ')
-                        + " y se ha adjuntado al expediente "
-                        + (StringUtils.hasText(expediente.getMatricula()) ? expediente.getMatricula().trim().toUpperCase(Locale.ROOT) : expediente.getId())
-                        + ": " + documento.getNombreArchivoOriginal() + ".",
-                "WhatsApp",
-                expediente,
-                expediente.getCliente());
+        registrarAdjuntoAutomatico(expediente, solicitud, tipo, documento);
+    }
+
+    private void registrarAdjuntoAutomatico(Expediente expediente, Solicitud solicitud, TipoDocumento tipo, Documento documento) {
+        String tipoTexto = tipo.name().replace('_', ' ');
+        if (expediente != null) {
+            historialCambioService.registrarCambioExpediente(expediente, null, "WHATSAPP DOCUMENTO",
+                    "Adjunto de WhatsApp incorporado como " + tipoTexto + ": " + documento.getNombreArchivoOriginal() + ".");
+            return;
+        }
+        historialCambioService.registrarCambioSolicitud(solicitud, null, "WHATSAPP DOCUMENTO",
+                "Adjunto de WhatsApp incorporado como " + tipoTexto + ": " + documento.getNombreArchivoOriginal() + ".");
     }
 
     private Optional<TipoDocumento> tipoPorRequisitoUnico(Expediente expediente) {
@@ -222,6 +225,9 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
         }
         String limpio = nombre.toLowerCase(Locale.ROOT)
                 .replaceAll("[^a-z0-9]", " ");
+        if (limpio.contains("informe") && limpio.contains("dgt")) {
+            return Optional.of(TipoDocumento.INFORME_DGT);
+        }
         Map<String, TipoDocumento> reglas = Map.ofEntries(
                 Map.entry("dni", TipoDocumento.DNI),
                 Map.entry("cif", TipoDocumento.CIF),
@@ -245,11 +251,35 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
         return detectados.size() == 1 ? Optional.of(detectados.get(0)) : Optional.empty();
     }
 
-    private Usuario usuarioCliente(Expediente expediente) {
-        if (expediente == null || expediente.getCliente() == null || expediente.getCliente().getId() == null) {
+    private boolean tipoCubreRequisito(TipoDocumento documento, TipoDocumento requisito) {
+        if (documento == null || requisito == null) {
+            return false;
+        }
+        if (documento == requisito) {
+            return true;
+        }
+        if (requisito == TipoDocumento.MANDATO) {
+            return documento == TipoDocumento.MANDATO_REPRESENTACION;
+        }
+        if (requisito == TipoDocumento.CONTRATO_COMPRAVENTA) {
+            return documento == TipoDocumento.FACTURA;
+        }
+        return (requisito == TipoDocumento.PERMISO_CIRCULACION || requisito == TipoDocumento.FICHA_TECNICA)
+                && documento == TipoDocumento.INFORME_DGT;
+    }
+
+    private boolean esDocumentoIdentidad(TipoDocumento tipoDocumento) {
+        return tipoDocumento == TipoDocumento.DNI || tipoDocumento == TipoDocumento.CIF;
+    }
+
+    private Usuario usuarioCliente(Expediente expediente, Solicitud solicitud) {
+        Long clienteId = expediente != null && expediente.getCliente() != null
+                ? expediente.getCliente().getId()
+                : solicitud != null && solicitud.getCliente() != null ? solicitud.getCliente().getId() : null;
+        if (clienteId == null) {
             return null;
         }
-        return usuarioRepository.findFirstByClienteIdAndRolUsuarioAndActivoTrueOrderByIdAsc(expediente.getCliente().getId(), RolUsuario.CLIENTE)
+        return usuarioRepository.findFirstByClienteIdAndRolUsuarioAndActivoTrueOrderByIdAsc(clienteId, RolUsuario.CLIENTE)
                 .orElse(null);
     }
 

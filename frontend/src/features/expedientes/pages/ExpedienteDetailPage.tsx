@@ -18,7 +18,7 @@ import { NextActionPanel } from "../components/NextActionPanel";
 import { OcrReviewDialog } from "../components/OcrReviewDialog";
 import { PhaseMilestonesPanel } from "../components/PhaseMilestonesPanel";
 import { SecondaryExpedienteTabs } from "../components/SecondaryExpedienteTabs";
-import { deleteDocument, deleteDocumentPages, extractDocumentPages, mergeDocuments, updateDocument, uploadExpedienteDocument } from "../services/documentosApi";
+import { applyDocumentRoles, deleteDocument, deleteDocumentPages, extractDocumentPages, mergeDocuments, readDocumentIdentity, readDocumentRoles, updateDocument, uploadExpedienteDocument } from "../services/documentosApi";
 import {
   completeExpedienteMilestone,
   finishExpediente,
@@ -30,6 +30,8 @@ import {
   requestAdditionalInfo,
   resolveAdditionalInfo,
   resolveIncident,
+  rollbackExpedienteFinalization,
+  rollbackExpedienteMilestone,
   sendExpedienteMessage,
   updateExpedienteInteresados,
   uploadIncidentDocument,
@@ -666,6 +668,9 @@ export function ExpedienteDetailPage() {
   const [resolvingIncident, setResolvingIncident] = useState<IncidenciaExpediente | null>(null);
   const [activeOperationId, setActiveOperationId] = useState<number | null>(null);
   const [editingDocument, setEditingDocument] = useState<DocumentoExpediente | null>(null);
+  const [readingIdentityId, setReadingIdentityId] = useState<number | null>(null);
+  const [readingRolesId, setReadingRolesId] = useState<number | null>(null);
+  const [applyingRolesId, setApplyingRolesId] = useState<number | null>(null);
   const { confirm, dialog } = useConfirmDialog();
 
   const refreshRelatedData = useCallback(async () => {
@@ -767,6 +772,65 @@ export function ExpedienteDetailPage() {
     }
   };
 
+  const handleReadDocumentIdentity = async (documento: DocumentoExpediente) => {
+    if (!documento.id) return;
+    setReadingIdentityId(documento.id);
+    try {
+      await readDocumentIdentity(documento.id, Boolean(documento.lecturaIdentidad));
+      await refreshExpediente();
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.details) {
+        alert(cause.details);
+        return;
+      }
+      alert("No se pudo leer la identidad del documento.");
+    } finally {
+      setReadingIdentityId(null);
+    }
+  };
+
+  const handleReadDocumentRoles = async (documento: DocumentoExpediente) => {
+    if (!documento.id) return;
+    setReadingRolesId(documento.id);
+    try {
+      await readDocumentRoles(documento.id, Boolean(documento.lecturaRoles));
+      await refreshExpediente();
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.details) {
+        alert(cause.details);
+        return;
+      }
+      alert("No se pudieron leer los roles del documento.");
+    } finally {
+      setReadingRolesId(null);
+    }
+  };
+
+  const handleApplyDocumentRoles = async (documento: DocumentoExpediente) => {
+    if (!documento.id) return;
+    const confirmed = await confirm({
+      title: "Aplicar datos al expediente",
+      description: "Se vincularan comprador y vendedor, se guardara la direccion completa leida y se sincronizaran los requisitos documentales.",
+      confirmLabel: "Aplicar datos",
+      tone: "success",
+    });
+    if (!confirmed) return;
+
+    setApplyingRolesId(documento.id);
+    try {
+      await applyDocumentRoles(documento.id);
+      await refreshExpediente();
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.details) {
+        alert(cause.details);
+        return;
+      }
+      alert("No se pudieron aplicar los datos al expediente.");
+    } finally {
+      setApplyingRolesId(null);
+    }
+  };
+
   const handleUploadCompleteExpediente = async (archivo: File) => {
     if (!expediente) return;
     const documentosPrevios = new Set(expediente.documentos.map((documento) => documento.id).filter(Boolean));
@@ -778,7 +842,7 @@ export function ExpedienteDetailPage() {
       const nuevos = actualizado.documentos.filter(
         (documento) => documento.id && !documentosPrevios.has(documento.id) && documento.tipo !== "EXPEDIENTE_COMPLETO",
       );
-      setOcrReviewDocuments(nuevos);
+      setOcrReviewDocuments(nuevos.length > 0 ? nuevos : actualizado.documentos.filter((documento) => documento.id));
       setOcrReviewOpen(true);
     } catch {
       alert("No se pudo procesar el expediente completo.");
@@ -969,6 +1033,26 @@ export function ExpedienteDetailPage() {
         await refreshExpediente();
       } catch {
         alert("No se pudo marcar la informacion como revisada.");
+      }
+      return;
+    }
+    if (actionType === "RETROCEDER_HITO" || actionType === "RETROCEDER_FINALIZACION") {
+      const confirmed = await confirm({
+        title: "Retroceder fase",
+        description: "Se deshara esta fase y las posteriores que dependan de ella. La documentacion subida no se eliminara.",
+        confirmLabel: "Retroceder",
+        tone: "danger",
+      });
+      if (!confirmed) return;
+      try {
+        if (actionType === "RETROCEDER_FINALIZACION") {
+          await rollbackExpedienteFinalization(expediente.id);
+        } else {
+          await rollbackExpedienteMilestone(expediente.id, accion?.codigoHito || hito.id);
+        }
+        await refreshExpediente();
+      } catch (cause) {
+        alert(cause instanceof ApiError ? cause.details || "No se pudo retroceder la fase." : "No se pudo retroceder la fase.");
       }
       return;
     }
@@ -1201,6 +1285,7 @@ export function ExpedienteDetailPage() {
             closingDocumentsReady={operaciones.length <= 1 ? hasClosingDocuments(expediente.documentos) : undefined}
             expedienteEstado={operaciones.length <= 1 ? expediente.estado : undefined}
             hitos={operationalHitos}
+            rollbackLocked={expediente.estado === "FINALIZADO" && hasClosingDocuments(expediente.documentos)}
             onRunMilestoneAction={handleRunMilestoneAction}
           />
           <CompleteExpedienteUploadPanel
@@ -1218,13 +1303,19 @@ export function ExpedienteDetailPage() {
             onUploadRequirement={handleUploadRequirement}
           />
           <DocumentsPanel
+            applyingRolesId={applyingRolesId}
             documentos={expediente.documentos}
             onDeleteDocument={handleDeleteDocument}
             onEditDocument={setEditingDocument}
+            onApplyRoles={handleApplyDocumentRoles}
             onOpenChecklist={() => setChecklistOpen(true)}
             onOpenReview={handleOpenDocumentReview}
             onOpenTemplates={() => setTemplateDialogOpen(true)}
+            onReadIdentity={handleReadDocumentIdentity}
+            onReadRoles={handleReadDocumentRoles}
             onUploadDocument={handleUploadDocument}
+            readingIdentityId={readingIdentityId}
+            readingRolesId={readingRolesId}
           />
         </div>
 

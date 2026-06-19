@@ -21,6 +21,17 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     @Query("select s from Solicitud s where s.cliente.id = :clienteId order by coalesce(s.fechaUltimaModificacion, s.fechaCreacion) desc")
     List<Solicitud> findByClienteIdOrderByFechaReferenciaDesc(Long clienteId);
 
+    @Query("""
+            select s from Solicitud s
+            left join fetch s.cliente
+            left join fetch s.tipoTramite
+            where s.cliente.id = :clienteId
+              and upper(replace(replace(coalesce(s.matricula, ''), ' ', ''), '-', '')) = :matricula
+            order by coalesce(s.fechaUltimaModificacion, s.fechaCreacion) desc
+            """)
+    List<Solicitud> findByClienteIdAndMatriculaNormalizada(@Param("clienteId") Long clienteId,
+                                                           @Param("matricula") String matricula);
+
     @Query(
             value = """
                     select s from Solicitud s
@@ -28,6 +39,16 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
                     left join s.tipoTramite tipoTramite
                     where (:clienteId is null or cliente.id = :clienteId)
                       and (:estado is null or s.estadoSolicitud = :estado)
+                      and (:estado is not null
+                           or :archivo = 'TODAS'
+                           or (:archivo = 'ARCHIVADAS' and s.estadoSolicitud in (
+                                com.example.gestor_documental.enums.EstadoSolicitud.CONVERTIDA,
+                                com.example.gestor_documental.enums.EstadoSolicitud.RECHAZADO
+                           ))
+                           or (:archivo = 'ACTIVAS' and s.estadoSolicitud not in (
+                                com.example.gestor_documental.enums.EstadoSolicitud.CONVERTIDA,
+                                com.example.gestor_documental.enums.EstadoSolicitud.RECHAZADO
+                           )))
                       and (:tipoTramiteId is null or tipoTramite.id = :tipoTramiteId)
                       and (:matricula is null or upper(coalesce(s.matricula, '')) like :matricula)
                       and (:desde is null or coalesce(s.fechaUltimaModificacion, s.fechaCreacion) >= :desde)
@@ -40,6 +61,16 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
                     left join s.tipoTramite tipoTramite
                     where (:clienteId is null or cliente.id = :clienteId)
                       and (:estado is null or s.estadoSolicitud = :estado)
+                      and (:estado is not null
+                           or :archivo = 'TODAS'
+                           or (:archivo = 'ARCHIVADAS' and s.estadoSolicitud in (
+                                com.example.gestor_documental.enums.EstadoSolicitud.CONVERTIDA,
+                                com.example.gestor_documental.enums.EstadoSolicitud.RECHAZADO
+                           ))
+                           or (:archivo = 'ACTIVAS' and s.estadoSolicitud not in (
+                                com.example.gestor_documental.enums.EstadoSolicitud.CONVERTIDA,
+                                com.example.gestor_documental.enums.EstadoSolicitud.RECHAZADO
+                           )))
                       and (:tipoTramiteId is null or tipoTramite.id = :tipoTramiteId)
                       and (:matricula is null or upper(coalesce(s.matricula, '')) like :matricula)
                       and (:desde is null or coalesce(s.fechaUltimaModificacion, s.fechaCreacion) >= :desde)
@@ -48,6 +79,7 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     )
     Page<Solicitud> buscarListado(@Param("clienteId") Long clienteId,
                                   @Param("estado") EstadoSolicitud estado,
+                                  @Param("archivo") String archivo,
                                   @Param("tipoTramiteId") Long tipoTramiteId,
                                   @Param("matricula") String matricula,
                                   @Param("desde") LocalDateTime desde,

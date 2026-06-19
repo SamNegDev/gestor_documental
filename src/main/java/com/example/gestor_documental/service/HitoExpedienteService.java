@@ -11,6 +11,10 @@ public interface HitoExpedienteService {
 
     HitoExpediente completar(Long expedienteId, CodigoHitoExpediente codigo, Usuario usuario);
 
+    void retroceder(Long expedienteId, CodigoHitoExpediente codigo, Usuario usuario);
+
+    void retrocederFinalizacion(Long expedienteId, Usuario usuario);
+
     void finalizar(Long expedienteId, Usuario usuario);
 
     void abrirIncidencia(Long expedienteId, Long tipoIncidenciaId, String observaciones, Usuario usuario);

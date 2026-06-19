@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -49,10 +50,31 @@ public class OcrPdfServiceImpl implements OcrPdfService {
             List<DocumentoDetectadoDto> resultado = new ArrayList<>();
             TipoDocumento tipoActual = null;
             List<Integer> paginasActuales = new ArrayList<>();
+            long limiteProcesamiento = System.nanoTime()
+                    + TimeUnit.SECONDS.toNanos(Math.max(1, ocrProperties.getMaxProcessingSeconds()));
 
             for (int i = 0; i < totalPaginas; i++) {
-                String textoPagina = extraerTextoPagina(document, renderer, i);
-                TipoDocumento tipoDetectado = detectarTipoDocumento(textoPagina);
+                if (System.nanoTime() > limiteProcesamiento) {
+                    if (!paginasActuales.isEmpty()) {
+                        resultado.add(new DocumentoDetectadoDto(
+                                tipoActual != null ? tipoActual : TipoDocumento.OTROS,
+                                new ArrayList<>(paginasActuales)
+                        ));
+                        paginasActuales.clear();
+                    }
+                    List<Integer> paginasPendientes = new ArrayList<>();
+                    for (int pendiente = i; pendiente < totalPaginas; pendiente++) {
+                        paginasPendientes.add(pendiente);
+                    }
+                    if (!paginasPendientes.isEmpty()) {
+                        resultado.add(new DocumentoDetectadoDto(TipoDocumento.OTROS, paginasPendientes));
+                    }
+                    log.warn("OCR detenido tras superar {} segundos. Paginas restantes marcadas como OTROS.",
+                            ocrProperties.getMaxProcessingSeconds());
+                    break;
+                }
+
+                TipoDocumento tipoDetectado = detectarTipoDocumentoPagina(document, renderer, i);
 
                 log.debug("OCR pagina {} de {} detectada como {}", i + 1, totalPaginas, tipoDetectado);
 
@@ -159,6 +181,21 @@ public class OcrPdfServiceImpl implements OcrPdfService {
             return textoEmbebido;
         }
 
+        return extraerTextoPaginaPorOcr(renderer, pageIndex);
+    }
+
+    private TipoDocumento detectarTipoDocumentoPagina(PDDocument document, PDFRenderer renderer, int pageIndex) throws IOException {
+        String textoEmbebido = extraerTextoEmbebido(document, pageIndex);
+        TipoDocumento tipoEmbebido = detectarTipoDocumento(textoEmbebido);
+        if (tipoEmbebido != null) {
+            return tipoEmbebido;
+        }
+
+        String textoOcr = extraerTextoPaginaPorOcr(renderer, pageIndex);
+        return detectarTipoDocumento(textoOcr);
+    }
+
+    private String extraerTextoPaginaPorOcr(PDFRenderer renderer, int pageIndex) throws IOException {
         BufferedImage imagen = renderer.renderImageWithDPI(
                 pageIndex,
                 ocrProperties.getDpi(),
@@ -204,14 +241,21 @@ public class OcrPdfServiceImpl implements OcrPdfService {
 
             Process process = processBuilder.start();
 
+            boolean terminado = process.waitFor(Math.max(1, ocrProperties.getPageTimeoutSeconds()), TimeUnit.SECONDS);
+            if (!terminado) {
+                process.destroyForcibly();
+                log.warn("Tesseract supero el limite de {} segundos al procesar una pagina OCR.",
+                        ocrProperties.getPageTimeoutSeconds());
+                return "";
+            }
+
+            int exitCode = process.exitValue();
             String output;
             try (java.io.BufferedReader reader = new java.io.BufferedReader(
                     new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
 
                 output = reader.lines().collect(java.util.stream.Collectors.joining("\n"));
             }
-
-            int exitCode = process.waitFor();
 
             if (exitCode != 0) {
                 log.warn("Tesseract devolvio codigo {} al procesar una pagina OCR. Salida: {}", exitCode, output);
@@ -294,6 +338,13 @@ public class OcrPdfServiceImpl implements OcrPdfService {
         }
 
         // Ficha técnica
+        if ((t.contains("informe") && t.contains("dgt") && t.contains("vehiculo")) ||
+                (t.contains("informe") && t.contains("registro de vehiculos")) ||
+                t.contains("informe reducido del vehiculo") ||
+                t.contains("informe completo del vehiculo")) {
+            return TipoDocumento.INFORME_DGT;
+        }
+
         if ((t.contains("numero de identificacion") && t.contains("clasificacion del vehiculo")) ||
                 t.contains("tara maxima") ||
                 t.contains("neumaticos") || t.contains("mtma") && t.contains("anchura") ||

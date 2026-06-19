@@ -13,7 +13,9 @@ import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.HitoExpediente;
+import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.HitoExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
@@ -30,13 +32,32 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class HitoExpedienteServiceImpl implements HitoExpedienteService {
 
+    private static final List<CodigoHitoExpediente> HITOS_DIRECTOS = List.of(
+            CodigoHitoExpediente.TRAMITE_PROGRAMA_GESTION,
+            CodigoHitoExpediente.MODELO_620_PRESENTADO,
+            CodigoHitoExpediente.ENVIADO_DGT
+    );
+
+    private static final List<CodigoHitoExpediente> HITOS_BATECOM = List.of(
+            CodigoHitoExpediente.BATE_TRAMITE_PROGRAMA_GESTION,
+            CodigoHitoExpediente.BATE_MODELO_620_PRESENTADO,
+            CodigoHitoExpediente.BATE_FINALIZADO,
+            CodigoHitoExpediente.COM_TRAMITE_PROGRAMA_GESTION,
+            CodigoHitoExpediente.COM_MODELO_620_PRESENTADO,
+            CodigoHitoExpediente.COM_ENVIADO_DGT,
+            CodigoHitoExpediente.COM_FINALIZADO
+    );
+
     private final HitoExpedienteRepository hitoExpedienteRepository;
     private final ExpedienteRepository expedienteRepository;
+    private final DocumentoRepository documentoRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final IncidenciaRepository incidenciaRepository;
     private final OperacionExpedienteRepository operacionRepository;
@@ -60,6 +81,12 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
 
         if (codigo == CodigoHitoExpediente.TRAMITE_PROGRAMA_GESTION) {
             validarDocumentacionCompleta(expedienteId);
+        }
+        if (codigo == CodigoHitoExpediente.BATE_TRAMITE_PROGRAMA_GESTION) {
+            validarDocumentacionCompletaOperacion(expedienteId, TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE);
+        }
+        if (codigo == CodigoHitoExpediente.COM_TRAMITE_PROGRAMA_GESTION) {
+            validarDocumentacionCompletaOperacion(expedienteId, TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM);
         }
         if (codigo == CodigoHitoExpediente.MODELO_620_PRESENTADO
                 || codigo == CodigoHitoExpediente.BATE_MODELO_620_PRESENTADO
@@ -97,6 +124,62 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
         }
 
         return guardado;
+    }
+
+    @Override
+    @Transactional
+    public void retroceder(Long expedienteId, CodigoHitoExpediente codigo, Usuario usuario) {
+        Expediente expediente = expedienteRepository.findById(expedienteId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
+
+        validarPermiso(expediente, usuario);
+        validarRetrocesoPermitido(expediente);
+
+        List<CodigoHitoExpediente> orden = ordenRetroceso(codigo);
+        int indice = orden.indexOf(codigo);
+        if (indice < 0) {
+            throw new OperacionInvalidaException("No se puede retroceder este hito.");
+        }
+
+        Set<CodigoHitoExpediente> codigosAEliminar = orden.subList(indice, orden.size())
+                .stream()
+                .collect(Collectors.toSet());
+        List<HitoExpediente> hitosActuales = hitoExpedienteRepository.findByExpedienteId(expedienteId);
+        List<HitoExpediente> hitosAEliminar = hitosActuales.stream()
+                .filter(hito -> codigosAEliminar.contains(hito.getCodigo()))
+                .toList();
+        if (hitosAEliminar.isEmpty()) {
+            throw new OperacionInvalidaException("El hito seleccionado no esta completado.");
+        }
+
+        Set<CodigoHitoExpediente> hitosRestantes = hitosActuales.stream()
+                .map(HitoExpediente::getCodigo)
+                .filter(hito -> !codigosAEliminar.contains(hito))
+                .collect(Collectors.toSet());
+
+        hitoExpedienteRepository.deleteAll(hitosAEliminar);
+        actualizarOperacionesTrasRetroceso(expedienteId, hitosRestantes);
+        registrarRetroceso(expediente, estadoTrasRetroceso(hitosRestantes), usuario,
+                "Se retrocedio el expediente hasta el hito anterior a: " + etiqueta(codigo) + ".");
+    }
+
+    @Override
+    @Transactional
+    public void retrocederFinalizacion(Long expedienteId, Usuario usuario) {
+        Expediente expediente = expedienteRepository.findById(expedienteId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
+
+        validarPermiso(expediente, usuario);
+        validarRetrocesoPermitido(expediente);
+        if (expediente.getEstadoExpediente() != EstadoExpediente.FINALIZADO) {
+            throw new OperacionInvalidaException("El expediente no esta finalizado.");
+        }
+
+        Set<CodigoHitoExpediente> hitosActuales = hitoExpedienteRepository.findByExpedienteId(expedienteId).stream()
+                .map(HitoExpediente::getCodigo)
+                .collect(Collectors.toSet());
+        registrarRetroceso(expediente, estadoTrasRetroceso(hitosActuales), usuario,
+                "Se reabrio el cierre del expediente.");
     }
 
     @Override
@@ -167,6 +250,16 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
         }
     }
 
+    private void validarDocumentacionCompletaOperacion(Long expedienteId, TipoOperacionExpediente tipoOperacion) {
+        boolean hayPendientes = requisitoRepository.findByExpedienteIdOrderByIdAsc(expedienteId).stream()
+                .filter(requisito -> requisito.getEstado() != EstadoRequisitoDocumental.POSTERIOR)
+                .filter(requisito -> requisito.getOperacion() != null && requisito.getOperacion().getTipo() == tipoOperacion)
+                .anyMatch(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO);
+        if (hayPendientes) {
+            throw new OperacionInvalidaException("Primero deben resolverse los requisitos documentales de esta operacion.");
+        }
+    }
+
     private void validarHitoCompletado(Long expedienteId, CodigoHitoExpediente codigo, String mensaje) {
         if (!hitoExpedienteRepository.existsByExpedienteIdAndCodigo(expedienteId, codigo)) {
             throw new OperacionInvalidaException(mensaje);
@@ -233,8 +326,109 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
                     .ifPresent(operacion -> {
                         operacion.setEstado(EstadoOperacionExpediente.FINALIZADA);
                         operacionRepository.save(operacion);
-                    });
+            });
         }
+    }
+
+    private List<CodigoHitoExpediente> ordenRetroceso(CodigoHitoExpediente codigo) {
+        if (HITOS_DIRECTOS.contains(codigo)) {
+            return HITOS_DIRECTOS;
+        }
+        if (HITOS_BATECOM.contains(codigo)) {
+            return HITOS_BATECOM;
+        }
+        return List.of();
+    }
+
+    private void validarRetrocesoPermitido(Expediente expediente) {
+        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO && tieneJustificantesFinales(expediente)) {
+            throw new OperacionInvalidaException("No se puede retroceder un expediente finalizado con todos los justificantes finales.");
+        }
+    }
+
+    private boolean tieneJustificantesFinales(Expediente expediente) {
+        List<Documento> documentos = documentoRepository.findByExpedienteId(expediente.getId());
+        List<com.example.gestor_documental.model.RequisitoDocumentalExpediente> requisitosFinales = requisitoRepository
+                .findByExpedienteIdOrderByIdAsc(expediente.getId())
+                .stream()
+                .filter(requisito -> requisito.getTipoDocumento() == TipoDocumento.MODELO_620
+                        || requisito.getTipoDocumento() == TipoDocumento.COMPROBANTE_DGT
+                        || requisito.getTipoDocumento() == TipoDocumento.HUELLA_TRAMITE)
+                .toList();
+
+        if (!requisitosFinales.isEmpty()) {
+            return requisitosFinales.stream()
+                    .allMatch(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.APORTADO
+                            || requisito.getEstado() == EstadoRequisitoDocumental.OMITIDO);
+        }
+
+        boolean tieneJustificanteDgt = documentos.stream().anyMatch(this::esJustificanteDgt);
+        boolean tieneModelo620 = documentos.stream().anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.MODELO_620);
+        return tieneJustificanteDgt && (!requiereModelo620(expediente) || tieneModelo620);
+    }
+
+    private boolean esJustificanteDgt(Documento documento) {
+        return documento.getTipoDocumento() == TipoDocumento.HUELLA_TRAMITE
+                || documento.getTipoDocumento() == TipoDocumento.COMPROBANTE_DGT;
+    }
+
+    private void actualizarOperacionesTrasRetroceso(Long expedienteId, Set<CodigoHitoExpediente> hitosRestantes) {
+        operacionRepository.findByExpedienteIdAndTipo(expedienteId, TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE)
+                .ifPresent(operacion -> {
+                    operacion.setEstado(hitosRestantes.contains(CodigoHitoExpediente.BATE_FINALIZADO)
+                            ? EstadoOperacionExpediente.FINALIZADA
+                            : EstadoOperacionExpediente.EN_CURSO);
+                    operacionRepository.save(operacion);
+                });
+        operacionRepository.findByExpedienteIdAndTipo(expedienteId, TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM)
+                .ifPresent(operacion -> {
+                    if (!hitosRestantes.contains(CodigoHitoExpediente.BATE_FINALIZADO)) {
+                        operacion.setEstado(EstadoOperacionExpediente.PENDIENTE);
+                    } else if (hitosRestantes.contains(CodigoHitoExpediente.COM_FINALIZADO)) {
+                        operacion.setEstado(EstadoOperacionExpediente.FINALIZADA);
+                    } else {
+                        operacion.setEstado(EstadoOperacionExpediente.EN_CURSO);
+                    }
+                    operacionRepository.save(operacion);
+                });
+    }
+
+    private EstadoExpediente estadoTrasRetroceso(Set<CodigoHitoExpediente> hitosRestantes) {
+        if (hitosRestantes.contains(CodigoHitoExpediente.ENVIADO_DGT)
+                || hitosRestantes.contains(CodigoHitoExpediente.COM_ENVIADO_DGT)) {
+            return EstadoExpediente.ENVIADO_DGT;
+        }
+        return EstadoExpediente.EN_TRAMITE;
+    }
+
+    private void registrarRetroceso(Expediente expediente, EstadoExpediente nuevoEstado, Usuario usuario, String descripcion) {
+        EstadoExpediente estadoAnterior = expediente.getEstadoExpediente();
+        expediente.setEstadoExpediente(nuevoEstado);
+        expediente.setEstadoPrevioPausa(null);
+        expediente.setFechaUltimaModificacion(LocalDateTime.now());
+        expediente.setModificadoPor(usuario);
+        expedienteRepository.save(expediente);
+        historialCambioService.registrarCambioExpediente(
+                expediente,
+                usuario,
+                "RETROCESO FASE",
+                descripcion + " Estado anterior: " + estadoAnterior.name() + ". Estado nuevo: " + nuevoEstado.name()
+        );
+    }
+
+    private String etiqueta(CodigoHitoExpediente codigo) {
+        return switch (codigo) {
+            case TRAMITE_PROGRAMA_GESTION -> "tramite subido al programa de gestion";
+            case MODELO_620_PRESENTADO -> "Modelo 620 presentado";
+            case ENVIADO_DGT -> "envio a DGT";
+            case BATE_TRAMITE_PROGRAMA_GESTION -> "BATE subido al programa de gestion";
+            case BATE_MODELO_620_PRESENTADO -> "Modelo 620 presentado en BATE";
+            case BATE_FINALIZADO -> "BATE finalizado";
+            case COM_TRAMITE_PROGRAMA_GESTION -> "COM subido al programa de gestion";
+            case COM_MODELO_620_PRESENTADO -> "Modelo 620 presentado en COM";
+            case COM_ENVIADO_DGT -> "COM enviado a DGT";
+            case COM_FINALIZADO -> "COM finalizado";
+        };
     }
 
     private String nota(CodigoHitoExpediente codigo) {

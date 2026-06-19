@@ -6,6 +6,7 @@ type Props = {
   closingDocumentsReady?: boolean;
   expedienteEstado?: string;
   hitos: HitoExpediente[];
+  rollbackLocked?: boolean;
   onRunMilestoneAction: (hito: HitoExpediente, accion?: HitoAccion) => void;
 };
 
@@ -31,7 +32,11 @@ function getDisplayHito(hito: HitoExpediente, index: number, total: number, expe
   } satisfies HitoExpediente;
 }
 
-export function PhaseMilestonesPanel({ closingDocumentsReady, expedienteEstado, hitos, onRunMilestoneAction }: Props) {
+function isRollbackAction(accion: HitoAccion) {
+  return accion.tipo === "RETROCEDER_HITO" || accion.tipo === "RETROCEDER_FINALIZACION";
+}
+
+export function PhaseMilestonesPanel({ closingDocumentsReady, expedienteEstado, hitos, rollbackLocked, onRunMilestoneAction }: Props) {
   const displayHitos = hitos.map((hito, index) => getDisplayHito(hito, index, hitos.length, expedienteEstado, closingDocumentsReady));
 
   return (
@@ -49,6 +54,8 @@ export function PhaseMilestonesPanel({ closingDocumentsReady, expedienteEstado, 
       <ol className="milestones-list milestones-list--compact">
         {displayHitos.map((hito, index) => {
           const waitingForClosingDocs = expedienteEstado === "FINALIZADO" && isClosingMilestone(hito, index, displayHitos.length) && !closingDocumentsReady;
+          const acciones = (hito.acciones || []).filter((accion) => !(rollbackLocked && isRollbackAction(accion)));
+          const showActions = hito.estado === "ACTUAL" && !hito.bloqueado && (acciones.length > 0 || (!hito.completado && hito.accion));
 
           return (
           <li className={`milestone milestone--${hito.estado.toLowerCase()}`} key={hito.id}>
@@ -67,10 +74,10 @@ export function PhaseMilestonesPanel({ closingDocumentsReady, expedienteEstado, 
                 {hito.nota ? ` · ${hito.nota}` : ""}
               </small>
             </div>
-            {!hito.completado && !hito.bloqueado ? (
+            {showActions ? (
               <div className="milestone__actions">
-                {hito.acciones && hito.acciones.length > 0
-                  ? hito.acciones.map((accion) => (
+                {acciones.length > 0
+                  ? acciones.map((accion) => (
                       <button
                         className={`soft-button soft-button--compact milestone-action--${accion.tono || "default"}`}
                         key={`${hito.id}-${accion.tipo}-${accion.codigoHito || accion.label}`}

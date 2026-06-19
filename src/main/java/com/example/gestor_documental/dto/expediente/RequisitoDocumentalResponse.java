@@ -20,6 +20,9 @@ public class RequisitoDocumentalResponse {
     private Long interesadoId;
     private String interesadoNombre;
     private String rolInteresado;
+    private Long interesadoRepresentadoId;
+    private String interesadoRepresentadoNombre;
+    private String rolRepresentado;
     private Long operacionId;
     private String operacionLabel;
     private Long documentoId;

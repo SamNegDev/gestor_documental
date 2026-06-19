@@ -1,4 +1,4 @@
-import { Eye, FilePlus2, FileText, Scissors, Pencil, Trash2, Upload } from "lucide-react";
+import { ClipboardCheck, Eye, FilePlus2, FileText, IdCard, Loader2, Pencil, Scissors, Trash2, Upload, UsersRound } from "lucide-react";
 import type { DocumentoExpediente } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 
@@ -10,9 +10,29 @@ type Props = {
   onUploadDocument: (documento: DocumentoExpediente, archivo: File) => void;
   onEditDocument: (documento: DocumentoExpediente) => void;
   onDeleteDocument: (documento: DocumentoExpediente) => void;
+  onReadIdentity?: (documento: DocumentoExpediente) => void;
+  onReadRoles?: (documento: DocumentoExpediente) => void;
+  onApplyRoles?: (documento: DocumentoExpediente) => void;
+  readingIdentityId?: number | null;
+  readingRolesId?: number | null;
+  applyingRolesId?: number | null;
 };
 
-export function DocumentsPanel({ documentos, onOpenChecklist, onOpenReview, onOpenTemplates, onUploadDocument, onEditDocument, onDeleteDocument }: Props) {
+export function DocumentsPanel({
+  documentos,
+  onOpenChecklist,
+  onOpenReview,
+  onOpenTemplates,
+  onUploadDocument,
+  onEditDocument,
+  onDeleteDocument,
+  onReadIdentity,
+  onReadRoles,
+  onApplyRoles,
+  readingIdentityId,
+  readingRolesId,
+  applyingRolesId,
+}: Props) {
   const pendientesActuales = documentos.filter((documento) => documento.estado === "PENDIENTE" && documento.requeridoAhora);
   const hasEditableDocuments = documentos.some((documento) => documento.id);
 
@@ -43,66 +63,125 @@ export function DocumentsPanel({ documentos, onOpenChecklist, onOpenReview, onOp
       ) : null}
 
       <div className="documents-list">
-        {documentos.map((documento, index) => (
-          <article className={`document-row document-row--${documento.estado.toLowerCase()}`} key={`${documento.tipo}-${documento.id ?? index}`}>
-            <div className="pdf-icon">
-              <FileText size={18} />
-              <strong>PDF</strong>
-            </div>
+        {documentos.map((documento, index) => {
+          const canReadIdentity = Boolean(documento.id && (documento.tipo === "DNI" || documento.tipo === "CIF"));
+          const canReadRoles = Boolean(documento.id && (documento.tipo === "CONTRATO_COMPRAVENTA" || documento.tipo === "FACTURA"));
+          const readingIdentity = Boolean(documento.id && readingIdentityId === documento.id);
+          const readingRoles = Boolean(documento.id && readingRolesId === documento.id);
+          const applyingRoles = Boolean(documento.id && applyingRolesId === documento.id);
+          const lectura = documento.lecturaIdentidad;
+          const lecturaRoles = documento.lecturaRoles;
 
-            <div className="document-row__body">
-              <strong>{documento.nombreOriginal || documento.nombre}</strong>
-              <span>
-                {formatDocumentType(documento.tipo)}
-                {documento.operacionLabel ? ` · ${documento.operacionLabel}` : ""}
-              </span>
-              <small>
-                {documento.subido
-                  ? `Subido ${formatDateTime(documento.fechaSubida)}${documento.subidoPor ? ` por ${documento.subidoPor}` : ""}`
-                  : documento.descripcion || "Documento pendiente"}
-              </small>
-            </div>
+          return (
+            <article className={`document-row document-row--${documento.estado.toLowerCase()}`} key={`${documento.tipo}-${documento.id ?? index}`}>
+              <div className="pdf-icon">
+                <FileText size={18} />
+                <strong>PDF</strong>
+              </div>
 
-            <span className="document-state">{humanizeEnum(documento.estado)}</span>
+              <div className="document-row__body">
+                <strong>{documento.nombreOriginal || documento.nombre}</strong>
+                <span>
+                  {formatDocumentType(documento.tipo)}
+                  {documento.operacionLabel ? ` · ${documento.operacionLabel}` : ""}
+                </span>
+                <small>
+                  {documento.subido
+                    ? `Subido ${formatDateTime(documento.fechaSubida)}${documento.subidoPor ? ` por ${documento.subidoPor}` : ""}`
+                    : documento.descripcion || "Documento pendiente"}
+                </small>
+                {lectura ? (
+                  <div className={`document-identity ${lectura.requiereRevision ? "document-identity--review" : "document-identity--linked"}`}>
+                    <IdCard size={14} />
+                    <span>{lectura.identificador || "Sin DNI/CIF"}</span>
+                    {lectura.nombreCompleto ? <span>{lectura.nombreCompleto}</span> : null}
+                    <em>{lectura.interesadoVinculadoNombre ? `vinculado a ${lectura.interesadoVinculadoNombre}` : "sin vincular"}</em>
+                  </div>
+                ) : null}
+                {lecturaRoles ? (
+                  <div className={`document-roles ${lecturaRoles.requiereRevision ? "document-roles--review" : "document-roles--linked"}`}>
+                    <UsersRound size={14} />
+                    <span>Vendedor: {lecturaRoles.vendedorNombre || lecturaRoles.vendedorIdentificador || "sin leer"}</span>
+                    <span>Comprador: {lecturaRoles.compradorNombre || lecturaRoles.compradorIdentificador || "sin leer"}</span>
+                    <em>{lecturaRoles.aplicadoExpediente ? "aplicado al expediente" : lecturaRoles.mensaje || lecturaRoles.motivoAplicacion || "roles leidos"}</em>
+                  </div>
+                ) : null}
+              </div>
 
-            <div className="document-row__actions">
-              <button
-                className="icon-button"
-                disabled={!documento.id}
-                onClick={() => documento.id && window.open(`/documentos/ver/${documento.id}`, "_blank", "noopener,noreferrer")}
-                title="Ver documento"
-                type="button"
-              >
-                <Eye size={16} />
-              </button>
-              <label className="icon-button" title="Subir documento">
-                <Upload size={16} />
-                <input
-                  hidden
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(event) => {
-                    const file = event.currentTarget.files?.[0];
-                    event.currentTarget.value = "";
-                    if (file) onUploadDocument(documento, file);
-                  }}
-                />
-              </label>
-              <button className="icon-button" disabled={!documento.id} onClick={() => onEditDocument(documento)} title="Editar documento" type="button">
-                <Pencil size={16} />
-              </button>
-              <button
-                className="icon-button icon-button--danger"
-                disabled={!documento.id}
-                onClick={() => onDeleteDocument(documento)}
-                title="Borrar documento"
-                type="button"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </article>
-        ))}
+              <span className="document-state">{humanizeEnum(documento.estado)}</span>
+
+              <div className="document-row__actions">
+                <button
+                  className="icon-button"
+                  disabled={!documento.id}
+                  onClick={() => documento.id && window.open(`/documentos/ver/${documento.id}`, "_blank", "noopener,noreferrer")}
+                  title="Ver documento"
+                  type="button"
+                >
+                  <Eye size={16} />
+                </button>
+                {canReadIdentity ? (
+                  <button
+                    className="icon-button"
+                    disabled={readingIdentity}
+                    onClick={() => onReadIdentity?.(documento)}
+                    title={lectura ? "Releer identidad" : "Leer identidad"}
+                    type="button"
+                  >
+                    {readingIdentity ? <Loader2 className="document-row__identity-spinner" size={16} /> : <IdCard size={16} />}
+                  </button>
+                ) : null}
+                {canReadRoles ? (
+                  <button
+                    className="icon-button"
+                    disabled={readingRoles}
+                    onClick={() => onReadRoles?.(documento)}
+                    title={lecturaRoles ? "Releer roles" : "Leer roles"}
+                    type="button"
+                  >
+                    {readingRoles ? <Loader2 className="document-row__identity-spinner" size={16} /> : <UsersRound size={16} />}
+                  </button>
+                ) : null}
+                {lecturaRoles?.aplicable ? (
+                  <button
+                    className="icon-button"
+                    disabled={applyingRoles}
+                    onClick={() => onApplyRoles?.(documento)}
+                    title="Aplicar datos al expediente"
+                    type="button"
+                  >
+                    {applyingRoles ? <Loader2 className="document-row__identity-spinner" size={16} /> : <ClipboardCheck size={16} />}
+                  </button>
+                ) : null}
+                <label className="icon-button" title="Subir documento">
+                  <Upload size={16} />
+                  <input
+                    hidden
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      event.currentTarget.value = "";
+                      if (file) onUploadDocument(documento, file);
+                    }}
+                  />
+                </label>
+                <button className="icon-button" disabled={!documento.id} onClick={() => onEditDocument(documento)} title="Editar documento" type="button">
+                  <Pencil size={16} />
+                </button>
+                <button
+                  className="icon-button icon-button--danger"
+                  disabled={!documento.id}
+                  onClick={() => onDeleteDocument(documento)}
+                  title="Borrar documento"
+                  type="button"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPatchForm, apiPostForm, apiPostJson } from "../../../shared/api/http";
-import type { DocumentoGenerado, PlantillaPreview, PlantillasExpediente } from "../types/expedienteDetail.types";
+import type { DocumentoGenerado, DocumentoIdentidadLectura, DocumentoRolesLectura, PlantillaPreview, PlantillasExpediente } from "../types/expedienteDetail.types";
 
 export function uploadExpedienteDocument(expedienteId: number, tipoDocumento: string, archivo: File, operacionId?: number | null): Promise<void> {
   const formData = new FormData();
@@ -36,6 +36,18 @@ export function updateDocument(
 
 export function deleteDocument(documentoId: number): Promise<void> {
   return apiDelete(`/api/documentos/${documentoId}`);
+}
+
+export function readDocumentIdentity(documentoId: number, forzar = false): Promise<DocumentoIdentidadLectura> {
+  return apiPostJson<DocumentoIdentidadLectura>(`/api/documentos/${documentoId}/lectura-identidad?forzar=${forzar ? "true" : "false"}`, {});
+}
+
+export function readDocumentRoles(documentoId: number, forzar = false): Promise<DocumentoRolesLectura> {
+  return apiPostJson<DocumentoRolesLectura>(`/api/documentos/${documentoId}/lectura-roles?forzar=${forzar ? "true" : "false"}`, {});
+}
+
+export function applyDocumentRoles(documentoId: number): Promise<DocumentoRolesLectura> {
+  return apiPostJson<DocumentoRolesLectura>(`/api/documentos/${documentoId}/lectura-roles/aplicar`, {});
 }
 
 export function getDocumentPageInfo(documentoId: number): Promise<{ totalPaginas: number }> {

@@ -24,4 +24,6 @@ public class DocumentoExpedienteResponse {
     private String estado;
     private boolean subido;
     private boolean requeridoAhora;
+    private DocumentoIdentidadLecturaResponse lecturaIdentidad;
+    private DocumentoRolesLecturaResponse lecturaRoles;
 }

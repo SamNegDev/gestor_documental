@@ -4,6 +4,7 @@ import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom
 import { AlertTriangle, ArrowLeft, CheckCircle2, Circle, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, Scissors, Send, UserRound } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
+import { ApiError } from "../../../shared/api/http";
 import { uppercaseInput } from "../../../shared/utils/text";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { CompleteExpedienteUploadPanel } from "../../expedientes/components/CompleteExpedienteUploadPanel";
@@ -25,8 +26,9 @@ import {
   enviarMensajeSolicitud,
   getSolicitudInteresadoCoincidencias,
   getSolicitudDetail,
+  procesarSolicitudDocumentacionIa,
 } from "../services/listadosApi";
-import type { SolicitudDetail } from "../types";
+import type { SolicitudDetail, SolicitudDocumentacionIaResponse } from "../types";
 
 export function SolicitudDetailPage() {
   const { id } = useParams();
@@ -80,6 +82,10 @@ export function SolicitudDetailPage() {
     },
   });
 
+  const procesarDocumentacionMutation = useMutation({
+    mutationFn: (solicitudId: number) => procesarSolicitudDocumentacionIa(solicitudId),
+  });
+
   const refreshSolicitud = async () => {
     const result = await solicitudQuery.refetch();
     await Promise.all([
@@ -102,7 +108,7 @@ export function SolicitudDetailPage() {
       const nuevos = actualizada.documentos.filter(
         (documento) => documento.id && !documentosPrevios.has(documento.id) && documento.tipo !== "EXPEDIENTE_COMPLETO",
       );
-      setOcrReviewDocuments(nuevos);
+      setOcrReviewDocuments(nuevos.length > 0 ? nuevos : actualizada.documentos.filter((documento) => documento.id));
       setOcrReviewOpen(true);
     } catch {
       alert("No se pudo procesar el PDF completo de la solicitud.");
@@ -234,6 +240,27 @@ export function SolicitudDetailPage() {
     }
   };
 
+  const handleProcessDocumentacionIa = async () => {
+    const solicitudActual = solicitudQuery.data;
+    if (!solicitudActual) return;
+    const confirmed = await confirm({
+      title: "Procesar documentacion",
+      description:
+        "Se leeran solo los DNI/CIF y factura/contrato que no tengan lectura previa. Si ya hay una lectura correcta se reutilizara para actualizar comprador y vendedor.",
+      confirmLabel: "Procesar",
+      cancelLabel: "Cancelar",
+      tone: "default",
+    });
+    if (!confirmed) return;
+    try {
+      const response = await procesarDocumentacionMutation.mutateAsync(solicitudActual.id);
+      await refreshSolicitud();
+      alert(buildSolicitudIaResultMessage(response));
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo procesar la documentacion." : "No se pudo procesar la documentacion.");
+    }
+  };
+
   if (solicitudQuery.isLoading) {
     return <div className="records-empty">Cargando solicitud...</div>;
   }
@@ -287,7 +314,7 @@ export function SolicitudDetailPage() {
           isClosed={isClosed}
           onConvert={handleConvertSolicitud}
           onStateChange={(estado) => estadoMutation.mutate({ solicitudId: solicitud.id, estado })}
-          pending={checkingInteresados || convertirMutation.isPending || estadoMutation.isPending}
+          pending={checkingInteresados || convertirMutation.isPending || estadoMutation.isPending || procesarDocumentacionMutation.isPending}
         />
       ) : null}
 
@@ -372,15 +399,28 @@ export function SolicitudDetailPage() {
         <section className="panel">
           <div className="panel-heading">
             <h2>Documentos</h2>
-            <button
-              className="soft-button soft-button--compact"
-              disabled={!solicitud.documentos.some((documento) => documento.id)}
-              onClick={handleOpenDocumentReview}
-              type="button"
-            >
-              <Scissors size={16} />
-              Revisar documentos
-            </button>
+            <div className="button-group">
+              {isAdmin && !isClosed ? (
+                <button
+                  className="primary-button primary-button--compact"
+                  disabled={procesarDocumentacionMutation.isPending || !solicitud.documentos.some((documento) => documento.id)}
+                  onClick={handleProcessDocumentacionIa}
+                  type="button"
+                >
+                  {procesarDocumentacionMutation.isPending ? <Loader2 size={16} /> : <FileText size={16} />}
+                  {procesarDocumentacionMutation.isPending ? "Procesando" : "Leer y actualizar"}
+                </button>
+              ) : null}
+              <button
+                className="soft-button soft-button--compact"
+                disabled={!solicitud.documentos.some((documento) => documento.id)}
+                onClick={handleOpenDocumentReview}
+                type="button"
+              >
+                <Scissors size={16} />
+                Revisar documentos
+              </button>
+            </div>
           </div>
           <div className="document-table">
             {solicitud.documentos.length === 0 ? <div className="document-table__empty">No hay documentos asociados.</div> : null}
@@ -475,6 +515,7 @@ export function SolicitudDetailPage() {
           </div>
         </div>
       ) : null}
+      {procesarDocumentacionMutation.isPending ? <SolicitudIaProgressModal /> : null}
       {dialog}
     </section>
   );
@@ -522,6 +563,46 @@ function AdminActions({
         ) : null}
       </div>
     </section>
+  );
+}
+
+function SolicitudIaProgressModal() {
+  return (
+    <div className="ga-progress-modal" role="status" aria-live="polite">
+      <div className="ga-progress-modal__panel">
+        <div className="ga-progress-modal__heading">
+          <span className="ga-progress-modal__spinner">
+            <Loader2 size={22} />
+          </span>
+          <div>
+            <p className="eyebrow">Procesando documentacion</p>
+            <h3>Leyendo DNI/CIF y factura</h3>
+          </div>
+          <strong>IA</strong>
+        </div>
+        <div className="ga-progress-modal__bar">
+          <span style={{ width: "72%" }} />
+        </div>
+        <div className="ga-progress-modal__status">
+          <strong>Actualizando solicitud</strong>
+          <span>Reutilizando lecturas validas cuando ya existen</span>
+        </div>
+        <ul className="ga-progress-modal__steps">
+          <li className="is-active">
+            <span />
+            Localizar identidades
+          </li>
+          <li className="is-active">
+            <span />
+            Leer factura o contrato
+          </li>
+          <li className="is-active">
+            <span />
+            Aplicar comprador y vendedor
+          </li>
+        </ul>
+      </div>
+    </div>
   );
 }
 
@@ -633,21 +714,35 @@ function buildCoincidenciasDescription(coincidencias: Array<{
     .join("\n");
 }
 
+function buildSolicitudIaResultMessage(response: SolicitudDocumentacionIaResponse) {
+  const consumo = `Lecturas nuevas: identidad ${response.lecturasIdentidadNuevas}, roles ${response.lecturasRolesNuevas}. Reutilizadas: identidad ${response.lecturasIdentidadReutilizadas}, roles ${response.lecturasRolesReutilizadas}.`;
+  const estado = response.requiereRevision
+    ? "Requiere revision manual."
+    : response.yaEstabaCorrecta
+      ? "No se han hecho cambios."
+      : response.datosAplicados
+        ? "Datos aplicados."
+        : "Proceso completado.";
+  const detalles = response.detalles?.length ? `\n\n${response.detalles.slice(0, 6).join("\n")}` : "";
+  return `${response.mensaje || "Proceso completado."}\n${estado}\n${consumo}${detalles}`;
+}
+
 function getInformativeMissingDocuments(solicitud: SolicitudDetail) {
   const uploadedTypes = new Set(solicitud.documentos.map((documento) => documento.tipo));
   const missing: string[] = [];
-  const relevantInterested = solicitud.interesados.filter((interesado) => {
-    if (solicitud.tipoTramite === "TRASPASO" || solicitud.tipoTramite === "BATECOM") {
-      return interesado.rol === "COMPRADOR" || interesado.rol === "VENDEDOR" || interesado.rol === "COMPRAVENTA";
-    }
-    return interesado.rol === "TITULAR";
-  });
+  const expectedIdentityCount =
+    solicitud.tipoTramite === "BATECOM"
+      ? 3
+      : solicitud.tipoTramite === "TRASPASO" || solicitud.tipoTramite === "NOTIFICACION_VENTA"
+        ? 2
+        : 1;
+  const uploadedIdentityCount = solicitud.documentos.filter((documento) => documento.tipo === "DNI" || documento.tipo === "CIF").length;
 
-  if (relevantInterested.length > 0 && !uploadedTypes.has("DNI") && !uploadedTypes.has("CIF")) {
-    missing.push("DNI o CIF de los interesados");
+  if (uploadedIdentityCount < expectedIdentityCount) {
+    missing.push(expectedIdentityCount === 1 ? "DNI o CIF del interesado" : "DNI o CIF de los interesados");
   }
   if (
-    (solicitud.tipoTramite === "TRASPASO" || solicitud.tipoTramite === "BATECOM")
+    (solicitud.tipoTramite === "TRASPASO" || solicitud.tipoTramite === "BATECOM" || solicitud.tipoTramite === "NOTIFICACION_VENTA")
     && !uploadedTypes.has("CONTRATO_COMPRAVENTA")
     && !uploadedTypes.has("FACTURA")
   ) {
@@ -655,6 +750,12 @@ function getInformativeMissingDocuments(solicitud: SolicitudDetail) {
   }
   if (!uploadedTypes.has("MANDATO") && !uploadedTypes.has("MANDATO_REPRESENTACION")) {
     missing.push("Mandato o autorizacion de gestion");
+  }
+  if (!uploadedTypes.has("INFORME_DGT") && !uploadedTypes.has("PERMISO_CIRCULACION")) {
+    missing.push("Permiso de circulacion o Informe DGT");
+  }
+  if (!uploadedTypes.has("INFORME_DGT") && !uploadedTypes.has("FICHA_TECNICA")) {
+    missing.push("Ficha tecnica o Informe DGT");
   }
   return missing;
 }

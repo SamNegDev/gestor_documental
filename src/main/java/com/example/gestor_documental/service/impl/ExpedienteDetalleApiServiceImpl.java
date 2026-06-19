@@ -25,6 +25,8 @@ import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.model.DocumentoIdentidadLectura;
+import com.example.gestor_documental.model.DocumentoRolesLectura;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.HistorialCambio;
@@ -36,6 +38,8 @@ import com.example.gestor_documental.model.OperacionExpediente;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.model.WhatsappWebhookEvento;
+import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
+import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.service.DocumentoService;
@@ -82,6 +86,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
     private final RequisitoDocumentalExpedienteService requisitoDocumentalService;
     private final HitoExpedienteService hitoExpedienteService;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final DocumentoIdentidadLecturaRepository documentoIdentidadLecturaRepository;
+    private final DocumentoRolesLecturaRepository documentoRolesLecturaRepository;
     private final WhatsappWebhookEventoRepository whatsappWebhookEventoRepository;
 
     @Override
@@ -167,6 +173,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .collect(Collectors.toSet());
         boolean documentacionBaseCompleta = requisitos.stream()
                 .filter(requisito -> requisito.getEstado() != EstadoRequisitoDocumental.POSTERIOR)
+                .filter(requisito -> !esDocumentoFinal(requisito.getTipoDocumento()))
                 .noneMatch(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO);
         boolean expedienteCompletoSubido = tiposSubidos.contains(TipoDocumento.EXPEDIENTE_COMPLETO);
         boolean finalizado = expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO;
@@ -269,6 +276,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                         : "Primero debe revisarse la documentacion base")
                 .accion(!tramiteSubido && documentacionLista ? "COMPLETAR_HITO" : null)
                 .accionLabel(!tramiteSubido && documentacionLista ? "Marcar subido" : null)
+                .acciones(List.of())
                 .completado(tramiteSubido)
                 .bloqueado(!tramiteSubido && !documentacionLista)
                 .build());
@@ -294,11 +302,28 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                         : modelo620Completado ? "Modelo 620 presentado" : tramiteSubido ? "Pendiente de confirmacion manual" : "Primero debe subirse el tramite al programa de gestion")
                 .accion(requiereModelo620 && !modelo620Completado && tramiteSubido ? "COMPLETAR_HITO" : null)
                 .accionLabel(requiereModelo620 && !modelo620Completado && tramiteSubido ? "Marcar presentado" : null)
+                .acciones(!modelo620Completado && tramiteSubido
+                        ? accionesConRetroceso(requiereModelo620 ? "Marcar presentado" : null,
+                                requiereModelo620 ? CodigoHitoExpediente.MODELO_620_PRESENTADO : null,
+                                CodigoHitoExpediente.TRAMITE_PROGRAMA_GESTION)
+                        : List.of())
                 .completado(modelo620Completado)
                 .bloqueado(!modelo620Completado && !tramiteSubido)
                 .build());
 
         List<HitoAccionResponse> accionesCierre = accionesCierre(finalizado, estadoDetalle.conIncidencia(), puedeContinuarTrasTramite, enviadoDgt);
+        if (finalizado) {
+            accionesCierre = new ArrayList<>(accionesCierre);
+            accionesCierre.add(accionRetrocesoFinalizacion());
+        } else if (enviadoDgtPersistido != null) {
+            accionesCierre = new ArrayList<>(accionesCierre);
+            accionesCierre.add(accionRetroceso(CodigoHitoExpediente.ENVIADO_DGT, "Retroceder"));
+        } else if (puedeContinuarTrasTramite) {
+            accionesCierre = new ArrayList<>(accionesCierre);
+            accionesCierre.add(accionRetroceso(
+                    modelo620Persistido != null ? CodigoHitoExpediente.MODELO_620_PRESENTADO : CodigoHitoExpediente.TRAMITE_PROGRAMA_GESTION,
+                    "Retroceder"));
+        }
         hitos.add(HitoExpedienteResponse.builder()
                 .id("finalizado-incidencia")
                 .titulo(tituloCierre(finalizado, estadoDetalle.conIncidencia(), enviadoDgt))
@@ -362,41 +387,46 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         boolean modelo = estadoDetalle.hitosPersistidos().containsKey(modeloCodigo);
         boolean cierre = estadoDetalle.hitosPersistidos().containsKey(cierreCodigo);
         boolean envio = envioCodigo != null && estadoDetalle.hitosPersistidos().containsKey(envioCodigo);
+        boolean documentacionPendiente = tieneRequisitosOperacionPendientes(estadoDetalle.requisitos(), tipoOperacion);
+        boolean tramiteBloqueado = bloqueada || documentacionPendiente;
         HitoExpediente tramitePersistido = estadoDetalle.hitosPersistidos().get(tramiteCodigo);
         HitoExpediente modeloPersistido = estadoDetalle.hitosPersistidos().get(modeloCodigo);
         HitoExpediente cierrePersistido = estadoDetalle.hitosPersistidos().get(cierreCodigo);
         HitoExpediente envioPersistido = envioCodigo != null ? estadoDetalle.hitosPersistidos().get(envioCodigo) : null;
+        CodigoHitoExpediente retrocesoTramite = tipoOperacion == TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM
+                ? CodigoHitoExpediente.BATE_FINALIZADO
+                : null;
 
         List<HitoExpedienteResponse> hitos = new ArrayList<>();
         hitos.add(HitoExpedienteResponse.builder()
                 .id(tipoOperacion.name().toLowerCase() + "-documentacion")
                 .titulo("Documentacion revisada")
                 .descripcion("Documentacion de la operacion preparada para gestion.")
-                .estado(bloqueada ? "BLOQUEADO" : "COMPLETADO")
+                .estado(bloqueada ? "BLOQUEADO" : documentacionPendiente ? "ACTUAL" : "COMPLETADO")
                 .tipo("AUTOMATICO")
-                .completado(!bloqueada)
+                .completado(!tramiteBloqueado)
                 .bloqueado(bloqueada)
-                .nota(bloqueada ? "Operacion pendiente de la fase anterior" : "Documentacion disponible en el expediente")
+                .nota(bloqueada
+                        ? "Operacion pendiente de la fase anterior"
+                        : documentacionPendiente ? "Quedan requisitos documentales pendientes de esta operacion" : "Documentacion disponible en el expediente")
                 .build());
         hitos.add(HitoExpedienteResponse.builder()
                 .id(tipoOperacion.name().toLowerCase() + "-tramite")
                 .titulo(tramite ? "Tramite subido al programa de gestion" : "Pendiente de subir a programa de gestion")
                 .descripcion("Confirmacion de carga de esta operacion en el programa de gestion.")
-                .estado(tramite ? "COMPLETADO" : bloqueada ? "BLOQUEADO" : "ACTUAL")
+                .estado(tramite ? "COMPLETADO" : tramiteBloqueado ? "BLOQUEADO" : "ACTUAL")
                 .tipo("MANUAL")
                 .fecha(fechaHito(tramitePersistido, null))
                 .usuario(usuarioHito(tramitePersistido))
-                .nota(tramite ? "Tramite cargado" : bloqueada ? "Primero finaliza BATE" : "Pendiente de confirmacion manual")
-                .accion(!tramite && !bloqueada ? "COMPLETAR_HITO" : null)
-                .accionLabel(!tramite && !bloqueada ? "Marcar subido" : null)
-                .acciones(!tramite && !bloqueada ? List.of(HitoAccionResponse.builder()
-                        .tipo("COMPLETAR_HITO")
-                        .codigoHito(tramiteCodigo.name())
-                        .label("Marcar subido")
-                        .tono("primary")
-                        .build()) : List.of())
+                .nota(tramite
+                        ? "Tramite cargado"
+                        : bloqueada ? "Primero finaliza BATE"
+                        : documentacionPendiente ? "Primero revisa la documentacion de esta operacion" : "Pendiente de confirmacion manual")
+                .accion(!tramite && !tramiteBloqueado ? "COMPLETAR_HITO" : null)
+                .accionLabel(!tramite && !tramiteBloqueado ? "Marcar subido" : null)
+                .acciones(accionesHitoOperacion(tramite, !tramite && !tramiteBloqueado, tramiteCodigo, "Marcar subido", retrocesoTramite))
                 .completado(tramite)
-                .bloqueado(bloqueada)
+                .bloqueado(!tramite && tramiteBloqueado)
                 .build());
         hitos.add(HitoExpedienteResponse.builder()
                 .id(tipoOperacion.name().toLowerCase() + "-modelo-620")
@@ -413,12 +443,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .nota(modelo ? "Modelo 620 presentado" : tramite ? "Pendiente de confirmacion manual" : "Primero debe subirse el tramite")
                 .accion(!modelo && tramite ? "COMPLETAR_HITO" : null)
                 .accionLabel(!modelo && tramite ? "Marcar presentado" : null)
-                .acciones(!modelo && tramite ? List.of(HitoAccionResponse.builder()
-                        .tipo("COMPLETAR_HITO")
-                        .codigoHito(modeloCodigo.name())
-                        .label("Marcar presentado")
-                        .tono("primary")
-                        .build()) : List.of())
+                .acciones(accionesHitoOperacion(modelo, !modelo && tramite, modeloCodigo, "Marcar presentado", tramiteCodigo))
                 .completado(modelo)
                 .bloqueado(!modelo && !tramite)
                 .build());
@@ -439,6 +464,9 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                     .tono("success")
                     .build());
         }
+        if (!cierre && tramite) {
+            accionesCierre.add(accionRetroceso(envio && envioCodigo != null ? envioCodigo : modelo ? modeloCodigo : tramiteCodigo, "Retroceder"));
+        }
         hitos.add(HitoExpedienteResponse.builder()
                 .id(tipoOperacion.name().toLowerCase() + "-cierre")
                 .titulo(cierre ? "Operacion finalizada" : "Cierre de operacion")
@@ -455,6 +483,16 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .bloqueado(!cierre && !tramite)
                 .build());
         return hitos;
+    }
+
+    private boolean tieneRequisitosOperacionPendientes(
+            List<RequisitoDocumentalExpediente> requisitos,
+            TipoOperacionExpediente tipoOperacion
+    ) {
+        return requisitos.stream()
+                .filter(requisito -> requisito.getEstado() != EstadoRequisitoDocumental.POSTERIOR)
+                .filter(requisito -> requisito.getOperacion() != null && requisito.getOperacion().getTipo() == tipoOperacion)
+                .anyMatch(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO);
     }
 
     private String calcularNotaDocumentacion(EstadoDetalle estadoDetalle) {
@@ -475,6 +513,12 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         return tramite != TipoTramiteEnum.NOTIFICACION_VENTA;
     }
 
+    private boolean esDocumentoFinal(TipoDocumento tipoDocumento) {
+        return tipoDocumento == TipoDocumento.MODELO_620
+                || tipoDocumento == TipoDocumento.COMPROBANTE_DGT
+                || tipoDocumento == TipoDocumento.HUELLA_TRAMITE;
+    }
+
     private boolean requisitoModeloResuelto(List<RequisitoDocumentalExpediente> requisitos, TipoOperacionExpediente tipoOperacion) {
         return requisitos.stream()
                 .filter(requisito -> requisito.getTipoDocumento() == TipoDocumento.MODELO_620)
@@ -482,6 +526,49 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                         || (requisito.getOperacion() != null && requisito.getOperacion().getTipo() == tipoOperacion))
                 .anyMatch(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.APORTADO
                         || requisito.getEstado() == EstadoRequisitoDocumental.OMITIDO);
+    }
+
+    private List<HitoAccionResponse> accionesHitoOperacion(boolean completado, boolean puedeAvanzar, CodigoHitoExpediente codigo, String avanceLabel, CodigoHitoExpediente retrocesoCodigo) {
+        if (completado) {
+            return List.of();
+        }
+        if (!puedeAvanzar) {
+            return List.of();
+        }
+        return accionesConRetroceso(avanceLabel, codigo, retrocesoCodigo);
+    }
+
+    private List<HitoAccionResponse> accionesConRetroceso(String avanceLabel, CodigoHitoExpediente avanceCodigo, CodigoHitoExpediente retrocesoCodigo) {
+        List<HitoAccionResponse> acciones = new ArrayList<>();
+        if (avanceLabel != null && avanceCodigo != null) {
+            acciones.add(HitoAccionResponse.builder()
+                    .tipo("COMPLETAR_HITO")
+                    .codigoHito(avanceCodigo.name())
+                    .label(avanceLabel)
+                    .tono("primary")
+                    .build());
+        }
+        if (retrocesoCodigo != null) {
+            acciones.add(accionRetroceso(retrocesoCodigo, "Retroceder"));
+        }
+        return acciones;
+    }
+
+    private HitoAccionResponse accionRetroceso(CodigoHitoExpediente codigo, String label) {
+        return HitoAccionResponse.builder()
+                .tipo("RETROCEDER_HITO")
+                .codigoHito(codigo.name())
+                .label(label)
+                .tono("warning")
+                .build();
+    }
+
+    private HitoAccionResponse accionRetrocesoFinalizacion() {
+        return HitoAccionResponse.builder()
+                .tipo("RETROCEDER_FINALIZACION")
+                .label("Retroceder")
+                .tono("warning")
+                .build();
     }
 
     private List<HitoAccionResponse> accionesCierre(boolean finalizado, boolean conIncidencia, boolean puedeContinuar, boolean enviadoDgt) {
@@ -624,16 +711,40 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
 
     private List<DocumentoExpedienteResponse> mapDocumentos(List<Documento> documentos, EstadoDetalle estadoDetalle) {
         List<DocumentoExpedienteResponse> resultado = new ArrayList<>();
+        List<Long> documentoIds = documentos.stream()
+                .map(Documento::getId)
+                .filter(id -> id != null)
+                .toList();
+        Map<Long, DocumentoIdentidadLectura> lecturasPorDocumento = documentoIds.isEmpty()
+                ? Map.of()
+                : documentoIdentidadLecturaRepository.findByDocumentoIdIn(documentoIds)
+                .stream()
+                .filter(lectura -> lectura.getDocumento() != null && lectura.getDocumento().getId() != null)
+                .collect(Collectors.toMap(lectura -> lectura.getDocumento().getId(), lectura -> lectura, (actual, repetida) -> actual));
+        Map<Long, DocumentoRolesLectura> lecturasRolesPorDocumento = documentoIds.isEmpty()
+                ? Map.of()
+                : documentoRolesLecturaRepository.findByDocumentoIdIn(documentoIds)
+                .stream()
+                .filter(lectura -> lectura.getDocumento() != null && lectura.getDocumento().getId() != null)
+                .collect(Collectors.toMap(lectura -> lectura.getDocumento().getId(), lectura -> lectura, (actual, repetida) -> actual));
 
         documentos.stream()
                 .sorted(Comparator.comparing(Documento::getFechaSubida, Comparator.nullsLast(Comparator.reverseOrder())))
-                .map(this::mapDocumentoSubido)
+                .map(documento -> mapDocumentoSubido(documento, lecturasPorDocumento.get(documento.getId()), lecturasRolesPorDocumento.get(documento.getId())))
                 .forEach(resultado::add);
 
         return resultado;
     }
 
     private DocumentoExpedienteResponse mapDocumentoSubido(Documento documento) {
+        return mapDocumentoSubido(documento, null, null);
+    }
+
+    private DocumentoExpedienteResponse mapDocumentoSubido(
+            Documento documento,
+            DocumentoIdentidadLectura lecturaIdentidad,
+            DocumentoRolesLectura lecturaRoles
+    ) {
         return DocumentoExpedienteResponse.builder()
                 .id(documento.getId())
                 .nombre(documento.getNombreArchivo())
@@ -649,6 +760,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .estado("SUBIDO")
                 .subido(true)
                 .requeridoAhora(false)
+                .lecturaIdentidad(com.example.gestor_documental.dto.expediente.DocumentoIdentidadLecturaResponse.from(lecturaIdentidad))
+                .lecturaRoles(com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaResponse.from(lecturaRoles))
                 .build();
     }
 
@@ -662,6 +775,9 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .interesadoId(requisito.getInteresado() != null ? requisito.getInteresado().getId() : null)
                 .interesadoNombre(requisito.getInteresado() != null ? requisito.getInteresado().getNombre() : null)
                 .rolInteresado(requisito.getRolInteresado() != null ? requisito.getRolInteresado().name() : null)
+                .interesadoRepresentadoId(requisito.getInteresadoRepresentado() != null ? requisito.getInteresadoRepresentado().getId() : null)
+                .interesadoRepresentadoNombre(requisito.getInteresadoRepresentado() != null ? requisito.getInteresadoRepresentado().getNombre() : null)
+                .rolRepresentado(requisito.getRolRepresentado() != null ? requisito.getRolRepresentado().name() : null)
                 .operacionId(requisito.getOperacion() != null ? requisito.getOperacion().getId() : null)
                 .operacionLabel(requisito.getOperacion() != null && requisito.getOperacion().getTipo() != null
                         ? requisito.getOperacion().getTipo().getLabel()

@@ -14,12 +14,12 @@ import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertResponse.SolicitudBulkConvertResult;
 import com.example.gestor_documental.dto.expediente.SolicitudDetailResponse;
+import com.example.gestor_documental.dto.expediente.SolicitudDocumentacionIaResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudListItemResponse;
 import com.example.gestor_documental.dto.expediente.TipoTramiteResumenResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
 import com.example.gestor_documental.enums.EstadoSolicitud;
-import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
@@ -35,6 +35,7 @@ import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.IncidenciaService;
 import com.example.gestor_documental.service.MensajeService;
+import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.impl.CorreoEntranteSolicitudService;
@@ -80,11 +81,13 @@ public class SolicitudApiController {
     private final MensajeService mensajeService;
     private final CurrentUserService currentUserService;
     private final CorreoEntranteSolicitudService correoEntranteSolicitudService;
+    private final SolicitudDocumentacionIaService solicitudDocumentacionIaService;
 
     @GetMapping
     public PagedResponse<SolicitudListItemResponse> listarSolicitudes(
             Authentication authentication,
             @RequestParam(required = false) EstadoSolicitud estado,
+            @RequestParam(required = false, defaultValue = "ACTIVAS") String archivo,
             @RequestParam(required = false) Long tipoTramiteId,
             @RequestParam(required = false) String matricula,
             @RequestParam(required = false) Long clienteId,
@@ -105,6 +108,7 @@ public class SolicitudApiController {
         return PagedResponse.of(solicitudService.buscarListado(
                         clienteVisibleId,
                         estado,
+                        archivo,
                         tipoTramiteId,
                         likeParam(matricula),
                         dateRange != null ? dateRange.desde() : null,
@@ -157,6 +161,15 @@ public class SolicitudApiController {
         Usuario usuarioLogueado = requireAdmin(authentication);
         Expediente expediente = solicitudService.convertirAExpediente(id, usuarioLogueado);
         return ResponseEntity.ok(java.util.Map.of("id", expediente.getId()));
+    }
+
+    @PostMapping("/{id}/documentacion-ia/procesar")
+    public SolicitudDocumentacionIaResponse procesarDocumentacionIa(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = requireAdmin(authentication);
+        return solicitudDocumentacionIaService.procesarDocumentacion(id, usuarioLogueado);
     }
 
     @GetMapping("/{id}/interesados/coincidencias")
@@ -359,33 +372,51 @@ public class SolicitudApiController {
     }
 
     private String situacionDocumental(Solicitud solicitud, List<Documento> documentos) {
+        if (solicitudArchivada(solicitud)) {
+            return "ARCHIVADA";
+        }
         if (documentos.isEmpty()) return "SIN DOCUMENTACION";
         int pendientes = contarDocumentosBasicosPendientes(solicitud, documentos);
         if (pendientes > 0) return pendientes == 1 ? "FALTA 1 DOCUMENTO" : "FALTAN " + pendientes + " DOCUMENTOS";
         return "DOCUMENTACION COMPLETA";
     }
 
+    private boolean solicitudArchivada(Solicitud solicitud) {
+        return solicitud.getExpediente() != null
+                || solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA
+                || solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO;
+    }
+
     private int contarDocumentosBasicosPendientes(Solicitud solicitud, List<Documento> documentos) {
         Set<TipoDocumento> tipos = documentos.stream().map(Documento::getTipoDocumento).collect(Collectors.toSet());
         int pendientes = 0;
-        boolean tramiteVenta = solicitud.getTipoTramite() != null
-                && (solicitud.getTipoTramite().getNombre() == TipoTramiteEnum.TRASPASO
-                || solicitud.getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM);
-        boolean tieneInteresadoAplicable = tramiteVenta
-                ? esRolVenta(solicitud.getInteresado1Rol()) || esRolVenta(solicitud.getInteresado2Rol())
-                : solicitud.getInteresado1Rol() == RolInteresado.TITULAR
-                || solicitud.getInteresado2Rol() == RolInteresado.TITULAR;
+        TipoTramiteEnum tramite = solicitud.getTipoTramite() != null ? solicitud.getTipoTramite().getNombre() : null;
+        int identidadesEsperadas = identidadesEsperadasSolicitud(tramite);
+        long identidadesAportadas = documentos.stream()
+                .filter(documento -> documento.getTipoDocumento() == TipoDocumento.DNI
+                        || documento.getTipoDocumento() == TipoDocumento.CIF)
+                .count();
+        pendientes += Math.max(0, identidadesEsperadas - (int) identidadesAportadas);
 
-        if (tieneInteresadoAplicable && !tipos.contains(TipoDocumento.DNI) && !tipos.contains(TipoDocumento.CIF)) pendientes++;
-        if (tramiteVenta && !tipos.contains(TipoDocumento.CONTRATO_COMPRAVENTA) && !tipos.contains(TipoDocumento.FACTURA)) pendientes++;
+        boolean requiereContrato = tramite == TipoTramiteEnum.TRASPASO
+                || tramite == TipoTramiteEnum.BATECOM
+                || tramite == TipoTramiteEnum.NOTIFICACION_VENTA;
+        if (requiereContrato && !tipos.contains(TipoDocumento.CONTRATO_COMPRAVENTA) && !tipos.contains(TipoDocumento.FACTURA)) pendientes++;
         if (!tipos.contains(TipoDocumento.MANDATO) && !tipos.contains(TipoDocumento.MANDATO_REPRESENTACION)) pendientes++;
+        boolean informeDgt = tipos.contains(TipoDocumento.INFORME_DGT);
+        if (!informeDgt && !tipos.contains(TipoDocumento.PERMISO_CIRCULACION)) pendientes++;
+        if (!informeDgt && !tipos.contains(TipoDocumento.FICHA_TECNICA)) pendientes++;
         return pendientes;
     }
 
-    private boolean esRolVenta(RolInteresado rol) {
-        return rol == RolInteresado.COMPRADOR
-                || rol == RolInteresado.VENDEDOR
-                || rol == RolInteresado.COMPRAVENTA;
+    private int identidadesEsperadasSolicitud(TipoTramiteEnum tramite) {
+        if (tramite == TipoTramiteEnum.BATECOM) {
+            return 3;
+        }
+        if (tramite == TipoTramiteEnum.TRASPASO || tramite == TipoTramiteEnum.NOTIFICACION_VENTA) {
+            return 2;
+        }
+        return 1;
     }
 
     private UsuarioResumenResponse mapUsuario(Usuario usuario) {

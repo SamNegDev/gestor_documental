@@ -2,6 +2,7 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.service.WhatsappOutboundService;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.Incidencia;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.TipoTramite;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -106,9 +107,57 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
 
     @Override
     public ResultadoWhatsapp enviarAvisoSeguimiento(String destinatario, String mensaje) {
+        return enviarBotones(destinatario, mensaje, List.of(
+                quickReply("gestapp_recibir_informacion", "Recibir info")
+        ));
+    }
+
+    @Override
+    public ResultadoWhatsapp enviarSelectorIncidencias(String destinatario, String mensaje, List<Incidencia> incidencias) {
+        List<Map<String, Object>> botones = incidencias == null
+                ? List.of()
+                : incidencias.stream()
+                .filter(incidencia -> incidencia != null && incidencia.getId() != null)
+                .limit(3)
+                .map(incidencia -> quickReply("gestapp_inc_" + incidencia.getId(), tituloIncidenciaBoton(incidencia)))
+                .toList();
+        if (botones.isEmpty()) {
+            return enviarTexto(destinatario, mensaje);
+        }
+        return enviarBotones(destinatario, mensaje, botones);
+    }
+
+    @Override
+    public ResultadoWhatsapp enviarMenuIncidencia(String destinatario, Incidencia incidencia, String mensaje) {
+        if (incidencia == null || incidencia.getId() == null) {
+            return ResultadoWhatsapp.error("No se ha podido identificar la incidencia.");
+        }
+        return enviarBotones(destinatario, mensaje, List.of(
+                quickReply("gestapp_inc_subir_" + incidencia.getId(), "Subir docs"),
+                quickReply("gestapp_inc_responder_" + incidencia.getId(), "Responder"),
+                quickReply("gestapp_inc_recordar_" + incidencia.getId(), "Recordarme")
+        ));
+    }
+
+    @Override
+    public ResultadoWhatsapp enviarMenuRecordatorioIncidencia(String destinatario, Incidencia incidencia) {
+        if (incidencia == null || incidencia.getId() == null) {
+            return ResultadoWhatsapp.error("No se ha podido identificar la incidencia.");
+        }
+        return enviarBotones(destinatario, "Cuando quieres que te lo recordemos?", List.of(
+                quickReply("gestapp_inc_recordar_manana_" + incidencia.getId(), "Manana"),
+                quickReply("gestapp_inc_recordar_7_" + incidencia.getId(), "1 semana"),
+                quickReply("gestapp_inc_recordar_15_" + incidencia.getId(), "15 dias")
+        ));
+    }
+
+    private ResultadoWhatsapp enviarBotones(String destinatario, String mensaje, List<Map<String, Object>> botones) {
         String telefono = normalizarTelefono(destinatario);
         if (!StringUtils.hasText(telefono)) {
             return ResultadoWhatsapp.error("El cliente no tiene un telefono configurado.");
+        }
+        if (botones == null || botones.isEmpty()) {
+            return ResultadoWhatsapp.error("No hay opciones disponibles para enviar por WhatsApp.");
         }
         if (!envioRealDisponible()) {
             return ResultadoWhatsapp.simulacion();
@@ -121,11 +170,7 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
                     "interactive", Map.of(
                             "type", "button",
                             "body", Map.of("text", mensaje != null ? mensaje : ""),
-                            "action", Map.of("buttons", java.util.List.of(
-                                    quickReply("gestapp_ya_lo_envie", "Ya lo envie"),
-                                    quickReply("gestapp_recordar_manana", "Recordarme manana"),
-                                    quickReply("gestapp_contactar", "Contactar")
-                            ))
+                            "action", Map.of("buttons", botones)
                     )
             );
             JsonNode response = enviar(payload);
@@ -377,6 +422,13 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
         );
     }
 
+    private String tituloIncidenciaBoton(Incidencia incidencia) {
+        String titulo = incidencia.getExpediente() != null && StringUtils.hasText(incidencia.getExpediente().getMatricula())
+                ? incidencia.getExpediente().getMatricula().trim().toUpperCase() + " #" + incidencia.getId()
+                : "Inc " + incidencia.getId();
+        return titulo.length() > 20 ? titulo.substring(0, 20) : titulo;
+    }
+
     private String textoMenuContinuacion(Expediente expediente, String mensaje) {
         StringBuilder builder = new StringBuilder();
         if (expediente != null) {
@@ -390,6 +442,7 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
         if (StringUtils.hasText(mensaje)) {
             builder.append(mensaje.trim()).append("\n\n");
         }
+        builder.append("Si envias archivos ahora, se adjuntaran a este expediente.\n\n");
         builder.append("➡️ *Que quieres hacer ahora?*");
         return builder.toString();
     }
@@ -409,6 +462,7 @@ public class WhatsappOutboundServiceImpl implements WhatsappOutboundService {
         if (StringUtils.hasText(mensaje)) {
             builder.append(mensaje.trim()).append("\n\n");
         }
+        builder.append("Si envias archivos ahora, se adjuntaran a esta solicitud.\n\n");
         builder.append("➡️ *Que quieres hacer ahora?*");
         return builder.toString();
     }

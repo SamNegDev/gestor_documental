@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPostJson, apiPutJson } from "../../../shared/api/http";
-import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudInteresadoCoincidencia, SolicitudListItem, SolicitudUpsertInput } from "../types";
+import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudDocumentacionIaResponse, SolicitudInteresadoCoincidencia, SolicitudListItem, SolicitudUpsertInput } from "../types";
 
 function buildQuery(filters: ListFilters) {
   const params = new URLSearchParams();
@@ -58,6 +58,10 @@ export function deleteSolicitud(id: string | number) {
 
 export function convertirSolicitud(id: number) {
   return apiPostJson<{ id: number }>(`/api/solicitudes/${id}/convertir`, {});
+}
+
+export function procesarSolicitudDocumentacionIa(id: number) {
+  return apiPostJson<SolicitudDocumentacionIaResponse>(`/api/solicitudes/${id}/documentacion-ia/procesar`, {});
 }
 
 export function getSolicitudInteresadoCoincidencias(id: number) {

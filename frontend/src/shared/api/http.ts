@@ -115,6 +115,25 @@ export async function apiPostJson<T = void>(path: string, body: unknown): Promis
   return response.json() as Promise<T>;
 }
 
+export async function apiPostJsonBlob(path: string, body: unknown): Promise<{ blob: Blob; filename: string | null }> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw await buildApiError(response, "POST", path);
+  }
+
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const filename = /filename="?([^"]+)"?/i.exec(disposition)?.[1] ?? null;
+  return { blob: await response.blob(), filename };
+}
+
 export function apiPutJson(path: string, body: unknown): Promise<void> {
   return apiRequest(path, {
     method: "PUT",

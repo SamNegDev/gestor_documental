@@ -27,7 +27,8 @@ import java.time.LocalDateTime;
 @Table(name = "whatsapp_adjunto", indexes = {
         @Index(name = "idx_whatsapp_adjunto_media_id", columnList = "media_id"),
         @Index(name = "idx_whatsapp_adjunto_estado", columnList = "estado"),
-        @Index(name = "idx_whatsapp_adjunto_fecha", columnList = "fecha_recepcion")
+        @Index(name = "idx_whatsapp_adjunto_fecha", columnList = "fecha_recepcion"),
+        @Index(name = "idx_whatsapp_adjunto_solicitud", columnList = "solicitud_id")
 })
 public class WhatsappAdjunto {
     @Id
@@ -79,4 +80,8 @@ public class WhatsappAdjunto {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "expediente_id")
     private Expediente expediente;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "solicitud_id")
+    private Solicitud solicitud;
 }

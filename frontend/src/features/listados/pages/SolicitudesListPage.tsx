@@ -149,9 +149,27 @@ export function SolicitudesListPage() {
         }}
         onSubmit={() => applyFilters(draftFilters)}
         onClear={() => {
-          setDraftFilters({});
-          setAppliedFilters({});
+          const resetFilters = { periodo: "ESTE_MES", archivo: "ACTIVAS", pagina: "0", tamanio: "25" };
+          setDraftFilters(resetFilters);
+          setAppliedFilters(resetFilters);
         }}
+        additionalFilter={
+          <label>
+            <span>Vista</span>
+            <select
+              value={draftFilters.archivo || "ACTIVAS"}
+              onChange={(event) => {
+                const nextFilters = { ...draftFilters, archivo: event.target.value, pagina: "0" };
+                setDraftFilters(nextFilters);
+                applyFilters(nextFilters);
+              }}
+            >
+              <option value="ACTIVAS">Activas</option>
+              <option value="ARCHIVADAS">Archivadas</option>
+              <option value="TODAS">Todas</option>
+            </select>
+          </label>
+        }
       />
 
       <div className="records-panel records-panel--ledger">
@@ -413,6 +431,7 @@ function readFilters(searchParams: URLSearchParams): ListFilters {
     tipoTramiteId: searchParams.get("tipoTramiteId") || "",
     clienteId: searchParams.get("clienteId") || "",
     matricula: searchParams.get("matricula") || "",
+    archivo: searchParams.get("archivo") || "ACTIVAS",
   };
 }
 
@@ -510,6 +529,7 @@ function nextSolicitudAction(solicitud: SolicitudListItem, isAdmin: boolean) {
 function documentStatusTone(value?: string | null) {
   if (value === "SIN DOCUMENTACION" || value?.startsWith("FALTA")) return "danger";
   if (value === "DOCUMENTACION COMPLETA") return "success";
+  if (value === "ARCHIVADA") return "neutral";
   return "neutral";
 }
 

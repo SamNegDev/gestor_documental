@@ -300,6 +300,22 @@ public class ExpedienteApiController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/hitos/{codigo}/retroceder")
+    public ResponseEntity<Void> retrocederHito(
+            @PathVariable Long id,
+            @PathVariable CodigoHitoExpediente codigo,
+            Authentication authentication
+    ) {
+        hitoExpedienteService.retroceder(id, codigo, requireAdmin(authentication));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/finalizar/retroceder")
+    public ResponseEntity<Void> retrocederFinalizacion(@PathVariable Long id, Authentication authentication) {
+        hitoExpedienteService.retrocederFinalizacion(id, requireAdmin(authentication));
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/finalizar")
     public ResponseEntity<Void> finalizar(@PathVariable Long id, Authentication authentication) {
         hitoExpedienteService.finalizar(id, requireAdmin(authentication));

@@ -1,18 +1,23 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.model.AvisoIncidencia;
 import com.example.gestor_documental.model.Cliente;
-import com.example.gestor_documental.model.Incidencia;
+import com.example.gestor_documental.model.ConfiguracionSeguimiento;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.Incidencia;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
-import com.example.gestor_documental.model.WhatsappWebhookEvento;
 import com.example.gestor_documental.enums.CodigoHitoExpediente;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoSolicitud;
+import com.example.gestor_documental.enums.EstadoWhatsappAdjunto;
 import com.example.gestor_documental.enums.EstadoWhatsappEvento;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.TipoTramite;
+import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.WhatsappWebhookEvento;
+import com.example.gestor_documental.repository.AvisoIncidenciaRepository;
 import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.HitoExpedienteRepository;
@@ -20,7 +25,10 @@ import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.repository.TipoTramiteRepository;
+import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
+import com.example.gestor_documental.service.AvisoAdminService;
+import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.WhatsappMediaService;
 import com.example.gestor_documental.service.WhatsappOutboundService;
@@ -33,6 +41,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import jakarta.annotation.PreDestroy;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -46,6 +55,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @RequiredArgsConstructor
@@ -56,14 +72,27 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
     private final ExpedienteRepository expedienteRepository;
     private final HitoExpedienteRepository hitoExpedienteRepository;
     private final IncidenciaRepository incidenciaRepository;
+    private final AvisoIncidenciaRepository avisoIncidenciaRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final SolicitudRepository solicitudRepository;
     private final TipoTramiteRepository tipoTramiteRepository;
+    private final WhatsappAdjuntoRepository adjuntoRepository;
+    private final AvisoAdminService avisoAdminService;
     private final HistorialCambioService historialCambioService;
+    private final ConfiguracionSeguimientoService configuracionSeguimientoService;
     private final WhatsappOutboundService whatsappOutboundService;
     private final WhatsappMediaService whatsappMediaService;
 
     private static final DateTimeFormatter FECHA_ESTADO_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final long VENTANA_NUEVO_LOTE_DOCUMENTOS_SEGUNDOS = 180;
+    private static final long ESPERA_CIERRE_LOTE_DOCUMENTOS_SEGUNDOS = 75;
+
+    private final ConcurrentMap<String, LoteDocumentosWhatsapp> lotesDocumentosPorContexto = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService cierreLotesDocumentosExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "whatsapp-cierre-lotes-documentos");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     @Value("${app.whatsapp.webhook.verify-token:}")
     private String verifyToken;
@@ -105,8 +134,11 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             boolean media = esMedia(message);
             if (media) {
                 aplicarContextoExpedientePrevio(evento);
+                aplicarContextoSolicitudPrevio(evento);
                 if (evento.getExpediente() != null && !StringUtils.hasText(evento.getAccionCodigo())) {
                     evento.setAccionCodigo("gestapp_contexto_expediente");
+                } else if (evento.getSolicitud() != null && !StringUtils.hasText(evento.getAccionCodigo())) {
+                    evento.setAccionCodigo("gestapp_contexto_solicitud");
                 }
                 evento.setEstado(EstadoWhatsappEvento.REVISADO);
                 evento.setFechaRevision(LocalDateTime.now());
@@ -118,8 +150,9 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             evento.setProcesado(true);
             evento = eventoRepository.save(evento);
             if (media) {
+                iniciarLoteDocumentos(evento);
                 whatsappMediaService.descargarYGuardar(evento, message);
-                enviarMenuTrasDocumento(evento);
+                registrarActividadLoteDocumentos(evento);
             }
         } catch (Exception ex) {
             WhatsappWebhookEvento evento = new WhatsappWebhookEvento();
@@ -154,6 +187,11 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         }
     }
 
+    @PreDestroy
+    public void detenerCierreLotesDocumentosExecutor() {
+        cierreLotesDocumentosExecutor.shutdownNow();
+    }
+
     private void asociarClienteYExpediente(WhatsappWebhookEvento evento) {
         if (!StringUtils.hasText(evento.getTelefono())) {
             return;
@@ -182,6 +220,16 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
                 .ifPresent(evento::setExpediente);
     }
 
+    private void aplicarContextoSolicitudPrevio(WhatsappWebhookEvento evento) {
+        if (evento.getSolicitud() != null || evento.getExpediente() != null || !StringUtils.hasText(evento.getTelefono())) {
+            return;
+        }
+        eventoRepository.findTopByTelefonoAndMessageIdIsNotNullOrderByFechaRecepcionDesc(evento.getTelefono())
+                .filter(this::eventoMantieneContextoSolicitud)
+                .map(WhatsappWebhookEvento::getSolicitud)
+                .ifPresent(evento::setSolicitud);
+    }
+
     private boolean eventoMantieneContextoExpediente(WhatsappWebhookEvento evento) {
         return evento != null
                 && evento.getExpediente() != null
@@ -190,7 +238,21 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
                     || accionAdmiteContextoExpediente(evento.getAccionCodigo()));
     }
 
+    private boolean eventoMantieneContextoSolicitud(WhatsappWebhookEvento evento) {
+        return evento != null
+                && evento.getSolicitud() != null
+                && ("gestapp_contexto_solicitud".equals(evento.getAccionCodigo())
+                    || "gestapp_mensaje_cliente".equals(evento.getAccionCodigo())
+                    || accionAdmiteContextoSolicitud(evento.getAccionCodigo()));
+    }
+
     private boolean accionAdmiteContextoExpediente(String accion) {
+        if (!StringUtils.hasText(accion)) {
+            return false;
+        }
+        if (accion.startsWith("gestapp_inc_")) {
+            return true;
+        }
         return List.of(
                 "gestapp_contactar",
                 "gestapp_enviar_mensaje",
@@ -199,8 +261,16 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
                 "gestapp_ver_pendientes",
                 "gestapp_recordar_manana",
                 "gestapp_enviar_documentacion",
-                "gestapp_ver_expediente",
-                "gestapp_ya_lo_envie"
+                "gestapp_ver_expediente"
+        ).contains(accion);
+    }
+
+    private boolean accionAdmiteContextoSolicitud(String accion) {
+        return List.of(
+                "gestapp_solicitud_aportar_documentos",
+                "gestapp_solicitud_estado",
+                "gestapp_solicitud_mensaje",
+                "gestapp_contactar_solicitud"
         ).contains(accion);
     }
 
@@ -213,6 +283,14 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             enviarIdentificacionNecesaria(evento);
             return true;
         }
+        if ("gestapp_recibir_informacion".equals(accion)) {
+            enviarInformacionPendienteCliente(evento);
+            return true;
+        }
+        if (accion.startsWith("gestapp_inc_")) {
+            procesarAccionIncidencia(evento, accion);
+            return true;
+        }
         if ("gestapp_estado_tramite".equals(accion) || "gestapp_menu_expedientes".equals(accion)) {
             solicitarMatriculaEstadoTramite(evento);
             return true;
@@ -222,10 +300,12 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             return true;
         }
         if ("gestapp_solicitud_aportar_documentos".equals(accion)) {
+            aplicarContextoSolicitudPrevio(evento);
             enviarEnlaceUltimaSolicitud(evento, "Puedes aportar documentacion desde la solicitud:");
             return true;
         }
         if ("gestapp_solicitud_estado".equals(accion)) {
+            aplicarContextoSolicitudPrevio(evento);
             enviarEstadoUltimaSolicitud(evento);
             return true;
         }
@@ -239,12 +319,14 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         }
         if ("gestapp_menu_principal".equals(accion)) {
             evento.setExpediente(null);
+            evento.setSolicitud(null);
             whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
             marcarRevisado(evento);
             return true;
         }
         if ("gestapp_salir".equals(accion)) {
             evento.setExpediente(null);
+            evento.setSolicitud(null);
             whatsappOutboundService.enviarTexto(evento.getTelefono(),
                     "👍 Perfecto, lo dejamos aqui.\n\nCuando necesites cualquier cosa, escribe *menu* y seguimos.");
             marcarRevisado(evento);
@@ -266,6 +348,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             return true;
         }
         if ("gestapp_contactar_solicitud".equals(accion)) {
+            aplicarContextoSolicitudPrevio(evento);
             confirmarContactoSolicitud(evento);
             return true;
         }
@@ -278,6 +361,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             return true;
         }
         if ("gestapp_solicitud_mensaje".equals(accion)) {
+            aplicarContextoSolicitudPrevio(evento);
             solicitarMensajeClienteSolicitud(evento);
             return true;
         }
@@ -315,6 +399,226 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         return false;
     }
 
+    private void enviarInformacionPendienteCliente(WhatsappWebhookEvento evento) {
+        List<Incidencia> incidencias = incidenciaRepository.findSeguimientoPendienteByCliente(
+                evento.getCliente().getId(),
+                LocalDateTime.now());
+        if (incidencias.isEmpty()) {
+            whatsappOutboundService.enviarTexto(evento.getTelefono(),
+                    "Ahora mismo no veo incidencias pendientes de notificar asociadas a este telefono.");
+            whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
+            marcarRevisado(evento);
+            return;
+        }
+
+        incidencias.forEach(this::registrarAvisoWhatsappRecibido);
+        if (incidencias.size() == 1) {
+            Incidencia incidencia = incidencias.get(0);
+            fijarContextoIncidencia(evento, incidencia);
+            whatsappOutboundService.enviarMenuIncidencia(evento.getTelefono(), incidencia, detalleIncidenciaMenu(incidencia));
+        } else {
+            List<Incidencia> opciones = incidencias.stream().limit(3).toList();
+            whatsappOutboundService.enviarSelectorIncidencias(
+                    evento.getTelefono(),
+                    resumenIncidenciasPendientes(incidencias),
+                    opciones);
+        }
+        marcarRevisado(evento);
+    }
+
+    private void procesarAccionIncidencia(WhatsappWebhookEvento evento, String accion) {
+        Optional<Incidencia> incidencia = incidenciaDesdeAccion(evento, accion);
+        if (incidencia.isEmpty()) {
+            whatsappOutboundService.enviarTexto(evento.getTelefono(),
+                    "No he podido localizar esa incidencia. Escribe menu para empezar de nuevo.");
+            whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
+            marcarRevisado(evento);
+            return;
+        }
+
+        Incidencia seleccionada = incidencia.get();
+        fijarContextoIncidencia(evento, seleccionada);
+        if (accion.startsWith("gestapp_inc_recordar_manana_")) {
+            programarRecordatorioIncidencia(evento, seleccionada, 1);
+            return;
+        }
+        if (accion.startsWith("gestapp_inc_recordar_7_")) {
+            programarRecordatorioIncidencia(evento, seleccionada, 7);
+            return;
+        }
+        if (accion.startsWith("gestapp_inc_recordar_15_")) {
+            programarRecordatorioIncidencia(evento, seleccionada, 15);
+            return;
+        }
+        if (accion.startsWith("gestapp_inc_subir_")) {
+            whatsappOutboundService.enviarTexto(evento.getTelefono(),
+                    "Envia ahora por aqui las fotos o documentos de " + etiquetaExpediente(seleccionada) + ". Los adjuntare a ese expediente.");
+            marcarRevisado(evento);
+            return;
+        }
+        if (accion.startsWith("gestapp_inc_responder_")) {
+            whatsappOutboundService.enviarTexto(evento.getTelefono(),
+                    "Escribe ahora la respuesta para " + etiquetaExpediente(seleccionada) + ". La dejare anotada para la gestoria.");
+            marcarRevisado(evento);
+            return;
+        }
+        if (accion.startsWith("gestapp_inc_recordar_")) {
+            whatsappOutboundService.enviarMenuRecordatorioIncidencia(evento.getTelefono(), seleccionada);
+            marcarRevisado(evento);
+            return;
+        }
+
+        whatsappOutboundService.enviarMenuIncidencia(evento.getTelefono(), seleccionada, detalleIncidenciaMenu(seleccionada));
+        marcarRevisado(evento);
+    }
+
+    private Optional<Incidencia> incidenciaDesdeAccion(WhatsappWebhookEvento evento, String accion) {
+        return incidenciaIdDesdeAccion(accion)
+                .flatMap(incidenciaRepository::findById)
+                .filter(incidencia -> incidencia.getExpediente() != null)
+                .filter(incidencia -> evento.getCliente() != null
+                        && incidencia.getExpediente().getCliente() != null
+                        && evento.getCliente().getId().equals(incidencia.getExpediente().getCliente().getId()));
+    }
+
+    private Optional<Long> incidenciaIdDesdeAccion(String accion) {
+        if (!StringUtils.hasText(accion)) {
+            return Optional.empty();
+        }
+        List<String> prefixes = List.of(
+                "gestapp_inc_recordar_manana_",
+                "gestapp_inc_recordar_15_",
+                "gestapp_inc_recordar_7_",
+                "gestapp_inc_recordar_",
+                "gestapp_inc_responder_",
+                "gestapp_inc_subir_",
+                "gestapp_inc_"
+        );
+        for (String prefix : prefixes) {
+            if (accion.startsWith(prefix)) {
+                try {
+                    return Optional.of(Long.parseLong(accion.substring(prefix.length())));
+                } catch (NumberFormatException exception) {
+                    return Optional.empty();
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private void fijarContextoIncidencia(WhatsappWebhookEvento evento, Incidencia incidencia) {
+        evento.setExpediente(incidencia.getExpediente());
+        evento.setSolicitud(null);
+    }
+
+    private void programarRecordatorioIncidencia(WhatsappWebhookEvento evento, Incidencia incidencia, int dias) {
+        LocalDateTime proximoAviso = LocalDateTime.now().plusDays(dias).with(LocalTime.of(9, 0));
+        incidencia.setProximoAviso(proximoAviso);
+        incidenciaRepository.save(incidencia);
+        Usuario usuario = usuarioSeguimiento(incidencia);
+        if (usuario != null) {
+            historialCambioService.registrarCambioExpediente(incidencia.getExpediente(), usuario, "WHATSAPP RECORDATORIO",
+                    "El cliente pidio recordatorio por WhatsApp hasta " + proximoAviso + ".");
+        }
+        whatsappOutboundService.enviarTexto(evento.getTelefono(), "Perfecto, te lo recordaremos en "
+                + (dias == 1 ? "manana" : dias + " dias") + ".");
+        whatsappOutboundService.enviarMenuIncidencia(evento.getTelefono(), incidencia, "Te dejo de nuevo las opciones de " + etiquetaExpediente(incidencia) + ".");
+        marcarRevisado(evento);
+    }
+
+    private void registrarAvisoWhatsappRecibido(Incidencia incidencia) {
+        ConfiguracionSeguimiento config = configuracionSeguimientoService.obtener();
+        int numero = Math.min(incidencia.getContadorAvisos() + 1, config.getMaxAvisos());
+        LocalDateTime ahora = LocalDateTime.now();
+        incidencia.setContadorAvisos(numero);
+        incidencia.setFechaUltimoAviso(ahora);
+        incidencia.setProximoAviso(siguienteVencimiento(ahora, numero, config));
+        incidencia.setSeguimientoArchivado(false);
+        incidencia.setFechaArchivoSeguimiento(null);
+        incidencia.setSeguimientoArchivadoPor(null);
+        incidenciaRepository.save(incidencia);
+
+        Usuario usuario = usuarioSeguimiento(incidencia);
+        if (usuario == null) {
+            return;
+        }
+        String mensaje = detalleIncidenciaMenu(incidencia);
+        AvisoIncidencia aviso = new AvisoIncidencia();
+        aviso.setIncidencia(incidencia);
+        aviso.setNumeroAviso(numero);
+        aviso.setEnviadoPor(usuario);
+        aviso.setMensaje(mensaje);
+        aviso.setDestinatario(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getTelefono() : null);
+        aviso.setAsunto("WhatsApp info " + numero);
+        aviso.setCanal("WHATSAPP");
+        aviso.setEstadoEnvio("RECIBIDO");
+        avisoIncidenciaRepository.save(aviso);
+        historialCambioService.registrarCambioExpediente(incidencia.getExpediente(), usuario, "AVISO INCIDENCIA",
+                "Aviso " + numero + " por WHATSAPP mostrado al cliente tras pulsar Recibir info.");
+    }
+
+    private LocalDateTime siguienteVencimiento(LocalDateTime fecha, int numeroAviso, ConfiguracionSeguimiento config) {
+        int dias = switch (numeroAviso) {
+            case 1 -> config.getDiasAviso1();
+            case 2 -> config.getDiasAviso2();
+            case 3 -> config.getDiasAviso3();
+            case 4 -> config.getDiasAviso4();
+            case 5 -> config.getDiasAviso5();
+            default -> 0;
+        };
+        return numeroAviso >= config.getMaxAvisos() || dias <= 0 ? null : fecha.plusDays(dias);
+    }
+
+    private Usuario usuarioSeguimiento(Incidencia incidencia) {
+        if (incidencia.getExpediente() != null && incidencia.getExpediente().getModificadoPor() != null) {
+            return incidencia.getExpediente().getModificadoPor();
+        }
+        if (incidencia.getCreadoPor() != null) {
+            return incidencia.getCreadoPor();
+        }
+        return incidencia.getExpediente() != null ? incidencia.getExpediente().getCreadoPor() : null;
+    }
+
+    private String resumenIncidenciasPendientes(List<Incidencia> incidencias) {
+        StringBuilder builder = new StringBuilder("Tienes ")
+                .append(incidencias.size())
+                .append(incidencias.size() == 1 ? " asunto pendiente:" : " asuntos pendientes:")
+                .append("\n");
+        int maximo = Math.min(incidencias.size(), 8);
+        for (int index = 0; index < maximo; index++) {
+            Incidencia incidencia = incidencias.get(index);
+            builder.append("\n")
+                    .append(index + 1)
+                    .append(". ")
+                    .append(etiquetaExpediente(incidencia))
+                    .append(" - ")
+                    .append(tipoIncidenciaWhatsapp(incidencia));
+        }
+        if (incidencias.size() > maximo) {
+            builder.append("\n... y ").append(incidencias.size() - maximo).append(" mas.");
+        }
+        builder.append("\n\nElige una incidencia para ver sus opciones.");
+        return limitarTextoWhatsapp(builder.toString(), 950);
+    }
+
+    private String detalleIncidenciaMenu(Incidencia incidencia) {
+        return limitarTextoWhatsapp(
+                "Expediente " + etiquetaExpediente(incidencia)
+                        + "\n" + tipoIncidenciaWhatsapp(incidencia) + ": " + detalleIncidenciaWhatsapp(incidencia)
+                        + "\n\nQue quieres hacer?",
+                950);
+    }
+
+    private String etiquetaExpediente(Incidencia incidencia) {
+        if (incidencia.getExpediente() == null) {
+            return "EXP-" + incidencia.getId();
+        }
+        if (StringUtils.hasText(incidencia.getExpediente().getMatricula())) {
+            return normalizarMatricula(incidencia.getExpediente().getMatricula());
+        }
+        return "EXP-" + incidencia.getExpediente().getId();
+    }
+
     private void solicitarMensajeClienteExpediente(WhatsappWebhookEvento evento) {
         if (evento.getExpediente() == null) {
             enviarEnlacePortalCliente(evento, "Puedes escribirnos desde el portal:");
@@ -349,16 +653,27 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         String accionAnterior = anterior.get().getAccionCodigo();
         if (!"gestapp_enviar_mensaje".equals(accionAnterior)
                 && !"gestapp_solicitud_mensaje".equals(accionAnterior)
-                && !"gestapp_mensaje_general".equals(accionAnterior)) {
+                && !"gestapp_mensaje_general".equals(accionAnterior)
+                && !(StringUtils.hasText(accionAnterior) && accionAnterior.startsWith("gestapp_inc_responder_"))) {
             return false;
         }
         evento.setAccionCodigo("gestapp_mensaje_cliente");
+        Optional<Incidencia> incidenciaAnterior = incidenciaDesdeAccion(evento, accionAnterior);
         if (evento.getExpediente() == null && anterior.get().getExpediente() != null) {
             evento.setExpediente(anterior.get().getExpediente());
+        } else if (evento.getExpediente() == null && incidenciaAnterior.isPresent()) {
+            evento.setExpediente(incidenciaAnterior.get().getExpediente());
+        }
+        if (evento.getSolicitud() == null && anterior.get().getSolicitud() != null) {
+            evento.setSolicitud(anterior.get().getSolicitud());
         }
         whatsappOutboundService.enviarTexto(evento.getTelefono(), "Mensaje recibido. Lo dejamos anotado para la gestoria.");
-        if (evento.getExpediente() != null) {
+        if (incidenciaAnterior.isPresent()) {
+            whatsappOutboundService.enviarMenuIncidencia(evento.getTelefono(), incidenciaAnterior.get(), "Te dejo de nuevo las opciones de " + etiquetaExpediente(incidenciaAnterior.get()) + ".");
+        } else if (evento.getExpediente() != null) {
             whatsappOutboundService.enviarMenuContinuacion(evento.getTelefono(), evento.getExpediente(), "Te dejo de nuevo las opciones del expediente.");
+        } else if (evento.getSolicitud() != null) {
+            whatsappOutboundService.enviarMenuContinuacionSolicitud(evento.getTelefono(), evento.getSolicitud(), "Te dejo de nuevo las opciones de la solicitud.");
         } else {
             whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
         }
@@ -388,8 +703,20 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         }
         List<Expediente> expedientes = expedienteRepository.findByClienteIdAndMatriculaNormalizada(evento.getCliente().getId(), matricula);
         if (expedientes.isEmpty()) {
+            List<Solicitud> solicitudes = solicitudRepository.findByClienteIdAndMatriculaNormalizada(evento.getCliente().getId(), matricula);
+            if (!solicitudes.isEmpty()) {
+                Solicitud solicitud = solicitudes.get(0);
+                evento.setSolicitud(solicitud);
+                evento.setAccionCodigo("gestapp_contexto_solicitud");
+                whatsappOutboundService.enviarMenuContinuacionSolicitud(evento.getTelefono(), solicitud,
+                        "Estado de tu solicitud: " + estadoSolicitudTexto(solicitud) + ".");
+                marcarRevisado(evento);
+                historialCambioService.registrarCambioSolicitud(solicitud, solicitud.getModificadoPor(), "WHATSAPP ESTADO",
+                        "Se envio al cliente el estado de la solicitud por WhatsApp tras consultar la matricula " + matricula + ".");
+                return true;
+            }
             whatsappOutboundService.enviarTexto(evento.getTelefono(),
-                    "No encuentro un trámite dado de alta para la matrícula " + matricula + " asociado a este teléfono. Revisa la matrícula o solicita contacto con la gestoría.");
+                    "No encuentro un expediente ni una solicitud para la matrícula " + matricula + " asociado a este teléfono. Revisa la matrícula o solicita contacto con la gestoría.");
             whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
             marcarRevisado(evento);
             return true;
@@ -455,6 +782,8 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         solicitud.setEstadoSolicitud(EstadoSolicitud.PENDIENTE_REVISION);
         solicitud.setObservaciones("Solicitud creada desde WhatsApp.");
         solicitud = solicitudRepository.save(solicitud);
+        evento.setSolicitud(solicitud);
+        evento.setAccionCodigo("gestapp_contexto_solicitud");
         historialCambioService.registrarCambioSolicitud(solicitud, null, "WHATSAPP SOLICITUD",
                 "Solicitud creada desde WhatsApp para la matricula " + matricula + ".");
         whatsappOutboundService.enviarMenuContinuacionSolicitud(evento.getTelefono(), solicitud,
@@ -670,6 +999,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             return false;
         }
         evento.setExpediente(null);
+        evento.setSolicitud(null);
         if (evento.getCliente() == null) {
             enviarIdentificacionNecesaria(evento);
             return true;
@@ -704,12 +1034,224 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
                 "El cliente pidio recordatorio por WhatsApp. Seguimiento pospuesto hasta " + proximoAviso + ".");
     }
 
-    private void enviarMenuTrasDocumento(WhatsappWebhookEvento evento) {
-        if (evento == null || evento.getExpediente() == null || !StringUtils.hasText(evento.getTelefono())) {
+    private void iniciarLoteDocumentos(WhatsappWebhookEvento evento) {
+        String clave = claveLoteDocumentos(evento);
+        if (!StringUtils.hasText(clave)) {
             return;
         }
-        whatsappOutboundService.enviarMenuContinuacion(evento.getTelefono(), evento.getExpediente(),
-                "✅ *Documento recibido correctamente.*");
+        LocalDateTime ahora = LocalDateTime.now();
+        AtomicBoolean nuevoLote = new AtomicBoolean(false);
+        AtomicReference<LoteDocumentosWhatsapp> loteActual = new AtomicReference<>();
+        lotesDocumentosPorContexto.compute(clave, (key, lote) -> {
+            boolean reiniciar = lote == null
+                    || lote.getUltimaActividad().isBefore(ahora.minusSeconds(VENTANA_NUEVO_LOTE_DOCUMENTOS_SEGUNDOS));
+            LoteDocumentosWhatsapp actualizado = reiniciar
+                    ? nuevoLoteDocumentos(evento, ahora)
+                    : lote.conActividad(ahora);
+            nuevoLote.set(reiniciar);
+            loteActual.set(actualizado);
+            return actualizado;
+        });
+        if (nuevoLote.get()) {
+            whatsappOutboundService.enviarTexto(evento.getTelefono(),
+                    "Comenzando registro de documentos recibidos para " + loteActual.get().getDescripcionContexto()
+                            + ". Te aviso con el total cuando termine.");
+        }
+    }
+
+    private LoteDocumentosWhatsapp nuevoLoteDocumentos(WhatsappWebhookEvento evento, LocalDateTime fecha) {
+        Long expedienteId = evento.getExpediente() != null ? evento.getExpediente().getId() : null;
+        Long solicitudId = evento.getSolicitud() != null ? evento.getSolicitud().getId() : null;
+        Long clienteId = evento.getCliente() != null ? evento.getCliente().getId() : null;
+        return new LoteDocumentosWhatsapp(
+                evento.getTelefono(),
+                descripcionContextoDocumentos(evento),
+                expedienteId,
+                solicitudId,
+                clienteId,
+                fecha,
+                1,
+                fecha);
+    }
+
+    private void registrarActividadLoteDocumentos(WhatsappWebhookEvento evento) {
+        String clave = claveLoteDocumentos(evento);
+        if (!StringUtils.hasText(clave)) {
+            return;
+        }
+        LocalDateTime ahora = LocalDateTime.now();
+        AtomicReference<LoteDocumentosWhatsapp> loteActual = new AtomicReference<>();
+        lotesDocumentosPorContexto.compute(clave, (key, lote) -> {
+            LoteDocumentosWhatsapp base = lote != null
+                    ? lote
+                    : nuevoLoteDocumentos(evento, ahora);
+            LoteDocumentosWhatsapp actualizado = base.conActividad(ahora);
+            loteActual.set(actualizado);
+            return actualizado;
+        });
+        programarCierreLoteDocumentos(clave, loteActual.get().getVersion());
+    }
+
+    private void programarCierreLoteDocumentos(String clave, int versionEsperada) {
+        cierreLotesDocumentosExecutor.schedule(
+                () -> cerrarLoteDocumentosSiEstable(clave, versionEsperada),
+                ESPERA_CIERRE_LOTE_DOCUMENTOS_SEGUNDOS,
+                TimeUnit.SECONDS);
+    }
+
+    private void cerrarLoteDocumentosSiEstable(String clave, int versionEsperada) {
+        LoteDocumentosWhatsapp lote = lotesDocumentosPorContexto.get(clave);
+        if (lote == null || lote.getVersion() != versionEsperada) {
+            return;
+        }
+        if (lotesDocumentosPorContexto.remove(clave, lote)) {
+            long total = adjuntoRepository.countMediaRegistradosEnContextoDesde(
+                    lote.getTelefono(),
+                    lote.getExpedienteId(),
+                    lote.getSolicitudId(),
+                    EstadoWhatsappAdjunto.CLASIFICADO,
+                    lote.getInicio());
+            whatsappOutboundService.enviarTexto(lote.getTelefono(), mensajeCierreLoteDocumentos(lote, total));
+            crearAvisoAdminLoteDocumentos(lote, total);
+        }
+    }
+
+    private void crearAvisoAdminLoteDocumentos(LoteDocumentosWhatsapp lote, long total) {
+        if (total <= 0) {
+            return;
+        }
+        Expediente expediente = lote.getExpedienteId() != null
+                ? expedienteRepository.findById(lote.getExpedienteId()).orElse(null)
+                : null;
+        Cliente cliente = lote.getClienteId() != null
+                ? clienteRepository.findById(lote.getClienteId()).orElse(null)
+                : null;
+        String detalle = "Se " + (total == 1 ? "ha" : "han") + " incorporado " + total + " "
+                + (total == 1 ? "documento" : "documentos")
+                + " por WhatsApp en " + lote.getDescripcionContexto() + ".";
+        avisoAdminService.crear(
+                "WHATSAPP_DOCUMENTOS_LOTE",
+                "Documentos WhatsApp incorporados",
+                detalle,
+                "WhatsApp",
+                expediente,
+                cliente);
+    }
+
+    private String mensajeCierreLoteDocumentos(LoteDocumentosWhatsapp lote, long total) {
+        if (total <= 0) {
+            return "He recibido la documentacion para " + lote.getDescripcionContexto()
+                    + ", pero no he podido registrar documentos nuevos. La gestoria lo revisara.";
+        }
+        return "Se " + (total == 1 ? "ha" : "han") + " registrado " + total + " "
+                + (total == 1 ? "documento" : "documentos")
+                + " en " + lote.getDescripcionContexto() + ".";
+    }
+
+    private String claveLoteDocumentos(WhatsappWebhookEvento evento) {
+        if (evento == null || !StringUtils.hasText(evento.getTelefono())) {
+            return null;
+        }
+        if (evento.getSolicitud() != null) {
+            return evento.getTelefono() + "|solicitud:" + evento.getSolicitud().getId();
+        }
+        if (evento.getExpediente() != null) {
+            return evento.getTelefono() + "|expediente:" + evento.getExpediente().getId();
+        }
+        return null;
+    }
+
+    private String descripcionContextoDocumentos(WhatsappWebhookEvento evento) {
+        if (evento.getSolicitud() != null) {
+            StringBuilder descripcion = new StringBuilder("la solicitud SOL-")
+                    .append(evento.getSolicitud().getId());
+            if (StringUtils.hasText(evento.getSolicitud().getMatricula())) {
+                descripcion.append(" (matricula ")
+                        .append(evento.getSolicitud().getMatricula().trim().toUpperCase(Locale.ROOT))
+                        .append(")");
+            }
+            return descripcion.toString();
+        }
+        if (evento.getExpediente() != null) {
+            if (StringUtils.hasText(evento.getExpediente().getMatricula())) {
+                return "el expediente " + evento.getExpediente().getMatricula().trim().toUpperCase(Locale.ROOT);
+            }
+            return "el expediente " + evento.getExpediente().getId();
+        }
+        return "el tramite";
+    }
+
+    private static final class LoteDocumentosWhatsapp {
+        private final String telefono;
+        private final String descripcionContexto;
+        private final Long expedienteId;
+        private final Long solicitudId;
+        private final Long clienteId;
+        private final LocalDateTime inicio;
+        private final int version;
+        private final LocalDateTime ultimaActividad;
+
+        private LoteDocumentosWhatsapp(String telefono,
+                                       String descripcionContexto,
+                                       Long expedienteId,
+                                       Long solicitudId,
+                                       Long clienteId,
+                                       LocalDateTime inicio,
+                                       int version,
+                                       LocalDateTime ultimaActividad) {
+            this.telefono = telefono;
+            this.descripcionContexto = descripcionContexto;
+            this.expedienteId = expedienteId;
+            this.solicitudId = solicitudId;
+            this.clienteId = clienteId;
+            this.inicio = inicio;
+            this.version = version;
+            this.ultimaActividad = ultimaActividad;
+        }
+
+        private LoteDocumentosWhatsapp conActividad(LocalDateTime fecha) {
+            return new LoteDocumentosWhatsapp(
+                    telefono,
+                    descripcionContexto,
+                    expedienteId,
+                    solicitudId,
+                    clienteId,
+                    inicio,
+                    version + 1,
+                    fecha);
+        }
+
+        private String getTelefono() {
+            return telefono;
+        }
+
+        private String getDescripcionContexto() {
+            return descripcionContexto;
+        }
+
+        private Long getExpedienteId() {
+            return expedienteId;
+        }
+
+        private Long getSolicitudId() {
+            return solicitudId;
+        }
+
+        private Long getClienteId() {
+            return clienteId;
+        }
+
+        private LocalDateTime getInicio() {
+            return inicio;
+        }
+
+        private int getVersion() {
+            return version;
+        }
+
+        private LocalDateTime getUltimaActividad() {
+            return ultimaActividad;
+        }
     }
 
     private void confirmarContactoGeneral(WhatsappWebhookEvento evento) {
@@ -721,10 +1263,10 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
     private void confirmarContactoSolicitud(WhatsappWebhookEvento evento) {
         whatsappOutboundService.enviarTexto(evento.getTelefono(),
                 "✅ Perfecto, paso el aviso a la gestoria para que revisen tu solicitud.");
-        Solicitud solicitud = evento.getCliente() != null
-                ? solicitudRepository.findByClienteIdOrderByFechaReferenciaDesc(evento.getCliente().getId()).stream().findFirst().orElse(null)
-                : null;
+        Solicitud solicitud = evento.getCliente() != null ? solicitudActual(evento) : null;
         if (solicitud != null) {
+            evento.setSolicitud(solicitud);
+            evento.setAccionCodigo("gestapp_contexto_solicitud");
             whatsappOutboundService.enviarMenuContinuacionSolicitud(evento.getTelefono(), solicitud, "Te dejo las opciones de la solicitud.");
         } else {
             whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
@@ -782,15 +1324,15 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             marcarRevisado(evento);
             return;
         }
-        Solicitud solicitud = solicitudRepository.findByClienteIdOrderByFechaReferenciaDesc(evento.getCliente().getId()).stream()
-                .findFirst()
-                .orElse(null);
+        Solicitud solicitud = solicitudActual(evento);
         if (solicitud == null) {
             whatsappOutboundService.enviarTexto(evento.getTelefono(), "No veo solicitudes asociadas a este telefono.");
             whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
             marcarRevisado(evento);
             return;
         }
+        evento.setSolicitud(solicitud);
+        evento.setAccionCodigo("gestapp_contexto_solicitud");
         whatsappOutboundService.enviarMenuContinuacionSolicitud(evento.getTelefono(), solicitud,
                 "Estado: " + estadoSolicitudTexto(solicitud) + ".");
         marcarRevisado(evento);
@@ -802,15 +1344,15 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             marcarRevisado(evento);
             return;
         }
-        Solicitud solicitud = solicitudRepository.findByClienteIdOrderByFechaReferenciaDesc(evento.getCliente().getId()).stream()
-                .findFirst()
-                .orElse(null);
+        Solicitud solicitud = solicitudActual(evento);
         if (solicitud == null) {
             whatsappOutboundService.enviarTexto(evento.getTelefono(), "No veo solicitudes asociadas a este telefono.");
             whatsappOutboundService.enviarMenuPrincipal(evento.getTelefono());
             marcarRevisado(evento);
             return;
         }
+        evento.setSolicitud(solicitud);
+        evento.setAccionCodigo("gestapp_contexto_solicitud");
         String base = publicUrl != null ? publicUrl : "";
         String enlace = (StringUtils.hasText(base) ? base.replaceAll("/$", "") : "") + "/solicitudes/" + solicitud.getId();
         whatsappOutboundService.enviarTexto(evento.getTelefono(), introduccion + "\n" + enlace);
@@ -823,6 +1365,15 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             return "pendiente de revision";
         }
         return solicitud.getEstadoSolicitud().name().toLowerCase(Locale.ROOT).replace('_', ' ');
+    }
+
+    private Solicitud solicitudActual(WhatsappWebhookEvento evento) {
+        if (evento.getSolicitud() != null) {
+            return evento.getSolicitud();
+        }
+        return evento.getCliente() != null
+                ? solicitudRepository.findByClienteIdOrderByFechaReferenciaDesc(evento.getCliente().getId()).stream().findFirst().orElse(null)
+                : null;
     }
 
     private void enviarDocumentacionPendiente(WhatsappWebhookEvento evento) {

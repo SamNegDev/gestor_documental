@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { BellRing, CarFront, FilePlus2, FolderOpen, Inbox, LayoutDashboard, LogOut, MessageCircle, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
+import { BellRing, CarFront, DatabaseSearch, Download, FolderOpen, Inbox, LayoutDashboard, LogOut, MessageCircle, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
 import { SidebarLink } from "./SidebarLink";
 import { Tooltip } from "../../shared/ui/Tooltip";
 import { getSessionUser, type SessionUser } from "../../shared/api/sessionApi";
@@ -23,6 +23,9 @@ function pageTitle(pathname: string) {
   if (pathname === "/admin/seguimiento-clientes") return "Seguimiento de clientes";
   if (pathname === "/admin/seguimiento-config") return "Periodos de seguimiento";
   if (pathname === "/admin/whatsapp") return "WhatsApp";
+  if (pathname === "/admin/catalogos-gestion") return "Catalogos Gestion Trafico";
+  if (pathname === "/admin/extraccion-ga") return "Extraccion GA";
+  if (pathname === "/admin/extraccion-ga/preparadas") return "Exportacion GA";
   if (pathname === "/cliente/tareas") return "Mis tareas";
   if (pathname === "/admin/clientes") return "Clientes";
   if (pathname.includes("/admin/clientes/nuevo")) return "Nuevo cliente";
@@ -38,6 +41,7 @@ function pageTitle(pathname: string) {
   if (pathname.includes("/cliente/solicitudes/nuevo")) return "Nueva solicitud";
   if (pathname.includes("/solicitudes/")) return "Detalle de solicitud";
   if (pathname.includes("/cliente/expedientes/")) return "Estado del expediente";
+  if (pathname.includes("/extraccion-ga")) return "Extraccion IA";
   if (pathname.endsWith("/editar")) return "Editar expediente";
   if (pathname.endsWith("/nuevo")) return "Nuevo expediente";
   return "Detalle de expediente";
@@ -55,15 +59,19 @@ const adminMenuItems: MenuItemConfig[] = [
   { id: "dashboard", to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { id: "tareas", to: "/admin/tareas", icon: Inbox, label: "Tareas" },
   { id: "seguimiento", to: "/admin/seguimiento-clientes", icon: BellRing, label: "Seguimiento clientes" },
-  { id: "seguimiento-config", to: "/admin/seguimiento-config", icon: Settings2, label: "Config. seguimiento" },
   { id: "whatsapp", to: "/admin/whatsapp", icon: MessageCircle, label: "WhatsApp" },
+  { id: "ga-export", to: "/admin/extraccion-ga", icon: Download, label: "Extraccion GA" },
   { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Expedientes" },
-  { id: "nuevo-expediente", to: "/expedientes/nuevo", icon: FilePlus2, label: "Nuevo expediente" },
   { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },
   { id: "interesados", to: "/interesados", icon: UserRound, label: "Interesados" },
   { id: "vehiculos", to: "/vehiculos", icon: CarFront, label: "Vehiculos" },
   { id: "clientes", to: "/admin/clientes", icon: UsersRound, label: "Clientes" },
   { id: "usuarios", to: "/admin/usuarios", icon: UserRoundCheck, label: "Usuarios" },
+];
+
+const adminSettingsItems: MenuItemConfig[] = [
+  { id: "seguimiento-config", to: "/admin/seguimiento-config", icon: BellRing, label: "Avisos" },
+  { id: "catalogos-gestion", to: "/admin/catalogos-gestion", icon: DatabaseSearch, label: "Datos auxiliares" },
 ];
 
 const clientMenuItems: MenuItemConfig[] = [
@@ -134,6 +142,7 @@ export function AppLayout() {
   }, [user]);
 
   const baseMenuItems = user?.rol === "CLIENTE" || isClientRoute ? clientMenuItems : adminMenuItems;
+  const settingsItems = user?.rol === "ADMIN" && !isClientRoute ? adminSettingsItems : [];
   const menuItems = baseMenuItems.map((item) => ({
     ...item,
     badge: item.id === "tareas" ? tareasResumen.data?.total : undefined,
@@ -177,10 +186,16 @@ export function AppLayout() {
           <div className="sidebar-menu-settings">
             <button className="sidebar-menu-settings__trigger" onClick={() => setMenuSettingsOpen((open) => !open)} type="button">
               <Settings2 size={15} />
-              Personalizar menu
+              Configuracion
             </button>
             {menuSettingsOpen ? (
               <div className="sidebar-menu-settings__panel">
+                {settingsItems.length ? (
+                  <div className="sidebar-menu-settings__links">
+                    {settingsItems.map((item) => <SidebarLink key={item.id} to={item.to} icon={item.icon} label={item.label} />)}
+                  </div>
+                ) : null}
+                <div className="sidebar-menu-settings__section-title">Vista</div>
                 {menuItems.map((item) => (
                   <label key={item.id}>
                     <input checked={!hiddenMenuItems.includes(item.id)} disabled={fixedMenuItems.has(item.id)} onChange={() => toggleMenuItem(item.id)} type="checkbox" />

@@ -12,7 +12,9 @@ const DOCUMENT_TYPES = [
   "CONTRATO_COMPRAVENTA",
   "PERMISO_CIRCULACION",
   "FICHA_TECNICA",
+  "INFORME_DGT",
   "MANDATO",
+  "MANDATO_REPRESENTACION",
   "FACTURA",
   "CAMBIO_TITULARIDAD",
   "AUTORIZACION_SERAFIN",
@@ -38,6 +40,11 @@ type Props = {
 function nombreSinExtension(nombre: string) {
   const index = nombre.lastIndexOf(".");
   return index > 0 ? nombre.slice(0, index) : nombre;
+}
+
+function isImageDocument(documento: DocumentoExpediente) {
+  const nombre = documento.nombreOriginal || documento.nombre;
+  return /\.(gif|jpe?g|png|webp)$/i.test(nombre);
 }
 
 export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, onDeleteDocument, onDeletePages, onExtractPages, onMergeDocuments, onSaveDocument, title = "Editor documental" }: Props) {
@@ -209,10 +216,18 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
               <article className="ocr-review-card" key={documento.id ?? documento.nombre}>
                 <div className="ocr-review-card__preview">
                   {documento.id ? (
-                    <iframe
-                      src={`/documentos/ver/${documento.id}?v=${previewVersion}#toolbar=0&navpanes=0&scrollbar=0`}
-                      title={documento.nombreOriginal || documento.nombre}
-                    />
+                    isImageDocument(documento) ? (
+                      <img
+                        src={`/documentos/ver/${documento.id}?v=${previewVersion}`}
+                        alt={documento.nombreOriginal || documento.nombre}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <iframe
+                        src={`/documentos/ver/${documento.id}?v=${previewVersion}#toolbar=0&navpanes=0&scrollbar=0`}
+                        title={documento.nombreOriginal || documento.nombre}
+                      />
+                    )
                   ) : null}
                 </div>
                 <div className="ocr-review-card__body">

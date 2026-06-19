@@ -1,6 +1,8 @@
 package com.example.gestor_documental.repository;
 
 import com.example.gestor_documental.enums.EstadoExpediente;
+import com.example.gestor_documental.enums.EstadoRevisionGa;
+import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Expediente;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -9,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.time.LocalDateTime;
 
@@ -168,4 +171,24 @@ public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
             """)
     List<Expediente> findByClienteIdAndMatriculaNormalizada(@Param("clienteId") Long clienteId,
                                                             @Param("matricula") String matricula);
+
+    @Query("""
+            select distinct e from Expediente e
+            left join fetch e.cliente
+            left join fetch e.tipoTramite
+            where exists (
+                select 1 from Documento d
+                where d.expediente = e
+                  and d.tipoDocumento in :tiposDocumento
+            )
+              and not exists (
+                select 1 from ExtraccionGaRevision r
+                where r.expediente = e
+                  and r.estado in :estadosExcluidos
+            )
+            order by coalesce(e.fechaUltimaModificacion, e.fechaCreacion) desc
+            """)
+    List<Expediente> findCandidatosExtraccionGa(@Param("tiposDocumento") Collection<TipoDocumento> tiposDocumento,
+                                                @Param("estadosExcluidos") Collection<EstadoRevisionGa> estadosExcluidos,
+                                                Pageable pageable);
 }

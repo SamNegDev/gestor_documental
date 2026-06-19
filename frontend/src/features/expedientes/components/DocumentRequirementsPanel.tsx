@@ -27,6 +27,7 @@ const DOCUMENT_TYPES = [
   "CONTRATO_COMPRAVENTA",
   "PERMISO_CIRCULACION",
   "FICHA_TECNICA",
+  "INFORME_DGT",
   "MANDATO",
   "FACTURA",
   "EXPEDIENTE_COMPLETO",
@@ -160,6 +161,7 @@ export function DocumentRequirementsPanel({
                 {formatDocumentType(requisito.tipoDocumento)}
                 {requisito.operacionLabel ? ` - ${requisito.operacionLabel}` : ""}
                 {requisito.interesadoNombre ? ` · ${requisito.interesadoNombre}` : ""}
+                {requisito.interesadoRepresentadoNombre ? ` · representante de ${requisito.interesadoRepresentadoNombre}` : ""}
                 {requisito.documentoNombre ? ` · ${requisito.documentoNombre}` : ""}
               </small>
               {bloqueado ? <small className="requirement-row__notice">Disponible cuando finalice esta fase del tramite.</small> : null}

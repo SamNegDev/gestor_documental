@@ -27,6 +27,7 @@ public interface SolicitudService {
 
     Page<Solicitud> buscarListado(Long clienteId,
                                   EstadoSolicitud estado,
+                                  String archivo,
                                   Long tipoTramiteId,
                                   String matricula,
                                   LocalDateTime desde,

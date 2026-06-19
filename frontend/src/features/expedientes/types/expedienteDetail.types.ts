@@ -78,6 +78,60 @@ export interface DocumentoExpediente {
   estado: DocumentoEstado;
   subido: boolean;
   requeridoAhora: boolean;
+  lecturaIdentidad?: DocumentoIdentidadLectura | null;
+  lecturaRoles?: DocumentoRolesLectura | null;
+}
+
+export interface DocumentoIdentidadLectura {
+  id: number;
+  documentoId: number;
+  tipoDocumentoDetectado?: string | null;
+  identificador?: string | null;
+  nombre?: string | null;
+  apellido1?: string | null;
+  apellido2?: string | null;
+  razonSocial?: string | null;
+  nombreCompleto?: string | null;
+  fechaNacimiento?: string | null;
+  fechaCaducidad?: string | null;
+  direccionTexto?: string | null;
+  confianzaGlobal?: number | null;
+  requiereRevision: boolean;
+  vinculadoAutomaticamente: boolean;
+  interesadoVinculadoId?: number | null;
+  interesadoVinculadoNombre?: string | null;
+  mensaje?: string | null;
+  modelo?: string | null;
+  fechaLectura?: string | null;
+}
+
+export interface DocumentoRolesLectura {
+  id: number;
+  documentoId: number;
+  tipoDocumentoDetectado?: string | null;
+  fechaDocumento?: string | null;
+  matricula?: string | null;
+  bastidor?: string | null;
+  valorDeclarado?: string | null;
+  vendedorIdentificador?: string | null;
+  vendedorNombre?: string | null;
+  vendedorDireccion?: string | null;
+  vendedorInteresadoId?: number | null;
+  vendedorInteresadoNombre?: string | null;
+  compradorIdentificador?: string | null;
+  compradorNombre?: string | null;
+  compradorDireccion?: string | null;
+  compradorInteresadoId?: number | null;
+  compradorInteresadoNombre?: string | null;
+  confianzaGlobal?: number | null;
+  requiereRevision: boolean;
+  aplicable: boolean;
+  motivoAplicacion?: string | null;
+  aplicadoExpediente: boolean;
+  fechaAplicacion?: string | null;
+  mensaje?: string | null;
+  modelo?: string | null;
+  fechaLectura?: string | null;
 }
 
 export interface RequisitoDocumental {
@@ -89,6 +143,9 @@ export interface RequisitoDocumental {
   interesadoId?: number | null;
   interesadoNombre?: string | null;
   rolInteresado?: string | null;
+  interesadoRepresentadoId?: number | null;
+  interesadoRepresentadoNombre?: string | null;
+  rolRepresentado?: string | null;
   operacionId?: number | null;
   operacionLabel?: string | null;
   documentoId?: number | null;

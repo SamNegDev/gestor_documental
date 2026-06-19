@@ -14,12 +14,18 @@ import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
+import com.example.gestor_documental.model.ClienteInteresado;
 import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.model.DocumentoIdentidadLectura;
+import com.example.gestor_documental.model.GestionPersonaRepresentanteCatalogo;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.OperacionExpediente;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
+import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.repository.GestionPersonaRepresentanteCatalogoRepository;
 import com.example.gestor_documental.repository.HitoExpedienteRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.repository.OperacionExpedienteRepository;
@@ -32,19 +38,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocumentalExpedienteService {
+
+    private static final double CONFIANZA_MINIMA_IDENTIDAD = 0.80;
 
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final ExpedienteService expedienteService;
     private final DocumentoService documentoService;
     private final InteresadoRepository interesadoRepository;
     private final DocumentoRepository documentoRepository;
+    private final DocumentoIdentidadLecturaRepository identidadLecturaRepository;
+    private final ClienteInteresadoRepository clienteInteresadoRepository;
+    private final GestionPersonaRepresentanteCatalogoRepository representanteCatalogoRepository;
     private final HitoExpedienteRepository hitoRepository;
     private final OperacionExpedienteRepository operacionRepository;
 
@@ -178,6 +192,11 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             Documento documento,
             Usuario usuario
     ) {
+        validarDocumentoInteresado(requisito, documento);
+        if (requisito.getInteresado() != null && documento.getInteresado() == null) {
+            documento.setInteresado(requisito.getInteresado());
+            documentoRepository.save(documento);
+        }
         requisito.setDocumento(documento);
         requisito.setEstado(EstadoRequisitoDocumental.APORTADO);
         requisito.setMotivoOmision(null);
@@ -202,6 +221,15 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         }
     }
 
+    private void validarDocumentoInteresado(RequisitoDocumentalExpediente requisito, Documento documento) {
+        if (!esDocumentoIdentidad(requisito.getTipoDocumento()) || requisito.getInteresado() == null) {
+            return;
+        }
+        if (documento.getInteresado() != null && !Objects.equals(documento.getInteresado().getId(), requisito.getInteresado().getId())) {
+            throw new OperacionInvalidaException("El documento pertenece a otro interesado");
+        }
+    }
+
     private void reconciliarConDocumentos(Expediente expediente, List<Documento> documentos, Usuario usuario) {
         List<RequisitoDocumentalExpediente> requisitos = requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId());
 
@@ -216,6 +244,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                     .or(() -> documentoHabitualCubreRequisito(expediente, requisito))
                     .or(() -> documentoClienteCubreRequisito(expediente, requisito))
                     .ifPresent(documento -> {
+                        vincularDocumentoIdentidadSiProcede(documento, requisito);
                         requisito.setDocumento(documento);
                         requisito.setEstado(EstadoRequisitoDocumental.APORTADO);
                         requisito.setFechaResolucion(LocalDateTime.now());
@@ -228,32 +257,70 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
 
     private void generarRequisitosBase(Expediente expediente, List<ExpedienteInteresado> interesados, Usuario usuario) {
         TipoTramiteEnum tramite = expediente.getTipoTramite() != null ? expediente.getTipoTramite().getNombre() : null;
+        List<ExpedienteInteresado> relaciones = interesados != null ? interesados : List.of();
 
-        for (ExpedienteInteresado relacion : interesados) {
-            Interesado interesado = relacion.getInteresado();
-            RolInteresado rol = relacion.getRol();
-            if (interesado == null || rol == null) {
-                continue;
+        if (tramite == TipoTramiteEnum.BATECOM) {
+            generarRequisitosBaseBatecom(expediente, relaciones, usuario);
+            if (!requiereModelo620(expediente)) {
+                eliminarModelos620DeReglaSinResolver(expediente);
             }
-
-            if ((tramite == TipoTramiteEnum.TRASPASO || tramite == TipoTramiteEnum.BATECOM)
-                    && (rol == RolInteresado.COMPRADOR || rol == RolInteresado.VENDEDOR || rol == RolInteresado.COMPRAVENTA)) {
-                generarIdentificacion(expediente, interesado, rol, usuario);
-            }
-
-            if (tramite != TipoTramiteEnum.TRASPASO && tramite != TipoTramiteEnum.BATECOM && rol == RolInteresado.TITULAR) {
-                generarIdentificacion(expediente, interesado, rol, usuario);
-            }
+            return;
         }
 
-        if (tramite == TipoTramiteEnum.TRASPASO || tramite == TipoTramiteEnum.BATECOM) {
+        for (RolInteresado rol : rolesEsperadosIdentificacion(tramite)) {
+            generarIdentificacionRol(expediente, interesadoPorRol(relaciones, rol), rol, null, usuario);
+        }
+
+        if (tramite == TipoTramiteEnum.TRASPASO || tramite == TipoTramiteEnum.NOTIFICACION_VENTA) {
             crearGlobalSiNoExiste(expediente, TipoDocumento.CONTRATO_COMPRAVENTA, "Contrato de compraventa o factura de venta", EstadoRequisitoDocumental.REQUERIDO, usuario);
         }
 
+        crearGlobalSiNoExiste(expediente, TipoDocumento.PERMISO_CIRCULACION, "Permiso de circulacion o Informe DGT", EstadoRequisitoDocumental.REQUERIDO, usuario);
+        crearGlobalSiNoExiste(expediente, TipoDocumento.FICHA_TECNICA, "Ficha tecnica o Informe DGT", EstadoRequisitoDocumental.REQUERIDO, usuario);
         crearGlobalSiNoExiste(expediente, TipoDocumento.MANDATO, "Mandato o autorizacion de gestion", EstadoRequisitoDocumental.REQUERIDO, usuario);
         if (!requiereModelo620(expediente)) {
             eliminarModelos620DeReglaSinResolver(expediente);
         }
+    }
+
+    private void generarRequisitosBaseBatecom(Expediente expediente, List<ExpedienteInteresado> interesados, Usuario usuario) {
+        OperacionExpediente bate = operacionRepository.findByExpedienteIdAndTipo(expediente.getId(), TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE)
+                .orElse(null);
+        OperacionExpediente com = operacionRepository.findByExpedienteIdAndTipo(expediente.getId(), TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM)
+                .orElse(null);
+
+        if (bate != null) {
+            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.VENDEDOR), RolInteresado.VENDEDOR, bate, usuario);
+            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.COMPRAVENTA), RolInteresado.COMPRAVENTA, bate, usuario);
+            crearPorOperacionSiNoExiste(expediente, TipoDocumento.CONTRATO_COMPRAVENTA, bate, "Contrato o factura de Entrega a compraventa (BATE)", EstadoRequisitoDocumental.REQUERIDO, usuario);
+            crearPorOperacionSiNoExiste(expediente, TipoDocumento.PERMISO_CIRCULACION, bate, "Permiso de circulacion o Informe DGT (BATE)", EstadoRequisitoDocumental.REQUERIDO, usuario);
+            crearPorOperacionSiNoExiste(expediente, TipoDocumento.FICHA_TECNICA, bate, "Ficha tecnica o Informe DGT (BATE)", EstadoRequisitoDocumental.REQUERIDO, usuario);
+            crearPorOperacionSiNoExiste(expediente, TipoDocumento.MANDATO, bate, "Mandato o autorizacion de gestion (BATE)", EstadoRequisitoDocumental.REQUERIDO, usuario);
+        }
+        if (com != null) {
+            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.COMPRAVENTA), RolInteresado.COMPRAVENTA, com, usuario);
+            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.COMPRADOR), RolInteresado.COMPRADOR, com, usuario);
+            crearPorOperacionSiNoExiste(expediente, TipoDocumento.CONTRATO_COMPRAVENTA, com, "Contrato o factura de Finalizacion entrega a compraventa (COM)", EstadoRequisitoDocumental.REQUERIDO, usuario);
+            crearPorOperacionSiNoExiste(expediente, TipoDocumento.PERMISO_CIRCULACION, com, "Permiso de circulacion o Informe DGT (COM)", EstadoRequisitoDocumental.REQUERIDO, usuario);
+            crearPorOperacionSiNoExiste(expediente, TipoDocumento.FICHA_TECNICA, com, "Ficha tecnica o Informe DGT (COM)", EstadoRequisitoDocumental.REQUERIDO, usuario);
+            crearPorOperacionSiNoExiste(expediente, TipoDocumento.MANDATO, com, "Mandato o autorizacion de gestion (COM)", EstadoRequisitoDocumental.REQUERIDO, usuario);
+        }
+    }
+
+    private List<RolInteresado> rolesEsperadosIdentificacion(TipoTramiteEnum tramite) {
+        if (tramite == TipoTramiteEnum.TRASPASO || tramite == TipoTramiteEnum.NOTIFICACION_VENTA) {
+            return List.of(RolInteresado.VENDEDOR, RolInteresado.COMPRADOR);
+        }
+        return List.of(RolInteresado.TITULAR);
+    }
+
+    private Interesado interesadoPorRol(List<ExpedienteInteresado> relaciones, RolInteresado rol) {
+        return relaciones.stream()
+                .filter(relacion -> relacion.getRol() == rol)
+                .map(ExpedienteInteresado::getInteresado)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private void generarRequisitosPosteriores(Expediente expediente, Usuario usuario) {
@@ -319,19 +386,28 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         }
     }
 
-    private void generarIdentificacion(Expediente expediente, Interesado interesado, RolInteresado rol, Usuario usuario) {
+    private void generarIdentificacionRol(Expediente expediente, Interesado interesado, RolInteresado rol, OperacionExpediente operacion, Usuario usuario) {
+        if (interesado == null) {
+            crearPorRolSiNoExiste(expediente, TipoDocumento.DNI, rol, operacion, "DNI/CIF " + rol.name().toLowerCase(Locale.ROOT), usuario);
+            return;
+        }
+        generarIdentificacion(expediente, interesado, rol, operacion, usuario);
+    }
+
+    private void generarIdentificacion(Expediente expediente, Interesado interesado, RolInteresado rol, OperacionExpediente operacion, Usuario usuario) {
         TipoPersona tipoPersona = inferirTipoPersona(interesado);
         String rolTexto = rol.name().toLowerCase();
 
         if (tipoPersona == TipoPersona.EMPRESA) {
-            eliminarIdentificacionNoAplicable(expediente, interesado, rol, TipoDocumento.DNI, "DNI " + rolTexto);
-            crearPorInteresadoSiNoExiste(expediente, TipoDocumento.CIF, interesado, rol, "CIF empresa " + rolTexto, usuario);
-            crearPorInteresadoSiNoExiste(expediente, TipoDocumento.DNI, interesado, rol, "DNI administrador " + rolTexto, usuario);
+            eliminarIdentificacionNoAplicable(expediente, interesado, rol, TipoDocumento.DNI, "DNI " + rolTexto, operacion);
+            eliminarPlaceholderIdentificacion(expediente, rol, operacion);
+            crearPorInteresadoSiNoExiste(expediente, TipoDocumento.CIF, interesado, rol, operacion, "CIF empresa " + rolTexto, usuario);
+            crearRepresentanteEmpresaSiNoExiste(expediente, interesado, rol, operacion, "DNI administrador " + rolTexto, usuario);
             return;
         }
 
-        eliminarIdentificacionNoAplicable(expediente, interesado, rol, TipoDocumento.CIF, null);
-        crearPorInteresadoSiNoExiste(expediente, TipoDocumento.DNI, interesado, rol, "DNI " + rolTexto, usuario);
+        eliminarIdentificacionNoAplicable(expediente, interesado, rol, TipoDocumento.CIF, null, operacion);
+        crearPorInteresadoSiNoExiste(expediente, TipoDocumento.DNI, interesado, rol, operacion, "DNI " + rolTexto, usuario);
     }
 
     private TipoPersona inferirTipoPersona(Interesado interesado) {
@@ -358,7 +434,8 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             Interesado interesado,
             RolInteresado rol,
             TipoDocumento tipoDocumento,
-            String descripcionProtegida
+            String descripcionProtegida,
+            OperacionExpediente operacion
     ) {
         requisitoRepository.findByExpedienteIdAndInteresadoIdAndRolInteresado(
                         expediente.getId(),
@@ -369,6 +446,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                 .filter(requisito -> requisito.getOrigen() == OrigenRequisitoDocumental.REGLA)
                 .filter(requisito -> requisito.getDocumento() == null)
                 .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                .filter(requisito -> mismaOperacion(requisito.getOperacion(), operacion))
                 .filter(requisito -> descripcionProtegida == null || !descripcionProtegida.equals(requisito.getDescripcion()))
                 .forEach(requisitoRepository::delete);
     }
@@ -378,25 +456,87 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             TipoDocumento tipoDocumento,
             Interesado interesado,
             RolInteresado rol,
+            OperacionExpediente operacion,
             String descripcion,
             Usuario usuario
     ) {
-        requisitoRepository.findFirstByExpedienteIdAndTipoDocumentoAndInteresadoIdAndRolInteresadoOrderByIdAsc(
-                expediente.getId(),
-                tipoDocumento,
-                interesado.getId(),
-                rol
-        ).ifPresentOrElse(
+        buscarPorInteresado(expediente, tipoDocumento, interesado, rol, operacion).ifPresentOrElse(
                 requisito -> actualizarDescripcionRegla(requisito, descripcion),
-                () -> requisitoRepository.save(nuevoRequisito(
-                        expediente,
-                        tipoDocumento,
-                        descripcion,
-                        EstadoRequisitoDocumental.REQUERIDO,
-                        interesado,
-                        rol,
-                        usuario
-                ))
+                () -> {
+                    Optional<RequisitoDocumentalExpediente> placeholder = buscarPlaceholder(expediente, tipoDocumento, rol, operacion);
+                    if (placeholder.isPresent()) {
+                        RequisitoDocumentalExpediente requisito = placeholder.get();
+                        requisito.setInteresado(interesado);
+                        requisito.setDescripcion(descripcion);
+                        requisitoRepository.save(requisito);
+                        return;
+                    }
+                    RequisitoDocumentalExpediente requisito = nuevoRequisito(
+                            expediente,
+                            tipoDocumento,
+                            descripcion,
+                            EstadoRequisitoDocumental.REQUERIDO,
+                            interesado,
+                            rol,
+                            usuario
+                    );
+                    requisito.setOperacion(operacion);
+                    requisitoRepository.save(requisito);
+                }
+        );
+    }
+
+    private void crearPorRolSiNoExiste(
+            Expediente expediente,
+            TipoDocumento tipoDocumento,
+            RolInteresado rol,
+            OperacionExpediente operacion,
+            String descripcion,
+            Usuario usuario
+    ) {
+        buscarPlaceholder(expediente, tipoDocumento, rol, operacion).ifPresentOrElse(
+                requisito -> actualizarDescripcionRegla(requisito, descripcion),
+                () -> {
+                    RequisitoDocumentalExpediente requisito = nuevoRequisito(
+                            expediente,
+                            tipoDocumento,
+                            descripcion,
+                            EstadoRequisitoDocumental.REQUERIDO,
+                            null,
+                            rol,
+                            usuario
+                    );
+                    requisito.setOperacion(operacion);
+                    requisitoRepository.save(requisito);
+                }
+        );
+    }
+
+    private void crearRepresentanteEmpresaSiNoExiste(
+            Expediente expediente,
+            Interesado empresa,
+            RolInteresado rolRepresentado,
+            OperacionExpediente operacion,
+            String descripcion,
+            Usuario usuario
+    ) {
+        buscarRepresentanteEmpresa(expediente, empresa, rolRepresentado, operacion).ifPresentOrElse(
+                requisito -> actualizarDescripcionRegla(requisito, descripcion),
+                () -> {
+                    RequisitoDocumentalExpediente requisito = nuevoRequisito(
+                            expediente,
+                            TipoDocumento.DNI,
+                            descripcion,
+                            EstadoRequisitoDocumental.REQUERIDO,
+                            null,
+                            null,
+                            usuario
+                    );
+                    requisito.setInteresadoRepresentado(empresa);
+                    requisito.setRolRepresentado(rolRepresentado);
+                    requisito.setOperacion(operacion);
+                    requisitoRepository.save(requisito);
+                }
         );
     }
 
@@ -405,6 +545,67 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             requisito.setDescripcion(descripcion);
             requisitoRepository.save(requisito);
         }
+    }
+
+    private Optional<RequisitoDocumentalExpediente> buscarPorInteresado(
+            Expediente expediente,
+            TipoDocumento tipoDocumento,
+            Interesado interesado,
+            RolInteresado rol,
+            OperacionExpediente operacion
+    ) {
+        return requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
+                .filter(requisito -> requisito.getTipoDocumento() == tipoDocumento)
+                .filter(requisito -> requisito.getInteresado() != null)
+                .filter(requisito -> Objects.equals(requisito.getInteresado().getId(), interesado.getId()))
+                .filter(requisito -> requisito.getRolInteresado() == rol)
+                .filter(requisito -> mismaOperacion(requisito.getOperacion(), operacion))
+                .findFirst();
+    }
+
+    private Optional<RequisitoDocumentalExpediente> buscarPlaceholder(
+            Expediente expediente,
+            TipoDocumento tipoDocumento,
+            RolInteresado rol,
+            OperacionExpediente operacion
+    ) {
+        return requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
+                .filter(requisito -> requisito.getTipoDocumento() == tipoDocumento)
+                .filter(requisito -> requisito.getInteresado() == null)
+                .filter(requisito -> requisito.getInteresadoRepresentado() == null)
+                .filter(requisito -> requisito.getRolInteresado() == rol)
+                .filter(requisito -> mismaOperacion(requisito.getOperacion(), operacion))
+                .findFirst();
+    }
+
+    private Optional<RequisitoDocumentalExpediente> buscarRepresentanteEmpresa(
+            Expediente expediente,
+            Interesado empresa,
+            RolInteresado rolRepresentado,
+            OperacionExpediente operacion
+    ) {
+        return requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
+                .filter(requisito -> requisito.getTipoDocumento() == TipoDocumento.DNI)
+                .filter(requisito -> requisito.getInteresado() == null)
+                .filter(requisito -> requisito.getInteresadoRepresentado() != null)
+                .filter(requisito -> Objects.equals(requisito.getInteresadoRepresentado().getId(), empresa.getId()))
+                .filter(requisito -> requisito.getRolRepresentado() == rolRepresentado)
+                .filter(requisito -> mismaOperacion(requisito.getOperacion(), operacion))
+                .findFirst();
+    }
+
+    private void eliminarPlaceholderIdentificacion(Expediente expediente, RolInteresado rol, OperacionExpediente operacion) {
+        buscarPlaceholder(expediente, TipoDocumento.DNI, rol, operacion)
+                .filter(requisito -> requisito.getOrigen() == OrigenRequisitoDocumental.REGLA)
+                .filter(requisito -> requisito.getDocumento() == null)
+                .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                .ifPresent(requisitoRepository::delete);
+    }
+
+    private boolean mismaOperacion(OperacionExpediente actual, OperacionExpediente esperada) {
+        Long actualId = actual != null ? actual.getId() : null;
+        Long esperadaId = esperada != null ? esperada.getId() : null;
+        return Objects.equals(actualId, esperadaId);
     }
 
     private void actualizarRegla(RequisitoDocumentalExpediente requisito, String descripcion, EstadoRequisitoDocumental estado) {
@@ -488,21 +689,296 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     private boolean documentoCubreRequisito(Documento documento, RequisitoDocumentalExpediente requisito) {
         if (requisito.getOperacion() != null) {
             if (documento.getOperacion() == null || documento.getOperacion().getId() == null) {
-                if (requisito.getOperacion().getTipo() != TipoOperacionExpediente.TRASPASO_DIRECTO) {
+                if (requisito.getOperacion().getTipo() != TipoOperacionExpediente.TRASPASO_DIRECTO
+                        && !esDocumentoVehiculoBase(requisito.getTipoDocumento())) {
                     return false;
                 }
             } else if (!documento.getOperacion().getId().equals(requisito.getOperacion().getId())) {
                 return false;
             }
         }
-        if (documento.getTipoDocumento() == requisito.getTipoDocumento()) {
+        if (esDocumentoIdentidad(requisito.getTipoDocumento())) {
+            return documentoIdentidadCubreRequisito(documento, requisito, false);
+        }
+        return tipoDocumentoCubreRequisito(documento.getTipoDocumento(), requisito.getTipoDocumento());
+    }
+
+    private boolean documentoIdentidadCubreRequisito(
+            Documento documento,
+            RequisitoDocumentalExpediente requisito,
+            boolean permitirDocumentoClientePropio
+    ) {
+        if (!tipoDocumentoCubreRequisito(documento.getTipoDocumento(), requisito.getTipoDocumento())) {
+            return false;
+        }
+        if (esRequisitoRepresentanteEmpresa(requisito)) {
+            return documentoRepresentanteEmpresaCubreRequisito(documento, requisito);
+        }
+        if (requisito.getInteresado() == null) {
+            return false;
+        }
+        if (documento.getInteresado() != null) {
+            return Objects.equals(documento.getInteresado().getId(), requisito.getInteresado().getId());
+        }
+        if (lecturaIdentidadCubreRequisito(documento, requisito)) {
             return true;
         }
-        if (requisito.getTipoDocumento() == TipoDocumento.MANDATO) {
-            return documento.getTipoDocumento() == TipoDocumento.MANDATO_REPRESENTACION;
+        return permitirDocumentoClientePropio && interesadoEsCliente(requisito.getExpediente(), requisito.getInteresado());
+    }
+
+    private boolean lecturaIdentidadCubreRequisito(Documento documento, RequisitoDocumentalExpediente requisito) {
+        if (documento.getId() == null || documento.getExpediente() == null || requisito.getExpediente() == null) {
+            return false;
         }
-        return requisito.getTipoDocumento() == TipoDocumento.CONTRATO_COMPRAVENTA
-                && documento.getTipoDocumento() == TipoDocumento.FACTURA;
+        if (!Objects.equals(documento.getExpediente().getId(), requisito.getExpediente().getId())) {
+            return false;
+        }
+        DocumentoIdentidadLectura lectura = identidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
+        if (lectura == null || lectura.getConfianzaGlobal() == null || lectura.getConfianzaGlobal() < CONFIANZA_MINIMA_IDENTIDAD) {
+            return false;
+        }
+        if (!normalizarIdentificador(requisito.getInteresado().getDni()).equals(normalizarIdentificador(lectura.getIdentificador()))) {
+            return false;
+        }
+        TipoDocumento tipoDetectado = lectura.getTipoDocumentoDetectado();
+        return tipoDetectado == null || tipoDocumentoCubreRequisito(tipoDetectado, requisito.getTipoDocumento());
+    }
+
+    private void vincularDocumentoIdentidadSiProcede(Documento documento, RequisitoDocumentalExpediente requisito) {
+        if (!esDocumentoIdentidad(requisito.getTipoDocumento()) || documento.getId() == null) {
+            return;
+        }
+        if (esRequisitoRepresentanteEmpresa(requisito)) {
+            vincularDocumentoRepresentanteEmpresa(documento, requisito);
+            return;
+        }
+        if (documento.getInteresado() != null) {
+            return;
+        }
+        if (requisito.getInteresado() == null) {
+            return;
+        }
+        DocumentoIdentidadLectura lectura = identidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
+        if (lectura == null || !lecturaIdentidadCubreRequisito(documento, requisito)) {
+            return;
+        }
+        Interesado interesado = requisito.getInteresado();
+        documento.setInteresado(interesado);
+        if (lectura.getTipoDocumentoDetectado() != null && lectura.getTipoDocumentoDetectado() != documento.getTipoDocumento()) {
+            documento.setTipoDocumento(lectura.getTipoDocumentoDetectado());
+        }
+        documentoRepository.save(documento);
+
+        String direccion = normalizarDireccionCompleta(lectura.getDireccionTexto());
+        if (direccion != null && !direccion.equals(interesado.getDireccion())) {
+            interesado.setDireccion(direccion);
+            interesadoRepository.save(interesado);
+        }
+        lectura.setInteresadoVinculado(interesado);
+        lectura.setVinculadoAutomaticamente(true);
+        lectura.setRequiereRevision(false);
+        lectura.setMensaje("Identidad leida y vinculada con interesado existente.");
+        identidadLecturaRepository.save(lectura);
+    }
+
+    private String normalizarDireccionCompleta(String direccion) {
+        return direccion == null ? null : com.example.gestor_documental.util.TextNormalizer.upperOrNull(direccion.replaceAll("\\s+", " "));
+    }
+
+    private boolean esRequisitoRepresentanteEmpresa(RequisitoDocumentalExpediente requisito) {
+        return requisito.getTipoDocumento() == TipoDocumento.DNI
+                && requisito.getInteresado() == null
+                && requisito.getInteresadoRepresentado() != null;
+    }
+
+    private boolean documentoRepresentanteEmpresaCubreRequisito(
+            Documento documento,
+            RequisitoDocumentalExpediente requisito
+    ) {
+        if (documento.getId() == null || requisito.getExpediente() == null || requisito.getInteresadoRepresentado() == null) {
+            return false;
+        }
+        if (documento.getExpediente() != null
+                && !Objects.equals(documento.getExpediente().getId(), requisito.getExpediente().getId())) {
+            return false;
+        }
+        if (documento.getCliente() != null
+                && requisito.getExpediente().getCliente() != null
+                && !Objects.equals(documento.getCliente().getId(), requisito.getExpediente().getCliente().getId())) {
+            return false;
+        }
+        if (documento.getInteresado() != null) {
+            return catalogoRepresentante(requisito.getInteresadoRepresentado(), documento.getInteresado().getDni()).isPresent();
+        }
+        DocumentoIdentidadLectura lectura = identidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
+        if (lectura == null || lectura.getConfianzaGlobal() == null || lectura.getConfianzaGlobal() < CONFIANZA_MINIMA_IDENTIDAD) {
+            return false;
+        }
+        TipoDocumento tipoDetectado = lectura.getTipoDocumentoDetectado();
+        if (tipoDetectado != null && !tipoDocumentoCubreRequisito(tipoDetectado, requisito.getTipoDocumento())) {
+            return false;
+        }
+        return catalogoRepresentante(requisito.getInteresadoRepresentado(), lectura.getIdentificador()).isPresent();
+    }
+
+    private void vincularDocumentoRepresentanteEmpresa(Documento documento, RequisitoDocumentalExpediente requisito) {
+        DocumentoIdentidadLectura lectura = identidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
+        if (lectura == null || !documentoRepresentanteEmpresaCubreRequisito(documento, requisito)) {
+            return;
+        }
+        GestionPersonaRepresentanteCatalogo catalogo = catalogoRepresentante(
+                requisito.getInteresadoRepresentado(),
+                lectura.getIdentificador()
+        ).orElse(null);
+        if (catalogo == null) {
+            return;
+        }
+        Interesado representante = obtenerOCrearRepresentante(lectura, catalogo);
+        documento.setInteresado(representante);
+        if (lectura.getTipoDocumentoDetectado() != null && lectura.getTipoDocumentoDetectado() != documento.getTipoDocumento()) {
+            documento.setTipoDocumento(lectura.getTipoDocumentoDetectado());
+        }
+        documentoRepository.save(documento);
+        asociarRepresentanteACliente(requisito.getExpediente(), representante);
+
+        lectura.setInteresadoVinculado(representante);
+        lectura.setVinculadoAutomaticamente(true);
+        lectura.setRequiereRevision(false);
+        lectura.setMensaje("Identidad leida y vinculada como administrador de " + requisito.getInteresadoRepresentado().getNombre() + ".");
+        identidadLecturaRepository.save(lectura);
+    }
+
+    private Optional<GestionPersonaRepresentanteCatalogo> catalogoRepresentante(Interesado empresa, String representanteDni) {
+        String nifEmpresa = normalizarIdentificador(empresa != null ? empresa.getDni() : null);
+        String nifRepresentante = normalizarIdentificador(representanteDni);
+        if (nifEmpresa.isBlank() || nifRepresentante.isBlank()) {
+            return Optional.empty();
+        }
+        return representanteCatalogoRepository.findByEmpresaNifNormalizadoOrderByIdAsc(nifEmpresa).stream()
+                .filter(catalogo -> nifRepresentante.equals(normalizarIdentificador(catalogo.getRepresentanteNifNormalizado()))
+                        || nifRepresentante.equals(normalizarIdentificador(catalogo.getRepresentanteNif())))
+                .findFirst();
+    }
+
+    private Interesado obtenerOCrearRepresentante(
+            DocumentoIdentidadLectura lectura,
+            GestionPersonaRepresentanteCatalogo catalogo
+    ) {
+        String dni = normalizarIdentificador(lectura.getIdentificador());
+        Interesado interesado = interesadoRepository.findByDni(dni).orElse(null);
+        String nombre = nombreRepresentante(lectura, catalogo);
+        String direccion = primerNoVacio(
+                normalizarDireccionCompleta(lectura.getDireccionTexto()),
+                direccionRepresentanteCatalogo(catalogo)
+        );
+        boolean creado = false;
+        boolean actualizado = false;
+        if (interesado == null) {
+            interesado = new Interesado();
+            interesado.setDni(dni);
+            interesado.setNombre(nombre != null ? nombre : dni);
+            interesado.setTipoPersona(TipoPersona.PARTICULAR);
+            interesado.setDireccion(direccion);
+            creado = true;
+        } else {
+            actualizado |= setIfBlank(interesado.getNombre(), nombre, interesado::setNombre);
+            if (direccion != null && !direccion.equals(interesado.getDireccion())) {
+                interesado.setDireccion(direccion);
+                actualizado = true;
+            }
+            if (interesado.getTipoPersona() == null) {
+                interesado.setTipoPersona(TipoPersona.PARTICULAR);
+                actualizado = true;
+            }
+        }
+        return creado || actualizado ? interesadoRepository.save(interesado) : interesado;
+    }
+
+    private String nombreRepresentante(
+            DocumentoIdentidadLectura lectura,
+            GestionPersonaRepresentanteCatalogo catalogo
+    ) {
+        String lecturaNombre = unirNombre(lectura.getNombre(), lectura.getApellido1(), lectura.getApellido2());
+        if (lecturaNombre != null) {
+            return lecturaNombre;
+        }
+        return unirNombre(
+                catalogo.getRepresentanteNombre(),
+                catalogo.getRepresentanteApellido1RazonSocial(),
+                catalogo.getRepresentanteApellido2()
+        );
+    }
+
+    private String unirNombre(String nombre, String apellido1, String apellido2) {
+        String text = String.join(" ", List.of(
+                nombre != null ? nombre : "",
+                apellido1 != null ? apellido1 : "",
+                apellido2 != null ? apellido2 : ""
+        )).replaceAll("\\s+", " ").trim();
+        return com.example.gestor_documental.util.TextNormalizer.upperOrNull(text);
+    }
+
+    private String direccionRepresentanteCatalogo(GestionPersonaRepresentanteCatalogo catalogo) {
+        return normalizarDireccionCompleta(String.join(" ", List.of(
+                catalogo.getRepresentanteDirSiglas() != null ? catalogo.getRepresentanteDirSiglas() : "",
+                catalogo.getRepresentanteDirCalle() != null ? catalogo.getRepresentanteDirCalle() : "",
+                catalogo.getRepresentanteDirNumero() != null ? catalogo.getRepresentanteDirNumero() : "",
+                catalogo.getRepresentanteDirPiso() != null ? catalogo.getRepresentanteDirPiso() : "",
+                catalogo.getRepresentanteDirPuerta() != null ? catalogo.getRepresentanteDirPuerta() : "",
+                catalogo.getRepresentanteDirCp() != null ? catalogo.getRepresentanteDirCp() : "",
+                catalogo.getRepresentanteDirMunicipio() != null ? catalogo.getRepresentanteDirMunicipio() : "",
+                catalogo.getRepresentanteDirProvincia() != null ? catalogo.getRepresentanteDirProvincia() : ""
+        )));
+    }
+
+    private void asociarRepresentanteACliente(Expediente expediente, Interesado representante) {
+        if (expediente.getCliente() == null || representante.getId() == null
+                || clienteInteresadoRepository.existsByClienteIdAndInteresadoId(expediente.getCliente().getId(), representante.getId())) {
+            return;
+        }
+        ClienteInteresado relacion = new ClienteInteresado();
+        relacion.setCliente(expediente.getCliente());
+        relacion.setInteresado(representante);
+        clienteInteresadoRepository.save(relacion);
+    }
+
+    private String primerNoVacio(String... valores) {
+        for (String valor : valores) {
+            if (valor != null && !valor.isBlank()) {
+                return valor;
+            }
+        }
+        return null;
+    }
+
+    private boolean setIfBlank(String actual, String nuevo, java.util.function.Consumer<String> setter) {
+        if ((actual == null || actual.isBlank()) && nuevo != null && !nuevo.isBlank()) {
+            setter.accept(nuevo);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean tipoDocumentoCubreRequisito(TipoDocumento documento, TipoDocumento requisito) {
+        if (documento == null || requisito == null) {
+            return false;
+        }
+        if (documento == requisito) {
+            return true;
+        }
+        if (requisito == TipoDocumento.MANDATO) {
+            return documento == TipoDocumento.MANDATO_REPRESENTACION;
+        }
+        if (requisito == TipoDocumento.CONTRATO_COMPRAVENTA) {
+            return documento == TipoDocumento.FACTURA;
+        }
+        return (requisito == TipoDocumento.PERMISO_CIRCULACION || requisito == TipoDocumento.FICHA_TECNICA)
+                && documento == TipoDocumento.INFORME_DGT;
+    }
+
+    private boolean esDocumentoVehiculoBase(TipoDocumento tipoDocumento) {
+        return tipoDocumento == TipoDocumento.PERMISO_CIRCULACION
+                || tipoDocumento == TipoDocumento.FICHA_TECNICA;
     }
 
     private java.util.Optional<Documento> documentoClienteCubreRequisito(
@@ -520,8 +996,10 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         }
 
         return documentoRepository.findByClienteIdOrderByFechaSubidaDesc(expediente.getCliente().getId()).stream()
-                .filter(documento -> documento.getInteresado() == null)
-                .filter(documento -> documentoCubreRequisito(documento, requisito))
+                .filter(documento -> documento.getInteresado() == null || esRequisitoRepresentanteEmpresa(requisito))
+                .filter(documento -> esDocumentoIdentidad(requisito.getTipoDocumento())
+                        ? documentoIdentidadCubreRequisito(documento, requisito, true)
+                        : documentoCubreRequisito(documento, requisito))
                 .findFirst();
     }
 
@@ -548,6 +1026,10 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                 || tipoDocumento == TipoDocumento.CIF
                 || tipoDocumento == TipoDocumento.MANDATO
                 || tipoDocumento == TipoDocumento.MANDATO_REPRESENTACION;
+    }
+
+    private boolean esDocumentoIdentidad(TipoDocumento tipoDocumento) {
+        return tipoDocumento == TipoDocumento.DNI || tipoDocumento == TipoDocumento.CIF;
     }
 
     private boolean interesadoEsCliente(Expediente expediente, Interesado interesado) {

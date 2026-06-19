@@ -11,6 +11,7 @@ import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.HistorialCambioRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
@@ -19,11 +20,14 @@ import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
+import com.example.gestor_documental.service.OperacionExpedienteService;
+import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.util.DireccionFormatter;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -51,6 +55,9 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final MensajeRepository mensajeRepository;
     private final HistorialCambioService historialCambioService;
     private final InteresadoService interesadoService;
+    private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final OperacionExpedienteService operacionExpedienteService;
+    private final ObjectProvider<RequisitoDocumentalExpedienteService> requisitoDocumentalExpedienteService;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -84,12 +91,24 @@ public class SolicitudServiceImpl implements SolicitudService {
     @Override
     public Page<Solicitud> buscarListado(Long clienteId,
                                          EstadoSolicitud estado,
+                                         String archivo,
                                          Long tipoTramiteId,
                                          String matricula,
                                          LocalDateTime desde,
                                          LocalDateTime hasta,
                                          Pageable pageable) {
-        return solicitudRepository.buscarListado(clienteId, estado, tipoTramiteId, matricula, desde, hasta, pageable);
+        return solicitudRepository.buscarListado(clienteId, estado, normalizarArchivoListado(archivo), tipoTramiteId, matricula, desde, hasta, pageable);
+    }
+
+    private String normalizarArchivoListado(String archivo) {
+        if (archivo == null || archivo.isBlank()) {
+            return "ACTIVAS";
+        }
+        String normalizado = archivo.trim().toUpperCase();
+        return switch (normalizado) {
+            case "ACTIVAS", "ARCHIVADAS", "TODAS" -> normalizado;
+            default -> "ACTIVAS";
+        };
     }
 
     @Override
@@ -305,6 +324,7 @@ public class SolicitudServiceImpl implements SolicitudService {
 
         expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado1dto);
         expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado2dto);
+        sincronizarDocumentacionExpedienteConvertido(expedienteGuardado, admin);
         
         historialCambioService.registrarCambioSolicitud(
                 solicitud, 
@@ -314,6 +334,16 @@ public class SolicitudServiceImpl implements SolicitudService {
         );
 
         return expedienteGuardado;
+    }
+
+    private void sincronizarDocumentacionExpedienteConvertido(Expediente expediente, Usuario admin) {
+        operacionExpedienteService.sincronizarYListar(expediente);
+        requisitoDocumentalExpedienteService.getObject().sincronizarYListar(
+                expediente,
+                expedienteInteresadoRepository.findByExpedienteId(expediente.getId()),
+                documentoRepository.findByExpedienteId(expediente.getId()),
+                admin
+        );
     }
 
     @Override

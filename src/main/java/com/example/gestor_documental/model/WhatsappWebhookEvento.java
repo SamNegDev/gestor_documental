@@ -27,7 +27,8 @@ import java.time.LocalDateTime;
 @Table(name = "whatsapp_webhook_evento", indexes = {
         @Index(name = "idx_whatsapp_evento_message_id", columnList = "message_id"),
         @Index(name = "idx_whatsapp_evento_telefono", columnList = "telefono"),
-        @Index(name = "idx_whatsapp_evento_fecha", columnList = "fecha_recepcion")
+        @Index(name = "idx_whatsapp_evento_fecha", columnList = "fecha_recepcion"),
+        @Index(name = "idx_whatsapp_evento_solicitud", columnList = "solicitud_id")
 })
 public class WhatsappWebhookEvento {
     @Id
@@ -78,6 +79,10 @@ public class WhatsappWebhookEvento {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "expediente_id")
     private Expediente expediente;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "solicitud_id")
+    private Solicitud solicitud;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "revisado_por_id")
