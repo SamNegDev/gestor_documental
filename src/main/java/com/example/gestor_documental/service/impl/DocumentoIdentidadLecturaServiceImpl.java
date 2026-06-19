@@ -240,17 +240,19 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         boolean revisionIa = booleano(resultado, "requiereRevision");
         TipoDocumento tipoDetectado = tipoDetectado(resultado, documento.getTipoDocumento());
         boolean identificadorInvalido = identificador != null && !identificadorValido(identificador);
-        Interesado interesadoVinculado = identificadorInvalido
+        boolean lecturaSegura = identificador != null
+                && !identificadorInvalido
+                && confianza != null
+                && confianza >= CONFIANZA_MINIMA_AUTOMATICA
+                && !revisionIa;
+        Interesado interesadoVinculado = !lecturaSegura
                 ? null
                 : resolverInteresadoVinculado(documento, identificador, resultado, tipoDetectado);
-        boolean conflictoInteresado = documento.getInteresado() != null
+        boolean conflictoInteresado = lecturaSegura
+                && documento.getInteresado() != null
                 && identificador != null
                 && !coincideIdentificador(documento.getInteresado(), identificador);
-        boolean requiereRevision = revisionIa
-                || identificador == null
-                || identificadorInvalido
-                || confianza == null
-                || confianza < CONFIANZA_MINIMA_AUTOMATICA
+        boolean requiereRevision = !lecturaSegura
                 || interesadoVinculado == null
                 || conflictoInteresado;
 
@@ -265,14 +267,14 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         lectura.setDireccionTexto(limitar(texto(resultado, "direccionTexto"), 500));
         lectura.setConfianzaGlobal(confianza);
         lectura.setInteresadoVinculado(interesadoVinculado);
-        lectura.setVinculadoAutomaticamente(interesadoVinculado != null && !conflictoInteresado);
+        lectura.setVinculadoAutomaticamente(!requiereRevision && interesadoVinculado != null);
         lectura.setRequiereRevision(requiereRevision);
         lectura.setModelo(modeloIdentidad());
         lectura.setFechaLectura(LocalDateTime.now());
         lectura.setResultadoJson(resultado.toString());
         lectura.setMensaje(mensajeLectura(identificador, identificadorInvalido, interesadoVinculado, conflictoInteresado, requiereRevision));
 
-        if (interesadoVinculado != null && !conflictoInteresado) {
+        if (!requiereRevision && interesadoVinculado != null) {
             boolean documentoActualizado = false;
             if (documento.getInteresado() == null) {
                 documento.setInteresado(interesadoVinculado);
@@ -436,11 +438,11 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         if (conflictoInteresado) {
             return "El documento ya estaba asociado a otro interesado; revisar antes de validar.";
         }
+        if (requiereRevision) {
+            return "Identidad leida con dudas; revisar antes de vincular.";
+        }
         if (interesado != null) {
             return "Identidad leida y vinculada con interesado existente.";
-        }
-        if (requiereRevision) {
-            return "Identidad leida sin coincidencia interna; revisar rol y vinculacion.";
         }
         return "Identidad leida.";
     }
