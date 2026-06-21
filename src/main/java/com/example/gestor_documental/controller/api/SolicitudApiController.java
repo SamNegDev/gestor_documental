@@ -360,7 +360,7 @@ public class SolicitudApiController {
 
     private SolicitudListItemResponse mapSolicitudListItem(Solicitud solicitud) {
         List<Documento> documentos = documentoService.listarPorSolicitud(solicitud.getId());
-        List<InteresadoSolicitudResponse> interesados = mapInteresados(solicitud, documentos, false);
+        List<InteresadoSolicitudResponse> interesados = mapInteresados(solicitud, documentos, true);
         return SolicitudListItemResponse.builder()
                 .id(solicitud.getId())
                 .matricula(solicitud.getMatricula())
