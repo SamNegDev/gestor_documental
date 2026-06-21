@@ -11,7 +11,10 @@ import type { InteresadoSearchResult } from "../../expedientes/types/expedienteD
 import type { SolicitudDetail, SolicitudUpsertInput } from "../types";
 import "../../expedientes/styles/expedienteDetail.css";
 
-const ROLES = ["COMPRADOR", "VENDEDOR", "TITULAR"];
+const ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
+const BATECOM_ROLE_ORDER = ["VENDEDOR", "COMPRAVENTA", "COMPRADOR"];
+const BATECOM_LABELS = ["Vendedor inicial", "Compraventa", "Comprador final"];
+
 function emptyForm(): SolicitudUpsertInput {
   return {
     tipoTramiteId: 0,
@@ -37,12 +40,26 @@ function emptyForm(): SolicitudUpsertInput {
     interesado2CodigoPostal: "",
     interesado2Municipio: "",
     interesado2Provincia: "",
+    interesado3Rol: "",
+    interesado3Nombre: "",
+    interesado3Dni: "",
+    interesado3Telefono: "",
+    interesado3Direccion: "",
+    interesado3TipoVia: "",
+    interesado3NombreVia: "",
+    interesado3CodigoPostal: "",
+    interesado3Municipio: "",
+    interesado3Provincia: "",
   };
 }
 
 function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
-  const interesado1 = solicitud.interesados[0];
-  const interesado2 = solicitud.interesados[1];
+  const interesados = isBatecomType(solicitud.tipoTramite)
+    ? BATECOM_ROLE_ORDER.map((rol) => solicitud.interesados.find((interesado) => interesado.rol === rol))
+    : solicitud.interesados;
+  const interesado1 = interesados[0];
+  const interesado2 = interesados[1];
+  const interesado3 = interesados[2];
   return {
     tipoTramiteId: 0,
     matricula: uppercaseInput(solicitud.matricula || ""),
@@ -67,6 +84,16 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     interesado2CodigoPostal: uppercaseInput(interesado2?.codigoPostal || ""),
     interesado2Municipio: uppercaseInput(interesado2?.municipio || ""),
     interesado2Provincia: uppercaseInput(interesado2?.provincia || ""),
+    interesado3Rol: interesado3?.rol || "",
+    interesado3Nombre: uppercaseInput(interesado3?.nombre || ""),
+    interesado3Dni: uppercaseInput(interesado3?.dni || ""),
+    interesado3Telefono: uppercaseInput(interesado3?.telefono || ""),
+    interesado3Direccion: uppercaseInput(interesado3?.direccion || ""),
+    interesado3TipoVia: uppercaseInput(interesado3?.tipoVia || ""),
+    interesado3NombreVia: uppercaseInput(interesado3?.nombreVia || ""),
+    interesado3CodigoPostal: uppercaseInput(interesado3?.codigoPostal || ""),
+    interesado3Municipio: uppercaseInput(interesado3?.municipio || ""),
+    interesado3Provincia: uppercaseInput(interesado3?.provincia || ""),
   };
 }
 
@@ -95,7 +122,55 @@ function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
     interesado2CodigoPostal: cleanUpperText(form.interesado2CodigoPostal),
     interesado2Municipio: cleanUpperText(form.interesado2Municipio),
     interesado2Provincia: cleanUpperText(form.interesado2Provincia),
+    interesado3Rol: cleanUpperText(form.interesado3Rol),
+    interesado3Nombre: cleanUpperText(form.interesado3Nombre),
+    interesado3Dni: cleanUpperText(form.interesado3Dni),
+    interesado3Telefono: cleanUpperText(form.interesado3Telefono),
+    interesado3Direccion: cleanUpperText(form.interesado3Direccion),
+    interesado3TipoVia: cleanUpperText(form.interesado3TipoVia),
+    interesado3NombreVia: cleanUpperText(form.interesado3NombreVia),
+    interesado3CodigoPostal: cleanUpperText(form.interesado3CodigoPostal),
+    interesado3Municipio: cleanUpperText(form.interesado3Municipio),
+    interesado3Provincia: cleanUpperText(form.interesado3Provincia),
   };
+}
+
+function isBatecomType(typeName?: string | null) {
+  return typeName === "BATECOM";
+}
+
+function applyBatecomRoles(form: SolicitudUpsertInput): SolicitudUpsertInput {
+  return BATECOM_ROLE_ORDER.reduce(
+    (current, rol, index) => ({
+      ...current,
+      [`interesado${index + 1}Rol`]: rol,
+    }),
+    form,
+  );
+}
+
+function clearThirdInteresado(form: SolicitudUpsertInput): SolicitudUpsertInput {
+  return {
+    ...form,
+    interesado3Rol: "",
+    interesado3Nombre: "",
+    interesado3Dni: "",
+    interesado3Telefono: "",
+    interesado3Direccion: "",
+    interesado3TipoVia: "",
+    interesado3NombreVia: "",
+    interesado3CodigoPostal: "",
+    interesado3Municipio: "",
+    interesado3Provincia: "",
+  };
+}
+
+function interestedIndexes(batecom: boolean) {
+  return batecom ? [1, 2, 3] : [1, 2];
+}
+
+function interestedBlockLabel(index: number, batecom: boolean) {
+  return batecom ? BATECOM_LABELS[index - 1] || `Interesado ${index}` : `Interesado ${index}`;
 }
 
 export function SolicitudFormPage() {
@@ -130,11 +205,12 @@ export function SolicitudFormPage() {
     mutationFn: async () => {
       if (!form.tipoTramiteId) throw new Error("Selecciona un tipo de tramite.");
       if (!form.matricula.trim()) throw new Error("La matricula es obligatoria.");
+      const formToSave = isBatecom ? applyBatecomRoles(form) : clearThirdInteresado(form);
       if (isEdit && id) {
-        await updateSolicitud(id, cleanPayload(form));
+        await updateSolicitud(id, cleanPayload(formToSave));
         return { id: Number(id) };
       }
-      const creada = await createSolicitud(cleanPayload(form));
+      const creada = await createSolicitud(cleanPayload(formToSave));
       return creada;
     },
     onSuccess: (solicitud) => navigate(`/solicitudes/${solicitud.id}`),
@@ -146,6 +222,7 @@ export function SolicitudFormPage() {
     () => catalogsQuery.data?.tiposTramite.find((tipo) => tipo.id === form.tipoTramiteId),
     [catalogsQuery.data, form.tipoTramiteId],
   );
+  const isBatecom = isBatecomType(selectedType?.nombre);
 
   if (loading) {
     return (
@@ -194,7 +271,16 @@ export function SolicitudFormPage() {
           <div className="edit-form-grid">
             <label>
               Tipo de tramite
-              <select value={form.tipoTramiteId || ""} onChange={(event) => setForm({ ...form, tipoTramiteId: Number(event.target.value) })} required>
+              <select
+                value={form.tipoTramiteId || ""}
+                onChange={(event) => {
+                  const tipoTramiteId = Number(event.target.value);
+                  const nextType = catalogsQuery.data?.tiposTramite.find((tipo) => tipo.id === tipoTramiteId);
+                  const nextForm = { ...form, tipoTramiteId };
+                  setForm(isBatecomType(nextType?.nombre) ? applyBatecomRoles(nextForm) : clearThirdInteresado(nextForm));
+                }}
+                required
+              >
                 <option value="">Selecciona un tipo</option>
                 {catalogsQuery.data?.tiposTramite.map((tipo) => (
                   <option key={tipo.id} value={tipo.id}>
@@ -214,15 +300,15 @@ export function SolicitudFormPage() {
           </div>
         </section>
 
-        {[1, 2].map((index) => (
+        {interestedIndexes(isBatecom).map((index) => (
           <section className="panel" key={index}>
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Interesado {index}</p>
+                <p className="eyebrow">{interestedBlockLabel(index, isBatecom)}</p>
                 <h2>Datos opcionales</h2>
               </div>
             </div>
-            <InteresadoFields form={form} index={index} onChange={setForm} />
+            <InteresadoFields form={form} index={index} onChange={setForm} lockedRole={isBatecom ? BATECOM_ROLE_ORDER[index - 1] : undefined} />
           </section>
         ))}
 
@@ -244,12 +330,14 @@ function InteresadoFields({
   form,
   index,
   onChange,
+  lockedRole,
 }: {
   form: SolicitudUpsertInput;
   index: number;
   onChange: (form: SolicitudUpsertInput) => void;
+  lockedRole?: string;
 }) {
-  const prefix = `interesado${index}` as "interesado1" | "interesado2";
+  const prefix = `interesado${index}` as "interesado1" | "interesado2" | "interesado3";
   const field = (name: string) => `${prefix}${name}` as keyof SolicitudUpsertInput;
   const addressValue: AddressValue = {
     tipoVia: form[field("TipoVia")] as string,
@@ -309,7 +397,11 @@ function InteresadoFields({
       )}
       <label>
         Rol
-        <select value={(form[field("Rol")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Rol")]: event.target.value })}>
+        <select
+          value={lockedRole || (form[field("Rol")] as string) || ""}
+          onChange={(event) => onChange({ ...form, [field("Rol")]: event.target.value })}
+          disabled={Boolean(lockedRole)}
+        >
           <option value="">Sin rol</option>
           {ROLES.map((rol) => (
             <option key={rol} value={rol}>

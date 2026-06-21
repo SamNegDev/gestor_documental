@@ -11,8 +11,8 @@ import { InteresadoAutocomplete } from "../components/InteresadoAutocomplete";
 import "../styles/expedienteDetail.css";
 
 const ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
-const BATECOM_ROLE_ORDER = ["VENDEDOR", "COMPRADOR", "COMPRAVENTA"];
-const BATECOM_LABELS = ["Vendedor inicial", "Comprador final", "Compraventa"];
+const BATECOM_ROLE_ORDER = ["VENDEDOR", "COMPRAVENTA", "COMPRADOR"];
+const BATECOM_LABELS = ["Vendedor inicial", "Compraventa", "Comprador final"];
 
 type InteresadoForm = ExpedienteEditInput["interesados"][number];
 

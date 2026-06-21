@@ -246,8 +246,9 @@ export function SolicitudDetailPage() {
     if (!solicitudActual) return;
     const confirmed = await confirm({
       title: "Procesar documentacion",
-      description:
-        "Se leeran solo los DNI/CIF y factura/contrato que no tengan lectura previa. Si ya hay una lectura correcta se reutilizara para actualizar comprador y vendedor.",
+      description: solicitudActual.tipoTramite === "BATECOM"
+        ? "Se leeran DNI/CIF y contratos/facturas. El sistema buscara la compraventa que aparece como comprador en una operacion y vendedor en otra."
+        : "Se leeran solo los DNI/CIF y factura/contrato que no tengan lectura previa. Si ya hay una lectura correcta se reutilizara para actualizar comprador y vendedor.",
       confirmLabel: "Procesar",
       cancelLabel: "Cancelar",
       tone: "default",
@@ -796,7 +797,10 @@ function buildSolicitudPreparationItems(solicitud: SolicitudDetail): SolicitudPr
   const representativesMissing = interesados.filter((item) => item.requiereRepresentanteLegal && !item.representanteLegalAportado);
   const representativesCovered = interesados.filter((item) => item.requiereRepresentanteLegal && item.representanteLegalAportado);
   const identityReady = missingIdentities.length === 0 && representativesMissing.length === 0;
-  const roleDocsReady = uploadedTypes.has("CONTRATO_COMPRAVENTA") || uploadedTypes.has("FACTURA");
+  const roleDocsCount = solicitud.documentos.filter((documento) => documento.tipo === "CONTRATO_COMPRAVENTA" || documento.tipo === "FACTURA").length;
+  const roleDocsReady = solicitud.tipoTramite === "BATECOM"
+    ? roleDocsCount >= 2
+    : roleDocsCount >= 1;
   const mandateReady = uploadedTypes.has("MANDATO") || uploadedTypes.has("MANDATO_REPRESENTACION");
   const vehicleMissingDocs = missingVehicleDocs(uploadedTypes);
   const vehicleReady = vehicleMissingDocs.length === 0;
@@ -826,9 +830,19 @@ function buildSolicitudPreparationItems(solicitud: SolicitudDetail): SolicitudPr
     },
     {
       key: "contrato",
-      label: "Factura o contrato",
-      detail: roleDocsReady ? "Disponible para leer comprador y vendedor." : "Necesario para fijar roles con seguridad.",
-      missing: roleDocsReady || solicitud.tipoTramite === "CAMBIO_DOMICILIO" ? null : "Falta factura o contrato para confirmar comprador y vendedor.",
+      label: solicitud.tipoTramite === "BATECOM" ? "Contratos BATE/COM" : "Factura o contrato",
+      detail: roleDocsReady
+        ? solicitud.tipoTramite === "BATECOM"
+          ? "Dos operaciones disponibles para detectar la compraventa comun."
+          : "Disponible para leer comprador y vendedor."
+        : solicitud.tipoTramite === "BATECOM"
+          ? `${roleDocsCount}/2 contrato(s) o factura(s) disponibles.`
+          : "Necesario para fijar roles con seguridad.",
+      missing: roleDocsReady || solicitud.tipoTramite === "CAMBIO_DOMICILIO"
+        ? null
+        : solicitud.tipoTramite === "BATECOM"
+          ? "Faltan contratos/facturas de entrega a compraventa y venta final."
+          : "Falta factura o contrato para confirmar comprador y vendedor.",
       ready: roleDocsReady || solicitud.tipoTramite === "CAMBIO_DOMICILIO",
     },
     {

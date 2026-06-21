@@ -5,6 +5,7 @@ import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
@@ -88,6 +89,10 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         leerRoles(documentosRoles, admin, contadores, detalles);
 
         Map<String, DocumentoIdentidadLectura> identidades = mejoresIdentidades(documentosIdentidad);
+        if (esBatecom(solicitud)) {
+            return procesarBatecom(solicitud, documentosIdentidad, documentosRoles, identidades, contadores, detalles, admin);
+        }
+
         DocumentoRolesLectura lecturaRoles = mejorLecturaRoles(documentosRoles);
         if (lecturaRoles == null) {
             detalles.add(documentosRoles.isEmpty()
@@ -136,6 +141,70 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         detalles.add("Datos de comprador y vendedor actualizados en la solicitud.");
         return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, true, false, false,
                 "Datos actualizados desde la documentacion.", detalles);
+    }
+
+    private SolicitudDocumentacionIaResponse procesarBatecom(
+            Solicitud solicitud,
+            List<Documento> documentosIdentidad,
+            List<Documento> documentosRoles,
+            Map<String, DocumentoIdentidadLectura> identidades,
+            Contadores contadores,
+            List<String> detalles,
+            Usuario admin
+    ) {
+        List<DocumentoRolesLectura> lecturas = lecturasRolesUsables(documentosRoles);
+        BatecomPartes partes = detectarPartesBatecom(lecturas, identidades);
+        if (partes == null) {
+            detalles.add(lecturas.size() < 2
+                    ? "BATECOM necesita dos lecturas validas: entrega a compraventa y venta final al comprador."
+                    : "No se ha detectado una compraventa comun que aparezca como comprador en una operacion y vendedor en otra.");
+            return respuesta(solicitud.getId(), documentosIdentidad.size(), documentosRoles.size(), contadores, false, false, true,
+                    "Lecturas realizadas, pero falta identificar las dos operaciones BATECOM.", detalles);
+        }
+
+        validarPersona(partes.vendedor(), "vendedor inicial");
+        validarPersona(partes.compraventa(), "compraventa");
+        validarPersona(partes.comprador(), "comprador final");
+        if (partes.vendedor().identificador().equals(partes.compraventa().identificador())
+                || partes.compraventa().identificador().equals(partes.comprador().identificador())
+                || partes.vendedor().identificador().equals(partes.comprador().identificador())) {
+            throw new OperacionInvalidaException("BATECOM requiere vendedor inicial, compraventa y comprador final distintos.");
+        }
+
+        List<String> faltasCorroboracion = faltasCorroboracionIdentidadBatecom(solicitud, partes, identidades);
+        if (!faltasCorroboracion.isEmpty()) {
+            detalles.addAll(faltasCorroboracion);
+            return respuesta(solicitud.getId(), documentosIdentidad.size(), documentosRoles.size(), contadores, false, false, true,
+                    "Lecturas realizadas, pero falta validar identidad antes de actualizar datos.", detalles);
+        }
+        detalles.addAll(avisosNombreIdentidad(partes.lecturaBate(), identidades));
+        detalles.addAll(avisosNombreIdentidad(partes.lecturaCom(), identidades));
+
+        if (solicitudBatecomYaCoincide(solicitud, partes)) {
+            marcarIdentidadesUsadas(identidades, partes.vendedor(), partes.compraventa(), partes.comprador());
+            detalles.add("La solicitud ya tenia vendedor inicial, compraventa y comprador final coherentes con las lecturas validas.");
+            return respuesta(solicitud.getId(), documentosIdentidad.size(), documentosRoles.size(), contadores, false, true, false,
+                    "Sin cambios: la documentacion BATECOM ya estaba procesada correctamente.", detalles);
+        }
+
+        aplicarPersona(solicitud, RolInteresado.VENDEDOR, partes.vendedor());
+        aplicarPersona(solicitud, RolInteresado.COMPRAVENTA, partes.compraventa());
+        aplicarPersona(solicitud, RolInteresado.COMPRADOR, partes.comprador());
+        aplicarMatriculaSiProcede(solicitud, partes.lecturaBate(), detalles);
+        aplicarMatriculaSiProcede(solicitud, partes.lecturaCom(), detalles);
+        solicitud.setFechaUltimaModificacion(LocalDateTime.now());
+        solicitud.setModificadoPor(admin);
+        solicitudRepository.save(solicitud);
+        marcarIdentidadesUsadas(identidades, partes.vendedor(), partes.compraventa(), partes.comprador());
+
+        historialCambioService.registrarCambioSolicitud(
+                solicitud,
+                admin,
+                "IA DOCUMENTACION BATECOM",
+                "Se actualizaron vendedor inicial, compraventa y comprador final desde contratos/facturas.");
+        detalles.add("Datos BATECOM actualizados: vendedor inicial, compraventa y comprador final.");
+        return respuesta(solicitud.getId(), documentosIdentidad.size(), documentosRoles.size(), contadores, true, false, false,
+                "Datos BATECOM actualizados desde la documentacion.", detalles);
     }
 
     private void validarAdmin(Usuario admin) {
@@ -225,6 +294,83 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 .orElse(null);
     }
 
+    private List<DocumentoRolesLectura> lecturasRolesUsables(List<Documento> documentosRoles) {
+        List<Long> documentoIds = documentosRoles.stream().map(Documento::getId).toList();
+        if (documentoIds.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Integer> orden = new HashMap<>();
+        for (int index = 0; index < documentoIds.size(); index++) {
+            orden.put(documentoIds.get(index), index);
+        }
+        return rolesLecturaRepository.findByDocumentoIdIn(documentoIds).stream()
+                .filter(this::rolesUsables)
+                .sorted(Comparator
+                        .comparing((DocumentoRolesLectura lectura) -> confianza(lectura.getConfianzaGlobal())).reversed()
+                        .thenComparing(lectura -> orden.getOrDefault(lectura.getDocumento() != null ? lectura.getDocumento().getId() : null, Integer.MAX_VALUE)))
+                .toList();
+    }
+
+    private BatecomPartes detectarPartesBatecom(
+            List<DocumentoRolesLectura> lecturas,
+            Map<String, DocumentoIdentidadLectura> identidades
+    ) {
+        BatecomPartes mejor = null;
+        double mejorConfianza = 0;
+        for (DocumentoRolesLectura lecturaBate : lecturas) {
+            String compraventa = normalizarIdentificador(lecturaBate.getCompradorIdentificador());
+            if (compraventa == null) {
+                continue;
+            }
+            for (DocumentoRolesLectura lecturaCom : lecturas) {
+                if (mismaLectura(lecturaBate, lecturaCom)) {
+                    continue;
+                }
+                String vendedorCom = normalizarIdentificador(lecturaCom.getVendedorIdentificador());
+                if (!compraventa.equals(vendedorCom)) {
+                    continue;
+                }
+                PersonaSolicitud vendedor = personaDesdeLectura(lecturaBate, true, identidades);
+                PersonaSolicitud intermediario = personaCompraventaBatecom(lecturaBate, lecturaCom, identidades);
+                PersonaSolicitud comprador = personaDesdeLectura(lecturaCom, false, identidades);
+                double confianzaMedia = (confianza(lecturaBate.getConfianzaGlobal()) + confianza(lecturaCom.getConfianzaGlobal())) / 2;
+                if (mejor == null || confianzaMedia > mejorConfianza) {
+                    mejor = new BatecomPartes(vendedor, intermediario, comprador, lecturaBate, lecturaCom);
+                    mejorConfianza = confianzaMedia;
+                }
+            }
+        }
+        return mejor;
+    }
+
+    private boolean mismaLectura(DocumentoRolesLectura first, DocumentoRolesLectura second) {
+        Long firstId = first != null && first.getDocumento() != null ? first.getDocumento().getId() : null;
+        Long secondId = second != null && second.getDocumento() != null ? second.getDocumento().getId() : null;
+        return firstId != null && firstId.equals(secondId);
+    }
+
+    private PersonaSolicitud personaCompraventaBatecom(
+            DocumentoRolesLectura lecturaBate,
+            DocumentoRolesLectura lecturaCom,
+            Map<String, DocumentoIdentidadLectura> identidades
+    ) {
+        String identificador = normalizarIdentificador(lecturaBate.getCompradorIdentificador());
+        DocumentoIdentidadLectura identidad = identificador != null ? identidades.get(identificador) : null;
+        String nombreIdentidad = nombreCompletoIdentidad(identidad);
+        String nombreBate = normalizarNombreRol(lecturaBate.getCompradorNombre(), identificador);
+        String nombreCom = normalizarNombreRol(lecturaCom.getVendedorNombre(), identificador);
+        String nombreRoles = nombreMasCompleto(nombreBate, nombreCom, null);
+        String nombreCatalogo = nombreCatalogoGestion(identificador);
+        String direccionIdentidad = identidad != null ? normalizarTexto(identidad.getDireccionTexto()) : null;
+        String direccionBate = normalizarTexto(lecturaBate.getCompradorDireccion());
+        String direccionCom = normalizarTexto(lecturaCom.getVendedorDireccion());
+        return new PersonaSolicitud(
+                identificador,
+                nombreMasCompleto(nombreIdentidad, nombreRoles, nombreCatalogo),
+                primerNoVacio(direccionIdentidad, direccionBate, direccionCom)
+        );
+    }
+
     private boolean identidadUsable(DocumentoIdentidadLectura lectura) {
         return lectura != null
                 && normalizarIdentificador(lectura.getIdentificador()) != null
@@ -261,6 +407,24 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
         if (!identidadCorroboraRol(solicitud, comprador.identificador(), identidades)) {
             faltas.add("No se aplica el comprador: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
+        }
+        return faltas;
+    }
+
+    private List<String> faltasCorroboracionIdentidadBatecom(
+            Solicitud solicitud,
+            BatecomPartes partes,
+            Map<String, DocumentoIdentidadLectura> identidades
+    ) {
+        List<String> faltas = new ArrayList<>();
+        if (!identidadCorroboraRol(solicitud, partes.vendedor().identificador(), identidades)) {
+            faltas.add("No se aplica el vendedor inicial: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
+        }
+        if (!identidadCorroboraRol(solicitud, partes.compraventa().identificador(), identidades)) {
+            faltas.add("No se aplica la compraventa: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
+        }
+        if (!identidadCorroboraRol(solicitud, partes.comprador().identificador(), identidades)) {
+            faltas.add("No se aplica el comprador final: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
         }
         return faltas;
     }
@@ -348,6 +512,18 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 vendedor, RolInteresado.VENDEDOR);
     }
 
+    private boolean solicitudBatecomYaCoincide(Solicitud solicitud, BatecomPartes partes) {
+        return solicitudContienePersona(solicitud, RolInteresado.VENDEDOR, partes.vendedor())
+                && solicitudContienePersona(solicitud, RolInteresado.COMPRAVENTA, partes.compraventa())
+                && solicitudContienePersona(solicitud, RolInteresado.COMPRADOR, partes.comprador());
+    }
+
+    private boolean solicitudContienePersona(Solicitud solicitud, RolInteresado rol, PersonaSolicitud persona) {
+        return bloqueCoincide(solicitud.getInteresado1Rol(), solicitud.getInteresado1Dni(), solicitud.getInteresado1Nombre(), solicitud.getInteresado1Direccion(), persona, rol)
+                || bloqueCoincide(solicitud.getInteresado2Rol(), solicitud.getInteresado2Dni(), solicitud.getInteresado2Nombre(), solicitud.getInteresado2Direccion(), persona, rol)
+                || bloqueCoincide(solicitud.getInteresado3Rol(), solicitud.getInteresado3Dni(), solicitud.getInteresado3Nombre(), solicitud.getInteresado3Direccion(), persona, rol);
+    }
+
     private boolean bloqueCoincide(
             RolInteresado rolActual,
             String dniActual,
@@ -387,17 +563,31 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             }
             return;
         }
+        if (slot == 3) {
+            validarConflictoDni(solicitud.getInteresado3Dni(), persona.identificador(), rol);
+            solicitud.setInteresado3Rol(rol);
+            solicitud.setInteresado3Dni(persona.identificador());
+            solicitud.setInteresado3Nombre(persona.nombre());
+            if (persona.direccion() != null) {
+                solicitud.setInteresado3Direccion(persona.direccion());
+            }
+            return;
+        }
         throw new OperacionInvalidaException("No hay un bloque libre para aplicar " + rol.name() + " en la solicitud.");
     }
 
     private int encontrarSlot(Solicitud solicitud, RolInteresado rol, String identificador) {
         String dni1 = normalizarIdentificador(solicitud.getInteresado1Dni());
         String dni2 = normalizarIdentificador(solicitud.getInteresado2Dni());
+        String dni3 = normalizarIdentificador(solicitud.getInteresado3Dni());
         if (identificador.equals(dni1)) {
             return solicitud.getInteresado1Rol() == null || solicitud.getInteresado1Rol() == rol ? 1 : 0;
         }
         if (identificador.equals(dni2)) {
             return solicitud.getInteresado2Rol() == null || solicitud.getInteresado2Rol() == rol ? 2 : 0;
+        }
+        if (identificador.equals(dni3)) {
+            return solicitud.getInteresado3Rol() == null || solicitud.getInteresado3Rol() == rol ? 3 : 0;
         }
         if (solicitud.getInteresado1Rol() == rol) {
             return 1;
@@ -405,11 +595,17 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         if (solicitud.getInteresado2Rol() == rol) {
             return 2;
         }
+        if (solicitud.getInteresado3Rol() == rol) {
+            return 3;
+        }
         if (bloqueVacio(solicitud.getInteresado1Rol(), solicitud.getInteresado1Dni(), solicitud.getInteresado1Nombre())) {
             return 1;
         }
         if (bloqueVacio(solicitud.getInteresado2Rol(), solicitud.getInteresado2Dni(), solicitud.getInteresado2Nombre())) {
             return 2;
+        }
+        if (bloqueVacio(solicitud.getInteresado3Rol(), solicitud.getInteresado3Dni(), solicitud.getInteresado3Nombre())) {
+            return 3;
         }
         return 0;
     }
@@ -644,6 +840,20 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return value == null || value.isBlank();
     }
 
+    private boolean esBatecom(Solicitud solicitud) {
+        return solicitud.getTipoTramite() != null
+                && solicitud.getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM;
+    }
+
+    private String primerNoVacio(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
     private String nombreDocumento(Documento documento) {
         return documento.getNombreArchivoOriginal() != null && !documento.getNombreArchivoOriginal().isBlank()
                 ? documento.getNombreArchivoOriginal()
@@ -662,6 +872,15 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     }
 
     private record PersonaSolicitud(String identificador, String nombre, String direccion) {
+    }
+
+    private record BatecomPartes(
+            PersonaSolicitud vendedor,
+            PersonaSolicitud compraventa,
+            PersonaSolicitud comprador,
+            DocumentoRolesLectura lecturaBate,
+            DocumentoRolesLectura lecturaCom
+    ) {
     }
 
     private record NombreCandidato(String valor, int prioridad) {

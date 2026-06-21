@@ -202,6 +202,13 @@ public class SolicitudServiceImpl implements SolicitudService {
                 "Interesado 2"
         );
 
+        validarInteresadoSolicitud(
+                solicitud.getInteresado3Nombre(),
+                solicitud.getInteresado3Dni(),
+                solicitud.getInteresado3Rol(),
+                "Interesado 3"
+        );
+
         boolean interesado1Informado = !interesadoSolicitudVacio(
                 solicitud.getInteresado1Nombre(),
                 solicitud.getInteresado1Dni(),
@@ -214,9 +221,27 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitud.getInteresado2Rol()
         );
 
-        if (interesado1Informado && interesado2Informado) {
-            if (solicitud.getInteresado1Dni().equalsIgnoreCase(solicitud.getInteresado2Dni())) {
-                throw new IllegalArgumentException("Los dos interesados no pueden tener el mismo DNI.");
+        boolean interesado3Informado = !interesadoSolicitudVacio(
+                solicitud.getInteresado3Nombre(),
+                solicitud.getInteresado3Dni(),
+                solicitud.getInteresado3Rol()
+        );
+
+        java.util.List<String> dnisInformados = new java.util.ArrayList<>();
+        if (interesado1Informado) {
+            dnisInformados.add(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()));
+        }
+        if (interesado2Informado) {
+            dnisInformados.add(TextNormalizer.upperOrNull(solicitud.getInteresado2Dni()));
+        }
+        if (interesado3Informado) {
+            dnisInformados.add(TextNormalizer.upperOrNull(solicitud.getInteresado3Dni()));
+        }
+        for (int i = 0; i < dnisInformados.size(); i++) {
+            for (int j = i + 1; j < dnisInformados.size(); j++) {
+                if (dnisInformados.get(i) != null && dnisInformados.get(i).equalsIgnoreCase(dnisInformados.get(j))) {
+                    throw new IllegalArgumentException("Los interesados no pueden tener el mismo DNI/CIF.");
+                }
             }
         }
     }
@@ -321,10 +346,23 @@ public class SolicitudServiceImpl implements SolicitudService {
          interesado2dto.setMunicipio(solicitud.getInteresado2Municipio());
          interesado2dto.setProvincia(solicitud.getInteresado2Provincia());
 
-        expedienteService.validarInteresados(interesado1dto, interesado2dto);
+         InteresadoFormDto interesado3dto = new InteresadoFormDto();
+         interesado3dto.setDni(solicitud.getInteresado3Dni());
+         interesado3dto.setNombre(solicitud.getInteresado3Nombre());
+         interesado3dto.setRol(solicitud.getInteresado3Rol());
+         interesado3dto.setDireccion(solicitud.getInteresado3Direccion());
+         interesado3dto.setTelefono(solicitud.getInteresado3Telefono());
+         interesado3dto.setTipoVia(solicitud.getInteresado3TipoVia());
+         interesado3dto.setNombreVia(solicitud.getInteresado3NombreVia());
+         interesado3dto.setCodigoPostal(solicitud.getInteresado3CodigoPostal());
+         interesado3dto.setMunicipio(solicitud.getInteresado3Municipio());
+         interesado3dto.setProvincia(solicitud.getInteresado3Provincia());
+
+        expedienteService.validarInteresados(List.of(interesado1dto, interesado2dto, interesado3dto));
 
         expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado1dto);
         expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado2dto);
+        expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado3dto);
         sincronizarDocumentacionExpedienteConvertido(expedienteGuardado, admin);
         
         historialCambioService.registrarCambioSolicitud(
@@ -384,6 +422,19 @@ public class SolicitudServiceImpl implements SolicitudService {
                                         solicitud.getInteresado2CodigoPostal(),
                                         solicitud.getInteresado2Municipio(),
                                         solicitud.getInteresado2Provincia())
+                        ),
+                        construirCoincidenciaSiHayDiferencias(
+                                solicitud.getInteresado3Rol(),
+                                solicitud.getInteresado3Dni(),
+                                solicitud.getInteresado3Nombre(),
+                                solicitud.getInteresado3Telefono(),
+                                direccionSolicitud(
+                                        solicitud.getInteresado3Direccion(),
+                                        solicitud.getInteresado3TipoVia(),
+                                        solicitud.getInteresado3NombreVia(),
+                                        solicitud.getInteresado3CodigoPostal(),
+                                        solicitud.getInteresado3Municipio(),
+                                        solicitud.getInteresado3Provincia())
                         )
                 ).stream()
                 .flatMap(Optional::stream)
@@ -578,6 +629,23 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitudActualizada.getInteresado2Municipio(),
                 solicitudActualizada.getInteresado2Provincia()));
 
+        solicitudBase.setInteresado3Rol(solicitudActualizada.getInteresado3Rol());
+        solicitudBase.setInteresado3Nombre(NombrePersonaNormalizer.normalizar(solicitudActualizada.getInteresado3Nombre()));
+        solicitudBase.setInteresado3Dni(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Dni()));
+        solicitudBase.setInteresado3Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Telefono()));
+        solicitudBase.setInteresado3TipoVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3TipoVia()));
+        solicitudBase.setInteresado3NombreVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3NombreVia()));
+        solicitudBase.setInteresado3CodigoPostal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3CodigoPostal()));
+        solicitudBase.setInteresado3Municipio(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Municipio()));
+        solicitudBase.setInteresado3Provincia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Provincia()));
+        solicitudBase.setInteresado3Direccion(direccionSolicitud(
+                solicitudActualizada.getInteresado3Direccion(),
+                solicitudActualizada.getInteresado3TipoVia(),
+                solicitudActualizada.getInteresado3NombreVia(),
+                solicitudActualizada.getInteresado3CodigoPostal(),
+                solicitudActualizada.getInteresado3Municipio(),
+                solicitudActualizada.getInteresado3Provincia()));
+
         solicitudBase.setObservaciones(TextNormalizer.upperOrNull(solicitudActualizada.getObservaciones()));
 
         java.util.List<String> cambios = new java.util.ArrayList<>();
@@ -679,6 +747,21 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitud.getInteresado2CodigoPostal(),
                 solicitud.getInteresado2Municipio(),
                 solicitud.getInteresado2Provincia()));
+        solicitud.setInteresado3Nombre(NombrePersonaNormalizer.normalizar(solicitud.getInteresado3Nombre()));
+        solicitud.setInteresado3Dni(TextNormalizer.upperOrNull(solicitud.getInteresado3Dni()));
+        solicitud.setInteresado3Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado3Telefono()));
+        solicitud.setInteresado3TipoVia(TextNormalizer.upperOrNull(solicitud.getInteresado3TipoVia()));
+        solicitud.setInteresado3NombreVia(TextNormalizer.upperOrNull(solicitud.getInteresado3NombreVia()));
+        solicitud.setInteresado3CodigoPostal(TextNormalizer.upperOrNull(solicitud.getInteresado3CodigoPostal()));
+        solicitud.setInteresado3Municipio(TextNormalizer.upperOrNull(solicitud.getInteresado3Municipio()));
+        solicitud.setInteresado3Provincia(TextNormalizer.upperOrNull(solicitud.getInteresado3Provincia()));
+        solicitud.setInteresado3Direccion(direccionSolicitud(
+                solicitud.getInteresado3Direccion(),
+                solicitud.getInteresado3TipoVia(),
+                solicitud.getInteresado3NombreVia(),
+                solicitud.getInteresado3CodigoPostal(),
+                solicitud.getInteresado3Municipio(),
+                solicitud.getInteresado3Provincia()));
     }
 
     private String direccionSolicitud(String direccion, String tipoVia, String nombreVia, String codigoPostal, String municipio, String provincia) {

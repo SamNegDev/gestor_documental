@@ -5,6 +5,7 @@ import com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaRespons
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoPersona;
+import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Documento;
@@ -237,9 +238,17 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
     }
 
     private String promptLecturaRoles(Documento documento) {
+        String contextoBatecom = esDocumentoSolicitudBatecom(documento)
+                ? """
+                Contexto BATECOM: el expediente puede tener dos operaciones. En una, el titular inicial vende/entrega a la compraventa; en otra, la compraventa vende al comprador final.
+                Extrae SOLO los roles visibles en ESTE documento: si la compraventa compra, ponla como COMPRADOR; si vende, ponla como VENDEDOR.
+                No intentes adivinar la otra operacion ni cambies el rol porque sea una compraventa. La consolidacion posterior detectara la compraventa comun.
+                """
+                : "";
         return """
                 Extrae roles de una operacion de transmision de vehiculo usando solo este contrato o factura.
                 Tipo documental esperado: %s.
+                %s
                 En contrato: vendedor/transmitente/propietario es VENDEDOR; comprador/adquirente es COMPRADOR.
                 En factura: emisor/proveedor/vendedor es VENDEDOR; cliente/receptor/comprador es COMPRADOR.
                 Ignora gestoria, asesor, mandatario, tramitador, datos bancarios, pie legal y cualquier tercero que no sea parte de la compraventa.
@@ -253,7 +262,13 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
                 No uses datos de DNI sueltos salvo que el contrato/factura los vincule claramente al rol.
                 No inventes datos. Si un rol no aparece claro, devuelve null y requiereRevision true.
                 Devuelve solo el JSON del esquema.
-                """.formatted(documento.getTipoDocumento() != null ? documento.getTipoDocumento().name() : "");
+                """.formatted(documento.getTipoDocumento() != null ? documento.getTipoDocumento().name() : "", contextoBatecom);
+    }
+
+    private boolean esDocumentoSolicitudBatecom(Documento documento) {
+        return documento.getSolicitud() != null
+                && documento.getSolicitud().getTipoTramite() != null
+                && documento.getSolicitud().getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM;
     }
 
     private void aplicarResultado(Documento documento, DocumentoRolesLectura lectura, JsonNode resultado, String modeloUsado) {

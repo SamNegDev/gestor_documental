@@ -355,6 +355,16 @@ public class SolicitudApiController {
         solicitud.setInteresado2CodigoPostal(TextNormalizer.upperOrNull(request.getInteresado2CodigoPostal()));
         solicitud.setInteresado2Municipio(TextNormalizer.upperOrNull(request.getInteresado2Municipio()));
         solicitud.setInteresado2Provincia(TextNormalizer.upperOrNull(request.getInteresado2Provincia()));
+        solicitud.setInteresado3Rol(request.getInteresado3Rol());
+        solicitud.setInteresado3Nombre(TextNormalizer.upperOrNull(request.getInteresado3Nombre()));
+        solicitud.setInteresado3Dni(TextNormalizer.upperOrNull(request.getInteresado3Dni()));
+        solicitud.setInteresado3Telefono(TextNormalizer.upperOrNull(request.getInteresado3Telefono()));
+        solicitud.setInteresado3Direccion(TextNormalizer.upperOrNull(request.getInteresado3Direccion()));
+        solicitud.setInteresado3TipoVia(TextNormalizer.upperOrNull(request.getInteresado3TipoVia()));
+        solicitud.setInteresado3NombreVia(TextNormalizer.upperOrNull(request.getInteresado3NombreVia()));
+        solicitud.setInteresado3CodigoPostal(TextNormalizer.upperOrNull(request.getInteresado3CodigoPostal()));
+        solicitud.setInteresado3Municipio(TextNormalizer.upperOrNull(request.getInteresado3Municipio()));
+        solicitud.setInteresado3Provincia(TextNormalizer.upperOrNull(request.getInteresado3Provincia()));
         return solicitud;
     }
 
@@ -426,7 +436,15 @@ public class SolicitudApiController {
         boolean requiereContrato = tramite == TipoTramiteEnum.TRASPASO
                 || tramite == TipoTramiteEnum.BATECOM
                 || tramite == TipoTramiteEnum.NOTIFICACION_VENTA;
-        if (requiereContrato && !tipos.contains(TipoDocumento.CONTRATO_COMPRAVENTA) && !tipos.contains(TipoDocumento.FACTURA)) pendientes++;
+        if (tramite == TipoTramiteEnum.BATECOM) {
+            long documentosRol = documentos.stream()
+                    .filter(documento -> documento.getTipoDocumento() == TipoDocumento.CONTRATO_COMPRAVENTA
+                            || documento.getTipoDocumento() == TipoDocumento.FACTURA)
+                    .count();
+            pendientes += Math.max(0, 2 - (int) documentosRol);
+        } else if (requiereContrato && !tipos.contains(TipoDocumento.CONTRATO_COMPRAVENTA) && !tipos.contains(TipoDocumento.FACTURA)) {
+            pendientes++;
+        }
         if (!tipos.contains(TipoDocumento.MANDATO) && !tipos.contains(TipoDocumento.MANDATO_REPRESENTACION)) pendientes++;
         boolean informeDgt = tipos.contains(TipoDocumento.INFORME_DGT);
         if (!informeDgt && !tipos.contains(TipoDocumento.PERMISO_CIRCULACION)) pendientes++;
@@ -564,7 +582,43 @@ public class SolicitudApiController {
                     solicitud.getInteresado2Provincia(),
                     incluirSoporteCliente));
         }
+        if (hasInteresadoData(
+                solicitud.getInteresado3Nombre(),
+                solicitud.getInteresado3Dni(),
+                solicitud.getInteresado3Telefono(),
+                solicitud.getInteresado3Direccion(),
+                solicitud.getInteresado3TipoVia(),
+                solicitud.getInteresado3NombreVia(),
+                solicitud.getInteresado3CodigoPostal(),
+                solicitud.getInteresado3Municipio(),
+                solicitud.getInteresado3Provincia(),
+                solicitud.getInteresado3Rol() != null ? solicitud.getInteresado3Rol().name() : null)) {
+            interesados.add(mapInteresadoSolicitud(
+                    solicitud,
+                    documentos,
+                    solicitud.getInteresado3Nombre(),
+                    solicitud.getInteresado3Rol() != null ? solicitud.getInteresado3Rol().name() : null,
+                    solicitud.getInteresado3Dni(),
+                    solicitud.getInteresado3Telefono(),
+                    solicitud.getInteresado3Direccion(),
+                    solicitud.getInteresado3TipoVia(),
+                    solicitud.getInteresado3NombreVia(),
+                    solicitud.getInteresado3CodigoPostal(),
+                    solicitud.getInteresado3Municipio(),
+                    solicitud.getInteresado3Provincia(),
+                    incluirSoporteCliente));
+        }
+        if (solicitud.getTipoTramite() != null && solicitud.getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM) {
+            interesados.sort(java.util.Comparator.comparingInt(item -> ordenRolBatecom(item.getRol())));
+        }
         return interesados;
+    }
+
+    private int ordenRolBatecom(String rol) {
+        if ("VENDEDOR".equals(rol)) return 0;
+        if ("COMPRAVENTA".equals(rol)) return 1;
+        if ("COMPRADOR".equals(rol)) return 2;
+        return 3;
     }
 
     private boolean hasInteresadoData(String... values) {

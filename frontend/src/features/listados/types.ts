@@ -152,6 +152,16 @@ export interface SolicitudUpsertInput {
   interesado2CodigoPostal?: string | null;
   interesado2Municipio?: string | null;
   interesado2Provincia?: string | null;
+  interesado3Rol?: string | null;
+  interesado3Nombre?: string | null;
+  interesado3Dni?: string | null;
+  interesado3Telefono?: string | null;
+  interesado3Direccion?: string | null;
+  interesado3TipoVia?: string | null;
+  interesado3NombreVia?: string | null;
+  interesado3CodigoPostal?: string | null;
+  interesado3Municipio?: string | null;
+  interesado3Provincia?: string | null;
 }
 
 export interface SolicitudBulkConvertResult {

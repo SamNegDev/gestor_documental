@@ -14,8 +14,8 @@ import { InteresadoAutocomplete } from "../components/InteresadoAutocomplete";
 import "../styles/expedienteDetail.css";
 
 const ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
-const BATECOM_ROLE_ORDER = ["VENDEDOR", "COMPRADOR", "COMPRAVENTA"];
-const BATECOM_LABELS = ["Vendedor inicial", "Comprador final", "Compraventa"];
+const BATECOM_ROLE_ORDER = ["VENDEDOR", "COMPRAVENTA", "COMPRADOR"];
+const BATECOM_LABELS = ["Vendedor inicial", "Compraventa", "Comprador final"];
 
 type InteresadoForm = ExpedienteEditInput["interesados"][number];
 
@@ -58,8 +58,11 @@ function buildBatecomPayload(form: ExpedienteEditInput): ExpedienteEditInput {
 
 function buildInitialForm(expediente: ExpedienteDetail): ExpedienteEditInput {
   const totalInteresados = expediente.tipoTramite === "BATECOM" ? 3 : 2;
+  const orderedInteresados = expediente.tipoTramite === "BATECOM"
+    ? BATECOM_ROLE_ORDER.map((rol) => expediente.interesados.find((interesado) => interesado.rol === rol))
+    : expediente.interesados;
   const interesados = Array.from({ length: totalInteresados }).map((_, index) => {
-    const interesado = expediente.interesados[index];
+    const interesado = orderedInteresados[index];
     return interesado
       ? {
           nombre: uppercaseInput(interesado.nombre || ""),
