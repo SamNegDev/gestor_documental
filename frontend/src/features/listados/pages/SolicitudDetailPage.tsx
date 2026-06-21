@@ -782,27 +782,24 @@ function hasInteresadoData(interesado: { nombre?: string | null; rol?: string | 
 function buildSolicitudPreparationItems(solicitud: SolicitudDetail): SolicitudPreparationItem[] {
   const uploadedTypes = new Set(solicitud.documentos.map((documento) => documento.tipo));
   const expectedIdentityCount = expectedIdentities(solicitud.tipoTramite);
-  const uploadedIdentityCount = solicitud.documentos.filter((documento) => documento.tipo === "DNI" || documento.tipo === "CIF").length;
   const interesados = solicitud.interesados.filter(hasInteresadoData);
-  const expectedRoleLabels = expectedRoles(solicitud.tipoTramite).map(roleLabel);
-  const missingRoleLabels = expectedRoles(solicitud.tipoTramite)
+  const expectedRoleKeys = expectedRoles(solicitud.tipoTramite);
+  const expectedRoleLabels = expectedRoleKeys.map(roleLabel);
+  const missingRoleLabels = expectedRoleKeys
     .filter((rol) => !interesados.some((item) => item.rol === rol && item.nombre && item.dni))
     .map(roleLabel);
   const incompleteLabels = interesados
     .filter((item) => !item.nombre || !item.dni || !item.rol)
     .map(interesadoLabel);
-  const identityCoveredCount = Math.max(
-    Math.min(uploadedIdentityCount, expectedIdentityCount),
-    interesados.filter((item) => item.documentoIdentidadAportado).length,
-  );
-  const missingIdentityCount = Math.max(0, expectedIdentityCount - identityCoveredCount);
+  const missingIdentities = missingIdentityTargets(expectedRoleKeys, interesados);
+  const identityCoveredCount = Math.max(0, expectedIdentityCount - missingIdentities.length);
   const representativesMissing = interesados.filter((item) => item.requiereRepresentanteLegal && !item.representanteLegalAportado);
   const representativesCovered = interesados.filter((item) => item.requiereRepresentanteLegal && item.representanteLegalAportado);
-  const identityReady = missingIdentityCount === 0 && representativesMissing.length === 0;
+  const identityReady = missingIdentities.length === 0 && representativesMissing.length === 0;
   const roleDocsReady = uploadedTypes.has("CONTRATO_COMPRAVENTA") || uploadedTypes.has("FACTURA");
   const mandateReady = uploadedTypes.has("MANDATO") || uploadedTypes.has("MANDATO_REPRESENTACION");
-  const circulationReady = uploadedTypes.has("INFORME_DGT") || uploadedTypes.has("PERMISO_CIRCULACION");
-  const fichaReady = uploadedTypes.has("INFORME_DGT") || uploadedTypes.has("FICHA_TECNICA");
+  const vehicleMissingDocs = missingVehicleDocs(uploadedTypes);
+  const vehicleReady = vehicleMissingDocs.length === 0;
   const interesadosReady = missingRoleLabels.length === 0 && incompleteLabels.length === 0;
   return [
     {
@@ -823,8 +820,8 @@ function buildSolicitudPreparationItems(solicitud: SolicitudDetail): SolicitudPr
       label: representativesMissing.length > 0 || representativesCovered.length > 0 ? "DNI/CIF y administrador" : "DNI/CIF",
       detail: identityReady
         ? identityReadyDetail(identityCoveredCount, expectedIdentityCount, representativesCovered)
-        : `${identityCoveredCount}/${expectedIdentityCount} identidad(es) cubiertas.`,
-      missing: identityMissingDetail(missingIdentityCount, representativesMissing, interesados),
+        : `${identityCoveredCount}/${expectedIdentityCount} identidad(es) principales cubiertas.`,
+      missing: identityMissingDetail(missingIdentities, representativesMissing),
       ready: identityReady,
     },
     {
@@ -844,9 +841,9 @@ function buildSolicitudPreparationItems(solicitud: SolicitudDetail): SolicitudPr
     {
       key: "vehiculo",
       label: "Vehiculo",
-      detail: circulationReady && fichaReady ? "Informe DGT o documentacion tecnica disponible." : "Falta permiso, ficha o Informe DGT.",
-      missing: circulationReady && fichaReady ? null : "Aporta Informe DGT o permiso + ficha tecnica.",
-      ready: circulationReady && fichaReady,
+      detail: vehicleReady ? vehicleReadyDetail(uploadedTypes) : vehiclePendingDetail(uploadedTypes, vehicleMissingDocs),
+      missing: vehicleReady ? null : vehicleMissingDetail(vehicleMissingDocs),
+      ready: vehicleReady,
     },
   ];
 }
@@ -877,6 +874,48 @@ function interesadoLabel(interesado: { rol?: string | null; nombre?: string | nu
   return roleLabel(interesado.rol) || interesado.nombre || "interesado";
 }
 
+type IdentityTarget = {
+  documentLabel: string;
+  ownerLabel: string;
+};
+
+function missingIdentityTargets(
+  expectedRolesList: string[],
+  interesados: Array<{
+    rol?: string | null;
+    nombre?: string | null;
+    dni?: string | null;
+    personaJuridica?: boolean;
+    documentoIdentidadAportado?: boolean;
+  }>,
+): IdentityTarget[] {
+  return expectedRolesList
+    .map((rol) => {
+      const interesado = interesados.find((item) => item.rol === rol);
+      if (!interesado) {
+        return { documentLabel: "DNI/CIF", ownerLabel: roleLabel(rol) };
+      }
+      if (interesado.documentoIdentidadAportado) {
+        return null;
+      }
+      return {
+        documentLabel: interesado.personaJuridica ? "CIF" : "DNI/NIE",
+        ownerLabel: identityOwnerLabel(interesado),
+      };
+    })
+    .filter(Boolean) as IdentityTarget[];
+}
+
+function identityOwnerLabel(interesado: { rol?: string | null; nombre?: string | null; dni?: string | null }) {
+  const rol = roleLabel(interesado.rol);
+  const nombre = interesado.nombre?.trim();
+  const dni = interesado.dni?.trim();
+  if (nombre && dni) return `${rol} ${nombre} (${dni})`;
+  if (nombre) return `${rol} ${nombre}`;
+  if (dni) return `${rol} ${dni}`;
+  return rol;
+}
+
 function identityReadyDetail(
   identityCoveredCount: number,
   expectedIdentityCount: number,
@@ -892,20 +931,16 @@ function identityReadyDetail(
 }
 
 function identityMissingDetail(
-  missingIdentityCount: number,
+  missingIdentities: IdentityTarget[],
   representativesMissing: Array<{
     nombre?: string | null;
     rol?: string | null;
     representanteLegalNombre?: string | null;
     representanteLegalDni?: string | null;
   }>,
-  interesados: Array<{ rol?: string | null; nombre?: string | null }>,
 ) {
   const parts: string[] = [];
-  if (missingIdentityCount > 0) {
-    const roles = interesados.length > 0 ? formatReadableList(interesados.map(interesadoLabel)) : "los interesados";
-    parts.push(`Falta ${missingIdentityCount} DNI/CIF adicional. Revisa ${roles}.`);
-  }
+  missingIdentities.forEach((item) => parts.push(`Falta ${item.documentLabel} de ${item.ownerLabel}.`));
   representativesMissing.forEach((item) => {
     const representante = item.representanteLegalNombre
       ? `${item.representanteLegalNombre}${item.representanteLegalDni ? ` (${item.representanteLegalDni})` : ""}`
@@ -913,6 +948,36 @@ function identityMissingDetail(
     parts.push(`Falta DNI del administrador ${representante}.`);
   });
   return parts.length > 0 ? parts.join(" ") : null;
+}
+
+function missingVehicleDocs(uploadedTypes: Set<string | null | undefined>) {
+  if (uploadedTypes.has("INFORME_DGT")) return [];
+  return [
+    !uploadedTypes.has("PERMISO_CIRCULACION") ? "permiso de circulacion" : null,
+    !uploadedTypes.has("FICHA_TECNICA") ? "ficha tecnica" : null,
+  ].filter(Boolean) as string[];
+}
+
+function vehicleReadyDetail(uploadedTypes: Set<string | null | undefined>) {
+  if (uploadedTypes.has("INFORME_DGT")) return "Informe DGT disponible para permiso y ficha.";
+  return "Permiso de circulacion y ficha tecnica disponibles.";
+}
+
+function vehiclePendingDetail(uploadedTypes: Set<string | null | undefined>, missingDocs: string[]) {
+  const availableDocs = [
+    uploadedTypes.has("PERMISO_CIRCULACION") ? "permiso de circulacion" : null,
+    uploadedTypes.has("FICHA_TECNICA") ? "ficha tecnica" : null,
+  ].filter(Boolean) as string[];
+  if (availableDocs.length === 0) return "Sin documentacion tecnica del vehiculo.";
+  return `${formatReadableList(availableDocs)} disponible; falta ${formatReadableList(missingDocs)}.`;
+}
+
+function vehicleMissingDetail(missingDocs: string[]) {
+  if (missingDocs.length === 0) return null;
+  const missing = formatReadableList(missingDocs);
+  return missingDocs.length > 1
+    ? `Faltan ${missing}, o sube Informe DGT.`
+    : `Falta ${missing}. Tambien puede cubrirse con Informe DGT.`;
 }
 
 function formatReadableList(values: string[]) {
