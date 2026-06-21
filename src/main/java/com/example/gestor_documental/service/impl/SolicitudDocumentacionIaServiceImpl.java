@@ -11,11 +11,13 @@ import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
+import com.example.gestor_documental.model.GestionPersonaCatalogo;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
+import com.example.gestor_documental.repository.GestionPersonaCatalogoRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
@@ -28,13 +30,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +53,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private final DocumentoRepository documentoRepository;
     private final DocumentoIdentidadLecturaRepository identidadLecturaRepository;
     private final DocumentoRolesLecturaRepository rolesLecturaRepository;
+    private final GestionPersonaCatalogoRepository gestionPersonaCatalogoRepository;
     private final DocumentoIdentidadLecturaService documentoIdentidadLecturaService;
     private final DocumentoRolesLecturaService documentoRolesLecturaService;
     private final HistorialCambioService historialCambioService;
@@ -295,9 +302,9 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             return;
         }
         String nombreIdentidad = nombreCompletoIdentidad(identidad);
-        String nombreRol = normalizarNombre(nombreRoles);
-        if (nombreIdentidad != null && nombreRol != null && !NombrePersonaNormalizer.equivalentes(nombreIdentidad, nombreRol)) {
-            avisos.add("Aviso: el nombre del " + etiqueta + " difiere entre DNI/CIF y contrato/factura. Se usa el dato del DNI/CIF.");
+        String nombreRol = normalizarNombreRol(nombreRoles, identificadorNormalizado);
+        if (nombreIdentidad != null && nombreRol != null && !nombresCompatibles(nombreIdentidad, nombreRol)) {
+            avisos.add("Aviso: el nombre del " + etiqueta + " difiere entre DNI/CIF y contrato/factura. Revisa la lectura antes de convertir.");
         }
     }
 
@@ -310,11 +317,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         DocumentoIdentidadLectura identidad = identificador != null ? identidades.get(identificador) : null;
         String nombreIdentidad = nombreCompletoIdentidad(identidad);
         String direccionIdentidad = identidad != null ? normalizarTexto(identidad.getDireccionTexto()) : null;
-        String nombreRoles = normalizarNombre(vendedor ? lectura.getVendedorNombre() : lectura.getCompradorNombre());
+        String nombreRoles = normalizarNombreRol(vendedor ? lectura.getVendedorNombre() : lectura.getCompradorNombre(), identificador);
+        String nombreCatalogo = nombreCatalogoGestion(identificador);
         String direccionRoles = normalizarTexto(vendedor ? lectura.getVendedorDireccion() : lectura.getCompradorDireccion());
         return new PersonaSolicitud(
                 identificador,
-                nombreIdentidad != null ? nombreIdentidad : nombreRoles,
+                nombreMasCompleto(nombreIdentidad, nombreRoles, nombreCatalogo),
                 direccionIdentidad != null ? direccionIdentidad : direccionRoles
         );
     }
@@ -497,6 +505,101 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return normalizarNombre(joined);
     }
 
+    private String nombreCatalogoGestion(String identificador) {
+        String normalizado = normalizarIdentificador(identificador);
+        if (normalizado == null) {
+            return null;
+        }
+        return gestionPersonaCatalogoRepository.findFirstByNifNormalizadoOrderByIdAsc(normalizado)
+                .map(this::nombreCompletoCatalogo)
+                .orElse(null);
+    }
+
+    private String nombreCompletoCatalogo(GestionPersonaCatalogo catalogo) {
+        if (catalogo == null) {
+            return null;
+        }
+        String joined = String.join(" ",
+                List.of(
+                        catalogo.getNombre() != null ? catalogo.getNombre() : "",
+                        catalogo.getApellido1RazonSocial() != null ? catalogo.getApellido1RazonSocial() : "",
+                        catalogo.getApellido2() != null ? catalogo.getApellido2() : ""
+                )).replaceAll("\\s+", " ").trim();
+        return normalizarNombre(joined);
+    }
+
+    private String normalizarNombreRol(String value, String identificador) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (esPersonaFisica(identificador) && trimmed.contains(",")) {
+            String[] partes = trimmed.split(",", 2);
+            if (partes.length == 2 && !partes[0].isBlank() && !partes[1].isBlank()) {
+                return normalizarNombre(partes[1] + " " + partes[0]);
+            }
+        }
+        return normalizarNombre(trimmed);
+    }
+
+    private boolean esPersonaFisica(String identificador) {
+        String normalizado = normalizarIdentificador(identificador);
+        return normalizado != null
+                && (normalizado.matches("[0-9]{8}[A-Z]") || normalizado.matches("[XYZ][0-9]{7}[A-Z]"));
+    }
+
+    private String nombreMasCompleto(String nombreIdentidad, String nombreRoles, String nombreCatalogo) {
+        List<NombreCandidato> candidatos = new ArrayList<>();
+        agregarCandidato(candidatos, nombreRoles, 3);
+        agregarCandidato(candidatos, nombreIdentidad, 2);
+        agregarCandidato(candidatos, nombreCatalogo, 1);
+        if (candidatos.isEmpty()) {
+            return null;
+        }
+        String base = nombreIdentidad != null ? nombreIdentidad : nombreRoles != null ? nombreRoles : nombreCatalogo;
+        return candidatos.stream()
+                .filter(candidato -> nombresCompatibles(base, candidato.valor()))
+                .max(Comparator
+                        .comparingInt((NombreCandidato candidato) -> tokensNombre(candidato.valor()).size())
+                        .thenComparingInt(NombreCandidato::prioridad))
+                .map(NombreCandidato::valor)
+                .orElse(candidatos.get(0).valor());
+    }
+
+    private void agregarCandidato(List<NombreCandidato> candidatos, String value, int prioridad) {
+        String normalizado = normalizarNombre(value);
+        if (normalizado != null) {
+            candidatos.add(new NombreCandidato(normalizado, prioridad));
+        }
+    }
+
+    private boolean nombresCompatibles(String referencia, String candidato) {
+        String ref = normalizarNombre(referencia);
+        String cand = normalizarNombre(candidato);
+        if (ref == null || cand == null) {
+            return ref == null && cand == null;
+        }
+        if (ref.equals(cand)) {
+            return true;
+        }
+        Set<String> refTokens = tokensNombre(ref);
+        Set<String> candTokens = tokensNombre(cand);
+        return candTokens.containsAll(refTokens) || refTokens.containsAll(candTokens);
+    }
+
+    private Set<String> tokensNombre(String value) {
+        String normalizado = normalizarNombre(value);
+        if (normalizado == null) {
+            return Set.of();
+        }
+        String sinAcentos = Normalizer.normalize(normalizado, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "");
+        return Arrays.stream(sinAcentos.split("\\s+"))
+                .map(token -> token.replaceAll("[^A-Z0-9]", ""))
+                .filter(token -> !token.isBlank())
+                .collect(Collectors.toSet());
+    }
+
     private String normalizarNombre(String value) {
         return NombrePersonaNormalizer.normalizar(value);
     }
@@ -559,5 +662,8 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     }
 
     private record PersonaSolicitud(String identificador, String nombre, String direccion) {
+    }
+
+    private record NombreCandidato(String valor, int prioridad) {
     }
 }
