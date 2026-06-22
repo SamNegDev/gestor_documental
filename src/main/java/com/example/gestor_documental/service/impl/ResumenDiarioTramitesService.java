@@ -34,6 +34,13 @@ public class ResumenDiarioTramitesService {
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter FECHA_CORTA = DateTimeFormatter.ofPattern("dd/MM");
+    private static final String LOGO_CID = "gestoria-cn-logo";
+    private static final CorreoService.ImagenInline LOGO_INLINE = new CorreoService.ImagenInline(
+            LOGO_CID,
+            "static/assets/logos/casado-negrin-logo.png",
+            "image/png",
+            "casado-negrin-logo.png"
+    );
 
     private final HistorialCambioRepository historialCambioRepository;
     private final IncidenciaRepository incidenciaRepository;
@@ -48,9 +55,6 @@ public class ResumenDiarioTramitesService {
 
     @Value("${app.daily-summary.zone:Atlantic/Canary}")
     private String zone;
-
-    @Value("${app.public-url:http://127.0.0.1:5173}")
-    private String publicUrl;
 
     @Scheduled(cron = "${app.daily-summary.cron:0 0 17 * * *}", zone = "${app.daily-summary.zone:Atlantic/Canary}")
     public void enviarResumenDiarioProgramado() {
@@ -120,7 +124,7 @@ public class ResumenDiarioTramitesService {
         String asunto = "Resumen de tramites - " + rango.fecha().format(FECHA);
         String texto = construirTexto(resumen, rango);
         String html = construirHtml(resumen, rango);
-        CorreoService.ResultadoCorreo resultado = correoService.enviarHtml(cliente.getEmail(), asunto, html, texto, copiasOcultas(cliente.getEmail()));
+        CorreoService.ResultadoCorreo resultado = correoService.enviarHtml(cliente.getEmail(), asunto, html, texto, copiasOcultas(cliente.getEmail()), LOGO_INLINE);
         if (!resultado.exito()) {
             log.warn("No se pudo enviar el resumen diario de tramites a {}: {}", cliente.getEmail(), resultado.error());
         } else if (resultado.simulado()) {
@@ -157,39 +161,45 @@ public class ResumenDiarioTramitesService {
 
     private String construirHtml(ResumenCliente resumen, RangoDia rango) {
         List<Expediente> finalizados = expedientesFinalizados(resumen.finalizaciones());
-        String logoUrl = logoUrl();
         return """
                 <!doctype html>
-                <html>
-                <body style="margin:0;padding:0;background:#f4f6f8;color:#172033;font-family:Arial,Helvetica,sans-serif;">
-                  <div style="display:none;max-height:0;overflow:hidden;">Resumen de tramites: finalizados e incidencias activas.</div>
-                  <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#f4f6f8;padding:28px 12px;">
+                <html lang="es">
+                <body style="margin:0;padding:0;background-color:#f4f6f8;color:#172033;font-family:Arial,Helvetica,sans-serif;">
+                  <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f4f6f8" style="background-color:#f4f6f8;">
                     <tr>
-                      <td align="center">
-                        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e3e8ef;">
+                      <td align="center" style="padding:24px 10px;">
+                        <table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="width:640px;background-color:#ffffff;border:1px solid #d9e0ea;">
                           <tr>
-                            <td style="background:#172033;color:#ffffff;padding:26px 30px;">
-                              <div style="font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#aeb9c8;">Resumen de tramites</div>
-                              <h1 style="margin:8px 0 6px;font-size:26px;line-height:1.2;">%s</h1>
-                              <div style="font-size:14px;color:#d7dde6;">%s &middot; Generado a las %s</div>
+                            <td bgcolor="#172033" style="background-color:#172033;color:#ffffff;padding:24px 28px;">
+                              <p style="margin:0 0 8px 0;font-size:12px;line-height:16px;text-transform:uppercase;color:#c4ccd8;font-weight:bold;">Resumen de tramites</p>
+                              <h1 style="margin:0 0 8px 0;font-size:25px;line-height:31px;font-weight:bold;color:#ffffff;">%s</h1>
+                              <p style="margin:0;font-size:14px;line-height:20px;color:#d7dde6;">%s &middot; Generado a las %s</p>
                             </td>
                           </tr>
                           <tr>
-                            <td style="padding:24px 30px 8px;">
-                              <p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#344054;">Hola%s, este es el estado resumido de tus tramites.</p>
-                              <table role="presentation" width="100%%" cellspacing="0" cellpadding="0">
+                            <td style="padding:24px 28px 10px 28px;">
+                              <p style="margin:0 0 18px 0;font-size:15px;line-height:23px;color:#344054;">Hola%s, este es el estado resumido de tus tramites.</p>
+                              <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
-                                  <td width="50%%" style="padding:0 8px 12px 0;">
-                                    <div style="border:1px solid #d9eadf;background:#f0faf3;border-radius:12px;padding:16px;">
-                                      <div style="font-size:12px;text-transform:uppercase;color:#2d7a46;font-weight:bold;">Finalizados hoy</div>
-                                      <div style="font-size:32px;font-weight:bold;color:#12351f;margin-top:4px;">%d</div>
-                                    </div>
+                                  <td width="50%%" valign="top" style="padding:0 7px 12px 0;">
+                                    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f0faf3" style="background-color:#f0faf3;border:1px solid #d9eadf;">
+                                      <tr>
+                                        <td style="padding:15px;">
+                                          <p style="margin:0 0 6px 0;font-size:12px;line-height:16px;color:#2d7a46;font-weight:bold;text-transform:uppercase;">Finalizados hoy</p>
+                                          <p style="margin:0;font-size:32px;line-height:36px;color:#12351f;font-weight:bold;">%d</p>
+                                        </td>
+                                      </tr>
+                                    </table>
                                   </td>
-                                  <td width="50%%" style="padding:0 0 12px 8px;">
-                                    <div style="border:1px solid #f2d5aa;background:#fff7eb;border-radius:12px;padding:16px;">
-                                      <div style="font-size:12px;text-transform:uppercase;color:#9a5b00;font-weight:bold;">Con incidencia</div>
-                                      <div style="font-size:32px;font-weight:bold;color:#573400;margin-top:4px;">%d</div>
-                                    </div>
+                                  <td width="50%%" valign="top" style="padding:0 0 12px 7px;">
+                                    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" bgcolor="#fff7eb" style="background-color:#fff7eb;border:1px solid #f2d5aa;">
+                                      <tr>
+                                        <td style="padding:15px;">
+                                          <p style="margin:0 0 6px 0;font-size:12px;line-height:16px;color:#9a5b00;font-weight:bold;text-transform:uppercase;">Con incidencia</p>
+                                          <p style="margin:0;font-size:32px;line-height:36px;color:#573400;font-weight:bold;">%d</p>
+                                        </td>
+                                      </tr>
+                                    </table>
                                   </td>
                                 </tr>
                               </table>
@@ -198,11 +208,15 @@ public class ResumenDiarioTramitesService {
                           %s
                           %s
                           <tr>
-                            <td style="padding:8px 30px 28px;">
-                              <div style="border-top:1px solid #e7ebf0;padding-top:18px;">
-                                <img src="%s" alt="Gestoria CN" style="display:block;max-width:180px;height:auto;margin-bottom:10px;">
-                                <div style="font-size:13px;color:#667085;line-height:1.5;">Gestoria Casado Negrin<br>Gestion documental y tramites de vehiculos</div>
-                              </div>
+                            <td style="padding:10px 28px 26px 28px;">
+                              <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" style="border-top:1px solid #e7ebf0;">
+                                <tr>
+                                  <td style="padding-top:18px;">
+                                    <img src="cid:%s" width="180" alt="Gestoria CN" style="display:block;width:180px;height:auto;border:0;outline:none;text-decoration:none;margin:0 0 10px 0;">
+                                    <p style="margin:0;font-size:13px;line-height:19px;color:#667085;">Gestoria Casado Negrin<br>Gestion documental y tramites de vehiculos</p>
+                                  </td>
+                                </tr>
+                              </table>
                             </td>
                           </tr>
                         </table>
@@ -220,7 +234,7 @@ public class ResumenDiarioTramitesService {
                 resumen.incidencias().size(),
                 bloqueFinalizados(finalizados),
                 bloqueIncidencias(resumen.incidencias()),
-                escapeHtml(logoUrl)
+                LOGO_CID
         );
     }
 
@@ -233,8 +247,8 @@ public class ResumenDiarioTramitesService {
             filas.append("""
                     <tr>
                       <td style="padding:12px 0;border-bottom:1px solid #edf1f5;">
-                        <strong style="display:block;color:#172033;font-size:15px;">%s</strong>
-                        <span style="color:#667085;font-size:13px;">%s</span>
+                        <p style="margin:0 0 3px 0;color:#172033;font-size:15px;line-height:21px;font-weight:bold;">%s</p>
+                        <p style="margin:0;color:#667085;font-size:13px;line-height:19px;">%s</p>
                       </td>
                     </tr>
                     """.formatted(escapeHtml(tituloExpediente(expediente)), escapeHtml(tipoTramite(expediente))));
@@ -251,9 +265,9 @@ public class ResumenDiarioTramitesService {
             filas.append("""
                     <tr>
                       <td style="padding:12px 0;border-bottom:1px solid #edf1f5;">
-                        <strong style="display:block;color:#172033;font-size:15px;">%s</strong>
-                        <span style="display:block;color:#9a5b00;font-size:13px;font-weight:bold;">%s</span>
-                        <span style="display:block;color:#667085;font-size:13px;">%s%s</span>
+                        <p style="margin:0 0 3px 0;color:#172033;font-size:15px;line-height:21px;font-weight:bold;">%s</p>
+                        <p style="margin:0 0 3px 0;color:#9a5b00;font-size:13px;line-height:19px;font-weight:bold;">%s</p>
+                        <p style="margin:0;color:#667085;font-size:13px;line-height:19px;">%s%s</p>
                       </td>
                     </tr>
                     """.formatted(
@@ -269,9 +283,9 @@ public class ResumenDiarioTramitesService {
     private String bloqueTabla(String titulo, String filas) {
         return """
                 <tr>
-                  <td style="padding:12px 30px;">
-                    <h2 style="font-size:18px;margin:0 0 6px;color:#172033;">%s</h2>
-                    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0">%s</table>
+                  <td style="padding:12px 28px;">
+                    <h2 style="font-size:18px;line-height:24px;margin:0 0 6px 0;color:#172033;">%s</h2>
+                    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0">%s</table>
                   </td>
                 </tr>
                 """.formatted(escapeHtml(titulo), filas);
@@ -280,9 +294,13 @@ public class ResumenDiarioTramitesService {
     private String bloqueVacio(String titulo, String texto) {
         return """
                 <tr>
-                  <td style="padding:12px 30px;">
-                    <h2 style="font-size:18px;margin:0 0 10px;color:#172033;">%s</h2>
-                    <div style="border:1px dashed #d6dde7;border-radius:12px;padding:14px;color:#667085;font-size:14px;background:#fafbfc;">%s</div>
+                  <td style="padding:12px 28px;">
+                    <h2 style="font-size:18px;line-height:24px;margin:0 0 10px 0;color:#172033;">%s</h2>
+                    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" bgcolor="#fafbfc" style="background-color:#fafbfc;border:1px solid #d6dde7;">
+                      <tr>
+                        <td style="padding:14px;color:#667085;font-size:14px;line-height:20px;">%s</td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
                 """.formatted(escapeHtml(titulo), escapeHtml(texto));
@@ -410,14 +428,6 @@ public class ResumenDiarioTramitesService {
             return "Sin descripcion";
         }
         return valor.replaceAll("\\s+", " ").trim();
-    }
-
-    private String logoUrl() {
-        String base = StringUtils.hasText(publicUrl) ? publicUrl.trim() : "";
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        return base + "/assets/logos/casado-negrin-logo.png";
     }
 
     private String escapeHtml(String value) {

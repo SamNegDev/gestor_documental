@@ -16,10 +16,13 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import jakarta.mail.MessagingException;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import jakarta.mail.AuthenticationFailedException;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import org.springframework.core.io.ClassPathResource;
 
 @Service
 @RequiredArgsConstructor
@@ -53,23 +56,28 @@ public class CorreoServiceImpl implements CorreoService {
 
     @Override
     public ResultadoCorreo enviar(String destinatario, String asunto, String mensaje, List<String> copiaOculta) {
-        return enviarInterno(destinatario, asunto, mensaje, null, copiaOculta);
+        return enviarInterno(destinatario, asunto, mensaje, null, copiaOculta, null);
     }
 
     @Override
     public ResultadoCorreo enviarHtml(String destinatario, String asunto, String html, String textoAlternativo, List<String> copiaOculta) {
-        return enviarInterno(destinatario, asunto, textoAlternativo, html, copiaOculta);
+        return enviarInterno(destinatario, asunto, textoAlternativo, html, copiaOculta, null);
     }
 
-    private ResultadoCorreo enviarInterno(String destinatario, String asunto, String mensaje, String html, List<String> copiaOculta) {
+    @Override
+    public ResultadoCorreo enviarHtml(String destinatario, String asunto, String html, String textoAlternativo, List<String> copiaOculta, ImagenInline imagenInline) {
+        return enviarInterno(destinatario, asunto, textoAlternativo, html, copiaOculta, imagenInline);
+    }
+
+    private ResultadoCorreo enviarInterno(String destinatario, String asunto, String mensaje, String html, List<String> copiaOculta, ImagenInline imagenInline) {
         if (!enabled) return ResultadoCorreo.simulacion();
         if (destinatario == null || destinatario.isBlank()) return ResultadoCorreo.error("El cliente no tiene un correo configurado.");
-        if ("graph".equalsIgnoreCase(provider)) return enviarGraph(destinatario, asunto, mensaje, html, copiaOculta);
+        if ("graph".equalsIgnoreCase(provider)) return enviarGraph(destinatario, asunto, mensaje, html, copiaOculta, imagenInline);
         if (from == null || from.isBlank()) return ResultadoCorreo.error("No se ha configurado el remitente del correo.");
         if (mailSender == null) return ResultadoCorreo.error("No se ha configurado el servicio SMTP.");
         try {
             var correo = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(correo, false, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(correo, imagenInline != null, "UTF-8");
             helper.setFrom(from, fromName);
             helper.setTo(destinatario);
             String[] bcc = destinatarios(copiaOculta);
@@ -79,6 +87,12 @@ public class CorreoServiceImpl implements CorreoService {
             helper.setSubject(asunto);
             if (StringUtils.hasText(html)) {
                 helper.setText(mensaje != null ? mensaje : "", html);
+                if (imagenInline != null) {
+                    ClassPathResource resource = recurso(imagenInline);
+                    if (resource.exists()) {
+                        helper.addInline(imagenInline.contentId(), resource, imagenInline.contentType());
+                    }
+                }
             } else {
                 helper.setText(mensaje, false);
             }
@@ -94,7 +108,7 @@ public class CorreoServiceImpl implements CorreoService {
         this.mailSender = mailSender;
     }
 
-    private ResultadoCorreo enviarGraph(String destinatario, String asunto, String mensaje, String html, List<String> copiaOculta) {
+    private ResultadoCorreo enviarGraph(String destinatario, String asunto, String mensaje, String html, List<String> copiaOculta, ImagenInline imagenInline) {
         String remitente = StringUtils.hasText(graphSender) ? graphSender.trim() : trim(from);
         if (!StringUtils.hasText(remitente)) return ResultadoCorreo.error("No se ha configurado el buzon remitente de Microsoft Graph.");
         if (!StringUtils.hasText(graphTenantId) || !StringUtils.hasText(graphClientId) || !StringUtils.hasText(graphClientSecret)) {
@@ -115,6 +129,10 @@ public class CorreoServiceImpl implements CorreoService {
             if (!bccRecipients.isEmpty()) {
                 message.put("bccRecipients", bccRecipients);
             }
+            List<Map<String, Object>> adjuntos = adjuntosInlineGraph(imagenInline);
+            if (!adjuntos.isEmpty()) {
+                message.put("attachments", adjuntos);
+            }
             Map<String, Object> payload = Map.of(
                     "message", message,
                     "saveToSentItems", graphSaveToSentItems
@@ -133,7 +151,7 @@ public class CorreoServiceImpl implements CorreoService {
             return ResultadoCorreo.enviado();
         } catch (RestClientResponseException ex) {
             return ResultadoCorreo.error("Microsoft Graph ha rechazado el envio (" + ex.getStatusCode().value() + "): " + detalleGraph(ex));
-        } catch (RestClientException | IllegalArgumentException ex) {
+        } catch (RestClientException | IllegalArgumentException | IOException ex) {
             return ResultadoCorreo.error("No se pudo enviar mediante Microsoft Graph: " + ex.getMessage());
         }
     }
@@ -153,6 +171,29 @@ public class CorreoServiceImpl implements CorreoService {
         return java.util.Arrays.stream(destinatarios(correos))
                 .map(correo -> Map.<String, Object>of("emailAddress", Map.of("address", correo)))
                 .toList();
+    }
+
+    private List<Map<String, Object>> adjuntosInlineGraph(ImagenInline imagenInline) throws IOException {
+        if (imagenInline == null) {
+            return List.of();
+        }
+        ClassPathResource resource = recurso(imagenInline);
+        if (!resource.exists()) {
+            return List.of();
+        }
+        String contentBytes = Base64.getEncoder().encodeToString(resource.getInputStream().readAllBytes());
+        Map<String, Object> adjunto = new java.util.LinkedHashMap<>();
+        adjunto.put("@odata.type", "#microsoft.graph.fileAttachment");
+        adjunto.put("name", imagenInline.filename());
+        adjunto.put("contentType", imagenInline.contentType());
+        adjunto.put("contentBytes", contentBytes);
+        adjunto.put("isInline", true);
+        adjunto.put("contentId", imagenInline.contentId());
+        return List.of(adjunto);
+    }
+
+    private ClassPathResource recurso(ImagenInline imagenInline) {
+        return new ClassPathResource(imagenInline.classpathLocation());
     }
 
     private String obtenerTokenGraph() {
