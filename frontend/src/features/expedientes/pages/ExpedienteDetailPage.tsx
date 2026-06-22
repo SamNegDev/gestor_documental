@@ -14,6 +14,7 @@ import { IncidentCreateDialog } from "../components/IncidentCreateDialog";
 import { IncidentResolutionDialog } from "../components/IncidentResolutionDialog";
 import { InteresadosPanel } from "../components/InteresadosPanel";
 import { InteresadoAutocomplete } from "../components/InteresadoAutocomplete";
+import { JustificanteThempusPanel } from "../components/JustificanteThempusPanel";
 import { NextActionPanel } from "../components/NextActionPanel";
 import { OcrReviewDialog } from "../components/OcrReviewDialog";
 import { PhaseMilestonesPanel } from "../components/PhaseMilestonesPanel";
@@ -1219,6 +1220,13 @@ export function ExpedienteDetailPage() {
     }
   };
 
+  const handleConfirmThempusSend = () => confirm({
+    title: "Enviar justificante a Thempus",
+    description: "Se llamara al endpoint externo de Thempus con los datos visibles en el panel. Si la integracion sigue desactivada, el backend no enviara nada.",
+    confirmLabel: "Enviar",
+    tone: "success",
+  });
+
   if (loading) {
     return (
       <div className="exp-detail-state">
@@ -1335,6 +1343,8 @@ export function ExpedienteDetailPage() {
           </div>
         </section>
       ) : null}
+
+      <JustificanteThempusPanel expediente={expediente} onConfirmSend={handleConfirmThempusSend} />
 
       <div className="exp-process-layout">
         <div className="exp-process-main">
