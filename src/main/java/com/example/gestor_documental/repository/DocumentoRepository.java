@@ -21,10 +21,13 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long> {
 
     List<Documento> findBySolicitudId(Long solicitudId);
 
+    @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
     List<Documento> findByClienteIdOrderByFechaSubidaDesc(Long clienteId);
 
+    @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
     List<Documento> findByClienteIdAndInteresadoIsNullOrderByFechaSubidaDesc(Long clienteId);
 
+    @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
     List<Documento> findByClienteIdAndInteresadoIdOrderByFechaSubidaDesc(Long clienteId, Long interesadoId);
 
     @Query("""
