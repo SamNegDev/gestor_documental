@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FilePlus2, FileText, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FilePlus2, FileText, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ShieldAlert, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
 import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteUploadPanel";
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
 import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
@@ -1251,6 +1251,7 @@ export function ExpedienteDetailPage() {
       : operationalHitos.find((hito) => hito.accion && !hito.completado && !hito.bloqueado) ?? expediente.siguientePaso;
   const hasActiveIncidents = expediente.incidencias.some((incidencia) => !incidencia.resuelta);
   const canRequestAdditionalInfo = expediente.estado !== "FINALIZADO" && expediente.estado !== "RECHAZADO";
+  const canOpenIncident = expediente.estado !== "FINALIZADO" && expediente.estado !== "RECHAZADO";
   const model620PhaseCompleted = operationalHitos.some((hito) => hito.id.toLowerCase().includes("modelo-620") && hito.completado);
   const showClosingDocumentsPanel = expediente.estado === "FINALIZADO" || model620PhaseCompleted;
   const disabledClosingDocumentTypes = new Set<string>();
@@ -1283,13 +1284,17 @@ export function ExpedienteDetailPage() {
           onUploadClosingDocument={handleUploadClosingDocument}
         />
       ) : null}
-      <IncidentAlertPanel incidencias={expediente.incidencias} onResolveIncident={setResolvingIncident} />
+      <IncidentAlertPanel
+        incidencias={expediente.incidencias}
+        onCreateIncident={canOpenIncident ? openIncidentDialog : undefined}
+        onResolveIncident={setResolvingIncident}
+      />
       {canRequestAdditionalInfo ? (
         <section className="exp-quick-actions" aria-label="Acciones rapidas del expediente">
           <div>
             <p className="eyebrow">Acciones del expediente</p>
-            <strong>Actualizar datos o solicitar informacion</strong>
-            <span>Revisa documentos existentes antes de pedir nada al cliente.</span>
+            <strong>Actualizar datos, incidencias o solicitudes</strong>
+            <span>Las incidencias pueden acumularse y el expediente seguira bloqueado hasta resolverlas todas.</span>
           </div>
           <div className="exp-quick-actions__buttons">
             <button
@@ -1300,6 +1305,14 @@ export function ExpedienteDetailPage() {
             >
               {updatingDocuments ? <Loader2 className="button-spinner" size={16} /> : <RefreshCw size={16} />}
               Actualizar datos
+            </button>
+            <button
+              className="soft-button milestone-action--warning"
+              onClick={openIncidentDialog}
+              type="button"
+            >
+              <ShieldAlert size={16} />
+              Abrir incidencia
             </button>
             <button
               className="soft-button"

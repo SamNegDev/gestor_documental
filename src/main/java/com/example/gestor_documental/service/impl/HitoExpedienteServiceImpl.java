@@ -204,8 +204,9 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
 
         validarPermiso(expediente, usuario);
-        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
-            throw new OperacionInvalidaException("No se puede abrir una incidencia en un expediente finalizado");
+        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
+                || expediente.getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
+            throw new OperacionInvalidaException("No se puede abrir una incidencia en un expediente finalizado o rechazado");
         }
 
         incidenciaService.crearIncidenciaExpediente(

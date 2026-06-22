@@ -44,8 +44,16 @@
   color: white;
 }
 
+.incident-alert-panel__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
 .incident-alert-panel h3 {
-  margin: 2px 0 8px;
+  margin: 2px 0 0;
   color: oklch(30% 0.15 27);
   font-size: 1.15rem;
 }
@@ -2978,6 +2986,11 @@
   .incident-alert-item__actions,
   .document-row__actions {
     justify-content: flex-start;
+  }
+
+  .incident-alert-panel__heading {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .document-row,
