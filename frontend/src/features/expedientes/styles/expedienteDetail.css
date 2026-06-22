@@ -2298,11 +2298,15 @@
 }
 
 .exp-quick-actions__buttons {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-}
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .button-spinner {
+    animation: exp-spin 0.8s linear infinite;
+  }
 
 .client-requirements-panel {
   border: 1px solid oklch(78% 0.09 78);

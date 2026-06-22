@@ -168,6 +168,13 @@ export interface InconsistenciaDocumental {
   accionSugerida?: string | null;
 }
 
+export interface ActualizacionDocumentalExpediente {
+  identidadesLeidas: number;
+  operacionesLeidas: number;
+  datosAplicados: number;
+  avisos: string[];
+}
+
 export interface HitoExpediente {
   id: string;
   titulo: string;

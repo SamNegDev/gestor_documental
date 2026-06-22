@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FilePlus2, FileText, Loader2, MessageCircle, Plus, Route, Save, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FilePlus2, FileText, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
 import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteUploadPanel";
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
 import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
@@ -34,6 +34,7 @@ import {
   rollbackExpedienteFinalization,
   rollbackExpedienteMilestone,
   sendExpedienteMessage,
+  updateExpedienteFromExistingDocuments,
   updateExpedienteInteresados,
   uploadIncidentDocument,
 } from "../services/expedienteDetailApi";
@@ -672,6 +673,7 @@ export function ExpedienteDetailPage() {
   const [readingIdentityId, setReadingIdentityId] = useState<number | null>(null);
   const [readingRolesId, setReadingRolesId] = useState<number | null>(null);
   const [applyingRolesId, setApplyingRolesId] = useState<number | null>(null);
+  const [updatingDocuments, setUpdatingDocuments] = useState(false);
   const { confirm, dialog } = useConfirmDialog();
 
   const refreshRelatedData = useCallback(async () => {
@@ -829,6 +831,32 @@ export function ExpedienteDetailPage() {
       alert("No se pudieron aplicar los datos al expediente.");
     } finally {
       setApplyingRolesId(null);
+    }
+  };
+
+  const handleUpdateFromExistingDocuments = async () => {
+    if (!expediente || updatingDocuments) return;
+    const confirmed = await confirm({
+      title: "Actualizar con documentos existentes",
+      description: "Se leeran DNI/CIF y contratos/facturas ya subidos, se aplicaran los datos seguros y se sincronizara el checklist documental.",
+      confirmLabel: "Actualizar",
+    });
+    if (!confirmed) return;
+    setUpdatingDocuments(true);
+    try {
+      const result = await updateExpedienteFromExistingDocuments(expediente.id);
+      await refreshExpediente();
+      const resumen = [
+        `${result.identidadesLeidas} identidad${result.identidadesLeidas === 1 ? "" : "es"} leida${result.identidadesLeidas === 1 ? "" : "s"}`,
+        `${result.operacionesLeidas} contrato/factura revisado${result.operacionesLeidas === 1 ? "" : "s"}`,
+        `${result.datosAplicados} aplicacion${result.datosAplicados === 1 ? "" : "es"} realizada${result.datosAplicados === 1 ? "" : "s"}`,
+      ].join(", ");
+      const avisos = result.avisos?.length ? `\n\nAvisos:\n${result.avisos.slice(0, 6).join("\n")}` : "";
+      alert(`Actualizacion completada: ${resumen}.${avisos}`);
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo actualizar con los documentos existentes." : "No se pudo actualizar con los documentos existentes.");
+    } finally {
+      setUpdatingDocuments(false);
     }
   };
 
@@ -1259,11 +1287,20 @@ export function ExpedienteDetailPage() {
       {canRequestAdditionalInfo ? (
         <section className="exp-quick-actions" aria-label="Acciones rapidas del expediente">
           <div>
-            <p className="eyebrow">Acciones con el cliente</p>
-            <strong>Solicitar informacion o documentacion</strong>
-            <span>Elige si necesitas una respuesta o un documento concreto para continuar.</span>
+            <p className="eyebrow">Acciones del expediente</p>
+            <strong>Actualizar datos o solicitar informacion</strong>
+            <span>Revisa documentos existentes antes de pedir nada al cliente.</span>
           </div>
           <div className="exp-quick-actions__buttons">
+            <button
+              className="soft-button"
+              disabled={updatingDocuments}
+              onClick={handleUpdateFromExistingDocuments}
+              type="button"
+            >
+              {updatingDocuments ? <Loader2 className="button-spinner" size={16} /> : <RefreshCw size={16} />}
+              Actualizar datos
+            </button>
             <button
               className="soft-button"
               disabled={hasActiveIncidents || hasAdditionalInfoFlow}

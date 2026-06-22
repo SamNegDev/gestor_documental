@@ -219,11 +219,25 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         if (requisito.getOperacion().getTipo() == TipoOperacionExpediente.TRASPASO_DIRECTO && documento.getOperacion() == null) {
             return;
         }
+        if (documento.getOperacion() == null && esDocumentoComunEntreOperaciones(documento.getTipoDocumento())) {
+            return;
+        }
         if (documento.getOperacion() == null
                 || documento.getOperacion().getId() == null
                 || !documento.getOperacion().getId().equals(requisito.getOperacion().getId())) {
             throw new OperacionInvalidaException("El documento no pertenece a la operacion del requisito");
         }
+    }
+
+    private boolean esDocumentoComunEntreOperaciones(TipoDocumento tipoDocumento) {
+        return tipoDocumento == TipoDocumento.DNI
+                || tipoDocumento == TipoDocumento.CIF
+                || tipoDocumento == TipoDocumento.PERMISO_CIRCULACION
+                || tipoDocumento == TipoDocumento.FICHA_TECNICA
+                || tipoDocumento == TipoDocumento.INFORME_DGT
+                || tipoDocumento == TipoDocumento.MANDATO
+                || tipoDocumento == TipoDocumento.MANDATO_REPRESENTACION
+                || tipoDocumento == TipoDocumento.EXPEDIENTE_COMPLETO;
     }
 
     private void validarDocumentoInteresado(RequisitoDocumentalExpediente requisito, Documento documento) {

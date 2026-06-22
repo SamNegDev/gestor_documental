@@ -4,6 +4,7 @@ import com.example.gestor_documental.config.OpenAiProperties;
 import com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaResponse;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.enums.TipoOperacionExpediente;
 import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
@@ -125,6 +126,9 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         if (expediente == null) {
             throw new OperacionInvalidaException("El documento no pertenece a un expediente.");
         }
+        if (esExpedienteBatecom(documento) && documento.getOperacion() == null) {
+            throw new OperacionInvalidaException("Selecciona si el contrato/factura pertenece a BATE o COM antes de aplicar datos.");
+        }
         validarLecturaAplicable(lectura);
         validarIdentidadesCorroboradas(documento, lectura);
 
@@ -140,8 +144,10 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
             throw new OperacionInvalidaException("Comprador y vendedor apuntan al mismo interesado.");
         }
 
-        aplicarRelacion(expediente, vendedor, RolInteresado.VENDEDOR);
-        aplicarRelacion(expediente, comprador, RolInteresado.COMPRADOR);
+        RolInteresado rolVendedor = rolVendedor(documento);
+        RolInteresado rolComprador = rolComprador(documento);
+        aplicarRelacion(expediente, vendedor, rolVendedor);
+        aplicarRelacion(expediente, comprador, rolComprador);
         vincularIdentidadesLeidas(expediente);
         sincronizarRequisitosExpediente(expediente, admin);
         lectura.setVendedorInteresado(vendedor);
@@ -155,8 +161,25 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
                 expediente,
                 admin,
                 "IA APLICAR DATOS",
-                "Se aplicaron comprador y vendedor desde " + nombreDocumento(documento) + ".");
+                "Se aplicaron " + rolVendedor.name().toLowerCase(Locale.ROOT) + " y "
+                        + rolComprador.name().toLowerCase(Locale.ROOT) + " desde " + nombreDocumento(documento) + ".");
         return DocumentoRolesLecturaResponse.from(lectura);
+    }
+
+    private RolInteresado rolVendedor(Documento documento) {
+        if (documento.getOperacion() != null
+                && documento.getOperacion().getTipo() == TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM) {
+            return RolInteresado.COMPRAVENTA;
+        }
+        return RolInteresado.VENDEDOR;
+    }
+
+    private RolInteresado rolComprador(Documento documento) {
+        if (documento.getOperacion() != null
+                && documento.getOperacion().getTipo() == TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE) {
+            return RolInteresado.COMPRAVENTA;
+        }
+        return RolInteresado.COMPRADOR;
     }
 
     private void validarTipoDocumento(Documento documento) {
@@ -266,9 +289,16 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
     }
 
     private boolean esDocumentoSolicitudBatecom(Documento documento) {
-        return documento.getSolicitud() != null
+        return (documento.getSolicitud() != null
                 && documento.getSolicitud().getTipoTramite() != null
-                && documento.getSolicitud().getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM;
+                && documento.getSolicitud().getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM)
+                || esExpedienteBatecom(documento);
+    }
+
+    private boolean esExpedienteBatecom(Documento documento) {
+        return documento.getExpediente() != null
+                && documento.getExpediente().getTipoTramite() != null
+                && documento.getExpediente().getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM;
     }
 
     private void aplicarResultado(Documento documento, DocumentoRolesLectura lectura, JsonNode resultado, String modeloUsado) {
