@@ -2,6 +2,7 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.service.CorreoService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
@@ -23,8 +24,8 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class CorreoServiceImpl implements CorreoService {
-    private final JavaMailSender mailSender;
     private final RestClient restClient = RestClient.create();
+    private JavaMailSender mailSender;
 
     @Value("${app.mail.enabled:false}")
     private boolean enabled;
@@ -47,15 +48,25 @@ public class CorreoServiceImpl implements CorreoService {
 
     @Override
     public ResultadoCorreo enviar(String destinatario, String asunto, String mensaje) {
+        return enviar(destinatario, asunto, mensaje, List.of());
+    }
+
+    @Override
+    public ResultadoCorreo enviar(String destinatario, String asunto, String mensaje, List<String> copiaOculta) {
         if (!enabled) return ResultadoCorreo.simulacion();
         if (destinatario == null || destinatario.isBlank()) return ResultadoCorreo.error("El cliente no tiene un correo configurado.");
-        if ("graph".equalsIgnoreCase(provider)) return enviarGraph(destinatario, asunto, mensaje);
+        if ("graph".equalsIgnoreCase(provider)) return enviarGraph(destinatario, asunto, mensaje, copiaOculta);
         if (from == null || from.isBlank()) return ResultadoCorreo.error("No se ha configurado el remitente del correo.");
+        if (mailSender == null) return ResultadoCorreo.error("No se ha configurado el servicio SMTP.");
         try {
             var correo = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(correo, false, "UTF-8");
             helper.setFrom(from, fromName);
             helper.setTo(destinatario);
+            String[] bcc = destinatarios(copiaOculta);
+            if (bcc.length > 0) {
+                helper.setBcc(bcc);
+            }
             helper.setSubject(asunto);
             helper.setText(mensaje, false);
             mailSender.send(correo);
@@ -65,7 +76,12 @@ public class CorreoServiceImpl implements CorreoService {
         }
     }
 
-    private ResultadoCorreo enviarGraph(String destinatario, String asunto, String mensaje) {
+    @Autowired(required = false)
+    public void setMailSender(JavaMailSender mailSender) {
+        this.mailSender = mailSender;
+    }
+
+    private ResultadoCorreo enviarGraph(String destinatario, String asunto, String mensaje, List<String> copiaOculta) {
         String remitente = StringUtils.hasText(graphSender) ? graphSender.trim() : trim(from);
         if (!StringUtils.hasText(remitente)) return ResultadoCorreo.error("No se ha configurado el buzon remitente de Microsoft Graph.");
         if (!StringUtils.hasText(graphTenantId) || !StringUtils.hasText(graphClientId) || !StringUtils.hasText(graphClientSecret)) {
@@ -73,17 +89,21 @@ public class CorreoServiceImpl implements CorreoService {
         }
         try {
             String token = obtenerTokenGraph();
+            Map<String, Object> message = new java.util.LinkedHashMap<>();
+            message.put("subject", asunto != null ? asunto : "");
+            message.put("body", Map.of(
+                    "contentType", "Text",
+                    "content", mensaje != null ? mensaje : ""
+            ));
+            message.put("toRecipients", List.of(Map.of(
+                    "emailAddress", Map.of("address", destinatario.trim())
+            )));
+            List<Map<String, Object>> bccRecipients = destinatariosGraph(copiaOculta);
+            if (!bccRecipients.isEmpty()) {
+                message.put("bccRecipients", bccRecipients);
+            }
             Map<String, Object> payload = Map.of(
-                    "message", Map.of(
-                            "subject", asunto != null ? asunto : "",
-                            "body", Map.of(
-                                    "contentType", "Text",
-                                    "content", mensaje != null ? mensaje : ""
-                            ),
-                            "toRecipients", List.of(Map.of(
-                                    "emailAddress", Map.of("address", destinatario.trim())
-                            ))
-                    ),
+                    "message", message,
                     "saveToSentItems", graphSaveToSentItems
             );
             restClient.post()
@@ -103,6 +123,23 @@ public class CorreoServiceImpl implements CorreoService {
         } catch (RestClientException | IllegalArgumentException ex) {
             return ResultadoCorreo.error("No se pudo enviar mediante Microsoft Graph: " + ex.getMessage());
         }
+    }
+
+    private String[] destinatarios(List<String> correos) {
+        if (correos == null) {
+            return new String[0];
+        }
+        return correos.stream()
+                .map(this::trim)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toArray(String[]::new);
+    }
+
+    private List<Map<String, Object>> destinatariosGraph(List<String> correos) {
+        return java.util.Arrays.stream(destinatarios(correos))
+                .map(correo -> Map.<String, Object>of("emailAddress", Map.of("address", correo)))
+                .toList();
     }
 
     private String obtenerTokenGraph() {
