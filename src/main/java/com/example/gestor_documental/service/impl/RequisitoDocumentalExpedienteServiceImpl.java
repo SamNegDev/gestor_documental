@@ -830,7 +830,8 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         if (requisito.getOperacion() != null) {
             if (documento.getOperacion() == null || documento.getOperacion().getId() == null) {
                 if (requisito.getOperacion().getTipo() != TipoOperacionExpediente.TRASPASO_DIRECTO
-                        && !esDocumentoVehiculoBase(requisito.getTipoDocumento())) {
+                        && !esDocumentoVehiculoBase(requisito.getTipoDocumento())
+                        && !esDocumentoComunEntreOperaciones(requisito.getTipoDocumento())) {
                     return false;
                 }
             } else if (!documento.getOperacion().getId().equals(requisito.getOperacion().getId())) {
@@ -1201,7 +1202,10 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         }
 
         return documentoRepository.findByClienteIdOrderByFechaSubidaDesc(expediente.getCliente().getId()).stream()
-                .filter(documento -> documento.getInteresado() == null || esRequisitoRepresentanteEmpresa(requisito))
+                .filter(documento -> documento.getInteresado() == null
+                        || esRequisitoRepresentanteEmpresa(requisito)
+                        || (requisito.getInteresado() != null
+                        && Objects.equals(documento.getInteresado().getId(), requisito.getInteresado().getId())))
                 .filter(documento -> esDocumentoIdentidad(requisito.getTipoDocumento())
                         ? documentoIdentidadCubreRequisito(documento, requisito, true)
                         : documentoCubreRequisito(documento, requisito))
