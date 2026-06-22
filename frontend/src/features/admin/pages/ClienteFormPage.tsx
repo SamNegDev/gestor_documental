@@ -164,7 +164,7 @@ export function ClienteFormPage() {
       setSummaryFeedback({
         tone: resultado.clientesEnviados > 0 ? "success" : "danger",
         text: resultado.clientesEnviados > 0
-          ? `Resumen enviado. Cambios incluidos: ${resultado.cambiosIncluidos}.${avisos}`
+          ? `Resumen enviado. Elementos incluidos: ${resultado.cambiosIncluidos}.${avisos}`
           : avisos || "No se pudo enviar el resumen diario.",
       });
     },

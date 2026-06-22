@@ -53,9 +53,18 @@ public class CorreoServiceImpl implements CorreoService {
 
     @Override
     public ResultadoCorreo enviar(String destinatario, String asunto, String mensaje, List<String> copiaOculta) {
+        return enviarInterno(destinatario, asunto, mensaje, null, copiaOculta);
+    }
+
+    @Override
+    public ResultadoCorreo enviarHtml(String destinatario, String asunto, String html, String textoAlternativo, List<String> copiaOculta) {
+        return enviarInterno(destinatario, asunto, textoAlternativo, html, copiaOculta);
+    }
+
+    private ResultadoCorreo enviarInterno(String destinatario, String asunto, String mensaje, String html, List<String> copiaOculta) {
         if (!enabled) return ResultadoCorreo.simulacion();
         if (destinatario == null || destinatario.isBlank()) return ResultadoCorreo.error("El cliente no tiene un correo configurado.");
-        if ("graph".equalsIgnoreCase(provider)) return enviarGraph(destinatario, asunto, mensaje, copiaOculta);
+        if ("graph".equalsIgnoreCase(provider)) return enviarGraph(destinatario, asunto, mensaje, html, copiaOculta);
         if (from == null || from.isBlank()) return ResultadoCorreo.error("No se ha configurado el remitente del correo.");
         if (mailSender == null) return ResultadoCorreo.error("No se ha configurado el servicio SMTP.");
         try {
@@ -68,7 +77,11 @@ public class CorreoServiceImpl implements CorreoService {
                 helper.setBcc(bcc);
             }
             helper.setSubject(asunto);
-            helper.setText(mensaje, false);
+            if (StringUtils.hasText(html)) {
+                helper.setText(mensaje != null ? mensaje : "", html);
+            } else {
+                helper.setText(mensaje, false);
+            }
             mailSender.send(correo);
             return ResultadoCorreo.enviado();
         } catch (MailException | MessagingException | UnsupportedEncodingException | IllegalArgumentException ex) {
@@ -81,7 +94,7 @@ public class CorreoServiceImpl implements CorreoService {
         this.mailSender = mailSender;
     }
 
-    private ResultadoCorreo enviarGraph(String destinatario, String asunto, String mensaje, List<String> copiaOculta) {
+    private ResultadoCorreo enviarGraph(String destinatario, String asunto, String mensaje, String html, List<String> copiaOculta) {
         String remitente = StringUtils.hasText(graphSender) ? graphSender.trim() : trim(from);
         if (!StringUtils.hasText(remitente)) return ResultadoCorreo.error("No se ha configurado el buzon remitente de Microsoft Graph.");
         if (!StringUtils.hasText(graphTenantId) || !StringUtils.hasText(graphClientId) || !StringUtils.hasText(graphClientSecret)) {
@@ -92,8 +105,8 @@ public class CorreoServiceImpl implements CorreoService {
             Map<String, Object> message = new java.util.LinkedHashMap<>();
             message.put("subject", asunto != null ? asunto : "");
             message.put("body", Map.of(
-                    "contentType", "Text",
-                    "content", mensaje != null ? mensaje : ""
+                    "contentType", StringUtils.hasText(html) ? "HTML" : "Text",
+                    "content", StringUtils.hasText(html) ? html : mensaje != null ? mensaje : ""
             ));
             message.put("toRecipients", List.of(Map.of(
                     "emailAddress", Map.of("address", destinatario.trim())
