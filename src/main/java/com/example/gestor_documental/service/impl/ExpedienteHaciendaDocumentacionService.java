@@ -1,6 +1,8 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.expediente.ExpedienteDetailResponse;
+import com.example.gestor_documental.enums.TipoOperacionExpediente;
+import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Usuario;
@@ -80,16 +82,33 @@ public class ExpedienteHaciendaDocumentacionService {
             if (vehiculo.isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta documentacion del vehiculo en el expediente " + expedienteId);
             }
-            if (venta.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta contrato o factura en el expediente " + expedienteId);
+            if (esBatecom(detalle)) {
+                List<Path> ventaBate = rutasPdfOperacion(documentos, TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE, rutaBase);
+                List<Path> ventaCom = rutasPdfOperacion(documentos, TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM, rutaBase);
+                if (ventaBate.isEmpty()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta contrato o factura BATE en el expediente " + expedienteId);
+                }
+                if (ventaCom.isEmpty()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta contrato o factura COM en el expediente " + expedienteId);
+                }
+                paquetes.put(carpetaZip(detalle, expedienteId, paquetes.keySet()), PaqueteHacienda.batecom(vehiculo, ventaBate, ventaCom));
+            } else {
+                if (venta.isEmpty()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta contrato o factura en el expediente " + expedienteId);
+                }
+                paquetes.put(carpetaZip(detalle, expedienteId, paquetes.keySet()), PaqueteHacienda.simple(vehiculo, venta));
             }
-            paquetes.put(carpetaZip(detalle, expedienteId, paquetes.keySet()), new PaqueteHacienda(vehiculo, venta));
         }
 
         try (ZipOutputStream zip = new ZipOutputStream(outputStream)) {
             for (Map.Entry<String, PaqueteHacienda> entry : paquetes.entrySet()) {
                 escribirPdf(zip, entry.getKey() + "/documentacion_vehiculo.pdf", entry.getValue().vehiculo());
-                escribirPdf(zip, entry.getKey() + "/contrato_factura_venta.pdf", entry.getValue().venta());
+                if (entry.getValue().esBatecom()) {
+                    escribirPdf(zip, entry.getKey() + "/contrato_factura_venta_BATE.pdf", entry.getValue().ventaBate());
+                    escribirPdf(zip, entry.getKey() + "/contrato_factura_venta_COM.pdf", entry.getValue().ventaCom());
+                } else {
+                    escribirPdf(zip, entry.getKey() + "/contrato_factura_venta.pdf", entry.getValue().venta());
+                }
             }
         }
     }
@@ -100,6 +119,19 @@ public class ExpedienteHaciendaDocumentacionService {
                 .map(documento -> rutaDocumento(documento, rutaBase))
                 .filter(path -> path != null && Files.exists(path) && path.getFileName().toString().toLowerCase().endsWith(".pdf"))
                 .toList();
+    }
+
+    private List<Path> rutasPdfOperacion(List<Documento> documentos, TipoOperacionExpediente tipoOperacion, Path rutaBase) {
+        return documentos.stream()
+                .filter(documento -> DOCUMENTOS_VENTA.contains(documento.getTipoDocumento()))
+                .filter(documento -> documento.getOperacion() != null && documento.getOperacion().getTipo() == tipoOperacion)
+                .map(documento -> rutaDocumento(documento, rutaBase))
+                .filter(path -> path != null && Files.exists(path) && path.getFileName().toString().toLowerCase().endsWith(".pdf"))
+                .toList();
+    }
+
+    private boolean esBatecom(ExpedienteDetailResponse detalle) {
+        return TipoTramiteEnum.BATECOM.name().equals(detalle.getTipoTramite());
     }
 
     private Path rutaDocumento(Documento documento, Path rutaBase) {
@@ -138,6 +170,17 @@ public class ExpedienteHaciendaDocumentacionService {
         return nombre.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
 
-    private record PaqueteHacienda(List<Path> vehiculo, List<Path> venta) {
+    private record PaqueteHacienda(List<Path> vehiculo, List<Path> venta, List<Path> ventaBate, List<Path> ventaCom) {
+        static PaqueteHacienda simple(List<Path> vehiculo, List<Path> venta) {
+            return new PaqueteHacienda(vehiculo, venta, List.of(), List.of());
+        }
+
+        static PaqueteHacienda batecom(List<Path> vehiculo, List<Path> ventaBate, List<Path> ventaCom) {
+            return new PaqueteHacienda(vehiculo, List.of(), ventaBate, ventaCom);
+        }
+
+        boolean esBatecom() {
+            return !ventaBate.isEmpty() || !ventaCom.isEmpty();
+        }
     }
 }
