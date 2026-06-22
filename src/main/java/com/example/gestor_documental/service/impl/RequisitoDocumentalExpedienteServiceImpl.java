@@ -408,6 +408,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
 
         eliminarIdentificacionNoAplicable(expediente, interesado, rol, TipoDocumento.CIF, null, operacion);
         crearPorInteresadoSiNoExiste(expediente, TipoDocumento.DNI, interesado, rol, operacion, "DNI " + rolTexto, usuario);
+        eliminarIdentificacionObsoleta(expediente, interesado, rol, TipoDocumento.DNI, operacion);
     }
 
     private TipoPersona inferirTipoPersona(Interesado interesado) {
@@ -600,6 +601,29 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                 .filter(requisito -> requisito.getDocumento() == null)
                 .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
                 .ifPresent(requisitoRepository::delete);
+    }
+
+    private void eliminarIdentificacionObsoleta(
+            Expediente expediente,
+            Interesado interesadoActual,
+            RolInteresado rol,
+            TipoDocumento tipoDocumento,
+            OperacionExpediente operacion
+    ) {
+        if (interesadoActual == null || interesadoActual.getId() == null) {
+            return;
+        }
+        requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
+                .filter(requisito -> requisito.getOrigen() == OrigenRequisitoDocumental.REGLA)
+                .filter(requisito -> requisito.getTipoDocumento() == tipoDocumento)
+                .filter(requisito -> requisito.getRolInteresado() == rol)
+                .filter(requisito -> mismaOperacion(requisito.getOperacion(), operacion))
+                .filter(requisito -> requisito.getDocumento() == null)
+                .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                .filter(requisito -> requisito.getInteresado() == null
+                        || requisito.getInteresado().getId() == null
+                        || !Objects.equals(requisito.getInteresado().getId(), interesadoActual.getId()))
+                .forEach(requisitoRepository::delete);
     }
 
     private boolean mismaOperacion(OperacionExpediente actual, OperacionExpediente esperada) {
