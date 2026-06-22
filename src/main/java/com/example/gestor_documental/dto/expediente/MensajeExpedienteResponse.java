@@ -17,4 +17,5 @@ public class MensajeExpedienteResponse {
     private String rolAutor;
     private String fechaCreacion;
     private String contenido;
+    private boolean noLeidoParaUsuario;
 }

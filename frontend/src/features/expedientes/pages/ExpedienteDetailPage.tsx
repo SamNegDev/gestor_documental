@@ -25,6 +25,7 @@ import {
   getExpedienteDetail,
   getIncidentTypes,
   linkIncidentDocument,
+  markExpedienteMessagesRead,
   openExpedienteIncident,
   reclaimIncident,
   requestAdditionalInfo,
@@ -1157,6 +1158,20 @@ export function ExpedienteDetailPage() {
     }
   };
 
+  const handleOpenMessages = async () => {
+    if (!expediente || !expediente.mensajesNoLeidos) return;
+    try {
+      await markExpedienteMessagesRead(expediente.id);
+      setExpediente((current) => current ? {
+        ...current,
+        mensajesNoLeidos: 0,
+        mensajes: current.mensajes.map((mensaje) => ({ ...mensaje, noLeidoParaUsuario: false })),
+      } : current);
+    } catch {
+      // El contador se refrescara en la siguiente carga del expediente.
+    }
+  };
+
   const handleDeleteDocument = async (documento: DocumentoExpediente) => {
     if (!documento.id) return;
     const confirmed = await confirm({
@@ -1289,6 +1304,8 @@ export function ExpedienteDetailPage() {
             onRunMilestoneAction={handleRunMilestoneAction}
           />
           <CompleteExpedienteUploadPanel
+            title="Extraer documentacion del expediente"
+            description="Sube un PDF completo para separar automaticamente los documentos que ya estan en nuestro poder."
             onUploadCompleteExpediente={handleUploadCompleteExpediente}
             processing={completeExpedienteProcessing}
           />
@@ -1322,7 +1339,7 @@ export function ExpedienteDetailPage() {
         <OperationalAside expediente={expediente} />
       </div>
 
-      <SecondaryExpedienteTabs expediente={expediente} onSendMessage={handleSendMessage} />
+      <SecondaryExpedienteTabs expediente={expediente} onOpenMessages={handleOpenMessages} onSendMessage={handleSendMessage} />
 
       <DocumentChecklistDialog
         documentos={expediente.documentos}

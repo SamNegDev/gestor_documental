@@ -28,6 +28,10 @@ public class Mensaje {
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;
 
+    private LocalDateTime fechaLecturaAdmin;
+
+    private LocalDateTime fechaLecturaCliente;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "autor_id", nullable = false)
     private Usuario autor;

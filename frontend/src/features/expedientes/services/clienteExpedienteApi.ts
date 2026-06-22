@@ -12,6 +12,7 @@ export interface ExpedienteCliente {
   solicitudId?: number | null;
   siguienteMensaje?: string | null;
   cliente?: ClienteResumen | null;
+  mensajesNoLeidos?: number;
   documentos: DocumentoExpediente[];
   requisitosDocumentales: RequisitoDocumental[];
   incidencias: IncidenciaExpediente[];
@@ -34,6 +35,10 @@ export async function getClienteExpediente(id: string | number): Promise<Expedie
 
 export function sendClienteExpedienteMessage(expedienteId: string | number, contenido: string): Promise<void> {
   return apiPostJson(`/api/cliente/expedientes/${expedienteId}/mensajes`, { contenido });
+}
+
+export function markClienteExpedienteMessagesRead(expedienteId: string | number): Promise<void> {
+  return apiPostJson(`/api/cliente/expedientes/${expedienteId}/mensajes/leidos`, {});
 }
 
 export function answerAdditionalInfo(expedienteId: string | number, contenido: string): Promise<void> {

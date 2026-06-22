@@ -32,6 +32,12 @@ export function bulkFinalDocumentsUrl(expedienteIds: number[]) {
   return `/api/expedientes/justificantes-finales?${params.toString()}`;
 }
 
+export function bulkHaciendaDocumentsUrl(expedienteIds: number[]) {
+  const params = new URLSearchParams();
+  expedienteIds.forEach((id) => params.append("ids", String(id)));
+  return `/api/expedientes/documentacion-hacienda?${params.toString()}`;
+}
+
 export function getSolicitudes(filters: ListFilters) {
   return apiGet<PagedResponse<SolicitudListItem>>(`/api/solicitudes${buildQuery(filters)}`);
 }

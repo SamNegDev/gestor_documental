@@ -687,6 +687,9 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     }
 
     private boolean documentoCubreRequisito(Documento documento, RequisitoDocumentalExpediente requisito) {
+        if (documento.getTipoDocumento() == TipoDocumento.EXPEDIENTE_COMPLETO && esRequisitoBaseCubiertoPorExpedienteCompleto(requisito)) {
+            return true;
+        }
         if (requisito.getOperacion() != null) {
             if (documento.getOperacion() == null || documento.getOperacion().getId() == null) {
                 if (requisito.getOperacion().getTipo() != TipoOperacionExpediente.TRASPASO_DIRECTO
@@ -701,6 +704,15 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             return documentoIdentidadCubreRequisito(documento, requisito, false);
         }
         return tipoDocumentoCubreRequisito(documento.getTipoDocumento(), requisito.getTipoDocumento());
+    }
+
+    private boolean esRequisitoBaseCubiertoPorExpedienteCompleto(RequisitoDocumentalExpediente requisito) {
+        return requisito.getEstado() != EstadoRequisitoDocumental.POSTERIOR
+                && requisito.getTipoDocumento() != TipoDocumento.MODELO_620
+                && requisito.getTipoDocumento() != TipoDocumento.COMPROBANTE_DGT
+                && requisito.getTipoDocumento() != TipoDocumento.HUELLA_TRAMITE
+                && requisito.getTipoDocumento() != TipoDocumento.DNI
+                && requisito.getTipoDocumento() != TipoDocumento.CIF;
     }
 
     private boolean documentoIdentidadCubreRequisito(

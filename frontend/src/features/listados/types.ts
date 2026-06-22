@@ -37,6 +37,7 @@ export interface ExpedienteListItem {
   } | null;
   justificantesFinalesDisponibles?: boolean;
   justificantesFinalesPendientes?: string[];
+  documentacionHaciendaDisponible?: boolean;
 }
 
 export interface PagedResponse<T> {

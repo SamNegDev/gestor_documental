@@ -25,6 +25,7 @@ public class ExpedienteClienteResponse {
     private Long solicitudId;
     private String siguienteMensaje;
     private ClienteResumenResponse cliente;
+    private int mensajesNoLeidos;
 
     @Builder.Default
     private List<DocumentoExpedienteResponse> documentos = new ArrayList<>();

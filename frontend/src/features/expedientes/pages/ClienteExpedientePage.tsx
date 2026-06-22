@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Tabs from "@radix-ui/react-tabs";
 import { Link, useParams } from "react-router-dom";
 import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, Download, Eye, FileText, History, Loader2, MessageCircle, Upload } from "lucide-react";
-import { answerAdditionalInfo, getClienteExpediente, sendClienteExpedienteMessage, type ExpedienteCliente } from "../services/clienteExpedienteApi";
+import { answerAdditionalInfo, getClienteExpediente, markClienteExpedienteMessagesRead, sendClienteExpedienteMessage, type ExpedienteCliente } from "../services/clienteExpedienteApi";
 import { uploadIncidentDocument } from "../services/expedienteDetailApi";
 import { uploadRequirementDocument } from "../services/requisitosApi";
 import type { DocumentoExpediente, IncidenciaExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
@@ -289,6 +289,20 @@ export function ClienteExpedientePage() {
     }
   };
 
+  const handleOpenMessages = async () => {
+    if (!id || !expediente?.mensajesNoLeidos) return;
+    try {
+      await markClienteExpedienteMessagesRead(id);
+      setExpediente((current) => current ? {
+        ...current,
+        mensajesNoLeidos: 0,
+        mensajes: current.mensajes.map((mensaje) => ({ ...mensaje, noLeidoParaUsuario: false })),
+      } : current);
+    } catch {
+      // Se refrescara en la siguiente carga.
+    }
+  };
+
   if (loading) {
     return (
       <div className="exp-detail-state">
@@ -521,11 +535,20 @@ export function ClienteExpedientePage() {
       </section>
 
       <section className="exp-panel exp-panel--secondary">
-        <Tabs.Root defaultValue="mensajes" className="secondary-tabs">
+        <Tabs.Root
+          defaultValue="historial"
+          className="secondary-tabs"
+          onValueChange={(value) => {
+            if (value === "mensajes") void handleOpenMessages();
+          }}
+        >
           <Tabs.List className="secondary-tabs__list" aria-label="Comunicación y seguimiento del expediente">
             <Tabs.Trigger value="mensajes">
               <MessageCircle size={16} />
               Mensajes
+              {(expediente.mensajesNoLeidos ?? 0) > 0 ? (
+                <span className="tab-unread-badge">{(expediente.mensajesNoLeidos ?? 0) > 99 ? "99+" : expediente.mensajesNoLeidos}</span>
+              ) : null}
             </Tabs.Trigger>
             <Tabs.Trigger value="historial">
               <History size={16} />
@@ -551,7 +574,7 @@ export function ClienteExpedientePage() {
                 <p className="exp-empty">No hay mensajes todavia.</p>
               ) : (
                 mensajes.map((mensaje) => (
-                  <article className="timeline-item" key={mensaje.id}>
+                  <article className={`timeline-item ${mensaje.noLeidoParaUsuario ? "timeline-item--unread" : ""}`} key={mensaje.id}>
                     <strong>{mensaje.autor || "Usuario"}</strong>
                     <p>{mensaje.contenido}</p>
                     <small>{formatDateTime(mensaje.fechaCreacion)}</small>

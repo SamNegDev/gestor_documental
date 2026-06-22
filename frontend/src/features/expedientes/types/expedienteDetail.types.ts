@@ -248,6 +248,7 @@ export interface MensajeExpediente {
   rolAutor?: string | null;
   fechaCreacion?: string;
   contenido: string;
+  noLeidoParaUsuario?: boolean;
 }
 
 export interface WhatsappExpediente {
@@ -328,6 +329,7 @@ export interface ExpedienteDetail {
   observaciones?: string | null;
   solicitudId?: number | null;
   siguientePaso?: HitoExpediente | null;
+  mensajesNoLeidos?: number;
   cliente?: ClienteResumen | null;
   creadoPor?: UsuarioResumen | null;
   modificadoPor?: UsuarioResumen | null;

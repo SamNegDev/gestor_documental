@@ -27,6 +27,7 @@ public class ExpedienteDetailResponse {
     private String observaciones;
     private Long solicitudId;
     private HitoExpedienteResponse siguientePaso;
+    private int mensajesNoLeidos;
 
     private ClienteResumenResponse cliente;
     private UsuarioResumenResponse creadoPor;

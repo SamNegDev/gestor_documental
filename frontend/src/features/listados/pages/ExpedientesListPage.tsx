@@ -4,7 +4,7 @@ import { Link, useOutletContext, useSearchParams } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, ChevronDown, Download, Eye, FilePlus2, FolderOpen, Search, UserRoundCheck } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { ApiError } from "../../../shared/api/http";
-import { bulkAdvanceExpedientes, bulkFinalDocumentsUrl, getExpedienteListCatalogs, getExpedientes } from "../services/listadosApi";
+import { bulkAdvanceExpedientes, bulkFinalDocumentsUrl, bulkHaciendaDocumentsUrl, getExpedienteListCatalogs, getExpedientes } from "../services/listadosApi";
 import { ListFiltersBar } from "../components/ListFiltersBar";
 import { ListPageChrome } from "../components/ListPageChrome";
 import type { ExpedienteListItem, ListCatalogs, ListFilters } from "../types";
@@ -109,6 +109,22 @@ export function ExpedientesListPage() {
     window.location.href = bulkFinalDocumentsUrl(selectedExpedientes.map((expediente) => expediente.id));
   }
 
+  async function handleDownloadHaciendaDocuments() {
+    const invalid = selectedExpedientes.some((expediente) => !expediente.documentacionHaciendaDisponible);
+    if (invalid) {
+      alert("Selecciona expedientes que esten en la fase de presentar Modelo 620.");
+      return;
+    }
+    const confirmed = await confirm({
+      title: "Documentacion para Hacienda",
+      description: `Se descargara un ZIP con documentacion del vehiculo y contrato/factura de ${selectedExpedientes.length} expedientes.`,
+      confirmLabel: "Descargar ZIP",
+      tone: "default",
+    });
+    if (!confirmed) return;
+    window.location.href = bulkHaciendaDocumentsUrl(selectedExpedientes.map((expediente) => expediente.id));
+  }
+
   return (
     <ListPageChrome
       eyebrow={isAdmin ? "Gestión interna" : "Portal cliente"}
@@ -166,6 +182,7 @@ export function ExpedientesListPage() {
             selected={selectedExpedientes}
             onAdvance={handleBulkAdvance}
             onClear={() => setSelectedIds(new Set())}
+            onDownloadHaciendaDocuments={handleDownloadHaciendaDocuments}
             onDownloadFinalDocuments={handleDownloadFinalDocuments}
           />
         ) : null}
@@ -403,16 +420,19 @@ function BulkActionsBar({
   selected,
   onAdvance,
   onClear,
+  onDownloadHaciendaDocuments,
   onDownloadFinalDocuments,
 }: {
   selected: ExpedienteListItem[];
   onAdvance: () => void;
   onClear: () => void;
+  onDownloadHaciendaDocuments: () => void;
   onDownloadFinalDocuments: () => void;
 }) {
   const firstAction = selected[0]?.siguienteAccion;
   const samePoint = Boolean(firstAction) && selected.every((expediente) => sameBulkAction(expediente.siguienteAccion, firstAction));
   const allFinalDocs = selected.length > 0 && selected.every((expediente) => expediente.justificantesFinalesDisponibles);
+  const allHaciendaDocs = selected.length > 0 && selected.every((expediente) => expediente.documentacionHaciendaDisponible);
 
   return (
     <div className="bulk-actions-bar">
@@ -431,6 +451,10 @@ function BulkActionsBar({
         <button className="soft-button soft-button--compact" disabled={!allFinalDocs} onClick={onDownloadFinalDocuments} type="button">
           <Download size={15} />
           Justificantes
+        </button>
+        <button className="soft-button soft-button--compact" disabled={!allHaciendaDocs} onClick={onDownloadHaciendaDocuments} type="button">
+          <Download size={15} />
+          Hacienda 620
         </button>
         <button className="primary-button primary-button--compact" disabled={!samePoint} onClick={onAdvance} type="button">
           <CheckCircle2 size={15} />

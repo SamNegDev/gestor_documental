@@ -10,4 +10,6 @@ public interface MensajeService {
     List<Mensaje> listarPorSolicitud(Long solicitudId);
     Mensaje añadirAExpediente(Long expedienteId, String contenido, Usuario autor);
     Mensaje añadirASolicitud(Long solicitudId, String contenido, Usuario autor);
+    long contarNoLeidosExpediente(Long expedienteId, Usuario usuario);
+    void marcarLeidosExpediente(Long expedienteId, Usuario usuario);
 }

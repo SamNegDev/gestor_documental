@@ -104,3 +104,7 @@ export function linkIncidentDocument(incidenciaId: number, documentoId: number):
 export function sendExpedienteMessage(expedienteId: string | number, contenido: string): Promise<void> {
   return apiPostJson(`/api/expedientes/${expedienteId}/mensajes`, { contenido });
 }
+
+export function markExpedienteMessagesRead(expedienteId: string | number): Promise<void> {
+  return apiPostJson(`/api/expedientes/${expedienteId}/mensajes/leidos`, {});
+}

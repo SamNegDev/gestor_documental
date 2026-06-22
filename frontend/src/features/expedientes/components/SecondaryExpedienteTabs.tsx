@@ -9,11 +9,14 @@ import { uppercaseInput } from "../../../shared/utils/text";
 type Props = {
   expediente: ExpedienteDetail;
   onSendMessage: (contenido: string) => Promise<void>;
+  onOpenMessages?: () => void;
 };
 
-export function SecondaryExpedienteTabs({ expediente, onSendMessage }: Props) {
+export function SecondaryExpedienteTabs({ expediente, onOpenMessages, onSendMessage }: Props) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [messagesOpened, setMessagesOpened] = useState(false);
+  const unreadMessages = messagesOpened ? 0 : expediente.mensajesNoLeidos ?? 0;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -30,7 +33,16 @@ export function SecondaryExpedienteTabs({ expediente, onSendMessage }: Props) {
 
   return (
     <section className="exp-panel exp-panel--secondary">
-      <Tabs.Root defaultValue="incidencias" className="secondary-tabs">
+      <Tabs.Root
+        defaultValue="incidencias"
+        className="secondary-tabs"
+        onValueChange={(value) => {
+          if (value === "mensajes" && !messagesOpened) {
+            setMessagesOpened(true);
+            onOpenMessages?.();
+          }
+        }}
+      >
         <Tabs.List className="secondary-tabs__list" aria-label="Información secundaria del expediente">
           <Tabs.Trigger value="incidencias">
             <MessageSquareWarning size={16} /> Incidencias
@@ -40,6 +52,7 @@ export function SecondaryExpedienteTabs({ expediente, onSendMessage }: Props) {
           </Tabs.Trigger>
           <Tabs.Trigger value="mensajes">
             <MessagesSquare size={16} /> Mensajes
+            {unreadMessages > 0 ? <span className="tab-unread-badge">{unreadMessages > 99 ? "99+" : unreadMessages}</span> : null}
           </Tabs.Trigger>
           <Tabs.Trigger value="whatsapp">
             <MessageCircle size={16} /> WhatsApp
@@ -97,7 +110,7 @@ export function SecondaryExpedienteTabs({ expediente, onSendMessage }: Props) {
           ) : (
             <div className="timeline-list">
               {expediente.mensajes.map((mensaje) => (
-                <article className="timeline-item" key={mensaje.id}>
+                <article className={`timeline-item ${mensaje.noLeidoParaUsuario ? "timeline-item--unread" : ""}`} key={mensaje.id}>
                   <strong>{mensaje.autor || "Usuario"}</strong>
                   <p>{mensaje.contenido}</p>
                   <small>{formatDateTime(mensaje.fechaCreacion)}</small>

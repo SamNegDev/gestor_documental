@@ -133,6 +133,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .observaciones(expediente.getObservaciones())
                 .solicitudId(expediente.getSolicitud() != null ? expediente.getSolicitud().getId() : null)
                 .siguientePaso(calcularSiguientePaso(estadoDetalle, hitos))
+                .mensajesNoLeidos((int) mensajeService.contarNoLeidosExpediente(expedienteId, usuarioLogueado))
                 .cliente(mapCliente(expediente.getCliente()))
                 .creadoPor(mapUsuario(expediente.getCreadoPor()))
                 .modificadoPor(mapUsuario(expediente.getModificadoPor()))
@@ -143,7 +144,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .hitos(hitos)
                 .incidencias(incidencias.stream().map(incidencia -> mapIncidencia(incidencia, documentos, expediente)).toList())
                 .historial(historial.stream().map(this::mapHistorial).toList())
-                .mensajes(mensajes.stream().map(this::mapMensaje).toList())
+                .mensajes(mensajes.stream().map(mensaje -> mapMensaje(mensaje, usuarioLogueado)).toList())
                 .whatsappMensajes(whatsappMensajes.stream().map(this::mapWhatsapp).toList())
                 .build();
     }
@@ -852,7 +853,17 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .build();
     }
 
-    private MensajeExpedienteResponse mapMensaje(Mensaje mensaje) {
+    private MensajeExpedienteResponse mapMensaje(Mensaje mensaje, Usuario usuarioLogueado) {
+        boolean noLeidoParaUsuario = false;
+        if (usuarioLogueado != null && usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN) {
+            noLeidoParaUsuario = mensaje.getAutor() != null
+                    && mensaje.getAutor().getRolUsuario() == RolUsuario.CLIENTE
+                    && mensaje.getFechaLecturaAdmin() == null;
+        } else if (usuarioLogueado != null) {
+            noLeidoParaUsuario = mensaje.getAutor() != null
+                    && mensaje.getAutor().getRolUsuario() == RolUsuario.ADMIN
+                    && mensaje.getFechaLecturaCliente() == null;
+        }
         return MensajeExpedienteResponse.builder()
                 .id(mensaje.getId())
                 .autor(mensaje.getAutor() != null ? nombreCompleto(mensaje.getAutor()) : null)
@@ -861,6 +872,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                         : null)
                 .fechaCreacion(formatearFecha(mensaje.getFechaCreacion()))
                 .contenido(mensaje.getContenido())
+                .noLeidoParaUsuario(noLeidoParaUsuario)
                 .build();
     }
 

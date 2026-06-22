@@ -49,6 +49,7 @@ public class ClienteExpedienteApiController {
                 .solicitudId(detalle.getSolicitudId())
                 .siguienteMensaje(mensajeEstado(detalle))
                 .cliente(detalle.getCliente())
+                .mensajesNoLeidos(detalle.getMensajesNoLeidos())
                 .documentos(detalle.getDocumentos().stream()
                         .filter(documento -> documento.isSubido())
                         .toList())
@@ -70,6 +71,12 @@ public class ClienteExpedienteApiController {
     ) {
         String contenidoFinal = contenido != null ? contenido : body != null ? body.get("contenido") : null;
         mensajeService.añadirAExpediente(id, contenidoFinal, currentUserService.requireUser(authentication));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/mensajes/leidos")
+    public ResponseEntity<Void> marcarMensajesLeidosCliente(@PathVariable Long id, Authentication authentication) {
+        mensajeService.marcarLeidosExpediente(id, currentUserService.requireUser(authentication));
         return ResponseEntity.noContent().build();
     }
 

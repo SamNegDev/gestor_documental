@@ -34,6 +34,7 @@ import com.example.gestor_documental.service.TipoIncidenciaService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.impl.ExpedienteJustificanteFinalService;
+import com.example.gestor_documental.service.impl.ExpedienteHaciendaDocumentacionService;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import java.io.IOException;
@@ -79,6 +80,7 @@ public class ExpedienteApiController {
     private final TipoTramiteService tipoTramiteService;
     private final CurrentUserService currentUserService;
     private final ExpedienteJustificanteFinalService justificanteFinalService;
+    private final ExpedienteHaciendaDocumentacionService haciendaDocumentacionService;
 
     @GetMapping
     public PagedResponse<ExpedienteListItemResponse> listarExpedientes(
@@ -378,6 +380,23 @@ public class ExpedienteApiController {
         justificanteFinalService.escribirZipJustificantesFinales(ids, admin, response.getOutputStream());
     }
 
+    @GetMapping("/documentacion-hacienda")
+    public void descargarDocumentacionHacienda(
+            @RequestParam("ids") List<Long> expedienteIds,
+            Authentication authentication,
+            HttpServletResponse response
+    ) throws IOException {
+        Usuario admin = requireAdmin(authentication);
+        List<Long> ids = normalizarIds(expedienteIds);
+        if (ids.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecciona al menos un expediente");
+        }
+
+        response.setContentType("application/zip");
+        response.setHeader("Content-Disposition", "attachment; filename=\"documentacion_hacienda_620.zip\"");
+        haciendaDocumentacionService.escribirZipDocumentacionHacienda(ids, admin, response.getOutputStream());
+    }
+
     @PostMapping("/{id}/incidencia")
     public ResponseEntity<Void> abrirIncidencia(
             @PathVariable Long id,
@@ -398,6 +417,12 @@ public class ExpedienteApiController {
     ) {
         String contenidoFinal = contenido != null ? contenido : body != null ? body.get("contenido") : null;
         mensajeService.añadirAExpediente(id, contenidoFinal, requireAdmin(authentication));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/mensajes/leidos")
+    public ResponseEntity<Void> marcarMensajesLeidos(@PathVariable Long id, Authentication authentication) {
+        mensajeService.marcarLeidosExpediente(id, usuario(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -523,6 +548,7 @@ public class ExpedienteApiController {
                 .siguienteAccion(siguienteAccion)
                 .justificantesFinalesDisponibles(justificanteFinalService.tieneJustificantesFinales(expediente.getId(), detalle.getEstado()))
                 .justificantesFinalesPendientes(justificanteFinalService.justificantesFinalesPendientes(expediente.getId(), detalle.getEstado()))
+                .documentacionHaciendaDisponible(haciendaDocumentacionService.tieneDocumentacionHaciendaDisponible(detalle))
                 .build();
     }
 

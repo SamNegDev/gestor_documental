@@ -34,4 +34,5 @@ public class ExpedienteListItemResponse {
     private boolean justificantesFinalesDisponibles;
     @Builder.Default
     private List<String> justificantesFinalesPendientes = new ArrayList<>();
+    private boolean documentacionHaciendaDisponible;
 }
