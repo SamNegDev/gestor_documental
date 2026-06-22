@@ -3,6 +3,7 @@ package com.example.gestor_documental.service.impl;
 import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
@@ -267,9 +268,10 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             throw new OperacionInvalidaException("El expediente no tiene una solicitud de informacion pendiente.");
         }
 
-        EstadoExpediente estadoDestino = hayRequisitosPendientes(expediente.getId())
+        EstadoExpediente estadoDestino = estadoBloqueantePorIncidenciasActivas(expediente.getId())
+                .orElseGet(() -> hayRequisitosPendientes(expediente.getId())
                 ? EstadoExpediente.PENDIENTE_DOCUMENTACION
-                : estadoReanudacion(expediente);
+                : estadoReanudacion(expediente));
         reanudar(expediente, estadoDestino, usuarioLogueado, "INFORMACION RESUELTA",
                 "La solicitud de informacion adicional se resolvio y el expediente retoma su tramitacion.");
     }
@@ -295,7 +297,9 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 || hayRequisitosPendientes(expediente.getId())) {
             return;
         }
-        reanudar(expediente, estadoReanudacion(expediente), usuarioLogueado, "DOCUMENTACION COMPLETADA",
+        EstadoExpediente estadoDestino = estadoBloqueantePorIncidenciasActivas(expediente.getId())
+                .orElseGet(() -> estadoReanudacion(expediente));
+        reanudar(expediente, estadoDestino, usuarioLogueado, "DOCUMENTACION COMPLETADA",
                 "Se completaron los requisitos documentales y el expediente retoma su tramitacion.");
     }
 
@@ -350,6 +354,17 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             return EstadoExpediente.EN_TRAMITE;
         }
         return previo;
+    }
+
+    private Optional<EstadoExpediente> estadoBloqueantePorIncidenciasActivas(Long expedienteId) {
+        List<Incidencia> activas = incidenciaRepository.findByExpedienteIdAndResueltaFalse(expedienteId);
+        if (activas.isEmpty()) {
+            return Optional.empty();
+        }
+        boolean documentacionPendiente = activas.stream()
+                .anyMatch(incidencia -> incidencia.getTipoIncidencia() != null
+                        && incidencia.getTipoIncidencia().getNombre() == TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION);
+        return Optional.of(documentacionPendiente ? EstadoExpediente.PENDIENTE_DOCUMENTACION : EstadoExpediente.INCIDENCIA);
     }
 
     private boolean hayRequisitosPendientes(Long expedienteId) {

@@ -20,6 +20,7 @@ import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.enums.TipoOperacionExpediente;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
@@ -114,7 +115,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .stream()
                 .collect(Collectors.toMap(HitoExpediente::getCodigo, hito -> hito, (actual, repetido) -> actual));
 
-        EstadoDetalle estadoDetalle = calcularEstadoDetalle(expediente, documentos, requisitos, hitosPersistidos);
+        EstadoExpediente estadoOperativo = calcularEstadoOperativo(expediente, incidencias);
+        EstadoDetalle estadoDetalle = calcularEstadoDetalle(expediente, estadoOperativo, documentos, requisitos, hitosPersistidos);
         List<HitoExpedienteResponse> hitos = calcularHitos(expediente, estadoDetalle);
         List<OperacionExpedienteResponse> operacionesResponse = operaciones.stream()
                 .map(operacion -> mapOperacion(expediente, operacion, estadoDetalle))
@@ -128,8 +130,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                         ? expediente.getTipoTramite().getNombre().name()
                         : null)
                 .tipoTramiteDescripcion(expediente.getTipoTramite() != null ? expediente.getTipoTramite().getDescripcion() : null)
-                .estado(expediente.getEstadoExpediente() != null ? expediente.getEstadoExpediente().name() : null)
-                .faseActual(calcularFaseActual(expediente, estadoDetalle))
+                .estado(estadoOperativo != null ? estadoOperativo.name() : null)
+                .faseActual(calcularFaseActual(estadoOperativo, estadoDetalle))
                 .fechaInicio(formatearFecha(expediente.getFechaCreacion()))
                 .fechaUltimaModificacion(formatearFecha(expediente.getFechaUltimaModificacion()))
                 .observaciones(expediente.getObservaciones())
@@ -168,6 +170,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
 
     private EstadoDetalle calcularEstadoDetalle(
             Expediente expediente,
+            EstadoExpediente estadoOperativo,
             List<Documento> documentos,
             List<RequisitoDocumentalExpediente> requisitos,
             Map<CodigoHitoExpediente, HitoExpediente> hitosPersistidos
@@ -180,12 +183,12 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .filter(requisito -> !esDocumentoFinal(requisito.getTipoDocumento()))
                 .noneMatch(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO);
         boolean expedienteCompletoSubido = tiposSubidos.contains(TipoDocumento.EXPEDIENTE_COMPLETO);
-        boolean finalizado = expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO;
-        boolean conIncidencia = expediente.getEstadoExpediente() == EstadoExpediente.INCIDENCIA
-                || expediente.getEstadoExpediente() == EstadoExpediente.REVISANDO_INCIDENCIAS;
-        boolean documentacionSolicitada = expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION;
-        boolean informacionSolicitada = expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL;
-        boolean informacionRecibida = expediente.getEstadoExpediente() == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA;
+        boolean finalizado = estadoOperativo == EstadoExpediente.FINALIZADO;
+        boolean conIncidencia = estadoOperativo == EstadoExpediente.INCIDENCIA
+                || estadoOperativo == EstadoExpediente.REVISANDO_INCIDENCIAS;
+        boolean documentacionSolicitada = estadoOperativo == EstadoExpediente.PENDIENTE_DOCUMENTACION;
+        boolean informacionSolicitada = estadoOperativo == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL;
+        boolean informacionRecibida = estadoOperativo == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA;
         boolean requisitosInicialesPendientes = !documentacionBaseCompleta;
         boolean modelo620Subido = !requiereModelo620(expediente)
                 || tiposSubidos.contains(TipoDocumento.MODELO_620)
@@ -193,28 +196,51 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 || requisitoModeloResuelto(requisitos, null);
         boolean tramiteSubido = finalizado || hitosPersistidos.containsKey(CodigoHitoExpediente.TRAMITE_PROGRAMA_GESTION);
         boolean enviadoDgt = finalizado
-                || expediente.getEstadoExpediente() == EstadoExpediente.ENVIADO_DGT
+                || estadoOperativo == EstadoExpediente.ENVIADO_DGT
                 || hitosPersistidos.containsKey(CodigoHitoExpediente.ENVIADO_DGT);
         return new EstadoDetalle(tiposSubidos, documentacionBaseCompleta, expedienteCompletoSubido, modelo620Subido,
                 requisitosInicialesPendientes, finalizado, conIncidencia, documentacionSolicitada, informacionSolicitada, informacionRecibida,
                 tramiteSubido, enviadoDgt, hitosPersistidos, requisitos);
     }
 
-    private String calcularFaseActual(Expediente expediente, EstadoDetalle estadoDetalle) {
-        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
+    private EstadoExpediente calcularEstadoOperativo(Expediente expediente, List<Incidencia> incidencias) {
+        EstadoExpediente estado = expediente.getEstadoExpediente();
+        if (estado == EstadoExpediente.FINALIZADO
+                || estado == EstadoExpediente.RECHAZADO
+                || estado == EstadoExpediente.PENDIENTE_DOCUMENTACION
+                || estado == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
+                || estado == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA
+                || estado == EstadoExpediente.INCIDENCIA
+                || estado == EstadoExpediente.REVISANDO_INCIDENCIAS) {
+            return estado;
+        }
+        List<Incidencia> activas = incidencias.stream()
+                .filter(incidencia -> !incidencia.isResuelta())
+                .toList();
+        if (activas.isEmpty()) {
+            return estado;
+        }
+        boolean documentacionPendiente = activas.stream()
+                .anyMatch(incidencia -> incidencia.getTipoIncidencia() != null
+                        && incidencia.getTipoIncidencia().getNombre() == TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION);
+        return documentacionPendiente ? EstadoExpediente.PENDIENTE_DOCUMENTACION : EstadoExpediente.INCIDENCIA;
+    }
+
+    private String calcularFaseActual(EstadoExpediente estadoOperativo, EstadoDetalle estadoDetalle) {
+        if (estadoOperativo == EstadoExpediente.FINALIZADO) {
             return "Finalizado";
         }
-        if (expediente.getEstadoExpediente() == EstadoExpediente.INCIDENCIA
-                || expediente.getEstadoExpediente() == EstadoExpediente.REVISANDO_INCIDENCIAS) {
+        if (estadoOperativo == EstadoExpediente.INCIDENCIA
+                || estadoOperativo == EstadoExpediente.REVISANDO_INCIDENCIAS) {
             return "Incidencias";
         }
-        if (expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION) {
+        if (estadoOperativo == EstadoExpediente.PENDIENTE_DOCUMENTACION) {
             return "Pendiente de documentacion";
         }
-        if (expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL) {
+        if (estadoOperativo == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL) {
             return "Solicitada informacion adicional";
         }
-        if (expediente.getEstadoExpediente() == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA) {
+        if (estadoOperativo == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA) {
             return "Informacion adicional recibida";
         }
         if (!estadoDetalle.documentacionBaseCompleta()) {
