@@ -1311,6 +1311,7 @@ export function ExpedienteDetailPage() {
           />
           <DocumentRequirementsPanel
             documentos={expediente.documentos}
+            inconsistencias={expediente.inconsistenciasDocumentales}
             interesados={expediente.interesados}
             openRequestSignal={requirementOpenSignal}
             requisitos={expediente.requisitosDocumentales}

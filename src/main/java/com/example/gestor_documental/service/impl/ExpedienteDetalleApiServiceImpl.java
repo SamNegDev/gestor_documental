@@ -6,6 +6,7 @@ import com.example.gestor_documental.dto.expediente.ExpedienteDetailResponse;
 import com.example.gestor_documental.dto.expediente.HistorialExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.HitoAccionResponse;
 import com.example.gestor_documental.dto.expediente.HitoExpedienteResponse;
+import com.example.gestor_documental.dto.expediente.InconsistenciaDocumentalResponse;
 import com.example.gestor_documental.dto.expediente.IncidenciaExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.InteresadoExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.MensajeExpedienteResponse;
@@ -16,6 +17,7 @@ import com.example.gestor_documental.dto.expediente.WhatsappExpedienteResponse;
 import com.example.gestor_documental.enums.CodigoHitoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoExpediente;
+import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoLogoCliente;
@@ -140,6 +142,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .interesados(interesados.stream().map(this::mapInteresado).toList())
                 .documentos(mapDocumentos(documentos, estadoDetalle))
                 .requisitosDocumentales(requisitos.stream().map(this::mapRequisitoDocumental).toList())
+                .inconsistenciasDocumentales(calcularInconsistenciasDocumentales(requisitos, documentos, interesados))
                 .operaciones(operacionesResponse)
                 .hitos(hitos)
                 .incidencias(incidencias.stream().map(incidencia -> mapIncidencia(incidencia, documentos, expediente)).toList())
@@ -874,6 +877,182 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .contenido(mensaje.getContenido())
                 .noLeidoParaUsuario(noLeidoParaUsuario)
                 .build();
+    }
+
+    private List<InconsistenciaDocumentalResponse> calcularInconsistenciasDocumentales(
+            List<RequisitoDocumentalExpediente> requisitos,
+            List<Documento> documentos,
+            List<ExpedienteInteresado> interesados
+    ) {
+        List<InconsistenciaDocumentalResponse> resultado = new ArrayList<>();
+        Map<RolInteresado, Interesado> interesadoActualPorRol = interesados.stream()
+                .filter(relacion -> relacion.getRol() != null && relacion.getInteresado() != null)
+                .collect(Collectors.toMap(
+                        ExpedienteInteresado::getRol,
+                        ExpedienteInteresado::getInteresado,
+                        (actual, repetido) -> actual,
+                        java.util.LinkedHashMap::new
+                ));
+        Map<String, RequisitoDocumentalExpediente> requeridoPorClave = new java.util.LinkedHashMap<>();
+
+        for (RequisitoDocumentalExpediente requisito : requisitos) {
+            if (requisito.getEstado() != EstadoRequisitoDocumental.REQUERIDO) {
+                continue;
+            }
+            if (requisito.getDocumento() != null) {
+                Documento documento = requisito.getDocumento();
+                if (requisito.getInteresado() != null
+                        && documento.getInteresado() != null
+                        && !java.util.Objects.equals(requisito.getInteresado().getId(), documento.getInteresado().getId())) {
+                    resultado.add(inconsistencia(
+                            "DOCUMENTO_DE_OTRA_PERSONA",
+                            "ALTA",
+                            "Documento vinculado a otra persona",
+                            "El requisito tiene un documento asociado, pero ese documento pertenece a otro interesado.",
+                            requisito,
+                            null,
+                            "REVISAR_DOCUMENTO"
+                    ));
+                }
+                continue;
+            }
+
+            String clave = claveRequisito(requisito);
+            RequisitoDocumentalExpediente previo = requeridoPorClave.putIfAbsent(clave, requisito);
+            if (previo != null) {
+                resultado.add(inconsistencia(
+                        "REQUISITO_DUPLICADO",
+                        "MEDIA",
+                        "Requisito duplicado",
+                        "Hay mas de un requisito automatico pendiente para el mismo documento e interesado.",
+                        requisito,
+                        null,
+                        "REVISAR_REQUISITO"
+                ));
+            }
+
+            if (esDocumentoIdentidad(requisito.getTipoDocumento()) && requisito.getRolInteresado() != null) {
+                Interesado interesadoActual = interesadoActualPorRol.get(requisito.getRolInteresado());
+                if (interesadoActual != null && requisito.getInteresado() == null) {
+                    resultado.add(inconsistencia(
+                            "REQUISITO_SIN_INTERESADO",
+                            "MEDIA",
+                            "Requisito sin interesado",
+                            "El requisito esta asociado al rol " + requisito.getRolInteresado().name() + ", pero no a la persona actual del expediente.",
+                            requisito,
+                            documentoSugerido(requisito, documentos, interesadoActual),
+                            "VINCULAR_DOCUMENTO"
+                    ));
+                    continue;
+                }
+                if (interesadoActual != null
+                        && requisito.getInteresado() != null
+                        && !java.util.Objects.equals(requisito.getInteresado().getId(), interesadoActual.getId())) {
+                    resultado.add(inconsistencia(
+                            "REQUISITO_INTERESADO_DESACTUALIZADO",
+                            "ALTA",
+                            "Requisito apunta a otro interesado",
+                            "El requisito no coincide con la persona actual del rol " + requisito.getRolInteresado().name() + ".",
+                            requisito,
+                            documentoSugerido(requisito, documentos, interesadoActual),
+                            "VINCULAR_DOCUMENTO"
+                    ));
+                    continue;
+                }
+            }
+
+            Documento sugerido = documentoSugerido(requisito, documentos, requisito.getInteresado());
+            if (sugerido != null) {
+                resultado.add(inconsistencia(
+                        "DOCUMENTO_POSIBLE_SIN_VINCULAR",
+                        "BAJA",
+                        "Documento posible sin vincular",
+                        "Existe un documento que podria cubrir este requisito, pero no esta vinculado automaticamente.",
+                        requisito,
+                        sugerido,
+                        "VINCULAR_DOCUMENTO"
+                ));
+            }
+        }
+        return resultado.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getCodigo() + "|" + item.getRequisitoId() + "|" + item.getDocumentoSugeridoId(),
+                        item -> item,
+                        (actual, repetido) -> actual,
+                        java.util.LinkedHashMap::new
+                ))
+                .values()
+                .stream()
+                .toList();
+    }
+
+    private InconsistenciaDocumentalResponse inconsistencia(
+            String codigo,
+            String severidad,
+            String titulo,
+            String detalle,
+            RequisitoDocumentalExpediente requisito,
+            Documento documentoSugerido,
+            String accionSugerida
+    ) {
+        return InconsistenciaDocumentalResponse.builder()
+                .codigo(codigo)
+                .severidad(severidad)
+                .titulo(titulo)
+                .detalle(detalle)
+                .requisitoId(requisito.getId())
+                .documentoSugeridoId(documentoSugerido != null ? documentoSugerido.getId() : null)
+                .documentoSugeridoNombre(documentoSugerido != null ? documentoSugerido.getNombreArchivoOriginal() : null)
+                .accionSugerida(accionSugerida)
+                .build();
+    }
+
+    private Documento documentoSugerido(
+            RequisitoDocumentalExpediente requisito,
+            List<Documento> documentos,
+            Interesado interesadoReferencia
+    ) {
+        return documentos.stream()
+                .filter(documento -> documento.getId() != null)
+                .filter(documento -> documentoCubreRequisitoLigero(documento, requisito))
+                .filter(documento -> interesadoReferencia == null
+                        || documento.getInteresado() == null
+                        || java.util.Objects.equals(documento.getInteresado().getId(), interesadoReferencia.getId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean documentoCubreRequisitoLigero(Documento documento, RequisitoDocumentalExpediente requisito) {
+        TipoDocumento documentoTipo = documento.getTipoDocumento();
+        TipoDocumento requisitoTipo = requisito.getTipoDocumento();
+        if (documentoTipo == null || requisitoTipo == null) {
+            return false;
+        }
+        if (documentoTipo == requisitoTipo) {
+            return true;
+        }
+        if (requisitoTipo == TipoDocumento.CONTRATO_COMPRAVENTA) {
+            return documentoTipo == TipoDocumento.FACTURA;
+        }
+        if (requisitoTipo == TipoDocumento.PERMISO_CIRCULACION || requisitoTipo == TipoDocumento.FICHA_TECNICA) {
+            return documentoTipo == TipoDocumento.INFORME_DGT;
+        }
+        return requisitoTipo == TipoDocumento.MANDATO && documentoTipo == TipoDocumento.MANDATO_REPRESENTACION;
+    }
+
+    private boolean esDocumentoIdentidad(TipoDocumento tipoDocumento) {
+        return tipoDocumento == TipoDocumento.DNI || tipoDocumento == TipoDocumento.CIF;
+    }
+
+    private String claveRequisito(RequisitoDocumentalExpediente requisito) {
+        return String.join("|",
+                requisito.getTipoDocumento() != null ? requisito.getTipoDocumento().name() : "",
+                requisito.getInteresado() != null && requisito.getInteresado().getId() != null ? requisito.getInteresado().getId().toString() : "",
+                requisito.getRolInteresado() != null ? requisito.getRolInteresado().name() : "",
+                requisito.getInteresadoRepresentado() != null && requisito.getInteresadoRepresentado().getId() != null ? requisito.getInteresadoRepresentado().getId().toString() : "",
+                requisito.getRolRepresentado() != null ? requisito.getRolRepresentado().name() : "",
+                requisito.getOperacion() != null && requisito.getOperacion().getId() != null ? requisito.getOperacion().getId().toString() : ""
+        );
     }
 
     private ClienteResumenResponse mapCliente(Cliente cliente) {

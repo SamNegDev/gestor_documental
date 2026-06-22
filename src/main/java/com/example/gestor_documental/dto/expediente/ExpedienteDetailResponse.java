@@ -43,6 +43,9 @@ public class ExpedienteDetailResponse {
     private List<RequisitoDocumentalResponse> requisitosDocumentales = new ArrayList<>();
 
     @Builder.Default
+    private List<InconsistenciaDocumentalResponse> inconsistenciasDocumentales = new ArrayList<>();
+
+    @Builder.Default
     private List<OperacionExpedienteResponse> operaciones = new ArrayList<>();
 
     @Builder.Default

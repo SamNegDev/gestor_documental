@@ -32,6 +32,7 @@ import com.example.gestor_documental.repository.OperacionExpedienteRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,7 +40,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Objects;
@@ -61,6 +64,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     private final GestionPersonaRepresentanteCatalogoRepository representanteCatalogoRepository;
     private final HitoExpedienteRepository hitoRepository;
     private final OperacionExpedienteRepository operacionRepository;
+    private final HistorialCambioService historialCambioService;
 
     @Override
     @Transactional
@@ -72,6 +76,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     ) {
         generarRequisitosBase(expediente, interesados, usuario);
         generarRequisitosPosteriores(expediente, usuario);
+        depurarRequisitosAutomaticos(expediente, interesados, usuario);
         reconciliarConDocumentos(expediente, documentos, usuario);
         return requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId());
     }
@@ -624,6 +629,100 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                         || requisito.getInteresado().getId() == null
                         || !Objects.equals(requisito.getInteresado().getId(), interesadoActual.getId()))
                 .forEach(requisitoRepository::delete);
+    }
+
+    private void depurarRequisitosAutomaticos(
+            Expediente expediente,
+            List<ExpedienteInteresado> relaciones,
+            Usuario usuario
+    ) {
+        List<RequisitoDocumentalExpediente> requisitos = requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId());
+        Map<RolInteresado, Interesado> interesadoActualPorRol = new LinkedHashMap<>();
+        for (ExpedienteInteresado relacion : relaciones != null ? relaciones : List.<ExpedienteInteresado>of()) {
+            if (relacion.getRol() != null && relacion.getInteresado() != null) {
+                interesadoActualPorRol.putIfAbsent(relacion.getRol(), relacion.getInteresado());
+            }
+        }
+
+        List<RequisitoDocumentalExpediente> eliminables = new ArrayList<>();
+        for (RequisitoDocumentalExpediente requisito : requisitos) {
+            if (!esRequisitoAutomaticoPendienteSinDocumento(requisito)) {
+                continue;
+            }
+            if (!esDocumentoIdentidad(requisito.getTipoDocumento()) || requisito.getRolInteresado() == null) {
+                continue;
+            }
+            Interesado interesadoActual = interesadoActualPorRol.get(requisito.getRolInteresado());
+            if (interesadoActual == null || interesadoActual.getId() == null) {
+                continue;
+            }
+            if (requisito.getInteresado() == null
+                    || requisito.getInteresado().getId() == null
+                    || !Objects.equals(requisito.getInteresado().getId(), interesadoActual.getId())) {
+                eliminables.add(requisito);
+            }
+        }
+
+        eliminables.addAll(requisitosAutomaticosDuplicados(requisitos, eliminables));
+        List<RequisitoDocumentalExpediente> unicos = eliminables.stream().distinct().toList();
+        if (unicos.isEmpty()) {
+            return;
+        }
+        requisitoRepository.deleteAll(unicos);
+        historialCambioService.registrarCambioExpediente(
+                expediente,
+                usuario,
+                "SANEAMIENTO DOCUMENTAL",
+                "Se eliminaron " + unicos.size() + " requisitos automaticos obsoletos o duplicados."
+        );
+    }
+
+    private List<RequisitoDocumentalExpediente> requisitosAutomaticosDuplicados(
+            List<RequisitoDocumentalExpediente> requisitos,
+            List<RequisitoDocumentalExpediente> yaEliminables
+    ) {
+        List<RequisitoDocumentalExpediente> duplicados = new ArrayList<>();
+        Map<String, RequisitoDocumentalExpediente> requeridoPorClave = new LinkedHashMap<>();
+        Map<String, Boolean> resueltoPorClave = new LinkedHashMap<>();
+        for (RequisitoDocumentalExpediente requisito : requisitos) {
+            if (requisito.getOrigen() != OrigenRequisitoDocumental.REGLA) {
+                continue;
+            }
+            String clave = claveRequisito(requisito);
+            if (requisito.getDocumento() != null || requisito.getEstado() == EstadoRequisitoDocumental.APORTADO) {
+                resueltoPorClave.put(clave, true);
+                continue;
+            }
+            if (!esRequisitoAutomaticoPendienteSinDocumento(requisito) || yaEliminables.contains(requisito)) {
+                continue;
+            }
+            if (Boolean.TRUE.equals(resueltoPorClave.get(clave))) {
+                duplicados.add(requisito);
+                continue;
+            }
+            RequisitoDocumentalExpediente previo = requeridoPorClave.putIfAbsent(clave, requisito);
+            if (previo != null) {
+                duplicados.add(requisito);
+            }
+        }
+        return duplicados;
+    }
+
+    private boolean esRequisitoAutomaticoPendienteSinDocumento(RequisitoDocumentalExpediente requisito) {
+        return requisito.getOrigen() == OrigenRequisitoDocumental.REGLA
+                && requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO
+                && requisito.getDocumento() == null;
+    }
+
+    private String claveRequisito(RequisitoDocumentalExpediente requisito) {
+        return String.join("|",
+                requisito.getTipoDocumento() != null ? requisito.getTipoDocumento().name() : "",
+                requisito.getInteresado() != null && requisito.getInteresado().getId() != null ? requisito.getInteresado().getId().toString() : "",
+                requisito.getRolInteresado() != null ? requisito.getRolInteresado().name() : "",
+                requisito.getInteresadoRepresentado() != null && requisito.getInteresadoRepresentado().getId() != null ? requisito.getInteresadoRepresentado().getId().toString() : "",
+                requisito.getRolRepresentado() != null ? requisito.getRolRepresentado().name() : "",
+                requisito.getOperacion() != null && requisito.getOperacion().getId() != null ? requisito.getOperacion().getId().toString() : ""
+        );
     }
 
     private boolean mismaOperacion(OperacionExpediente actual, OperacionExpediente esperada) {

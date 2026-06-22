@@ -157,6 +157,17 @@ export interface RequisitoDocumental {
   fechaResolucion?: string | null;
 }
 
+export interface InconsistenciaDocumental {
+  codigo: string;
+  severidad: "BAJA" | "MEDIA" | "ALTA" | string;
+  titulo: string;
+  detalle: string;
+  requisitoId?: number | null;
+  documentoSugeridoId?: number | null;
+  documentoSugeridoNombre?: string | null;
+  accionSugerida?: string | null;
+}
+
 export interface HitoExpediente {
   id: string;
   titulo: string;
@@ -336,6 +347,7 @@ export interface ExpedienteDetail {
   interesados: InteresadoExpediente[];
   documentos: DocumentoExpediente[];
   requisitosDocumentales: RequisitoDocumental[];
+  inconsistenciasDocumentales: InconsistenciaDocumental[];
   operaciones: OperacionExpediente[];
   hitos: HitoExpediente[];
   incidencias: IncidenciaExpediente[];

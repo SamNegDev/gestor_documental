@@ -1,11 +1,12 @@
-import { CheckCircle2, CircleDashed, FileText, Link2, Plus, Slash, Upload, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleDashed, FileText, Link2, Plus, Slash, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { DocumentoExpediente, InteresadoExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
+import type { DocumentoExpediente, InconsistenciaDocumental, InteresadoExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 import { formatDocumentType, humanizeEnum } from "../utils/formatters";
 import { uppercaseInput } from "../../../shared/utils/text";
 
 type Props = {
   requisitos: RequisitoDocumental[];
+  inconsistencias?: InconsistenciaDocumental[];
   documentos: DocumentoExpediente[];
   interesados: InteresadoExpediente[];
   onAddRequirement: (input: {
@@ -53,6 +54,7 @@ function RequirementIcon({ estado }: { estado: RequisitoDocumental["estado"] }) 
 
 export function DocumentRequirementsPanel({
   requisitos,
+  inconsistencias = [],
   documentos,
   interesados,
   onAddRequirement,
@@ -76,6 +78,7 @@ export function DocumentRequirementsPanel({
   const requisitosPendientes = requisitos.filter((requisito) => !CLOSING_REQUIREMENT_TYPES.has(requisito.tipoDocumento) && requisito.estado === "REQUERIDO");
   const pendientes = requisitosPendientes.length;
   const documentosSubidos = documentos.filter((documento) => documento.id);
+  const visibleInconsistencias = inconsistencias.filter((item) => item.requisitoId);
 
   useEffect(() => {
     if (openRequestSignal <= 0) return;
@@ -147,6 +150,42 @@ export function DocumentRequirementsPanel({
         </div>
       </div>
       <div className="requirements-list">
+        {visibleInconsistencias.length > 0 ? (
+          <div className="document-inconsistency-menu" aria-label="Casos documentales a revisar">
+            <div className="document-inconsistency-menu__heading">
+              <AlertTriangle size={17} />
+              <div>
+                <strong>Casos a revisar</strong>
+                <span>{visibleInconsistencias.length} incidencia{visibleInconsistencias.length === 1 ? "" : "s"} documental{visibleInconsistencias.length === 1 ? "" : "es"}</span>
+              </div>
+            </div>
+            {visibleInconsistencias.map((item) => {
+              const requisito = requisitos.find((current) => current.id === item.requisitoId);
+              const canLink = Boolean(requisito && item.documentoSugeridoId && item.accionSugerida === "VINCULAR_DOCUMENTO");
+              return (
+                <article className={`document-inconsistency document-inconsistency--${String(item.severidad || "MEDIA").toLowerCase()}`} key={`${item.codigo}-${item.requisitoId}-${item.documentoSugeridoId || "sin-doc"}`}>
+                  <div>
+                    <strong>{item.titulo}</strong>
+                    <p>{item.detalle}</p>
+                    {item.documentoSugeridoNombre ? <small>Documento sugerido: {item.documentoSugeridoNombre}</small> : null}
+                  </div>
+                  {canLink && requisito ? (
+                    <button
+                      className="soft-button soft-button--compact"
+                      onClick={() => onLinkRequirementDocument(requisito, Number(item.documentoSugeridoId))}
+                      type="button"
+                    >
+                      <Link2 size={15} />
+                      Vincular
+                    </button>
+                  ) : (
+                    <span className="document-inconsistency__status">{humanizeEnum(item.severidad)}</span>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
         {requisitosVisibles.map((requisito) => {
           const bloqueado = requisito.estado === "POSTERIOR";
           const esModelo620 = requisito.tipoDocumento === "MODELO_620";
