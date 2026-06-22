@@ -5,6 +5,7 @@ import com.example.gestor_documental.service.impl.ResumenDiarioTramitesService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,6 +28,18 @@ public class ResumenDiarioApiController {
         currentUserService.requireAdmin(authentication);
         ResumenDiarioTramitesService.ResultadoResumenDiario resultado =
                 resumenDiarioTramitesService.enviarResumenDiarioManual(incluirClientesSinCambios);
+        return new ResumenDiarioResponse(resultado.clientesEnviados(), resultado.cambiosIncluidos(), resultado.avisos());
+    }
+
+    @PostMapping("/clientes/{clienteId}/enviar")
+    public ResumenDiarioResponse enviarCliente(
+            @PathVariable Long clienteId,
+            @RequestParam(defaultValue = "true") boolean incluirClienteSinCambios,
+            Authentication authentication
+    ) {
+        currentUserService.requireAdmin(authentication);
+        ResumenDiarioTramitesService.ResultadoResumenDiario resultado =
+                resumenDiarioTramitesService.enviarResumenDiarioManualCliente(clienteId, incluirClienteSinCambios);
         return new ResumenDiarioResponse(resultado.clientesEnviados(), resultado.cambiosIncluidos(), resultado.avisos());
     }
 

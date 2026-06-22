@@ -25,5 +25,22 @@ public interface HistorialCambioRepository extends JpaRepository<HistorialCambio
             order by h.fechaCambio asc, h.id asc
             """)
     List<HistorialCambio> findCambiosExpedienteEntre(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
+
+    @Query("""
+            select h from HistorialCambio h
+            join fetch h.expediente e
+            left join fetch e.cliente
+            left join fetch e.tipoTramite
+            left join fetch h.usuario
+            where h.expediente is not null
+              and e.cliente.id = :clienteId
+              and h.fechaCambio >= :desde
+              and h.fechaCambio < :hasta
+            order by h.fechaCambio asc, h.id asc
+            """)
+    List<HistorialCambio> findCambiosExpedienteClienteEntre(@Param("clienteId") Long clienteId,
+                                                            @Param("desde") LocalDateTime desde,
+                                                            @Param("hasta") LocalDateTime hasta);
+
     void deleteBySolicitudId(Long solicitudId);
 }

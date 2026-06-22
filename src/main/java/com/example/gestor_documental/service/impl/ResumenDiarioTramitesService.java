@@ -7,6 +7,7 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.HistorialCambioRepository;
 import com.example.gestor_documental.service.CorreoService;
+import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,6 +55,31 @@ public class ResumenDiarioTramitesService {
 
     public ResultadoResumenDiario enviarResumenDiarioManual(boolean incluirClientesSinCambios) {
         return enviarResumenDiario(incluirClientesSinCambios);
+    }
+
+    public ResultadoResumenDiario enviarResumenDiarioManualCliente(Long clienteId, boolean incluirClienteSinCambios) {
+        Cliente cliente = clienteRepository.findById(clienteId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado"));
+        ZoneId zoneId = ZoneId.of(zone);
+        LocalDate hoy = LocalDate.now(zoneId);
+        LocalDateTime desde = hoy.atStartOfDay();
+        LocalDateTime hasta = LocalDateTime.now(zoneId).withNano(0);
+        List<HistorialCambio> cambios = historialCambioRepository.findCambiosExpedienteClienteEntre(clienteId, desde, hasta);
+
+        if (!StringUtils.hasText(cliente.getEmail())) {
+            return new ResultadoResumenDiario(0, cambios.size(), List.of("El cliente no tiene email configurado."));
+        }
+        if (cambios.isEmpty() && !incluirClienteSinCambios) {
+            return new ResultadoResumenDiario(0, 0, List.of("El cliente no tiene cambios registrados hoy."));
+        }
+
+        String asunto = "Resumen diario de tramites - " + hoy.format(FECHA);
+        String mensaje = construirMensaje(cliente, hoy, desde, hasta, cambios);
+        CorreoService.ResultadoCorreo resultado = enviar(cliente.getEmail(), asunto, mensaje, copiasOcultas(cliente.getEmail()));
+        if (resultado.exito()) {
+            return new ResultadoResumenDiario(1, cambios.size(), List.of());
+        }
+        return new ResultadoResumenDiario(0, cambios.size(), List.of("No se pudo enviar a " + cliente.getEmail() + ": " + resultado.error()));
     }
 
     private ResultadoResumenDiario enviarResumenDiario(boolean incluirClientesSinCambios) {

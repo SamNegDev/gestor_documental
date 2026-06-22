@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Building2, ExternalLink, FileText, Image, MessageCircle, Save, Trash2, Upload, UserRound } from "lucide-react";
+import { ArrowLeft, Building2, ExternalLink, FileText, Image, Mail, MessageCircle, Save, Trash2, Upload, UserRound } from "lucide-react";
 import {
   createCliente,
   deleteClienteDocumento,
   deleteClienteLogo,
+  enviarResumenDiarioCliente,
   getCliente,
   iniciarWhatsappCliente,
   updateCliente,
@@ -65,6 +66,7 @@ export function ClienteFormPage() {
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [documentFeedback, setDocumentFeedback] = useState<BrandingFeedback>(null);
   const [whatsappFeedback, setWhatsappFeedback] = useState<BrandingFeedback>(null);
+  const [summaryFeedback, setSummaryFeedback] = useState<BrandingFeedback>(null);
   const { confirm, dialog } = useConfirmDialog();
 
   const clienteQuery = useQuery({
@@ -155,6 +157,20 @@ export function ClienteFormPage() {
     onError: (cause) => setWhatsappFeedback({ tone: "danger", text: errorMessage(cause, "No se pudo iniciar la conversacion por WhatsApp.") }),
   });
 
+  const sendSummaryMutation = useMutation({
+    mutationFn: () => enviarResumenDiarioCliente(id!, true),
+    onSuccess: (resultado) => {
+      const avisos = resultado.avisos.length ? ` ${resultado.avisos.join(" ")}` : "";
+      setSummaryFeedback({
+        tone: resultado.clientesEnviados > 0 ? "success" : "danger",
+        text: resultado.clientesEnviados > 0
+          ? `Resumen enviado. Cambios incluidos: ${resultado.cambiosIncluidos}.${avisos}`
+          : avisos || "No se pudo enviar el resumen diario.",
+      });
+    },
+    onError: (cause) => setSummaryFeedback({ tone: "danger", text: errorMessage(cause, "No se pudo enviar el resumen diario.") }),
+  });
+
   function handleLogoFile(tipo: LogoType, archivo?: File) {
     if (!archivo) return;
     setBrandingFeedback(null);
@@ -211,6 +227,19 @@ export function ClienteFormPage() {
     if (confirmed) deleteDocumentMutation.mutate(documento.id);
   }
 
+  async function handleSendSummary() {
+    const confirmed = await confirm({
+      title: "Enviar resumen diario",
+      description: `Se enviara al email configurado para ${form.nombre || "este cliente"} con los cambios registrados hoy. Si no hay cambios, recibira igualmente el resumen sin actividad.`,
+      confirmLabel: "Enviar resumen",
+      tone: "default",
+    });
+    if (confirmed) {
+      setSummaryFeedback(null);
+      sendSummaryMutation.mutate();
+    }
+  }
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!form.nif.trim() || !form.nombre.trim() || !form.email.trim()) throw new Error("NIF, nombre y email son obligatorios.");
@@ -241,6 +270,17 @@ export function ClienteFormPage() {
           {isEdit ? (
             <button
               className="soft-button soft-button--compact"
+              disabled={!form.email || sendSummaryMutation.isPending}
+              type="button"
+              onClick={handleSendSummary}
+            >
+              <Mail size={16} />
+              {sendSummaryMutation.isPending ? "Enviando" : "Enviar resumen"}
+            </button>
+          ) : null}
+          {isEdit ? (
+            <button
+              className="soft-button soft-button--compact"
               disabled={!form.telefono || iniciarWhatsappMutation.isPending}
               type="button"
               onClick={() => {
@@ -262,6 +302,12 @@ export function ClienteFormPage() {
       {whatsappFeedback ? (
         <p className={`client-branding-feedback client-branding-feedback--${whatsappFeedback.tone}`} role="status">
           {whatsappFeedback.text}
+        </p>
+      ) : null}
+
+      {summaryFeedback ? (
+        <p className={`client-branding-feedback client-branding-feedback--${summaryFeedback.tone}`} role="status">
+          {summaryFeedback.text}
         </p>
       ) : null}
 

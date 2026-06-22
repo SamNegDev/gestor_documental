@@ -23,6 +23,12 @@ export interface ClienteInput {
   preferenciaCanal?: "EMAIL" | "WHATSAPP" | "AMBOS" | "SIN_AVISOS" | null;
 }
 
+export interface ResumenDiarioResponse {
+  clientesEnviados: number;
+  cambiosIncluidos: number;
+  avisos: string[];
+}
+
 export interface UsuarioAdmin {
   id: number;
   nombre: string;

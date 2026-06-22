@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPostForm, apiPostJson, apiPutJson } from "../../../shared/api/http";
-import type { ClienteAdmin, ClienteInput, UsuarioAdmin, UsuarioCatalogs, UsuarioInput } from "../types";
+import type { ClienteAdmin, ClienteInput, ResumenDiarioResponse, UsuarioAdmin, UsuarioCatalogs, UsuarioInput } from "../types";
 
 export function getClientes() {
   return apiGet<ClienteAdmin[]>("/api/admin/clientes");
@@ -44,6 +44,13 @@ export function deleteClienteDocumento(documentoId: number) {
 
 export function iniciarWhatsappCliente(id: string | number) {
   return apiPostJson<{ exito: boolean; simulado: boolean; messageId?: string }>(`/api/admin/clientes/${id}/whatsapp/iniciar`, {});
+}
+
+export function enviarResumenDiarioCliente(id: string | number, incluirClienteSinCambios = true) {
+  return apiPostJson<ResumenDiarioResponse>(
+    `/api/admin/resumen-diario-tramites/clientes/${id}/enviar?incluirClienteSinCambios=${incluirClienteSinCambios}`,
+    {},
+  );
 }
 
 export function getUsuarios() {
