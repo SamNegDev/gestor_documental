@@ -15,8 +15,10 @@ import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.UsuarioRepository;
 import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
+import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.OcrPdfService;
+import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
 import com.example.gestor_documental.service.WhatsappMediaService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,6 +55,8 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
     private final UsuarioRepository usuarioRepository;
     private final HistorialCambioService historialCambioService;
     private final OcrPdfService ocrPdfService;
+    private final DocumentoService documentoService;
+    private final SolicitudDocumentacionIaService solicitudDocumentacionIaService;
 
     @Value("${app.whatsapp.access-token:}")
     private String accessToken;
@@ -146,6 +150,10 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
         if ((expediente == null && solicitud == null) || !StringUtils.hasText(adjunto.getNombreArchivo())) {
             return;
         }
+        if (expediente == null && solicitud != null && esPdf(adjunto)) {
+            adjuntarPdfCompletoASolicitud(adjunto, solicitud);
+            return;
+        }
         TipoDocumento tipo = tipoPorNombre(adjunto.getNombreArchivoOriginal())
                 .or(() -> tipoPorOcr(adjunto))
                 .or(() -> expediente != null ? tipoPorRequisitoUnico(expediente) : Optional.empty())
@@ -180,6 +188,40 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
         registrarAdjuntoAutomatico(expediente, solicitud, tipo, documento);
     }
 
+    private void adjuntarPdfCompletoASolicitud(WhatsappAdjunto adjunto, Solicitud solicitud) {
+        Path archivo = rutaAdjunto(adjunto);
+        if (archivo == null) {
+            return;
+        }
+        Usuario usuario = Optional.ofNullable(usuarioCliente(null, solicitud))
+                .or(() -> primerAdminActivo())
+                .orElse(null);
+        documentoService.guardarParaSolicitud(solicitud.getId(), new PathMultipartFile(
+                archivo,
+                adjunto.getNombreArchivoOriginal(),
+                adjunto.getMimeType()), TipoDocumento.EXPEDIENTE_COMPLETO, usuario);
+        adjunto.setEstado(EstadoWhatsappAdjunto.CLASIFICADO);
+        historialCambioService.registrarCambioSolicitud(solicitud, usuario, "WHATSAPP DOCUMENTO",
+                "Adjunto PDF de WhatsApp incorporado como expediente completo: "
+                        + (StringUtils.hasText(adjunto.getNombreArchivoOriginal())
+                        ? adjunto.getNombreArchivoOriginal()
+                        : "Documento recibido por WhatsApp")
+                        + ".");
+        intentarLecturaIaSolicitud(solicitud);
+    }
+
+    private void intentarLecturaIaSolicitud(Solicitud solicitud) {
+        Usuario admin = primerAdminActivo().orElse(null);
+        if (admin == null) {
+            return;
+        }
+        try {
+            solicitudDocumentacionIaService.procesarDocumentacion(solicitud.getId(), admin);
+        } catch (RuntimeException ignored) {
+            // La lectura IA es una ayuda posterior al OCR; el documento debe quedar igualmente disponible para revision manual.
+        }
+    }
+
     private void registrarAdjuntoAutomatico(Expediente expediente, Solicitud solicitud, TipoDocumento tipo, Documento documento) {
         String tipoTexto = tipo.name().replace('_', ' ');
         if (expediente != null) {
@@ -202,11 +244,8 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
     }
 
     private Optional<TipoDocumento> tipoPorOcr(WhatsappAdjunto adjunto) {
-        if (!StringUtils.hasText(adjunto.getNombreArchivo())) {
-            return Optional.empty();
-        }
-        Path archivo = Paths.get(uploadDir).toAbsolutePath().normalize().resolve(adjunto.getNombreArchivo()).normalize();
-        if (!archivo.startsWith(Paths.get(uploadDir).toAbsolutePath().normalize()) || !Files.exists(archivo)) {
+        Path archivo = rutaAdjunto(adjunto);
+        if (archivo == null) {
             return Optional.empty();
         }
         try {
@@ -217,6 +256,25 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
         } catch (RuntimeException exception) {
             return Optional.empty();
         }
+    }
+
+    private Path rutaAdjunto(WhatsappAdjunto adjunto) {
+        if (!StringUtils.hasText(adjunto.getNombreArchivo())) {
+            return null;
+        }
+        Path base = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Path archivo = base.resolve(adjunto.getNombreArchivo()).normalize();
+        if (!archivo.startsWith(base) || !Files.exists(archivo)) {
+            return null;
+        }
+        return archivo;
+    }
+
+    private boolean esPdf(WhatsappAdjunto adjunto) {
+        String mimeType = adjunto.getMimeType();
+        String nombre = adjunto.getNombreArchivoOriginal();
+        return "application/pdf".equalsIgnoreCase(mimeType)
+                || (StringUtils.hasText(nombre) && nombre.toLowerCase(Locale.ROOT).endsWith(".pdf"));
     }
 
     private Optional<TipoDocumento> tipoPorNombre(String nombre) {
@@ -281,6 +339,10 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
         }
         return usuarioRepository.findFirstByClienteIdAndRolUsuarioAndActivoTrueOrderByIdAsc(clienteId, RolUsuario.CLIENTE)
                 .orElse(null);
+    }
+
+    private Optional<Usuario> primerAdminActivo() {
+        return usuarioRepository.findFirstByRolUsuarioAndActivoTrueOrderByIdAsc(RolUsuario.ADMIN);
     }
 
     private record PathMultipartFile(Path path, String originalFilename, String contentType) implements MultipartFile {

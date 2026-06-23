@@ -54,6 +54,7 @@ import java.util.HexFormat;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -86,6 +87,8 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
     private static final DateTimeFormatter FECHA_ESTADO_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final long VENTANA_NUEVO_LOTE_DOCUMENTOS_SEGUNDOS = 180;
     private static final long ESPERA_CIERRE_LOTE_DOCUMENTOS_SEGUNDOS = 75;
+    private static final int DIGITOS_TELEFONO_COINCIDENCIA = 9;
+    private static final long HORAS_VALIDEZ_CONTEXTO_WHATSAPP = 24;
 
     private final ConcurrentMap<String, LoteDocumentosWhatsapp> lotesDocumentosPorContexto = new ConcurrentHashMap<>();
     private final ScheduledExecutorService cierreLotesDocumentosExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -196,18 +199,30 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         if (!StringUtils.hasText(evento.getTelefono())) {
             return;
         }
-        Optional<Cliente> cliente = clienteRepository.findAll().stream()
-                .filter(item -> coincideTelefono(evento.getTelefono(), item.getTelefono()))
-                .findFirst();
-        cliente.ifPresent(evento::setCliente);
+        resolverClientePorTelefono(evento.getTelefono()).ifPresent(evento::setCliente);
+    }
+
+    private Optional<Cliente> resolverClientePorTelefono(String telefono) {
+        List<Cliente> candidatos = clienteRepository.findAll().stream()
+                .filter(item -> coincideTelefono(telefono, item.getTelefono()))
+                .toList();
+        return candidatos.size() == 1 ? Optional.of(candidatos.get(0)) : Optional.empty();
     }
 
     private boolean coincideTelefono(String origen, String telefonoCliente) {
+        String origenNormalizado = normalizarTelefono(origen);
         String cliente = normalizarTelefono(telefonoCliente);
-        if (!StringUtils.hasText(cliente)) {
+        if (!StringUtils.hasText(origenNormalizado)
+                || !StringUtils.hasText(cliente)
+                || origenNormalizado.length() < DIGITOS_TELEFONO_COINCIDENCIA
+                || cliente.length() < DIGITOS_TELEFONO_COINCIDENCIA) {
             return false;
         }
-        return origen.endsWith(cliente) || cliente.endsWith(origen);
+        return ultimosDigitosTelefono(origenNormalizado).equals(ultimosDigitosTelefono(cliente));
+    }
+
+    private String ultimosDigitosTelefono(String telefono) {
+        return telefono.substring(telefono.length() - DIGITOS_TELEFONO_COINCIDENCIA);
     }
 
     private void aplicarContextoExpedientePrevio(WhatsappWebhookEvento evento) {
@@ -216,8 +231,14 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         }
         eventoRepository.findTopByTelefonoAndMessageIdIsNotNullOrderByFechaRecepcionDesc(evento.getTelefono())
                 .filter(this::eventoMantieneContextoExpediente)
-                .map(WhatsappWebhookEvento::getExpediente)
-                .ifPresent(evento::setExpediente);
+                .filter(this::contextoWhatsappReciente)
+                .filter(anterior -> contextoCompatibleConCliente(evento, anterior.getExpediente().getCliente()))
+                .ifPresent(anterior -> {
+                    evento.setExpediente(anterior.getExpediente());
+                    if (evento.getCliente() == null) {
+                        evento.setCliente(anterior.getExpediente().getCliente());
+                    }
+                });
     }
 
     private void aplicarContextoSolicitudPrevio(WhatsappWebhookEvento evento) {
@@ -226,8 +247,27 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         }
         eventoRepository.findTopByTelefonoAndMessageIdIsNotNullOrderByFechaRecepcionDesc(evento.getTelefono())
                 .filter(this::eventoMantieneContextoSolicitud)
-                .map(WhatsappWebhookEvento::getSolicitud)
-                .ifPresent(evento::setSolicitud);
+                .filter(this::contextoWhatsappReciente)
+                .filter(anterior -> contextoCompatibleConCliente(evento, anterior.getSolicitud().getCliente()))
+                .ifPresent(anterior -> {
+                    evento.setSolicitud(anterior.getSolicitud());
+                    if (evento.getCliente() == null) {
+                        evento.setCliente(anterior.getSolicitud().getCliente());
+                    }
+                });
+    }
+
+    private boolean contextoWhatsappReciente(WhatsappWebhookEvento evento) {
+        return evento != null
+                && evento.getFechaRecepcion() != null
+                && !evento.getFechaRecepcion().isBefore(LocalDateTime.now().minusHours(HORAS_VALIDEZ_CONTEXTO_WHATSAPP));
+    }
+
+    private boolean contextoCompatibleConCliente(WhatsappWebhookEvento evento, Cliente clienteContexto) {
+        if (evento.getCliente() == null || clienteContexto == null) {
+            return true;
+        }
+        return Objects.equals(evento.getCliente().getId(), clienteContexto.getId());
     }
 
     private boolean eventoMantieneContextoExpediente(WhatsappWebhookEvento evento) {

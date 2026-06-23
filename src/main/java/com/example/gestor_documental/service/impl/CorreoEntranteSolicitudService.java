@@ -17,6 +17,7 @@ import com.example.gestor_documental.repository.UsuarioRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.OcrPdfService;
+import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
 import com.example.gestor_documental.util.TextNormalizer;
 import jakarta.mail.Address;
 import jakarta.mail.BodyPart;
@@ -70,6 +71,7 @@ public class CorreoEntranteSolicitudService {
     private final DocumentoService documentoService;
     private final OcrPdfService ocrPdfService;
     private final HistorialCambioService historialCambioService;
+    private final SolicitudDocumentacionIaService solicitudDocumentacionIaService;
     private final RestClient restClient = RestClient.create();
     private final AtomicBoolean processing = new AtomicBoolean(false);
 
@@ -284,7 +286,17 @@ public class CorreoEntranteSolicitudService {
                 "Solicitud creada automaticamente desde el buzon de correo."
         );
         documentoService.guardarParaSolicitud(guardada.getId(), archivo, TipoDocumento.EXPEDIENTE_COMPLETO, admin);
+        intentarLecturaIaSolicitud(guardada, admin);
         registrarProcesado(messageId, asunto, remitente, matricula, guardada.getId(), "PROCESADO", "Solicitud creada desde PDF adjunto.");
+    }
+
+    private void intentarLecturaIaSolicitud(Solicitud solicitud, Usuario admin) {
+        try {
+            solicitudDocumentacionIaService.procesarDocumentacion(solicitud.getId(), admin);
+        } catch (RuntimeException exception) {
+            log.info("Solicitud {} creada desde correo, pero la lectura IA queda pendiente: {}",
+                    solicitud.getId(), exception.getMessage());
+        }
     }
 
     private TipoTramiteEnum detectarTipoTramite(String texto) {
