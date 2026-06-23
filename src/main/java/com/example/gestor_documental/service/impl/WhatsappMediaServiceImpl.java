@@ -161,7 +161,6 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
         Documento documento = new Documento();
         documento.setExpediente(expediente);
         documento.setSolicitud(solicitud);
-        documento.setCliente(expediente != null ? expediente.getCliente() : solicitud.getCliente());
         documento.setTipoDocumento(tipo);
         documento.setNombreArchivo(adjunto.getNombreArchivo());
         documento.setNombreArchivoOriginal(StringUtils.hasText(adjunto.getNombreArchivoOriginal())

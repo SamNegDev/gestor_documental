@@ -140,7 +140,6 @@ public class WhatsappInboxApiController {
 
         Documento documento = new Documento();
         documento.setExpediente(expediente);
-        documento.setCliente(expediente.getCliente());
         documento.setTipoDocumento(tipoDocumento);
         documento.setNombreArchivo(adjunto.getNombreArchivo());
         documento.setNombreArchivoOriginal(StringUtils.hasText(adjunto.getNombreArchivoOriginal())
