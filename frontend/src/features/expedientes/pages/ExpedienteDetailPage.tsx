@@ -87,6 +87,7 @@ const CLOSING_DOCUMENTS = [
 
 const INTERESADO_ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
 const COMPLETE_EXPEDIENTE_JOB_STORAGE_PREFIX = "gestor.expedienteCompleto.job.";
+const COMPLETE_DOCUMENT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 type InteresadoCorrection = ExpedienteEditInput["interesados"][number];
 
@@ -753,6 +754,24 @@ export function ExpedienteDetailPage() {
       return data;
     });
   }, [activeOperationId, id, refreshRelatedData]);
+
+  useEffect(() => {
+    const documentos = expediente?.documentos ?? [];
+    const hasCompleteDocument = documentos.some((documento) => documento.tipo === "EXPEDIENTE_COMPLETO");
+    const hasSeparatedDocuments = documentos.some((documento) => documento.tipo !== "EXPEDIENTE_COMPLETO" && documento.subido);
+    if (!id || !hasCompleteDocument || hasSeparatedDocuments || completeExpedienteProcessing) return;
+
+    const startedAt = Date.now();
+    const intervalId = window.setInterval(() => {
+      if (Date.now() - startedAt > COMPLETE_DOCUMENT_POLL_TIMEOUT_MS) {
+        window.clearInterval(intervalId);
+        return;
+      }
+      void refreshExpediente();
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [completeExpedienteProcessing, expediente?.documentos, id, refreshExpediente]);
 
   useEffect(() => {
     if (!completeExpedienteJob || !id) return;

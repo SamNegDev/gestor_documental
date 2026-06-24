@@ -32,6 +32,7 @@ import {
 import type { SolicitudDetail, SolicitudDocumentacionIaResponse } from "../types";
 
 const COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX = "gestor.solicitudCompleta.job.";
+const COMPLETE_DOCUMENT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 export function SolicitudDetailPage() {
   const { id } = useParams();
@@ -101,6 +102,24 @@ export function SolicitudDetailPage() {
     ]);
     return result.data;
   };
+
+  useEffect(() => {
+    const documentos = solicitudQuery.data?.documentos ?? [];
+    const hasCompleteDocument = documentos.some((documento) => documento.tipo === "EXPEDIENTE_COMPLETO");
+    const hasSeparatedDocuments = documentos.some((documento) => documento.tipo !== "EXPEDIENTE_COMPLETO");
+    if (!id || !hasCompleteDocument || hasSeparatedDocuments || completeSolicitudProcessing) return;
+
+    const startedAt = Date.now();
+    const intervalId = window.setInterval(() => {
+      if (Date.now() - startedAt > COMPLETE_DOCUMENT_POLL_TIMEOUT_MS) {
+        window.clearInterval(intervalId);
+        return;
+      }
+      void refreshSolicitud();
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [completeSolicitudProcessing, id, solicitudQuery.data?.documentos]);
 
   useEffect(() => {
     if (!id) return;
