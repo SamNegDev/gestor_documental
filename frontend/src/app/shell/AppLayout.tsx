@@ -39,6 +39,7 @@ function pageTitle(pathname: string) {
   if (pathname.startsWith("/interesados")) return pathname === "/interesados" ? "Interesados" : "Ficha del interesado";
   if (pathname.startsWith("/vehiculos")) return pathname === "/vehiculos" ? "Vehiculos" : "Ficha del vehiculo";
   if (pathname.includes("/cliente/solicitudes/") && pathname.endsWith("/editar")) return "Editar solicitud";
+  if (pathname === "/cliente/solicitudes/creacion-multiple") return "Creacion multiple";
   if (pathname.includes("/cliente/solicitudes/nuevo")) return "Nueva solicitud";
   if (pathname.includes("/solicitudes/")) return "Detalle de solicitud";
   if (pathname.includes("/cliente/expedientes/")) return "Estado del expediente";
@@ -81,6 +82,7 @@ const clientMenuItems: MenuItemConfig[] = [
   { id: "tareas", to: "/cliente/tareas", icon: Inbox, label: "Mis tareas" },
   { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Mis expedientes" },
   { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },
+  { id: "solicitudes-bulk", to: "/cliente/solicitudes/creacion-multiple", icon: FolderPlus, label: "Creacion multiple" },
   { id: "interesados", to: "/interesados", icon: UserRound, label: "Interesados" },
   { id: "vehiculos", to: "/vehiculos", icon: CarFront, label: "Vehiculos" },
 ];

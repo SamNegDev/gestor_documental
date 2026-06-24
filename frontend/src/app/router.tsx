@@ -17,6 +17,7 @@ import { ExtraccionGaReviewPage } from "../features/ia/pages/ExtraccionGaReviewP
 import { ExtraccionGaWorkspacePage } from "../features/ia/pages/ExtraccionGaWorkspacePage";
 import { ExpedientesListPage } from "../features/listados/pages/ExpedientesListPage";
 import { SolicitudDetailPage } from "../features/listados/pages/SolicitudDetailPage";
+import { SolicitudBulkCreatePage } from "../features/listados/pages/SolicitudBulkCreatePage";
 import { SolicitudFormPage } from "../features/listados/pages/SolicitudFormPage";
 import { SolicitudesListPage } from "../features/listados/pages/SolicitudesListPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
@@ -68,6 +69,7 @@ export const router = createBrowserRouter([
       { path: "cliente/expedientes/:id", element: <RequireRole allow={["CLIENTE"]}><ClienteExpedientePage /></RequireRole> },
       { path: "solicitudes", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><SolicitudesListPage /></RequireRole> },
       { path: "solicitudes/:id", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><SolicitudDetailPage /></RequireRole> },
+      { path: "cliente/solicitudes/creacion-multiple", element: <RequireRole allow={["CLIENTE"]}><SolicitudBulkCreatePage /></RequireRole> },
       { path: "interesados", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><InteresadosRegistroPage /></RequireRole> },
       { path: "interesados/:id", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><InteresadoRegistroDetailPage /></RequireRole> },
       { path: "vehiculos", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><VehiculosRegistroPage /></RequireRole> },

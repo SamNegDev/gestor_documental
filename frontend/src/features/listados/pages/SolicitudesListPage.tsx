@@ -131,10 +131,16 @@ export function SolicitudesListPage() {
             {checkingEmail ? "Comprobando" : "Comprobar buzon"}
           </button>
         ) : (
-          <Link className="primary-button primary-button--compact" to="/cliente/solicitudes/nuevo">
-            <Plus size={16} />
-            Nueva solicitud
-          </Link>
+          <>
+            <Link className="soft-button soft-button--compact" to="/cliente/solicitudes/creacion-multiple">
+              <Plus size={16} />
+              Creacion multiple
+            </Link>
+            <Link className="primary-button primary-button--compact" to="/cliente/solicitudes/nuevo">
+              <Plus size={16} />
+              Nueva solicitud
+            </Link>
+          </>
         )
       }
     >
