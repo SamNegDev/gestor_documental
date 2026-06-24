@@ -8,6 +8,7 @@ import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
+import com.example.gestor_documental.model.CorreccionClasificacionDocumento;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Incidencia;
@@ -20,6 +21,7 @@ import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
+import com.example.gestor_documental.repository.CorreccionClasificacionDocumentoRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.repository.OperacionExpedienteRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
@@ -58,6 +60,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     private final ClienteInteresadoRepository clienteInteresadoRepository;
     private final InteresadoRepository interesadoRepository;
     private final SolicitudRepository solicitudRepository;
+    private final CorreccionClasificacionDocumentoRepository correccionClasificacionDocumentoRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoDocumentalRepository;
     private final OperacionExpedienteRepository operacionExpedienteRepository;
     private final ExpedienteService expedienteService;
@@ -420,15 +423,15 @@ public class DocumentoServiceImpl implements DocumentoService {
         return documentoRepository.findBySolicitudId(id);
     }
 
-    private void guardarDocumentoGeneradoParaSolicitud(Solicitud solicitud,
+    private Documento guardarDocumentoGeneradoParaSolicitud(Solicitud solicitud,
             byte[] contenido,
             TipoDocumento tipoDocumento,
             Usuario usuario,
             String nombreArchivoOriginal) throws IOException {
-        guardarDocumentoGeneradoParaSolicitud(solicitud, contenido, tipoDocumento, usuario, nombreArchivoOriginal, true);
+        return guardarDocumentoGeneradoParaSolicitud(solicitud, contenido, tipoDocumento, usuario, nombreArchivoOriginal, true);
     }
 
-    private void guardarDocumentoGeneradoParaSolicitud(Solicitud solicitud,
+    private Documento guardarDocumentoGeneradoParaSolicitud(Solicitud solicitud,
             byte[] contenido,
             TipoDocumento tipoDocumento,
             Usuario usuario,
@@ -440,19 +443,18 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (registrarHistorial) {
             registrarCargaDocumentoSolicitud(solicitud, doc, usuario);
         }
-
-
+        return doc;
     }
 
-    private void guardarDocumentoGeneradoParaExpediente(Expediente expediente,
+    private Documento guardarDocumentoGeneradoParaExpediente(Expediente expediente,
             byte[] contenido,
             TipoDocumento tipoDocumento,
             Usuario usuario,
             String nombreArchivoOriginal) throws IOException {
-        guardarDocumentoGeneradoParaExpediente(expediente, contenido, tipoDocumento, usuario, nombreArchivoOriginal, null, true);
+        return guardarDocumentoGeneradoParaExpediente(expediente, contenido, tipoDocumento, usuario, nombreArchivoOriginal, null, true);
     }
 
-    private void guardarDocumentoGeneradoParaExpediente(Expediente expediente,
+    private Documento guardarDocumentoGeneradoParaExpediente(Expediente expediente,
             byte[] contenido,
             TipoDocumento tipoDocumento,
             Usuario usuario,
@@ -466,8 +468,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (registrarHistorial) {
             registrarCargaDocumentoExpediente(expediente, doc, usuario);
         }
-
-
+        return doc;
     }
 
     private Documento construirDocumentoBase(MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario)
@@ -640,6 +641,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
 
         documentoRepository.save(documento);
+        registrarCorreccionClasificacion(documento, tipoAnterior, documento.getTipoDocumento(), usuario, "EDICION_TIPO");
     }
 
     private String extensionDe(String nombreArchivo) {
@@ -787,14 +789,16 @@ public class DocumentoServiceImpl implements DocumentoService {
                 String nombreNuevo = nuevoNombre != null && !nuevoNombre.isBlank()
                         ? asegurarExtension(nuevoNombre, documentoOriginal.getNombreArchivoOriginal())
                         : generarNombreAutomatico(documentoOriginal, nuevoTipo, operacion);
-                guardarDocumentoGeneradoParaExpediente(
+                Documento generado = guardarDocumentoGeneradoParaExpediente(
                         documentoOriginal.getExpediente(), pdfExtraido, nuevoTipo, usuario, nombreNuevo, operacion, false);
+                registrarCorreccionClasificacion(generado, documentoOriginal.getTipoDocumento(), nuevoTipo, usuario, "EXTRACCION_PAGINAS");
             } else if (documentoOriginal.getSolicitud() != null) {
                 String nombreNuevo = nuevoNombre != null && !nuevoNombre.isBlank()
                         ? asegurarExtension(nuevoNombre, documentoOriginal.getNombreArchivoOriginal())
                         : generarNombreAutomatico(documentoOriginal, nuevoTipo, null);
-                guardarDocumentoGeneradoParaSolicitud(
+                Documento generado = guardarDocumentoGeneradoParaSolicitud(
                         documentoOriginal.getSolicitud(), pdfExtraido, nuevoTipo, usuario, nombreNuevo, false);
+                registrarCorreccionClasificacion(generado, documentoOriginal.getTipoDocumento(), nuevoTipo, usuario, "EXTRACCION_PAGINAS");
             }
 
             Files.write(rutaOriginal, pdfRestante);
@@ -848,6 +852,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     public void unirDocumentos(Long documentoPrincipalId, List<Long> documentoIds, TipoDocumento tipoDocumento, String nombreArchivo, Long operacionId, Usuario usuario) {
         Documento principal = obtenerDocumentoConPermiso(documentoPrincipalId, usuario);
         validarTransformacionExpedienteOSolicitud(principal);
+        TipoDocumento tipoAnterior = principal.getTipoDocumento();
         List<Long> ids = documentoIds == null ? List.of() : documentoIds.stream()
                 .filter(id -> id != null && !id.equals(documentoPrincipalId))
                 .distinct()
@@ -892,6 +897,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                 principal.setOperacion(resolverOperacionExpediente(principal.getExpediente(), operacionId));
             }
             documentoRepository.save(principal);
+            registrarCorreccionClasificacion(principal, tipoAnterior, principal.getTipoDocumento(), usuario, "UNION_DOCUMENTOS");
 
             for (Documento documento : documentos.subList(1, documentos.size())) {
                 reasignarRequisitos(documento, principal);
@@ -1115,6 +1121,28 @@ public class DocumentoServiceImpl implements DocumentoService {
                 usuario,
                 ACCION_CARGAR_DOCUMENTO,
                 "Se cargó el documento: " + documento.getNombreArchivoOriginal());
+    }
+
+    private void registrarCorreccionClasificacion(
+            Documento documento,
+            TipoDocumento tipoAnterior,
+            TipoDocumento tipoCorregido,
+            Usuario usuario,
+            String origen
+    ) {
+        if (documento == null || tipoCorregido == null || tipoCorregido == tipoAnterior) {
+            return;
+        }
+        CorreccionClasificacionDocumento correccion = new CorreccionClasificacionDocumento();
+        correccion.setDocumento(documento);
+        correccion.setExpediente(documento.getExpediente());
+        correccion.setSolicitud(documento.getSolicitud());
+        correccion.setUsuario(usuario);
+        correccion.setTipoAnterior(tipoAnterior);
+        correccion.setTipoCorregido(tipoCorregido);
+        correccion.setOrigen(origen);
+        correccion.setNombreArchivoOriginal(documento.getNombreArchivoOriginal());
+        correccionClasificacionDocumentoRepository.save(correccion);
     }
 
     private void registrarProcesamientoExpedienteCompleto(Expediente expediente, Documento documento, Usuario usuario, int documentosDetectados) {
