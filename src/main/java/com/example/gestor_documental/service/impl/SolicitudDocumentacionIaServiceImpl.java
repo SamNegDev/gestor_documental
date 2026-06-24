@@ -64,8 +64,21 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     @Transactional
     public SolicitudDocumentacionIaResponse procesarDocumentacion(Long solicitudId, Usuario admin) {
         validarAdmin(admin);
+        return procesarDocumentacion(solicitudId, admin, false);
+    }
+
+    @Override
+    @Transactional
+    public SolicitudDocumentacionIaResponse procesarDocumentacionInterna(Long solicitudId, Usuario usuario) {
+        return procesarDocumentacion(solicitudId, usuario, true);
+    }
+
+    private SolicitudDocumentacionIaResponse procesarDocumentacion(Long solicitudId, Usuario usuario, boolean automatica) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+        if (automatica) {
+            validarPermisoSolicitud(solicitud, usuario);
+        }
         validarSolicitudAbierta(solicitud);
 
         List<Documento> documentos = documentoRepository.findBySolicitudId(solicitudId).stream()
@@ -85,12 +98,13 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
 
         List<String> detalles = new ArrayList<>();
         Contadores contadores = new Contadores();
-        leerIdentidades(documentosIdentidad, admin, contadores, detalles);
-        leerRoles(documentosRoles, admin, contadores, detalles);
+        boolean permitirRelectura = usuario != null && usuario.getRolUsuario() == RolUsuario.ADMIN;
+        leerIdentidades(documentosIdentidad, usuario, contadores, detalles, permitirRelectura);
+        leerRoles(documentosRoles, usuario, contadores, detalles, permitirRelectura);
 
         Map<String, DocumentoIdentidadLectura> identidades = mejoresIdentidades(documentosIdentidad);
         if (esBatecom(solicitud)) {
-            return procesarBatecom(solicitud, documentosIdentidad, documentosRoles, identidades, contadores, detalles, admin);
+            return procesarBatecom(solicitud, documentosIdentidad, documentosRoles, identidades, contadores, detalles, usuario);
         }
 
         DocumentoRolesLectura lecturaRoles = mejorLecturaRoles(documentosRoles);
@@ -129,13 +143,13 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         aplicarPersona(solicitud, RolInteresado.COMPRADOR, comprador);
         aplicarMatriculaSiProcede(solicitud, lecturaRoles, detalles);
         solicitud.setFechaUltimaModificacion(LocalDateTime.now());
-        solicitud.setModificadoPor(admin);
+        solicitud.setModificadoPor(usuario);
         solicitudRepository.save(solicitud);
         marcarIdentidadesUsadas(identidades, vendedor, comprador);
 
         historialCambioService.registrarCambioSolicitud(
                 solicitud,
-                admin,
+                usuario,
                 "IA DOCUMENTACION",
                 "Se actualizaron comprador y vendedor desde DNI/CIF y factura/contrato.");
         detalles.add("Datos de comprador y vendedor actualizados en la solicitud.");
@@ -213,6 +227,20 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
     }
 
+    private void validarPermisoSolicitud(Solicitud solicitud, Usuario usuario) {
+        if (usuario == null) {
+            throw new AccesoDenegadoException("No tienes permiso para procesar esta solicitud.");
+        }
+        if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
+            return;
+        }
+        Long clienteSolicitudId = solicitud.getCliente() != null ? solicitud.getCliente().getId() : null;
+        Long clienteUsuarioId = usuario.getCliente() != null ? usuario.getCliente().getId() : null;
+        if (clienteSolicitudId == null || !clienteSolicitudId.equals(clienteUsuarioId)) {
+            throw new AccesoDenegadoException("No tienes permiso para procesar esta solicitud.");
+        }
+    }
+
     private void validarSolicitudAbierta(Solicitud solicitud) {
         if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA || solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO) {
             throw new OperacionInvalidaException("No se puede procesar una solicitud cerrada.");
@@ -222,13 +250,23 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
     }
 
-    private void leerIdentidades(List<Documento> documentos, Usuario admin, Contadores contadores, List<String> detalles) {
+    private void leerIdentidades(
+            List<Documento> documentos,
+            Usuario usuario,
+            Contadores contadores,
+            List<String> detalles,
+            boolean permitirRelectura
+    ) {
         for (Documento documento : documentos) {
             DocumentoIdentidadLectura lecturaExistente = identidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
             boolean existente = lecturaExistente != null;
-            boolean forzar = existente && !identidadUsable(lecturaExistente);
+            boolean forzar = permitirRelectura && existente && !identidadUsable(lecturaExistente);
             try {
-                documentoIdentidadLecturaService.leerIdentidad(documento.getId(), forzar, admin);
+                if (existente && !forzar) {
+                    contadores.identidadReutilizada++;
+                    continue;
+                }
+                documentoIdentidadLecturaService.leerIdentidad(documento.getId(), forzar, usuario);
                 if (existente && !forzar) {
                     contadores.identidadReutilizada++;
                 } else {
@@ -240,13 +278,23 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
     }
 
-    private void leerRoles(List<Documento> documentos, Usuario admin, Contadores contadores, List<String> detalles) {
+    private void leerRoles(
+            List<Documento> documentos,
+            Usuario usuario,
+            Contadores contadores,
+            List<String> detalles,
+            boolean permitirRelectura
+    ) {
         for (Documento documento : documentos) {
             DocumentoRolesLectura lecturaExistente = rolesLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
             boolean existente = lecturaExistente != null;
-            boolean forzar = existente && !rolesUsables(lecturaExistente);
+            boolean forzar = permitirRelectura && existente && !rolesUsables(lecturaExistente);
             try {
-                documentoRolesLecturaService.leerRoles(documento.getId(), forzar, admin);
+                if (existente && !forzar) {
+                    contadores.rolesReutilizada++;
+                    continue;
+                }
+                documentoRolesLecturaService.leerRoles(documento.getId(), forzar, usuario);
                 if (existente && !forzar) {
                     contadores.rolesReutilizada++;
                 } else {

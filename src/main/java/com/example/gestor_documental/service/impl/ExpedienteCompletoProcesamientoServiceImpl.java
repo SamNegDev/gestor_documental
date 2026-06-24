@@ -1,6 +1,7 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.expediente.ProcesamientoExpedienteCompletoResponse;
+import com.example.gestor_documental.dto.expediente.SolicitudDocumentacionIaResponse;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
@@ -15,6 +16,7 @@ import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteCompletoProcesamientoService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
 import com.example.gestor_documental.service.SolicitudService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -44,6 +46,7 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
     private final SolicitudRepository solicitudRepository;
     private final ExpedienteService expedienteService;
     private final SolicitudService solicitudService;
+    private final SolicitudDocumentacionIaService solicitudDocumentacionIaService;
 
     private final ConcurrentMap<String, JobState> jobs = new ConcurrentHashMap<>();
 
@@ -182,18 +185,41 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
             int generados = job.target() == JobTarget.SOLICITUD
                     ? documentoService.procesarExpedienteCompletoSolicitudDocumento(job.documentoId(), usuario)
                     : documentoService.procesarExpedienteCompletoDocumento(job.documentoId(), usuario);
+            String lecturaIaMensaje = job.target() == JobTarget.SOLICITUD
+                    ? intentarLecturaIaSolicitud(job.solicitudId(), usuario)
+                    : null;
             actualizar(
                     jobId,
                     EstadoJob.COMPLETADO,
                     generados,
-                    generados > 0
+                    (generados > 0
                             ? "Separacion completada. Documentos generados: " + generados + "."
-                            : "Separacion completada sin documentos detectados."
+                            : "Separacion completada sin documentos detectados.")
+                            + (lecturaIaMensaje != null ? " " + lecturaIaMensaje : "")
             );
         } catch (Exception exception) {
             actualizar(jobId, EstadoJob.ERROR, 0, exception.getMessage() != null
                     ? exception.getMessage()
                     : "No se pudo separar el expediente completo.");
+        }
+    }
+
+    private String intentarLecturaIaSolicitud(Long solicitudId, Usuario usuario) {
+        if (solicitudId == null) {
+            return null;
+        }
+        try {
+            SolicitudDocumentacionIaResponse response = solicitudDocumentacionIaService.procesarDocumentacionInterna(solicitudId, usuario);
+            if (response.isDatosAplicados()) {
+                return "Datos de interesados actualizados con IA.";
+            }
+            if (response.isYaEstabaCorrecta()) {
+                return "Datos de interesados ya estaban correctos.";
+            }
+            return "Lectura IA realizada; requiere revision.";
+        } catch (RuntimeException exception) {
+            log.info("Solicitud {} separada, pero la lectura IA queda pendiente: {}", solicitudId, exception.getMessage());
+            return "Lectura IA pendiente: " + (exception.getMessage() != null ? exception.getMessage() : "no se pudo completar") + ".";
         }
     }
 
