@@ -13,8 +13,10 @@ import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteCompletoProcesamientoService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.SolicitudService;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @RequiredArgsConstructor
@@ -36,11 +39,22 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
     private final SolicitudService solicitudService;
 
     private final ConcurrentMap<String, JobState> jobs = new ConcurrentHashMap<>();
-    private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "expediente-completo-procesamiento");
-        thread.setDaemon(true);
-        return thread;
-    });
+
+    @Value("${app.ocr.expediente-completo.concurrent-jobs:2}")
+    private int concurrentJobs;
+
+    private ExecutorService executor;
+
+    @PostConstruct
+    void iniciarExecutor() {
+        int workers = Math.max(1, Math.min(concurrentJobs, 4));
+        AtomicInteger threadNumber = new AtomicInteger(1);
+        executor = Executors.newFixedThreadPool(workers, runnable -> {
+            Thread thread = new Thread(runnable, "expediente-completo-procesamiento-" + threadNumber.getAndIncrement());
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
 
     @Override
     public ProcesamientoExpedienteCompletoResponse iniciar(Long expedienteId, MultipartFile archivo, Long operacionId, Usuario usuario) {
@@ -100,7 +114,9 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
 
     @PreDestroy
     void cerrarExecutor() {
-        executor.shutdownNow();
+        if (executor != null) {
+            executor.shutdownNow();
+        }
     }
 
     private void procesar(String jobId, Usuario usuario) {
