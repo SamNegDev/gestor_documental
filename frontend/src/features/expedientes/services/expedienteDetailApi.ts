@@ -1,6 +1,7 @@
 import { apiGet, apiPost, apiPostForm, apiPostJson, apiPutJson } from "../../../shared/api/http";
 import type {
   ActualizacionDocumentalExpediente,
+  CreacionConProcesamiento,
   ExpedienteDetail,
   ExpedienteEditCatalogs,
   ExpedienteEditInput,
@@ -30,6 +31,20 @@ export function updateExpedienteFromExistingDocuments(id: string | number): Prom
 
 export function createExpediente(input: ExpedienteEditInput): Promise<{ id: number }> {
   return apiPostJson<{ id: number }>("/api/expedientes", input);
+}
+
+export function createExpedienteWithCompleteProcessing(input: {
+  clienteId: number;
+  tipoTramiteId: number;
+  matricula: string;
+  archivo: File;
+}): Promise<CreacionConProcesamiento> {
+  const formData = new FormData();
+  formData.append("clienteId", String(input.clienteId));
+  formData.append("tipoTramiteId", String(input.tipoTramiteId));
+  formData.append("matricula", input.matricula);
+  formData.append("archivo", input.archivo);
+  return apiPostForm<CreacionConProcesamiento>("/api/expedientes/creacion-multiple", formData);
 }
 
 export function searchInteresados(query: string): Promise<InteresadoSearchResult[]> {

@@ -8,6 +8,7 @@ import com.example.gestor_documental.dto.expediente.ActualizacionDocumentalExped
 import com.example.gestor_documental.dto.expediente.ActualizarInteresadosExpedienteRequest;
 import com.example.gestor_documental.dto.expediente.ActualizarExpedienteRequest;
 import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
+import com.example.gestor_documental.dto.expediente.CreacionConProcesamientoResponse;
 import com.example.gestor_documental.dto.expediente.ExpedienteEditCatalogsResponse;
 import com.example.gestor_documental.dto.expediente.ExpedienteListItemResponse;
 import com.example.gestor_documental.dto.expediente.HitoAccionResponse;
@@ -27,6 +28,7 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.service.ClienteService;
+import com.example.gestor_documental.service.ExpedienteCompletoProcesamientoService;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HitoExpedienteService;
@@ -62,6 +64,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -78,6 +81,7 @@ public class ExpedienteApiController {
     private final InteresadoRepository interesadoRepository;
     private final MensajeService mensajeService;
     private final ClienteService clienteService;
+    private final ExpedienteCompletoProcesamientoService expedienteCompletoProcesamientoService;
     private final TipoIncidenciaService tipoIncidenciaService;
     private final TipoTramiteService tipoTramiteService;
     private final CurrentUserService currentUserService;
@@ -259,6 +263,38 @@ public class ExpedienteApiController {
         return ResponseEntity
                 .created(URI.create("/expedientes/" + creado.getId()))
                 .body(Map.of("id", creado.getId()));
+    }
+
+    @PostMapping("/creacion-multiple")
+    public CreacionConProcesamientoResponse crearExpedienteConProcesamiento(
+            @RequestParam Long clienteId,
+            @RequestParam Long tipoTramiteId,
+            @RequestParam String matricula,
+            @RequestParam("archivo") MultipartFile archivo,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = requireAdmin(authentication);
+        if (matricula == null || matricula.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La matricula es obligatoria");
+        }
+
+        Expediente expediente = new Expediente();
+        expediente.setMatricula(TextNormalizer.upperOrNull(matricula));
+        expediente.setObservaciones("CREACION MULTIPLE");
+
+        Expediente creado = expedienteService.crearExpedienteCompleto(
+                expediente,
+                usuarioLogueado,
+                clienteId,
+                tipoTramiteId,
+                List.of(new InteresadoFormDto(), new InteresadoFormDto())
+        );
+
+        return new CreacionConProcesamientoResponse(
+                creado.getId(),
+                null,
+                expedienteCompletoProcesamientoService.iniciar(creado.getId(), archivo, null, usuarioLogueado)
+        );
     }
 
     @PutMapping("/{id}")

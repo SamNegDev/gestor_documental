@@ -1,4 +1,5 @@
-import { apiDelete, apiGet, apiPostJson, apiPutJson } from "../../../shared/api/http";
+import { apiDelete, apiGet, apiPostForm, apiPostJson, apiPutJson } from "../../../shared/api/http";
+import type { CreacionConProcesamiento } from "../../expedientes/types/expedienteDetail.types";
 import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudDocumentacionIaResponse, SolicitudInteresadoCoincidencia, SolicitudListItem, SolicitudUpsertInput } from "../types";
 
 function buildQuery(filters: ListFilters) {
@@ -52,6 +53,14 @@ export function getSolicitudDetail(id: string | number) {
 
 export function createSolicitud(input: SolicitudUpsertInput) {
   return apiPostJson<{ id: number }>("/api/solicitudes", input);
+}
+
+export function createSolicitudWithCompleteProcessing(input: { tipoTramiteId: number; matricula: string; archivo: File }) {
+  const formData = new FormData();
+  formData.append("tipoTramiteId", String(input.tipoTramiteId));
+  formData.append("matricula", input.matricula);
+  formData.append("archivo", input.archivo);
+  return apiPostForm<CreacionConProcesamiento>("/api/solicitudes/creacion-multiple", formData);
 }
 
 export function updateSolicitud(id: string | number, input: SolicitudUpsertInput) {

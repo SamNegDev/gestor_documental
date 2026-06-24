@@ -3,6 +3,7 @@ package com.example.gestor_documental.controller.api;
 import com.example.gestor_documental.dto.PagedResponse;
 
 import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
+import com.example.gestor_documental.dto.expediente.CreacionConProcesamientoResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoIdentidadLecturaResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaResponse;
@@ -261,6 +262,39 @@ public class SolicitudApiController {
                 request.getTipoTramiteId()
         );
         return ResponseEntity.ok(java.util.Map.of("id", creada.getId()));
+    }
+
+    @PostMapping("/creacion-multiple")
+    public CreacionConProcesamientoResponse crearSolicitudConProcesamiento(
+            @RequestParam Long tipoTramiteId,
+            @RequestParam String matricula,
+            @RequestParam("archivo") MultipartFile archivo,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = usuario(authentication);
+        if (usuarioLogueado.getCliente() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes un cliente asociado");
+        }
+        if (matricula == null || matricula.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La matricula es obligatoria");
+        }
+
+        Solicitud solicitud = new Solicitud();
+        solicitud.setMatricula(TextNormalizer.upperOrNull(matricula));
+        solicitud.setObservaciones("CREACION MULTIPLE");
+
+        Solicitud creada = solicitudService.crearSolicitudCompleta(
+                solicitud,
+                usuarioLogueado,
+                usuarioLogueado.getCliente(),
+                tipoTramiteId
+        );
+
+        return new CreacionConProcesamientoResponse(
+                null,
+                creada.getId(),
+                expedienteCompletoProcesamientoService.iniciarSolicitud(creada.getId(), archivo, usuarioLogueado)
+        );
     }
 
     @PutMapping("/{id}")

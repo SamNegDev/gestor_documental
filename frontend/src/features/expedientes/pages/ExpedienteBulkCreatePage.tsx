@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertCircle, ArrowLeft, FileCheck2, FilePlus2, Loader2, Plus, Trash2, Upload } from "lucide-react";
-import { createExpediente, getExpedienteEditCatalogs } from "../services/expedienteDetailApi";
-import { getCompleteExpedienteProcessing, startCompleteExpedienteProcessing } from "../services/documentosApi";
+import { createExpedienteWithCompleteProcessing, getExpedienteEditCatalogs } from "../services/expedienteDetailApi";
+import { getCompleteExpedienteProcessing } from "../services/documentosApi";
 import type { ExpedienteEditCatalogs, ProcesamientoExpedienteCompleto } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
 import { ApiError } from "../../../shared/api/http";
@@ -55,6 +55,7 @@ export function ExpedienteBulkCreatePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,7 +85,7 @@ export function ExpedienteBulkCreatePage() {
         getCompleteExpedienteProcessing(row.job.jobId)
           .then((job) => {
             setRows((current) => current.map((item) => item.id === row.id
-              ? { ...item, job, status: job.estado === "COMPLETADO" ? "COMPLETADO" : job.estado === "ERROR" ? "ERROR" : "PROCESANDO", message: job.mensaje || item.message }
+              ? { ...item, job, status: job.estado === "COMPLETADO" ? "COMPLETADO" : job.estado === "ERROR" ? "ERROR" : job.estado === "PENDIENTE" ? "EN_COLA" : "PROCESANDO", message: job.mensaje || item.message }
               : item));
           })
           .catch(() => {
@@ -111,27 +112,36 @@ export function ExpedienteBulkCreatePage() {
       return;
     }
     setSaving(true);
-    for (const row of readyRows) {
+    setNotice(null);
+    const results = await Promise.all(readyRows.map(async (row) => {
       updateRow(row.id, { status: "CREANDO", message: "Creando expediente." });
       try {
-        const creado = await createExpediente({
+        const creado = await createExpedienteWithCompleteProcessing({
           clienteId,
           tipoTramiteId: row.tipoTramiteId,
           matricula: uppercaseInput(row.matricula),
-          observaciones: "CREACION MULTIPLE",
-          interesados: [],
+          archivo: row.archivo as File,
         });
-        updateRow(row.id, { expedienteId: creado.id, status: "EN_COLA", message: "Expediente creado. Separacion en cola." });
-        const job = await startCompleteExpedienteProcessing(creado.id, row.archivo as File);
-        updateRow(row.id, { job, status: "PROCESANDO", message: job.mensaje || "Separando PDF." });
+        updateRow(row.id, {
+          expedienteId: creado.expedienteId || undefined,
+          job: creado.procesamiento,
+          status: creado.procesamiento.estado === "PENDIENTE" ? "EN_COLA" : "PROCESANDO",
+          message: "Expediente creado correctamente. Separacion en cola.",
+        });
+        return true;
       } catch (cause) {
         updateRow(row.id, {
           status: "ERROR",
           message: cause instanceof ApiError && cause.details ? cause.details : "No se pudo crear o procesar esta fila.",
         });
+        return false;
       }
-    }
+    }));
     setSaving(false);
+    const created = results.filter(Boolean).length;
+    setNotice(created > 0
+      ? `${created} expediente${created === 1 ? "" : "s"} creado${created === 1 ? "" : "s"} correctamente y con separacion en cola. Puedes cerrar esta pagina o volver al listado.`
+      : "No se pudo crear ningun expediente.");
   };
 
   if (loading) {
@@ -159,6 +169,7 @@ export function ExpedienteBulkCreatePage() {
         <div>
           <p className="eyebrow">Alta en lote</p>
           <h2>Creacion multiple de expedientes</h2>
+          {notice ? <span>{notice}</span> : null}
         </div>
         <Link className="soft-button" to="/expedientes">
           <ArrowLeft size={16} />

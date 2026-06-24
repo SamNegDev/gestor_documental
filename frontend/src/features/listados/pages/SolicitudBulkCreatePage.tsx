@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertCircle, ArrowLeft, FileCheck2, FilePlus2, Loader2, Plus, Trash2, Upload } from "lucide-react";
-import { createSolicitud, getSolicitudListCatalogs } from "../services/listadosApi";
-import { getCompleteExpedienteProcessing, startCompleteSolicitudProcessing } from "../../expedientes/services/documentosApi";
+import { createSolicitudWithCompleteProcessing, getSolicitudListCatalogs } from "../services/listadosApi";
+import { getCompleteExpedienteProcessing } from "../../expedientes/services/documentosApi";
 import type { ProcesamientoExpedienteCompleto } from "../../expedientes/types/expedienteDetail.types";
 import type { ListCatalogs } from "../types";
 import { humanizeEnum } from "../../expedientes/utils/formatters";
@@ -55,6 +55,7 @@ export function SolicitudBulkCreatePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,7 +84,7 @@ export function SolicitudBulkCreatePage() {
         getCompleteExpedienteProcessing(row.job.jobId)
           .then((job) => {
             setRows((current) => current.map((item) => item.id === row.id
-              ? { ...item, job, status: job.estado === "COMPLETADO" ? "COMPLETADO" : job.estado === "ERROR" ? "ERROR" : "PROCESANDO", message: job.mensaje || item.message }
+              ? { ...item, job, status: job.estado === "COMPLETADO" ? "COMPLETADO" : job.estado === "ERROR" ? "ERROR" : job.estado === "PENDIENTE" ? "EN_COLA" : "PROCESANDO", message: job.mensaje || item.message }
               : item));
           })
           .catch(() => {
@@ -107,25 +108,35 @@ export function SolicitudBulkCreatePage() {
       return;
     }
     setSaving(true);
-    for (const row of readyRows) {
+    setNotice(null);
+    const results = await Promise.all(readyRows.map(async (row) => {
       updateRow(row.id, { status: "CREANDO", message: "Creando solicitud." });
       try {
-        const creada = await createSolicitud({
+        const creada = await createSolicitudWithCompleteProcessing({
           tipoTramiteId: row.tipoTramiteId,
           matricula: uppercaseInput(row.matricula),
-          observaciones: "CREACION MULTIPLE",
+          archivo: row.archivo as File,
         });
-        updateRow(row.id, { solicitudId: creada.id, status: "EN_COLA", message: "Solicitud creada. Separacion en cola." });
-        const job = await startCompleteSolicitudProcessing(creada.id, row.archivo as File);
-        updateRow(row.id, { job, status: "PROCESANDO", message: job.mensaje || "Separando PDF." });
+        updateRow(row.id, {
+          solicitudId: creada.solicitudId || undefined,
+          job: creada.procesamiento,
+          status: creada.procesamiento.estado === "PENDIENTE" ? "EN_COLA" : "PROCESANDO",
+          message: "Solicitud creada correctamente. Separacion en cola.",
+        });
+        return true;
       } catch (cause) {
         updateRow(row.id, {
           status: "ERROR",
           message: cause instanceof ApiError && cause.details ? cause.details : "No se pudo crear o procesar esta fila.",
         });
+        return false;
       }
-    }
+    }));
     setSaving(false);
+    const created = results.filter(Boolean).length;
+    setNotice(created > 0
+      ? `${created} solicitud${created === 1 ? "" : "es"} creada${created === 1 ? "" : "s"} correctamente y con separacion en cola. Puedes cerrar esta pagina o volver al listado.`
+      : "No se pudo crear ninguna solicitud.");
   };
 
   if (loading) {
@@ -153,6 +164,7 @@ export function SolicitudBulkCreatePage() {
         <div>
           <p className="eyebrow">Alta en lote</p>
           <h2>Creacion multiple de solicitudes</h2>
+          {notice ? <span>{notice}</span> : null}
         </div>
         <Link className="soft-button" to="/solicitudes">
           <ArrowLeft size={16} />

@@ -190,6 +190,12 @@ export interface ProcesamientoExpedienteCompleto {
   fechaActualizacion?: string | null;
 }
 
+export interface CreacionConProcesamiento {
+  expedienteId?: number | null;
+  solicitudId?: number | null;
+  procesamiento: ProcesamientoExpedienteCompleto;
+}
+
 export interface HitoExpediente {
   id: string;
   titulo: string;
