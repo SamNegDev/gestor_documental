@@ -11,6 +11,7 @@ import com.example.gestor_documental.dto.expediente.IncidenciaExpedienteResponse
 import com.example.gestor_documental.dto.expediente.InteresadoSolicitudResponse;
 import com.example.gestor_documental.dto.expediente.ListCatalogsResponse;
 import com.example.gestor_documental.dto.expediente.MensajeExpedienteResponse;
+import com.example.gestor_documental.dto.expediente.ProcesamientoExpedienteCompletoResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudUpsertRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertResponse;
@@ -41,6 +42,7 @@ import com.example.gestor_documental.repository.DocumentoIdentidadLecturaReposit
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.DocumentoService;
+import com.example.gestor_documental.service.ExpedienteCompletoProcesamientoService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.IncidenciaService;
 import com.example.gestor_documental.service.MensajeService;
@@ -87,6 +89,7 @@ public class SolicitudApiController {
     private final ClienteService clienteService;
     private final TipoTramiteService tipoTramiteService;
     private final DocumentoService documentoService;
+    private final ExpedienteCompletoProcesamientoService expedienteCompletoProcesamientoService;
     private final IncidenciaService incidenciaService;
     private final HistorialCambioService historialCambioService;
     private final MensajeService mensajeService;
@@ -312,6 +315,16 @@ public class SolicitudApiController {
         Usuario usuarioLogueado = usuario(authentication);
         documentoService.guardarParaSolicitud(id, archivo, tipoDocumento, usuarioLogueado);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/documentos/expediente-completo/procesamientos")
+    public ProcesamientoExpedienteCompletoResponse iniciarProcesamientoExpedienteCompleto(
+            @PathVariable Long id,
+            @RequestParam("archivo") MultipartFile archivo,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = usuario(authentication);
+        return expedienteCompletoProcesamientoService.iniciarSolicitud(id, archivo, usuarioLogueado);
     }
 
     private Usuario usuario(Authentication authentication) {

@@ -22,6 +22,14 @@ public interface DocumentoService {
 
     Documento guardarParaExpediente(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento, Long operacionId, Usuario usuario);
 
+    Documento guardarExpedienteCompletoOriginalParaExpediente(Long expedienteId, MultipartFile archivo, Long operacionId, Usuario usuario);
+
+    int procesarExpedienteCompletoDocumento(Long documentoId, Usuario usuario);
+
+    Documento guardarExpedienteCompletoOriginalParaSolicitud(Long solicitudId, MultipartFile archivo, Usuario usuario);
+
+    int procesarExpedienteCompletoSolicitudDocumento(Long documentoId, Usuario usuario);
+
     Documento guardarGeneradoParaExpediente(Long expedienteId, byte[] contenido, TipoDocumento tipoDocumento,
             String nombreArchivoOriginal, String descripcion, Usuario usuario);
 

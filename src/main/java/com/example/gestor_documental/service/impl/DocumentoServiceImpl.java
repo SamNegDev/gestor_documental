@@ -34,6 +34,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -109,37 +110,8 @@ public class DocumentoServiceImpl implements DocumentoService {
             OperacionExpediente operacion = resolverOperacionExpediente(expediente, operacionId);
 
             if (TipoDocumento.EXPEDIENTE_COMPLETO.equals(tipoDocumento)) {
-                // SIEMPRE guardar el original primero
-                Documento docOriginal = construirDocumentoBase(archivo, tipoDocumento, usuario);
-                docOriginal.setExpediente(expediente);
-                docOriginal.setOperacion(operacion);
-                documentoRepository.save(docOriginal);
-
-
-                List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivo);
-
-                if (documentosDetectados == null || documentosDetectados.isEmpty()) {
-                    registrarProcesamientoExpedienteCompleto(expediente, docOriginal, usuario, 0);
-                    return docOriginal;
-                }
-
-                byte[] pdfOriginal = archivo.getBytes();
-
-                for (DocumentoDetectadoDto detectado : documentosDetectados) {
-                    byte[] pdfSeparado = pdfSplitService.extraerPaginas(
-                            pdfOriginal,
-                            detectado.getPaginas());
-
-                    guardarDocumentoGeneradoParaExpediente(
-                            expediente,
-                            pdfSeparado,
-                            detectado.getTipoDocumento(),
-                            usuario,
-                            expediente.getMatricula() + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf",
-                            null,
-                            false);
-                }
-                registrarProcesamientoExpedienteCompleto(expediente, docOriginal, usuario, documentosDetectados.size());
+                Documento docOriginal = guardarExpedienteCompletoOriginalParaExpediente(expedienteId, archivo, operacionId, usuario);
+                procesarExpedienteCompletoDocumento(docOriginal.getId(), usuario);
                 return docOriginal;
             }
             Documento doc = construirDocumentoBase(archivo, tipoDocumento, usuario);
@@ -177,6 +149,85 @@ public class DocumentoServiceImpl implements DocumentoService {
             return documento;
         } catch (IOException exception) {
             throw new RuntimeException("No se pudo guardar el documento generado", exception);
+        }
+    }
+
+    @Override
+    @Transactional
+    public Documento guardarExpedienteCompletoOriginalParaExpediente(Long expedienteId, MultipartFile archivo, Long operacionId, Usuario usuario) {
+        if (archivo == null || archivo.isEmpty()) {
+            return null;
+        }
+
+        try {
+            Expediente expediente = expedienteRepository.findById(expedienteId)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
+            if (!expedienteService.tienePermisoExpediente(expediente, usuario)) {
+                throw new AccesoDenegadoException("No tienes permiso para subir documentos a este expediente");
+            }
+            OperacionExpediente operacion = resolverOperacionExpediente(expediente, operacionId);
+
+            Documento docOriginal = construirDocumentoBase(archivo, TipoDocumento.EXPEDIENTE_COMPLETO, usuario);
+            docOriginal.setExpediente(expediente);
+            docOriginal.setOperacion(operacion);
+            documentoRepository.save(docOriginal);
+            return docOriginal;
+        } catch (IOException e) {
+            throw new RuntimeException("Error al guardar el expediente completo", e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public int procesarExpedienteCompletoDocumento(Long documentoId, Usuario usuario) {
+        Documento docOriginal = obtenerDocumentoConPermiso(documentoId, usuario);
+        if (docOriginal.getExpediente() == null) {
+            throw new OperacionInvalidaException("El documento no pertenece a un expediente");
+        }
+        if (docOriginal.getTipoDocumento() != TipoDocumento.EXPEDIENTE_COMPLETO) {
+            throw new OperacionInvalidaException("El documento no es un expediente completo");
+        }
+
+        Path rutaOriginal = obtenerCarpetaUploads().resolve(docOriginal.getNombreArchivo()).normalize();
+        Path carpetaUploads = obtenerCarpetaUploads();
+        if (!rutaOriginal.startsWith(carpetaUploads)) {
+            throw new OperacionInvalidaException("Ruta de archivo no permitida");
+        }
+        try {
+            if (!Files.exists(rutaOriginal)) {
+                throw new RecursoNoEncontradoException("El archivo fisico del documento no existe");
+            }
+
+            byte[] pdfOriginal = Files.readAllBytes(rutaOriginal);
+            MultipartFile archivoProcesable = new PathMultipartFile(
+                    rutaOriginal,
+                    docOriginal.getNombreArchivoOriginal(),
+                    "application/pdf"
+            );
+            List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivoProcesable);
+
+            if (documentosDetectados == null || documentosDetectados.isEmpty()) {
+                registrarProcesamientoExpedienteCompleto(docOriginal.getExpediente(), docOriginal, usuario, 0);
+                return 0;
+            }
+
+            int generados = 0;
+            for (DocumentoDetectadoDto detectado : documentosDetectados) {
+                byte[] pdfSeparado = pdfSplitService.extraerPaginas(pdfOriginal, detectado.getPaginas());
+                guardarDocumentoGeneradoParaExpediente(
+                        docOriginal.getExpediente(),
+                        pdfSeparado,
+                        detectado.getTipoDocumento(),
+                        usuario,
+                        docOriginal.getExpediente().getMatricula() + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf",
+                        docOriginal.getOperacion(),
+                        false);
+                generados++;
+            }
+            registrarProcesamientoExpedienteCompleto(docOriginal.getExpediente(), docOriginal, usuario, generados);
+            return generados;
+        } catch (IOException e) {
+            throw new RuntimeException("Error al procesar el expediente completo", e);
         }
     }
 
@@ -331,35 +382,8 @@ public class DocumentoServiceImpl implements DocumentoService {
                 throw new AccesoDenegadoException("No tienes permiso para subir documentos a este expediente");
             }
             if (TipoDocumento.EXPEDIENTE_COMPLETO.equals(tipoDocumento)) {
-                // SIEMPRE guardar el original primero
-                Documento docOriginal = construirDocumentoBase(archivo, tipoDocumento, usuario);
-                docOriginal.setSolicitud(solicitud);
-                documentoRepository.save(docOriginal);
-
-
-                List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivo);
-
-                if (documentosDetectados == null || documentosDetectados.isEmpty()) {
-                    registrarProcesamientoExpedienteCompleto(solicitud, docOriginal, usuario, 0);
-                    return;
-                }
-
-                byte[] pdfOriginal = archivo.getBytes();
-
-                for (DocumentoDetectadoDto detectado : documentosDetectados) {
-                    byte[] pdfSeparado = pdfSplitService.extraerPaginas(
-                            pdfOriginal,
-                            detectado.getPaginas());
-
-                    guardarDocumentoGeneradoParaSolicitud(
-                            solicitud,
-                            pdfSeparado,
-                            detectado.getTipoDocumento(),
-                            usuario,
-                            solicitud.getMatricula() + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf",
-                            false);
-                }
-                registrarProcesamientoExpedienteCompleto(solicitud, docOriginal, usuario, documentosDetectados.size());
+                Documento docOriginal = guardarExpedienteCompletoOriginalParaSolicitud(solicitudId, archivo, usuario);
+                procesarExpedienteCompletoSolicitudDocumento(docOriginal.getId(), usuario);
                 return;
             }
 
@@ -893,6 +917,82 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
     }
 
+    @Override
+    @Transactional
+    public Documento guardarExpedienteCompletoOriginalParaSolicitud(Long solicitudId, MultipartFile archivo, Usuario usuario) {
+        if (archivo == null || archivo.isEmpty()) {
+            return null;
+        }
+
+        try {
+            Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+            if (!solicitudService.tienePermisoSolicitud(solicitud, usuario)) {
+                throw new AccesoDenegadoException("No tienes permiso para subir documentos a esta solicitud");
+            }
+
+            Documento docOriginal = construirDocumentoBase(archivo, TipoDocumento.EXPEDIENTE_COMPLETO, usuario);
+            docOriginal.setSolicitud(solicitud);
+            documentoRepository.save(docOriginal);
+            return docOriginal;
+        } catch (IOException e) {
+            throw new RuntimeException("Error al guardar el expediente completo", e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public int procesarExpedienteCompletoSolicitudDocumento(Long documentoId, Usuario usuario) {
+        Documento docOriginal = obtenerDocumentoConPermiso(documentoId, usuario);
+        if (docOriginal.getSolicitud() == null) {
+            throw new OperacionInvalidaException("El documento no pertenece a una solicitud");
+        }
+        if (docOriginal.getTipoDocumento() != TipoDocumento.EXPEDIENTE_COMPLETO) {
+            throw new OperacionInvalidaException("El documento no es un expediente completo");
+        }
+
+        Path rutaOriginal = obtenerCarpetaUploads().resolve(docOriginal.getNombreArchivo()).normalize();
+        Path carpetaUploads = obtenerCarpetaUploads();
+        if (!rutaOriginal.startsWith(carpetaUploads)) {
+            throw new OperacionInvalidaException("Ruta de archivo no permitida");
+        }
+        try {
+            if (!Files.exists(rutaOriginal)) {
+                throw new RecursoNoEncontradoException("El archivo fisico del documento no existe");
+            }
+
+            byte[] pdfOriginal = Files.readAllBytes(rutaOriginal);
+            MultipartFile archivoProcesable = new PathMultipartFile(
+                    rutaOriginal,
+                    docOriginal.getNombreArchivoOriginal(),
+                    "application/pdf"
+            );
+            List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivoProcesable);
+
+            if (documentosDetectados == null || documentosDetectados.isEmpty()) {
+                registrarProcesamientoExpedienteCompleto(docOriginal.getSolicitud(), docOriginal, usuario, 0);
+                return 0;
+            }
+
+            int generados = 0;
+            for (DocumentoDetectadoDto detectado : documentosDetectados) {
+                byte[] pdfSeparado = pdfSplitService.extraerPaginas(pdfOriginal, detectado.getPaginas());
+                guardarDocumentoGeneradoParaSolicitud(
+                        docOriginal.getSolicitud(),
+                        pdfSeparado,
+                        detectado.getTipoDocumento(),
+                        usuario,
+                        docOriginal.getSolicitud().getMatricula() + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf",
+                        false);
+                generados++;
+            }
+            registrarProcesamientoExpedienteCompleto(docOriginal.getSolicitud(), docOriginal, usuario, generados);
+            return generados;
+        } catch (IOException e) {
+            throw new RuntimeException("Error al procesar el expediente completo", e);
+        }
+    }
+
     private void validarAdminSiDocumentoCliente(Documento documento, Usuario usuario) {
         if (documento.getCliente() != null && documento.getInteresado() == null
                 && (usuario == null || usuario.getRolUsuario() != RolUsuario.ADMIN)) {
@@ -949,6 +1049,56 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     private Path obtenerCarpetaUploads() {
         return Paths.get(uploadDir).toAbsolutePath().normalize();
+    }
+
+    private record PathMultipartFile(Path path, String originalFilename, String contentType) implements MultipartFile {
+        @Override
+        public String getName() {
+            return "archivo";
+        }
+
+        @Override
+        public String getOriginalFilename() {
+            return originalFilename;
+        }
+
+        @Override
+        public String getContentType() {
+            return contentType;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            try {
+                return Files.size(path) == 0;
+            } catch (IOException e) {
+                return true;
+            }
+        }
+
+        @Override
+        public long getSize() {
+            try {
+                return Files.size(path);
+            } catch (IOException e) {
+                return 0;
+            }
+        }
+
+        @Override
+        public byte[] getBytes() throws IOException {
+            return Files.readAllBytes(path);
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+            return Files.newInputStream(path);
+        }
+
+        @Override
+        public void transferTo(java.io.File dest) throws IOException, IllegalStateException {
+            Files.copy(path, dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     private void registrarCargaDocumentoExpediente(Expediente expediente, Documento documento, Usuario usuario) {

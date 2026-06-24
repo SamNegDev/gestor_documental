@@ -9,6 +9,7 @@ import { ClienteExpedientePage } from "../features/expedientes/pages/ClienteExpe
 import { CatalogosGestionPage } from "../features/catalogosGestion/pages/CatalogosGestionPage";
 import { DashboardPage } from "../features/listados/pages/DashboardPage";
 import { ExpedienteCreatePage } from "../features/expedientes/pages/ExpedienteCreatePage";
+import { ExpedienteBulkCreatePage } from "../features/expedientes/pages/ExpedienteBulkCreatePage";
 import { ExpedienteDetailPage } from "../features/expedientes/pages/ExpedienteDetailPage";
 import { ExpedienteEditPage } from "../features/expedientes/pages/ExpedienteEditPage";
 import { ExtraccionGaExportQueuePage } from "../features/ia/pages/ExtraccionGaExportQueuePage";
@@ -59,6 +60,7 @@ export const router = createBrowserRouter([
       { path: "cliente/dashboard", element: <RequireRole allow={["CLIENTE"]}><DashboardPage /></RequireRole> },
       { path: "expedientes", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><ExpedientesListPage /></RequireRole> },
       { path: "expedientes/nuevo", element: <RequireRole allow={["ADMIN"]}><ExpedienteCreatePage /></RequireRole> },
+      { path: "expedientes/creacion-multiple", element: <RequireRole allow={["ADMIN"]}><ExpedienteBulkCreatePage /></RequireRole> },
       { path: "expedientes/:id", element: <RequireRole allow={["ADMIN"]}><ExpedienteDetailPage /></RequireRole> },
       { path: "expedientes/:id/editar", element: <RequireRole allow={["ADMIN"]}><ExpedienteEditPage /></RequireRole> },
       { path: "expedientes/:id/extraccion-ga", element: <RequireRole allow={["ADMIN"]}><ExtraccionGaReviewPage /></RequireRole> },

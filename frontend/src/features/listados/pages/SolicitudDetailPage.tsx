@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, Scissors, Send, UserRound } from "lucide-react";
@@ -13,11 +13,12 @@ import {
   deleteDocument,
   deleteDocumentPages,
   extractDocumentPages,
+  getCompleteExpedienteProcessing,
   mergeDocuments,
+  startCompleteSolicitudProcessing,
   updateDocument,
-  uploadSolicitudDocument,
 } from "../../expedientes/services/documentosApi";
-import type { DocumentoExpediente } from "../../expedientes/types/expedienteDetail.types";
+import type { DocumentoExpediente, ProcesamientoExpedienteCompleto } from "../../expedientes/types/expedienteDetail.types";
 import { formatDocumentType } from "../../expedientes/utils/formatters";
 import "../../expedientes/styles/expedienteDetail.css";
 import {
@@ -30,6 +31,8 @@ import {
 } from "../services/listadosApi";
 import type { SolicitudDetail, SolicitudDocumentacionIaResponse } from "../types";
 
+const COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX = "gestor.solicitudCompleta.job.";
+
 export function SolicitudDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -39,6 +42,8 @@ export function SolicitudDetailPage() {
   const [ocrReviewOpen, setOcrReviewOpen] = useState(false);
   const [ocrReviewDocuments, setOcrReviewDocuments] = useState<DocumentoExpediente[]>([]);
   const [completeSolicitudProcessing, setCompleteSolicitudProcessing] = useState(false);
+  const [completeSolicitudJob, setCompleteSolicitudJob] = useState<ProcesamientoExpedienteCompleto | null>(null);
+  const [completeSolicitudMinimized, setCompleteSolicitudMinimized] = useState(false);
   const [checkingInteresados, setCheckingInteresados] = useState(false);
   const [iaResult, setIaResult] = useState<SolicitudDocumentacionIaResponse | null>(null);
   const { confirm, dialog } = useConfirmDialog();
@@ -97,24 +102,56 @@ export function SolicitudDetailPage() {
     return result.data;
   };
 
+  useEffect(() => {
+    if (!id) return;
+    const storedJobId = window.localStorage.getItem(`${COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX}${id}`);
+    if (!storedJobId) return;
+    getCompleteExpedienteProcessing(storedJobId)
+      .then((job) => {
+        setCompleteSolicitudJob(job);
+        setCompleteSolicitudProcessing(job.estado === "PENDIENTE" || job.estado === "PROCESANDO");
+        if (job.estado === "COMPLETADO" || job.estado === "ERROR") {
+          window.localStorage.removeItem(`${COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX}${id}`);
+        }
+      })
+      .catch(() => window.localStorage.removeItem(`${COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX}${id}`));
+  }, [id]);
+
+  useEffect(() => {
+    if (!completeSolicitudJob || !id) return;
+    if (completeSolicitudJob.estado !== "PENDIENTE" && completeSolicitudJob.estado !== "PROCESANDO") return;
+    const intervalId = window.setInterval(() => {
+      getCompleteExpedienteProcessing(completeSolicitudJob.jobId)
+        .then(async (job) => {
+          setCompleteSolicitudJob(job);
+          const active = job.estado === "PENDIENTE" || job.estado === "PROCESANDO";
+          setCompleteSolicitudProcessing(active);
+          if (!active) {
+            window.localStorage.removeItem(`${COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX}${id}`);
+            await refreshSolicitud();
+          }
+        })
+        .catch(() => {
+          setCompleteSolicitudProcessing(false);
+          window.localStorage.removeItem(`${COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX}${id}`);
+        });
+    }, 2500);
+    return () => window.clearInterval(intervalId);
+  }, [completeSolicitudJob, id]);
+
   const handleUploadCompleteSolicitud = async (archivo: File) => {
     const solicitud = solicitudQuery.data;
     if (!solicitud) return;
-    const documentosPrevios = new Set(solicitud.documentos.map((documento) => documento.id).filter(Boolean));
     setCompleteSolicitudProcessing(true);
+    setCompleteSolicitudMinimized(false);
     try {
-      await uploadSolicitudDocument(solicitud.id, "EXPEDIENTE_COMPLETO", archivo);
-      const actualizada = await refreshSolicitud();
-      if (!actualizada) return;
-      const nuevos = actualizada.documentos.filter(
-        (documento) => documento.id && !documentosPrevios.has(documento.id) && documento.tipo !== "EXPEDIENTE_COMPLETO",
-      );
-      setOcrReviewDocuments(nuevos.length > 0 ? nuevos : actualizada.documentos.filter((documento) => documento.id));
-      setOcrReviewOpen(true);
+      const job = await startCompleteSolicitudProcessing(solicitud.id, archivo);
+      setCompleteSolicitudJob(job);
+      window.localStorage.setItem(`${COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX}${solicitud.id}`, job.jobId);
+      await refreshSolicitud();
     } catch {
-      alert("No se pudo procesar el PDF completo de la solicitud.");
-    } finally {
       setCompleteSolicitudProcessing(false);
+      alert("No se pudo iniciar la separacion del PDF completo de la solicitud.");
     }
   };
 
@@ -330,6 +367,9 @@ export function SolicitudDetailPage() {
           <CompleteExpedienteUploadPanel
             onUploadCompleteExpediente={handleUploadCompleteSolicitud}
             processing={completeSolicitudProcessing}
+            processingJob={completeSolicitudJob}
+            minimized={completeSolicitudMinimized}
+            onToggleMinimized={() => setCompleteSolicitudMinimized((current) => !current)}
             title="Aportar documentacion completa"
             description="Sube el PDF completo de la solicitud y el sistema intentara separar automaticamente los documentos detectados."
           />
@@ -490,18 +530,6 @@ export function SolicitudDetailPage() {
         onClose={() => setOcrReviewOpen(false)}
         open={ocrReviewOpen}
       />
-      {completeSolicitudProcessing ? (
-        <div className="exp-processing-overlay" role="status" aria-live="polite">
-          <div className="exp-processing-overlay__panel">
-            <Loader2 className="exp-processing-overlay__spinner" size={34} />
-            <div>
-              <p className="eyebrow">Procesando OCR</p>
-              <h3>Separando PDF completo</h3>
-              <p>Estamos leyendo el archivo, detectando documentos y preparando la revision.</p>
-            </div>
-          </div>
-        </div>
-      ) : null}
       {procesarDocumentacionMutation.isPending ? <SolicitudIaProgressModal /> : null}
       {dialog}
     </section>

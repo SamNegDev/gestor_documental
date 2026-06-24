@@ -175,6 +175,21 @@ export interface ActualizacionDocumentalExpediente {
   avisos: string[];
 }
 
+export type ProcesamientoExpedienteCompletoEstado = "PENDIENTE" | "PROCESANDO" | "COMPLETADO" | "ERROR";
+
+export interface ProcesamientoExpedienteCompleto {
+  jobId: string;
+  expedienteId?: number | null;
+  solicitudId?: number | null;
+  documentoId: number;
+  archivo: string;
+  estado: ProcesamientoExpedienteCompletoEstado;
+  documentosGenerados: number;
+  mensaje?: string | null;
+  fechaCreacion?: string | null;
+  fechaActualizacion?: string | null;
+}
+
 export interface HitoExpediente {
   id: string;
   titulo: string;

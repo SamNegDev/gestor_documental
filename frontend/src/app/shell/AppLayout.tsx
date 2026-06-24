@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { BellRing, CarFront, DatabaseSearch, Download, FolderOpen, Inbox, LayoutDashboard, LogOut, MessageCircle, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
+import { BellRing, CarFront, DatabaseSearch, Download, FolderOpen, FolderPlus, Inbox, LayoutDashboard, LogOut, MessageCircle, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
 import { SidebarLink } from "./SidebarLink";
 import { Tooltip } from "../../shared/ui/Tooltip";
 import { getSessionUser, type SessionUser } from "../../shared/api/sessionApi";
@@ -34,6 +34,7 @@ function pageTitle(pathname: string) {
   if (pathname.includes("/admin/usuarios/nuevo")) return "Nuevo usuario";
   if (pathname.includes("/admin/usuarios/")) return "Editar usuario";
   if (pathname === "/expedientes") return "Expedientes";
+  if (pathname === "/expedientes/creacion-multiple") return "Creacion multiple";
   if (pathname === "/solicitudes") return "Solicitudes";
   if (pathname.startsWith("/interesados")) return pathname === "/interesados" ? "Interesados" : "Ficha del interesado";
   if (pathname.startsWith("/vehiculos")) return pathname === "/vehiculos" ? "Vehiculos" : "Ficha del vehiculo";
@@ -62,6 +63,7 @@ const adminMenuItems: MenuItemConfig[] = [
   { id: "whatsapp", to: "/admin/whatsapp", icon: MessageCircle, label: "WhatsApp" },
   { id: "ga-export", to: "/admin/extraccion-ga", icon: Download, label: "Extraccion GA" },
   { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Expedientes" },
+  { id: "expedientes-bulk", to: "/expedientes/creacion-multiple", icon: FolderPlus, label: "Creacion multiple" },
   { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },
   { id: "interesados", to: "/interesados", icon: UserRound, label: "Interesados" },
   { id: "vehiculos", to: "/vehiculos", icon: CarFront, label: "Vehiculos" },

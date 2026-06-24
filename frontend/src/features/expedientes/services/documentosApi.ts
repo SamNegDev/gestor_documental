@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPatchForm, apiPostForm, apiPostJson } from "../../../shared/api/http";
-import type { DocumentoGenerado, DocumentoIdentidadLectura, DocumentoRolesLectura, PlantillaPreview, PlantillasExpediente } from "../types/expedienteDetail.types";
+import type { DocumentoGenerado, DocumentoIdentidadLectura, DocumentoRolesLectura, PlantillaPreview, PlantillasExpediente, ProcesamientoExpedienteCompleto } from "../types/expedienteDetail.types";
 
 export function uploadExpedienteDocument(expedienteId: number, tipoDocumento: string, archivo: File, operacionId?: number | null): Promise<void> {
   const formData = new FormData();
@@ -7,6 +7,23 @@ export function uploadExpedienteDocument(expedienteId: number, tipoDocumento: st
   formData.append("archivo", archivo);
   if (operacionId) formData.append("operacionId", String(operacionId));
   return apiPostForm(`/api/expedientes/${expedienteId}/documentos`, formData);
+}
+
+export function startCompleteExpedienteProcessing(expedienteId: number, archivo: File, operacionId?: number | null): Promise<ProcesamientoExpedienteCompleto> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  if (operacionId) formData.append("operacionId", String(operacionId));
+  return apiPostForm<ProcesamientoExpedienteCompleto>(`/api/expedientes/${expedienteId}/documentos/expediente-completo/procesamientos`, formData);
+}
+
+export function startCompleteSolicitudProcessing(solicitudId: number, archivo: File): Promise<ProcesamientoExpedienteCompleto> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  return apiPostForm<ProcesamientoExpedienteCompleto>(`/api/solicitudes/${solicitudId}/documentos/expediente-completo/procesamientos`, formData);
+}
+
+export function getCompleteExpedienteProcessing(jobId: string): Promise<ProcesamientoExpedienteCompleto> {
+  return apiGet<ProcesamientoExpedienteCompleto>(`/api/procesamientos-expediente-completo/${jobId}`);
 }
 
 export function uploadSolicitudDocument(solicitudId: number, tipoDocumento: string, archivo: File): Promise<void> {

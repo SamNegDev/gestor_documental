@@ -18,7 +18,7 @@ import { NextActionPanel } from "../components/NextActionPanel";
 import { OcrReviewDialog } from "../components/OcrReviewDialog";
 import { PhaseMilestonesPanel } from "../components/PhaseMilestonesPanel";
 import { SecondaryExpedienteTabs } from "../components/SecondaryExpedienteTabs";
-import { applyDocumentRoles, deleteDocument, deleteDocumentPages, extractDocumentPages, mergeDocuments, readDocumentIdentity, readDocumentRoles, updateDocument, uploadExpedienteDocument } from "../services/documentosApi";
+import { applyDocumentRoles, deleteDocument, deleteDocumentPages, extractDocumentPages, getCompleteExpedienteProcessing, mergeDocuments, readDocumentIdentity, readDocumentRoles, startCompleteExpedienteProcessing, updateDocument, uploadExpedienteDocument } from "../services/documentosApi";
 import {
   completeExpedienteMilestone,
   finishExpediente,
@@ -58,6 +58,7 @@ import type {
   IncidenciaExpediente,
   InteresadoSearchResult,
   OperacionExpediente,
+  ProcesamientoExpedienteCompleto,
   RequisitoDocumental,
   TipoIncidencia,
 } from "../types/expedienteDetail.types";
@@ -85,6 +86,7 @@ const CLOSING_DOCUMENTS = [
 ] as const;
 
 const INTERESADO_ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
+const COMPLETE_EXPEDIENTE_JOB_STORAGE_PREFIX = "gestor.expedienteCompleto.job.";
 
 type InteresadoCorrection = ExpedienteEditInput["interesados"][number];
 
@@ -659,6 +661,8 @@ export function ExpedienteDetailPage() {
   const [ocrReviewOpen, setOcrReviewOpen] = useState(false);
   const [ocrReviewDocuments, setOcrReviewDocuments] = useState<DocumentoExpediente[]>([]);
   const [completeExpedienteProcessing, setCompleteExpedienteProcessing] = useState(false);
+  const [completeExpedienteJob, setCompleteExpedienteJob] = useState<ProcesamientoExpedienteCompleto | null>(null);
+  const [completeExpedienteMinimized, setCompleteExpedienteMinimized] = useState(false);
   const [incidentDialogOpen, setIncidentDialogOpen] = useState(false);
   const [additionalInfoDialogOpen, setAdditionalInfoDialogOpen] = useState(false);
   const [interesadosCorrectionOpen, setInteresadosCorrectionOpen] = useState(false);
@@ -723,6 +727,21 @@ export function ExpedienteDetailPage() {
 
   useEffect(() => loadExpediente(), [loadExpediente]);
 
+  useEffect(() => {
+    if (!id) return;
+    const storedJobId = window.localStorage.getItem(`${COMPLETE_EXPEDIENTE_JOB_STORAGE_PREFIX}${id}`);
+    if (!storedJobId) return;
+    getCompleteExpedienteProcessing(storedJobId)
+      .then((job) => {
+        setCompleteExpedienteJob(job);
+        setCompleteExpedienteProcessing(job.estado === "PENDIENTE" || job.estado === "PROCESANDO");
+        if (job.estado === "COMPLETADO" || job.estado === "ERROR") {
+          window.localStorage.removeItem(`${COMPLETE_EXPEDIENTE_JOB_STORAGE_PREFIX}${id}`);
+        }
+      })
+      .catch(() => window.localStorage.removeItem(`${COMPLETE_EXPEDIENTE_JOB_STORAGE_PREFIX}${id}`));
+  }, [id]);
+
   const refreshExpediente = useCallback(() => {
     if (!id) return Promise.resolve();
     return getExpedienteDetail(id).then(async (data) => {
@@ -734,6 +753,30 @@ export function ExpedienteDetailPage() {
       return data;
     });
   }, [activeOperationId, id, refreshRelatedData]);
+
+  useEffect(() => {
+    if (!completeExpedienteJob || !id) return;
+    if (completeExpedienteJob.estado !== "PENDIENTE" && completeExpedienteJob.estado !== "PROCESANDO") return;
+
+    const intervalId = window.setInterval(() => {
+      getCompleteExpedienteProcessing(completeExpedienteJob.jobId)
+        .then(async (job) => {
+          setCompleteExpedienteJob(job);
+          const active = job.estado === "PENDIENTE" || job.estado === "PROCESANDO";
+          setCompleteExpedienteProcessing(active);
+          if (!active) {
+            window.localStorage.removeItem(`${COMPLETE_EXPEDIENTE_JOB_STORAGE_PREFIX}${id}`);
+            await refreshExpediente();
+          }
+        })
+        .catch(() => {
+          setCompleteExpedienteProcessing(false);
+          window.localStorage.removeItem(`${COMPLETE_EXPEDIENTE_JOB_STORAGE_PREFIX}${id}`);
+        });
+    }, 2500);
+
+    return () => window.clearInterval(intervalId);
+  }, [completeExpedienteJob, id, refreshExpediente]);
 
   const openIncidentDialog = () => {
     setIncidentDialogOpen(true);
@@ -862,21 +905,16 @@ export function ExpedienteDetailPage() {
 
   const handleUploadCompleteExpediente = async (archivo: File) => {
     if (!expediente) return;
-    const documentosPrevios = new Set(expediente.documentos.map((documento) => documento.id).filter(Boolean));
     setCompleteExpedienteProcessing(true);
+    setCompleteExpedienteMinimized(false);
     try {
-      await uploadExpedienteDocument(expediente.id, "EXPEDIENTE_COMPLETO", archivo);
-      const actualizado = await refreshExpediente();
-      if (!actualizado) return;
-      const nuevos = actualizado.documentos.filter(
-        (documento) => documento.id && !documentosPrevios.has(documento.id) && documento.tipo !== "EXPEDIENTE_COMPLETO",
-      );
-      setOcrReviewDocuments(nuevos.length > 0 ? nuevos : actualizado.documentos.filter((documento) => documento.id));
-      setOcrReviewOpen(true);
+      const job = await startCompleteExpedienteProcessing(expediente.id, archivo, activeOperationId);
+      setCompleteExpedienteJob(job);
+      window.localStorage.setItem(`${COMPLETE_EXPEDIENTE_JOB_STORAGE_PREFIX}${expediente.id}`, job.jobId);
+      await refreshExpediente();
     } catch {
-      alert("No se pudo procesar el expediente completo.");
-    } finally {
       setCompleteExpedienteProcessing(false);
+      alert("No se pudo iniciar la separacion del expediente completo.");
     }
   };
 
@@ -1358,6 +1396,9 @@ export function ExpedienteDetailPage() {
             description="Sube un PDF completo para separar automaticamente los documentos que ya estan en nuestro poder."
             onUploadCompleteExpediente={handleUploadCompleteExpediente}
             processing={completeExpedienteProcessing}
+            processingJob={completeExpedienteJob}
+            minimized={completeExpedienteMinimized}
+            onToggleMinimized={() => setCompleteExpedienteMinimized((current) => !current)}
           />
           <DocumentRequirementsPanel
             documentos={expediente.documentos}
@@ -1414,18 +1455,6 @@ export function ExpedienteDetailPage() {
         onClose={() => setOcrReviewOpen(false)}
         open={ocrReviewOpen}
       />
-      {completeExpedienteProcessing ? (
-        <div className="exp-processing-overlay" role="status" aria-live="polite">
-          <div className="exp-processing-overlay__panel">
-            <Loader2 className="exp-processing-overlay__spinner" size={34} />
-            <div>
-              <p className="eyebrow">Procesando OCR</p>
-              <h3>Separando expediente completo</h3>
-              <p>Estamos leyendo el PDF, detectando documentos y preparando la revision.</p>
-            </div>
-          </div>
-        </div>
-      ) : null}
       <AdditionalInfoDialog
         onClose={() => setAdditionalInfoDialogOpen(false)}
         onSubmit={handleRequestAdditionalInfo}

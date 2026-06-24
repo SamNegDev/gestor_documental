@@ -4,12 +4,14 @@ import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.dto.expediente.DocumentoIdentidadLecturaResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaResponse;
+import com.example.gestor_documental.dto.expediente.ProcesamientoExpedienteCompletoResponse;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
 import com.example.gestor_documental.service.DocumentoService;
+import com.example.gestor_documental.service.ExpedienteCompletoProcesamientoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +38,7 @@ public class DocumentoApiController {
     private final DocumentoService documentoService;
     private final DocumentoIdentidadLecturaService documentoIdentidadLecturaService;
     private final DocumentoRolesLecturaService documentoRolesLecturaService;
+    private final ExpedienteCompletoProcesamientoService expedienteCompletoProcesamientoService;
     private final CurrentUserService currentUserService;
 
     @PostMapping("/expedientes/{expedienteId}/documentos")
@@ -49,6 +52,26 @@ public class DocumentoApiController {
         Usuario usuarioLogueado = currentUserService.requireUser(authentication);
         documentoService.guardarParaExpediente(expedienteId, archivo, tipoDocumento, operacionId, usuarioLogueado);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/expedientes/{expedienteId}/documentos/expediente-completo/procesamientos")
+    public ProcesamientoExpedienteCompletoResponse iniciarProcesamientoExpedienteCompleto(
+            @PathVariable Long expedienteId,
+            @RequestParam("archivo") MultipartFile archivo,
+            @RequestParam(required = false) Long operacionId,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
+        return expedienteCompletoProcesamientoService.iniciar(expedienteId, archivo, operacionId, usuarioLogueado);
+    }
+
+    @GetMapping("/procesamientos-expediente-completo/{jobId}")
+    public ProcesamientoExpedienteCompletoResponse obtenerProcesamientoExpedienteCompleto(
+            @PathVariable String jobId,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
+        return expedienteCompletoProcesamientoService.obtener(jobId, usuarioLogueado);
     }
 
     @PatchMapping("/documentos/{id}")
