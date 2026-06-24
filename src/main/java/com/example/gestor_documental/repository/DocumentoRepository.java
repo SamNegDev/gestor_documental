@@ -21,6 +21,35 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long> {
 
     List<Documento> findBySolicitudId(Long solicitudId);
 
+    @EntityGraph(attributePaths = {"expediente", "solicitud", "subidoPor"})
+    @Query("""
+            select d from Documento d
+            where d.tipoDocumento = com.example.gestor_documental.enums.TipoDocumento.EXPEDIENTE_COMPLETO
+              and d.fechaSubida >= :desde
+              and d.subidoPor is not null
+              and not exists (
+                  select 1 from HistorialCambio historial
+                  where historial.accion = 'CARGAR DOCUMENTO'
+                    and historial.fechaCambio > d.fechaSubida
+                    and historial.descripcion like concat('%', d.nombreArchivoOriginal, '%')
+                    and (
+                        (d.expediente is not null and historial.expediente = d.expediente)
+                        or (d.solicitud is not null and historial.solicitud = d.solicitud)
+                    )
+              )
+              and not exists (
+                  select 1 from Documento generado
+                  where generado.tipoDocumento <> com.example.gestor_documental.enums.TipoDocumento.EXPEDIENTE_COMPLETO
+                    and generado.fechaSubida > d.fechaSubida
+                    and (
+                        (d.expediente is not null and generado.expediente = d.expediente)
+                        or (d.solicitud is not null and generado.solicitud = d.solicitud)
+                    )
+              )
+            order by d.fechaSubida asc
+            """)
+    List<Documento> findExpedientesCompletosPendientesDesde(@Param("desde") LocalDateTime desde, Pageable pageable);
+
     @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
     List<Documento> findByClienteIdOrderByFechaSubidaDesc(Long clienteId);
 

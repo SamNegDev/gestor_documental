@@ -10,5 +10,7 @@ public interface ExpedienteCompletoProcesamientoService {
 
     ProcesamientoExpedienteCompletoResponse iniciarSolicitud(Long solicitudId, MultipartFile archivo, Usuario usuario);
 
+    ProcesamientoExpedienteCompletoResponse iniciarDocumentoExistente(Long documentoId, Usuario usuario);
+
     ProcesamientoExpedienteCompletoResponse obtener(String jobId, Usuario usuario);
 }

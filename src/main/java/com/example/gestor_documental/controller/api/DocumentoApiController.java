@@ -74,6 +74,15 @@ public class DocumentoApiController {
         return expedienteCompletoProcesamientoService.obtener(jobId, usuarioLogueado);
     }
 
+    @PostMapping("/documentos/{id}/expediente-completo/procesamientos")
+    public ProcesamientoExpedienteCompletoResponse reencolarProcesamientoExpedienteCompleto(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
+        return expedienteCompletoProcesamientoService.iniciarDocumentoExistente(id, usuarioLogueado);
+    }
+
     @PatchMapping("/documentos/{id}")
     public ResponseEntity<Void> editarDocumento(
             @PathVariable Long id,

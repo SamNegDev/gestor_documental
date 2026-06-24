@@ -1,12 +1,15 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.expediente.ProcesamientoExpedienteCompletoResponse;
+import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.DocumentoService;
@@ -16,7 +19,9 @@ import com.example.gestor_documental.service.SolicitudService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,9 +35,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCompletoProcesamientoService {
 
     private final DocumentoService documentoService;
+    private final DocumentoRepository documentoRepository;
     private final ExpedienteRepository expedienteRepository;
     private final SolicitudRepository solicitudRepository;
     private final ExpedienteService expedienteService;
@@ -54,6 +61,7 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
             thread.setDaemon(true);
             return thread;
         });
+        reencolarPendientesRecientes();
     }
 
     @Override
@@ -100,6 +108,54 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
         jobs.put(jobId, job);
         executor.submit(() -> procesar(jobId, usuario));
         return toResponse(job);
+    }
+
+    @Override
+    public ProcesamientoExpedienteCompletoResponse iniciarDocumentoExistente(Long documentoId, Usuario usuario) {
+        Documento documento = documentoService.obtenerDocumentoConPermiso(documentoId, usuario);
+        if (documento.getTipoDocumento() != TipoDocumento.EXPEDIENTE_COMPLETO) {
+            throw new OperacionInvalidaException("Solo se puede procesar un expediente completo");
+        }
+        Long expedienteId = documento.getExpediente() != null ? documento.getExpediente().getId() : null;
+        Long solicitudId = documento.getSolicitud() != null ? documento.getSolicitud().getId() : null;
+        if (expedienteId == null && solicitudId == null) {
+            throw new OperacionInvalidaException("El documento no pertenece a una solicitud o expediente");
+        }
+
+        String jobId = UUID.randomUUID().toString();
+        LocalDateTime ahora = LocalDateTime.now();
+        JobState job = new JobState(
+                jobId,
+                expedienteId,
+                solicitudId,
+                documento.getId(),
+                documento.getNombreArchivoOriginal(),
+                solicitudId != null ? JobTarget.SOLICITUD : JobTarget.EXPEDIENTE,
+                EstadoJob.PENDIENTE,
+                0,
+                "Expediente completo reencolado. Pendiente de separacion.",
+                ahora,
+                ahora
+        );
+        jobs.put(jobId, job);
+        executor.submit(() -> procesar(jobId, usuario));
+        return toResponse(job);
+    }
+
+    private void reencolarPendientesRecientes() {
+        try {
+            documentoRepository.findExpedientesCompletosPendientesDesde(LocalDateTime.now().minusHours(24), PageRequest.of(0, 20))
+                    .forEach(documento -> {
+                        try {
+                            ProcesamientoExpedienteCompletoResponse job = iniciarDocumentoExistente(documento.getId(), documento.getSubidoPor());
+                            log.info("Reencolado expediente completo pendiente {} como job {}", documento.getId(), job.jobId());
+                        } catch (Exception exception) {
+                            log.warn("No se pudo reencolar expediente completo pendiente {}", documento.getId(), exception);
+                        }
+                    });
+        } catch (Exception exception) {
+            log.warn("No se pudieron buscar expedientes completos pendientes para reencolar", exception);
+        }
     }
 
     @Override
