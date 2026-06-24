@@ -448,8 +448,14 @@ public class SolicitudApiController {
             return "ARCHIVADA";
         }
         if (documentos.isEmpty()) return "SIN DOCUMENTACION";
-        int pendientes = contarDocumentosBasicosPendientes(solicitud, documentos, interesados);
-        if (pendientes > 0) return pendientes == 1 ? "FALTA 1 DOCUMENTO" : "FALTAN " + pendientes + " DOCUMENTOS";
+        int datosPendientes = contarDatosBasicosPendientes(solicitud, interesados);
+        if (datosPendientes > 0) {
+            return datosPendientes == 1 ? "FALTA 1 DATO" : "FALTAN " + datosPendientes + " DATOS";
+        }
+        int documentosPendientes = contarDocumentosBasicosPendientes(solicitud, documentos, interesados);
+        if (documentosPendientes > 0) {
+            return documentosPendientes == 1 ? "FALTA 1 DOCUMENTO" : "FALTAN " + documentosPendientes + " DOCUMENTOS";
+        }
         return "DOCUMENTACION COMPLETA";
     }
 
@@ -457,6 +463,37 @@ public class SolicitudApiController {
         return solicitud.getExpediente() != null
                 || solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA
                 || solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO;
+    }
+
+    private int contarDatosBasicosPendientes(Solicitud solicitud, List<InteresadoSolicitudResponse> interesados) {
+        TipoTramiteEnum tramite = solicitud.getTipoTramite() != null ? solicitud.getTipoTramite().getNombre() : null;
+        Set<String> rolesEsperados = rolesEsperadosSolicitud(tramite);
+        int pendientes = 0;
+        for (String rol : rolesEsperados) {
+            boolean informado = interesados.stream().anyMatch(interesado ->
+                    rol.equals(interesado.getRol())
+                            && hasText(interesado.getNombre())
+                            && hasText(interesado.getDni()));
+            if (!informado) {
+                pendientes++;
+            }
+        }
+        pendientes += (int) interesados.stream()
+                .filter(interesado -> !hasText(interesado.getNombre())
+                        || !hasText(interesado.getDni())
+                        || !hasText(interesado.getRol()))
+                .count();
+        return pendientes;
+    }
+
+    private Set<String> rolesEsperadosSolicitud(TipoTramiteEnum tramite) {
+        if (tramite == TipoTramiteEnum.BATECOM) {
+            return Set.of("VENDEDOR", "COMPRAVENTA", "COMPRADOR");
+        }
+        if (tramite == TipoTramiteEnum.TRASPASO || tramite == TipoTramiteEnum.NOTIFICACION_VENTA) {
+            return Set.of("VENDEDOR", "COMPRADOR");
+        }
+        return Set.of("TITULAR");
     }
 
     private int contarDocumentosBasicosPendientes(Solicitud solicitud, List<Documento> documentos, List<InteresadoSolicitudResponse> interesados) {
@@ -800,6 +837,10 @@ public class SolicitudApiController {
             return "";
         }
         return value.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
     private record DocumentoSoporte(boolean aportado, String origen) {
