@@ -428,10 +428,16 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         String destinatario = telefonoCliente(incidencia);
         WhatsappOutboundService.ResultadoWhatsapp resultado = whatsappOutboundService.enviarAvisoSeguimiento(destinatario, texto);
         if (!resultado.exito()) return new NotificacionIncidenciaResponse(false, false, resultado.error());
+        AvisoIncidencia aviso = new AvisoIncidencia();
+        aviso.setIncidencia(incidencia); aviso.setNumeroAviso(numero); aviso.setEnviadoPor(admin); aviso.setMensaje(texto);
+        aviso.setDestinatario(destinatario); aviso.setAsunto("WhatsApp seguimiento"); aviso.setCanal("WHATSAPP");
+        aviso.setEstadoEnvio(resultado.simulado() ? "SIMULADO" : "ENVIADO");
+        avisoIncidenciaRepository.save(aviso);
+        registrarAvisoCorrecto(incidencia, numero, texto, config, admin, resultado.simulado(), "WHATSAPP");
         return new NotificacionIncidenciaResponse(true, resultado.simulado(),
                 resultado.simulado()
                         ? "WhatsApp simulado correctamente."
-                        : "WhatsApp enviado correctamente. El seguimiento se actualizara cuando el cliente pulse Recibir info.");
+                        : "WhatsApp enviado correctamente. El seguimiento queda actualizado.");
     }
 
     private void validarCanalPermitido(Incidencia incidencia, String canal) {

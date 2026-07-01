@@ -109,7 +109,7 @@ public class SolicitudApiController {
             @RequestParam(required = false) Long tipoTramiteId,
             @RequestParam(required = false) String matricula,
             @RequestParam(required = false) Long clienteId,
-            @RequestParam(required = false, defaultValue = "ESTE_MES") String periodo
+            @RequestParam(required = false, defaultValue = "ULTIMA_SEMANA") String periodo
             , @RequestParam(required = false) LocalDate fechaDesde
             , @RequestParam(required = false) LocalDate fechaHasta
             , @RequestParam(required = false, defaultValue = "0") int pagina
@@ -889,8 +889,9 @@ public class SolicitudApiController {
 
     private DateRange dateRange(String periodo, LocalDate fechaDesde, LocalDate fechaHasta) {
         LocalDate today = LocalDate.now();
-        return switch (periodo != null ? periodo : "ESTE_MES") {
+        return switch (periodo != null ? periodo : "ULTIMA_SEMANA") {
             case "ULTIMA_SEMANA" -> new DateRange(today.minusDays(6).atStartOfDay(), today.plusDays(1).atStartOfDay());
+            case "MES_ANTERIOR" -> new DateRange(today.minusMonths(1).withDayOfMonth(1).atStartOfDay(), today.withDayOfMonth(1).atStartOfDay());
             case "ULTIMOS_3_MESES" -> new DateRange(today.minusMonths(3).atStartOfDay(), null);
             case "ESTE_ANIO" -> new DateRange(today.withDayOfYear(1).atStartOfDay(), null);
             case "TODO" -> null;

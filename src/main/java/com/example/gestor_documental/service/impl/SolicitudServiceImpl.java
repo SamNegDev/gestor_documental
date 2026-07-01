@@ -25,6 +25,7 @@ import com.example.gestor_documental.service.RequisitoDocumentalExpedienteServic
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.util.DireccionFormatter;
+import com.example.gestor_documental.util.DireccionNormalizer;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
@@ -460,7 +461,7 @@ public class SolicitudServiceImpl implements SolicitudService {
                     if (valorAportadoDiferente(telefonoDeclarado, interesado.getTelefono())) {
                         diferencias.add("Telefono");
                     }
-                    if (valorAportadoDiferente(direccionDeclarada, interesado.getDireccion())) {
+                    if (direccionAportadaDiferente(direccionDeclarada, interesado.getDireccion())) {
                         diferencias.add("Direccion");
                     }
                     if (diferencias.isEmpty()) {
@@ -496,6 +497,15 @@ public class SolicitudServiceImpl implements SolicitudService {
         }
         String registradoNormalizado = NombrePersonaNormalizer.normalizar(registrado);
         return !declaradoNormalizado.equals(registradoNormalizado);
+    }
+
+    private boolean direccionAportadaDiferente(String declarada, String registrada) {
+        String declaradaNormalizada = DireccionNormalizer.normalizar(declarada);
+        if (declaradaNormalizada == null || declaradaNormalizada.isBlank()) {
+            return false;
+        }
+        String registradaNormalizada = DireccionNormalizer.normalizar(registrada);
+        return !declaradaNormalizada.equals(registradaNormalizada);
     }
 
     /**

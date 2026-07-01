@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Archive, ArrowRight, CheckSquare2, ClipboardList, Clock3, FileWarning, Inbox, Mail, MessageCircle, SearchCheck } from "lucide-react";
+import { AlertTriangle, Archive, ArrowRight, CheckSquare2, ClipboardList, Clock3, FileWarning, Inbox, Mail, MessageCircle, SearchCheck, Send } from "lucide-react";
 import { Link, useOutletContext } from "react-router-dom";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
+import { ApiError } from "../../../shared/api/http";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { PaginationBar } from "../../listados/components/PaginationBar";
+import { getExpedienteListCatalogs } from "../../listados/services/listadosApi";
 import { archivarSeguimiento, prepararNotificacionExpediente } from "../../seguimiento/services/seguimientoApi";
 import { NotificationEmailDialog } from "../components/NotificationEmailDialog";
-import { getTareas, getTareasResumen, revisarTareaWhatsapp } from "../services/tareasApi";
+import { enviarAvisosConjuntos, getTareas, getTareasResumen, revisarTareaWhatsapp } from "../services/tareasApi";
 import type { Tarea } from "../types";
 
 export function TareasPage() {
@@ -17,13 +19,16 @@ export function TareasPage() {
   const ambito = isAdmin ? "GESTION" : "CLIENTE";
   const [tipo, setTipo] = useState("");
   const [prioridad, setPrioridad] = useState("");
+  const [clienteId, setClienteId] = useState("");
   const [pagina, setPagina] = useState(0);
   const [tamanio, setTamanio] = useState(25);
+  const [bulkFeedback, setBulkFeedback] = useState<string | null>(null);
   const [notificacion, setNotificacion] = useState<{ incidenciaId: number; canal: "email" | "whatsapp" } | null>(null);
   const query = useQuery({
-    queryKey: ["tareas", ambito, tipo, prioridad, pagina, tamanio],
-    queryFn: () => getTareas({ ambito, tipo, prioridad, pagina, tamanio }),
+    queryKey: ["tareas", ambito, tipo, prioridad, clienteId, pagina, tamanio],
+    queryFn: () => getTareas({ ambito, tipo, prioridad, clienteId: isAdmin ? clienteId : "", pagina, tamanio }),
   });
+  const catalogs = useQuery({ queryKey: ["expedientes", "catalogos-listado"], queryFn: getExpedienteListCatalogs, enabled: isAdmin });
   const resumen = useQuery({ queryKey: ["tareas", "resumen"], queryFn: getTareasResumen });
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["tareas"] });
@@ -31,6 +36,17 @@ export function TareasPage() {
   };
   const archiveMutation = useMutation({ mutationFn: archivarSeguimiento, onSuccess: refresh });
   const whatsappReviewMutation = useMutation({ mutationFn: revisarTareaWhatsapp, onSuccess: refresh });
+  const bulkNotify = useMutation({
+    mutationFn: () => enviarAvisosConjuntos(clienteId),
+    onSuccess: (result) => {
+      setBulkFeedback(`${result.clientesEnviados} clientes avisados · ${result.cambiosIncluidos} avisos incluidos${result.avisos.length ? ` · ${result.avisos[0]}` : ""}`);
+      refresh();
+    },
+    onError: (error) => {
+      const message = error instanceof ApiError ? error.details || error.message : "No se pudo enviar el aviso conjunto.";
+      setBulkFeedback(message);
+    },
+  });
   async function notify(tarea: Tarea, canal: "email" | "whatsapp") {
     if (tarea.entidad === "INCIDENCIA") {
       setNotificacion({ incidenciaId: tarea.entidadId, canal });
@@ -54,8 +70,20 @@ export function TareasPage() {
           <h2>{isAdmin ? "Bandeja de tareas" : "Mis tareas"}</h2>
           <p>{isAdmin ? "Acciones de gestion que requieren intervencion." : "Acciones que necesitan tu atencion para continuar los tramites."}</p>
         </div>
-        <span className="records-count">{data?.totalElementos ?? 0} pendientes</span>
+        {isAdmin ? (
+          <div className="records-header__actions">
+            <button className="soft-button" disabled={bulkNotify.isPending || !clienteId} onClick={() => bulkNotify.mutate()} type="button">
+              <Send size={16} />
+              {bulkNotify.isPending ? "Enviando..." : clienteId ? "Aviso conjunto" : "Selecciona cliente"}
+            </button>
+            <span className="records-count">{data?.totalElementos ?? 0} pendientes</span>
+          </div>
+        ) : (
+          <span className="records-count">{data?.totalElementos ?? 0} pendientes</span>
+        )}
       </header>
+
+      {bulkFeedback ? <div className="form-feedback">{bulkFeedback}</div> : null}
 
       <section className="task-summary">
         <Summary icon={Inbox} label="Total" value={resumen.data?.total ?? 0} />
@@ -71,6 +99,7 @@ export function TareasPage() {
             <option value="SOLICITUD_PENDIENTE_REVISION">Solicitudes por revisar</option>
             <option value="APORTACION_PENDIENTE_REVISION">Aportaciones por revisar</option>
             <option value="INCIDENCIA_PENDIENTE_NOTIFICAR">Avisos al cliente</option>
+            <option value="INCIDENCIA_RECORDATORIO_PENDIENTE">Recordatorios vencidos</option>
             <option value="INCIDENCIA_PENDIENTE_ARCHIVAR">Seguimientos por archivar</option>
             <option value="INCIDENCIA_PENDIENTE_CLIENTE">Incidencias</option>
             <option value="DOCUMENTACION_PENDIENTE_CLIENTE">Documentacion pendiente</option>
@@ -92,6 +121,15 @@ export function TareasPage() {
             <option value="MEDIA">Media</option>
           </select>
         </label>
+        {isAdmin ? (
+          <label>
+            <span>Cliente</span>
+            <select value={clienteId} onChange={(event) => { setClienteId(event.target.value); setPagina(0); }}>
+              <option value="">Todos los clientes</option>
+              {catalogs.data?.clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
+            </select>
+          </label>
+        ) : null}
       </div>
 
       <section className="records-panel records-panel--ledger">
@@ -228,6 +266,7 @@ function taskIcon(tipo: string) {
 
 function taskActionKind(tipo: string): { label: string; tone: "neutral" | "warning" | "success" | "danger" | "info" } | null {
   if (tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR") return { label: "AVISO AL CLIENTE", tone: "warning" };
+  if (tipo === "INCIDENCIA_RECORDATORIO_PENDIENTE") return { label: "RECORDATORIO", tone: "warning" };
   if (tipo.startsWith("INCIDENCIA_")) return { label: "INCIDENCIA", tone: "danger" };
   if (tipo === "EXPEDIENTE_ESTANCADO") return { label: "SIN ACTIVIDAD", tone: "neutral" };
   if (tipo === "DOCUMENTACION_PENDIENTE_CLIENTE" || tipo === "JUSTIFICANTE_FINAL_PENDIENTE") return { label: "FALTA DOCUMENTACION", tone: "warning" };

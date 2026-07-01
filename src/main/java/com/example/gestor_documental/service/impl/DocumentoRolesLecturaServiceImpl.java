@@ -263,10 +263,16 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
     private String promptLecturaRoles(Documento documento) {
         String contextoBatecom = esDocumentoSolicitudBatecom(documento)
                 ? """
-                Contexto BATECOM: el expediente puede tener dos operaciones. En una, el titular inicial vende/entrega a la compraventa; en otra, la compraventa vende al comprador final.
-                Extrae SOLO los roles visibles en ESTE documento: si la compraventa compra, ponla como COMPRADOR; si vende, ponla como VENDEDOR.
-                No intentes adivinar la otra operacion ni cambies el rol porque sea una compraventa. La consolidacion posterior detectara la compraventa comun.
-                """
+                Contexto BATECOM: el expediente puede tener dos operaciones documentales distintas.
+                - Operacion BATE / ENTREGA A COMPRAVENTA: el titular inicial es VENDEDOR y la compraventa/profesional es COMPRADOR.
+                - Operacion COM / VENTA FINAL: la compraventa/profesional es VENDEDOR y el cliente final es COMPRADOR.
+                Extrae SOLO los roles visibles en ESTE documento y respeta los encabezados o secciones del contrato/factura.
+                Si una empresa de compraventa aparece bajo "comprador", "adquirente" o despues del encabezado de comprador en BATE, debe ir en compradorIdentificador/compradorNombre, nunca como vendedor.
+                Si esa misma compraventa aparece bajo "vendedor", "transmitente" o emisor en COM, debe ir en vendedorIdentificador/vendedorNombre.
+                No cambies el rol por el tipo de entidad: una compraventa puede comprar en BATE y vender en COM.
+                No intentes adivinar la otra operacion. La consolidacion posterior detectara la compraventa comun.
+                %s
+                """.formatted(contextoOperacionBatecom(documento))
                 : "";
         return """
                 Extrae roles de una operacion de transmision de vehiculo usando solo este contrato o factura.
@@ -301,7 +307,21 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
                 && documento.getExpediente().getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM;
     }
 
+    private String contextoOperacionBatecom(Documento documento) {
+        if (documento.getOperacion() == null || documento.getOperacion().getTipo() == null) {
+            return "Operacion concreta no indicada: usa exclusivamente los encabezados visibles del documento.";
+        }
+        if (documento.getOperacion().getTipo() == TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE) {
+            return "Este documento esta asignado a BATE: la compraventa/profesional que recibe el vehiculo debe salir como COMPRADOR.";
+        }
+        if (documento.getOperacion().getTipo() == TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM) {
+            return "Este documento esta asignado a COM: la compraventa/profesional que transmite al cliente final debe salir como VENDEDOR.";
+        }
+        return "Operacion directa: aplica vendedor y comprador visibles sin reglas BATECOM.";
+    }
+
     private void aplicarResultado(Documento documento, DocumentoRolesLectura lectura, JsonNode resultado, String modeloUsado) {
+        resultado = corregirRolesBatecomPorOperacion(documento, resultado);
         String vendedorIdentificador = normalizarIdentificador(texto(resultado, "vendedorIdentificador"));
         String compradorIdentificador = normalizarIdentificador(texto(resultado, "compradorIdentificador"));
         Double confianza = numero(resultado, "confianzaGlobal");
@@ -340,6 +360,72 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         lectura.setAplicadoExpediente(false);
         lectura.setFechaAplicacion(null);
         lectura.setResultadoJson(resultado.toString());
+    }
+
+    private JsonNode corregirRolesBatecomPorOperacion(Documento documento, JsonNode resultado) {
+        if (!(resultado instanceof ObjectNode objectNode)
+                || documento.getOperacion() == null
+                || documento.getOperacion().getTipo() == null
+                || !esExpedienteBatecom(documento)) {
+            return resultado;
+        }
+        TipoOperacionExpediente tipoOperacion = documento.getOperacion().getTipo();
+        String vendedor = normalizarIdentificador(texto(resultado, "vendedorIdentificador"));
+        String comprador = normalizarIdentificador(texto(resultado, "compradorIdentificador"));
+        if (vendedor == null || comprador == null || vendedor.equals(comprador)) {
+            return resultado;
+        }
+
+        if (tipoOperacion == TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE
+                && lecturaBatecomInvertidaEnBate(documento, vendedor, comprador)) {
+            intercambiarCompradorVendedor(objectNode);
+            objectNode.put("observaciones", "Roles intercambiados automaticamente: en BATE la compraventa debe figurar como comprador.");
+            return objectNode;
+        }
+        if (tipoOperacion == TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM
+                && lecturaBatecomInvertidaEnCom(documento, vendedor, comprador)) {
+            intercambiarCompradorVendedor(objectNode);
+            objectNode.put("observaciones", "Roles intercambiados automaticamente: en COM la compraventa debe figurar como vendedor.");
+        }
+        return objectNode;
+    }
+
+    private boolean lecturaBatecomInvertidaEnBate(Documento documento, String vendedor, String comprador) {
+        return vendedorEsCompraventaExistente(documento, vendedor)
+                || (esCif(vendedor) && !esCif(comprador));
+    }
+
+    private boolean lecturaBatecomInvertidaEnCom(Documento documento, String vendedor, String comprador) {
+        return vendedorEsCompraventaExistente(documento, comprador)
+                || (!esCif(vendedor) && esCif(comprador));
+    }
+
+    private boolean vendedorEsCompraventaExistente(Documento documento, String identificador) {
+        if (documento.getExpediente() == null || documento.getExpediente().getId() == null || identificador == null) {
+            return false;
+        }
+        return expedienteInteresadoRepository.findByExpedienteId(documento.getExpediente().getId()).stream()
+                .filter(relacion -> relacion.getRol() == RolInteresado.COMPRAVENTA)
+                .map(ExpedienteInteresado::getInteresado)
+                .anyMatch(interesado -> interesado != null && identificador.equals(normalizarIdentificador(interesado.getDni())));
+    }
+
+    private boolean esCif(String identificador) {
+        String normalizado = normalizarIdentificador(identificador);
+        return normalizado != null && normalizado.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
+    }
+
+    private void intercambiarCompradorVendedor(ObjectNode node) {
+        intercambiarCampos(node, "vendedorIdentificador", "compradorIdentificador");
+        intercambiarCampos(node, "vendedorNombre", "compradorNombre");
+        intercambiarCampos(node, "vendedorDireccion", "compradorDireccion");
+    }
+
+    private void intercambiarCampos(ObjectNode node, String first, String second) {
+        JsonNode firstValue = node.get(first);
+        JsonNode secondValue = node.get(second);
+        node.set(first, secondValue == null ? objectMapper.nullNode() : secondValue);
+        node.set(second, firstValue == null ? objectMapper.nullNode() : firstValue);
     }
 
     private void validarLecturaAplicable(DocumentoRolesLectura lectura) {

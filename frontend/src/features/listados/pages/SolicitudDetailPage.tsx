@@ -47,6 +47,7 @@ export function SolicitudDetailPage() {
   const [completeSolicitudMinimized, setCompleteSolicitudMinimized] = useState(false);
   const [checkingInteresados, setCheckingInteresados] = useState(false);
   const [iaResult, setIaResult] = useState<SolicitudDocumentacionIaResponse | null>(null);
+  const [iaError, setIaError] = useState<string | null>(null);
   const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
 
@@ -312,11 +313,12 @@ export function SolicitudDetailPage() {
     if (!confirmed) return;
     try {
       setIaResult(null);
+      setIaError(null);
       const response = await procesarDocumentacionMutation.mutateAsync(solicitudActual.id);
       await refreshSolicitud();
       setIaResult(response);
     } catch (cause) {
-      alert(cause instanceof ApiError ? cause.details || "No se pudo procesar la documentacion." : "No se pudo procesar la documentacion.");
+      setIaError(cause instanceof ApiError ? cause.details || "No se pudo procesar la documentacion." : "No se pudo procesar la documentacion.");
     }
   };
 
@@ -378,6 +380,7 @@ export function SolicitudDetailPage() {
       ) : null}
 
       {iaResult ? <SolicitudIaResultPanel response={iaResult} onDismiss={() => setIaResult(null)} /> : null}
+      {iaError ? <SolicitudIaErrorPanel message={iaError} onDismiss={() => setIaError(null)} /> : null}
 
       {!isAdmin ? <ClientStatusCallout solicitud={solicitud} expedientePath={isAdmin ? undefined : "/cliente/expedientes"} /> : null}
 
@@ -619,6 +622,21 @@ function SolicitudPreparationPanel({ items }: { items: SolicitudPreparationItem[
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+function SolicitudIaErrorPanel({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <section className="solicitud-ia-result solicitud-ia-result--danger" role="alert" aria-live="assertive">
+      <div className="solicitud-ia-result__heading">
+        <AlertTriangle size={20} />
+        <div>
+          <strong>No se pudo actualizar con IA</strong>
+          <span>{message}</span>
+        </div>
+        <button className="soft-button soft-button--compact" type="button" onClick={onDismiss}>Cerrar</button>
+      </div>
     </section>
   );
 }

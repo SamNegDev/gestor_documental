@@ -24,9 +24,10 @@ export function ListFiltersBar({
       <div className="list-period-toolbar">
         <label>
           <span>Periodo</span>
-          <select value={filters.periodo || "ESTE_MES"} onChange={(event) => onChange({ ...filters, periodo: event.target.value })}>
+          <select value={filters.periodo || "ULTIMA_SEMANA"} onChange={(event) => onChange({ ...filters, periodo: event.target.value })}>
             <option value="ULTIMA_SEMANA">Ultima semana</option>
             <option value="ESTE_MES">Este mes</option>
+            <option value="MES_ANTERIOR">Mes anterior</option>
             <option value="ULTIMOS_3_MESES">Ultimos 3 meses</option>
             <option value="ESTE_ANIO">Este año</option>
             <option value="TODO">Todo el historico</option>
@@ -49,9 +50,10 @@ export function ListFiltersBar({
       <div className="list-filters-grid">
         <label>
           <span>Periodo</span>
-          <select value={filters.periodo || "ESTE_MES"} onChange={(event) => onChange({ ...filters, periodo: event.target.value })}>
+          <select value={filters.periodo || "ULTIMA_SEMANA"} onChange={(event) => onChange({ ...filters, periodo: event.target.value })}>
             <option value="ULTIMA_SEMANA">Ultima semana</option>
             <option value="ESTE_MES">Este mes</option>
+            <option value="MES_ANTERIOR">Mes anterior</option>
             <option value="ULTIMOS_3_MESES">Ultimos 3 meses</option>
             <option value="ESTE_ANIO">Este año</option>
             <option value="TODO">Todo el historico</option>

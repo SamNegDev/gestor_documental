@@ -4,3 +4,4 @@ export type SeguimientoPage = PagedResponse<Seguimiento>;
 export interface NotificacionPreview { incidenciaId:number; destinatario:string; asunto:string; mensaje:string; numeroAviso:number; maxAvisos:number; envioReal:boolean; proveedor?:string|null; }
 export interface NotificacionResultado { exito:boolean; simulado:boolean; mensaje:string; }
 export interface SeguimientoConfig { diasAviso1:number; diasAviso2:number; diasAviso3:number; diasAviso4:number; diasAviso5:number; maxAvisos:number; diasExpedienteEstancado:number; }
+export interface ResumenDiarioResponse { clientesEnviados:number; cambiosIncluidos:number; avisos:string[]; }

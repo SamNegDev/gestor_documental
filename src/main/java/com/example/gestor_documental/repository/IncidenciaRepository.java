@@ -45,6 +45,69 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
             select i from Incidencia i
             left join fetch i.expediente e
             left join fetch e.cliente c
+            left join fetch i.tipoIncidencia
+            where i.resuelta = false
+              and i.seguimientoArchivado = false
+              and i.expediente is not null
+              and i.contadorAvisos = 0
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+            order by c.nombre asc, i.fechaCreacion asc
+            """)
+    List<Incidencia> findPendientesPrimerAviso();
+
+    @Query("""
+            select i from Incidencia i
+            left join fetch i.expediente e
+            left join fetch e.cliente c
+            left join fetch i.tipoIncidencia
+            where i.resuelta = false
+              and i.seguimientoArchivado = false
+              and i.expediente is not null
+              and c.id = :clienteId
+              and i.contadorAvisos = 0
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+            order by i.fechaCreacion asc
+            """)
+    List<Incidencia> findPendientesPrimerAvisoByCliente(@Param("clienteId") Long clienteId);
+
+    @Query("""
+            select i from Incidencia i
+            left join fetch i.expediente e
+            left join fetch e.cliente c
+            left join fetch i.tipoIncidencia
+            where i.resuelta = false
+              and i.seguimientoArchivado = false
+              and i.expediente is not null
+              and i.contadorAvisos > 0
+              and i.proximoAviso is not null
+              and i.proximoAviso <= :ahora
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+            order by c.nombre asc, i.proximoAviso asc
+            """)
+    List<Incidencia> findRecordatoriosPendientes(@Param("ahora") LocalDateTime ahora);
+
+    @Query("""
+            select i from Incidencia i
+            left join fetch i.expediente e
+            left join fetch e.cliente c
+            left join fetch i.tipoIncidencia
+            where i.resuelta = false
+              and i.seguimientoArchivado = false
+              and i.expediente is not null
+              and c.id = :clienteId
+              and i.contadorAvisos > 0
+              and i.proximoAviso is not null
+              and i.proximoAviso <= :ahora
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+            order by i.proximoAviso asc
+            """)
+    List<Incidencia> findRecordatoriosPendientesByCliente(@Param("clienteId") Long clienteId,
+                                                          @Param("ahora") LocalDateTime ahora);
+
+    @Query("""
+            select i from Incidencia i
+            left join fetch i.expediente e
+            left join fetch e.cliente c
             left join fetch e.tipoTramite
             left join fetch i.tipoIncidencia
             where i.resuelta = false

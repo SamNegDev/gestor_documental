@@ -73,7 +73,7 @@ public class RegistroApiController {
     @GetMapping("/interesados")
     public List<InteresadoRegistroResponse> listarInteresados(
             @RequestParam(required = false) String q,
-            @RequestParam(required = false, defaultValue = "ESTE_MES") String periodo,
+            @RequestParam(required = false, defaultValue = "ULTIMA_SEMANA") String periodo,
             @RequestParam(required = false) LocalDate fechaDesde,
             @RequestParam(required = false) LocalDate fechaHasta,
             Authentication authentication
@@ -189,7 +189,7 @@ public class RegistroApiController {
     @GetMapping("/vehiculos")
     public List<VehiculoRegistroResponse> listarVehiculos(
             @RequestParam(required = false) String q,
-            @RequestParam(required = false, defaultValue = "ESTE_MES") String periodo,
+            @RequestParam(required = false, defaultValue = "ULTIMA_SEMANA") String periodo,
             @RequestParam(required = false) LocalDate fechaDesde,
             @RequestParam(required = false) LocalDate fechaHasta,
             Authentication authentication
@@ -354,8 +354,9 @@ public class RegistroApiController {
     }
     private DateRange dateRange(String periodo, LocalDate fechaDesde, LocalDate fechaHasta) {
         LocalDate today = LocalDate.now();
-        return switch (periodo != null ? periodo : "ESTE_MES") {
+        return switch (periodo != null ? periodo : "ULTIMA_SEMANA") {
             case "ULTIMA_SEMANA" -> new DateRange(today.minusDays(6).atStartOfDay(), today.plusDays(1).atStartOfDay());
+            case "MES_ANTERIOR" -> new DateRange(today.minusMonths(1).withDayOfMonth(1).atStartOfDay(), today.withDayOfMonth(1).atStartOfDay());
             case "ULTIMOS_3_MESES" -> new DateRange(today.minusMonths(3).atStartOfDay(), null);
             case "ESTE_ANIO" -> new DateRange(today.withDayOfYear(1).atStartOfDay(), today.plusYears(1).withDayOfYear(1).atStartOfDay());
             case "TODO" -> new DateRange(null, null);

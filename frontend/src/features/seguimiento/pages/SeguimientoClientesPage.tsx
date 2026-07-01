@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArrowRight, BellRing, CalendarClock, Clock3, History, Mail, MessageCircle, RotateCcw, X } from "lucide-react";
+import { Archive, ArrowRight, BellRing, CalendarClock, Clock3, History, Mail, MessageCircle, RotateCcw, Send, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ApiError } from "../../../shared/api/http";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
@@ -8,7 +8,7 @@ import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { PaginationBar } from "../../listados/components/PaginationBar";
 import { getExpedienteListCatalogs } from "../../listados/services/listadosApi";
 import { NotificationEmailDialog } from "../../tareas/components/NotificationEmailDialog";
-import { archivarSeguimiento, getSeguimientos, posponerSeguimiento, reactivarSeguimiento } from "../services/seguimientoApi";
+import { archivarSeguimiento, enviarListadoIncidencias, getSeguimientos, posponerSeguimiento, reactivarSeguimiento } from "../services/seguimientoApi";
 import type { Seguimiento } from "../types";
 
 export function SeguimientoClientesPage() {
@@ -18,6 +18,7 @@ export function SeguimientoClientesPage() {
   const [pagina, setPagina] = useState(0);
   const [tamanio, setTamanio] = useState(25);
   const [notificacion, setNotificacion] = useState<{ incidenciaId: number; canal: "email" | "whatsapp" } | null>(null);
+  const [bulkFeedback, setBulkFeedback] = useState<string | null>(null);
   const [seguimientoParaPosponer, setSeguimientoParaPosponer] = useState<Seguimiento | null>(null);
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirmDialog();
@@ -41,6 +42,17 @@ export function SeguimientoClientesPage() {
       refresh();
     },
   });
+  const bulkIncidents = useMutation({
+    mutationFn: () => enviarListadoIncidencias(clienteId),
+    onSuccess: (result) => {
+      setBulkFeedback(`${result.clientesEnviados} clientes enviados · ${result.cambiosIncluidos} incidencias incluidas${result.avisos.length ? ` · ${result.avisos[0]}` : ""}`);
+      refresh();
+    },
+    onError: (error) => {
+      const message = error instanceof ApiError ? error.details || error.message : "No se pudo enviar el listado de incidencias.";
+      setBulkFeedback(message);
+    },
+  });
   const data = query.data;
   const years = Array.from({ length: 8 }, (_, i) => new Date().getFullYear() - i);
 
@@ -62,8 +74,16 @@ export function SeguimientoClientesPage() {
           <h2>Seguimiento de clientes</h2>
           <p>Solicitudes al cliente ya notificadas pendientes de respuesta y seguimientos archivados que siguen vigentes.</p>
         </div>
-        <span className="records-count">{data?.totalElementos ?? 0} casos</span>
+        <div className="records-header__actions">
+          <button className="soft-button" disabled={bulkIncidents.isPending || !clienteId} onClick={() => bulkIncidents.mutate()} type="button">
+            <Send size={16} />
+            {bulkIncidents.isPending ? "Enviando..." : clienteId ? "Recordatorio global" : "Selecciona cliente"}
+          </button>
+          <span className="records-count">{data?.totalElementos ?? 0} casos</span>
+        </div>
       </header>
+
+      {bulkFeedback ? <div className="form-feedback">{bulkFeedback}</div> : null}
 
       <div className="task-tabs">
         <button className={vista === "PENDIENTES" ? "is-active" : ""} onClick={() => { setVista("PENDIENTES"); setPagina(0); }} type="button"><BellRing size={15} /> En seguimiento</button>

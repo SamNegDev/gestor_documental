@@ -475,7 +475,7 @@ function sameBulkAction(
 
 function readFilters(searchParams: URLSearchParams): ListFilters {
   return {
-    periodo: searchParams.get("periodo") || "ESTE_MES",
+    periodo: searchParams.get("periodo") || "ULTIMA_SEMANA",
     estado: searchParams.get("estado") || "",
     estados: searchParams.get("estados") || "",
     tipoTramiteId: searchParams.get("tipoTramiteId") || "",

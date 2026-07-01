@@ -68,6 +68,7 @@ public class TareaApiController {
     public PagedResponse<TareaResponse> listar(@RequestParam(required = false) String tipo,
             @RequestParam(required = false) String prioridad,
             @RequestParam(required = false) String ambito,
+            @RequestParam(required = false) Long clienteId,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "25") int tamanio,
             Authentication authentication) {
@@ -76,6 +77,7 @@ public class TareaApiController {
                 .filter(tarea -> ambito == null || ambito.isBlank() || ambito.equals(tarea.getAmbito()))
                 .filter(tarea -> tipo == null || tipo.isBlank() || tipo.equals(tarea.getTipo()))
                 .filter(tarea -> prioridad == null || prioridad.isBlank() || prioridad.equals(tarea.getPrioridad()))
+                .filter(tarea -> clienteId == null || clienteId.equals(tarea.getClienteId()))
                 .sorted(Comparator.comparing(TareaResponse::getDiasPendiente, Comparator.reverseOrder())
                         .thenComparingInt(tarea -> ordenPrioridad(tarea.getPrioridad())))
                 .toList();
@@ -99,8 +101,11 @@ public class TareaApiController {
                 ? null
                 : usuario.getCliente().getId();
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
-            List<Incidencia> incidenciasPendientes = incidenciaRepository.findSeguimientoPendiente(LocalDateTime.now());
-            incidenciasPendientes.forEach(i -> tareas.add(tareaSeguimientoIncidencia(i)));
+            LocalDateTime ahora = LocalDateTime.now();
+            List<Incidencia> incidenciasPrimerAviso = incidenciaRepository.findPendientesPrimerAviso();
+            List<Incidencia> recordatoriosPendientes = incidenciaRepository.findRecordatoriosPendientes(ahora);
+            incidenciasPrimerAviso.forEach(i -> tareas.add(tareaSeguimientoIncidencia(i)));
+            recordatoriosPendientes.forEach(i -> tareas.add(tareaSeguimientoIncidencia(i)));
             whatsappWebhookEventoRepository.findByEstadoWithExpediente(EstadoWhatsappEvento.PENDIENTE)
                     .forEach(evento -> tareas.add(tareaWhatsapp(evento)));
             whatsappWebhookEventoRepository.findByEstadoWithClienteWithoutExpediente(EstadoWhatsappEvento.PENDIENTE)
@@ -109,7 +114,9 @@ public class TareaApiController {
                     .forEach(evento -> tareas.add(tareaWhatsappSinCliente(evento)));
             whatsappAdjuntoRepository.findByEstadoForTareas(EstadoWhatsappAdjunto.PENDIENTE_CLASIFICAR)
                     .forEach(adjunto -> tareas.add(tareaWhatsappAdjunto(adjunto)));
-            Set<Long> expedientesConIncidenciaPendiente = incidenciasPendientes.stream()
+            List<Incidencia> incidenciasSeguimiento = new ArrayList<>(incidenciasPrimerAviso);
+            incidenciasSeguimiento.addAll(recordatoriosPendientes);
+            Set<Long> expedientesConIncidenciaPendiente = incidenciasSeguimiento.stream()
                     .map(Incidencia::getExpediente)
                     .filter(Objects::nonNull)
                     .map(Expediente::getId)
@@ -184,11 +191,15 @@ public class TareaApiController {
     private TareaResponse tareaSeguimientoIncidencia(Incidencia incidencia) {
         LocalDateTime fecha = incidencia.getProximoAviso() != null ? incidencia.getProximoAviso() : incidencia.getFechaCreacion();
         int maxAvisos = configuracionSeguimientoService.obtener().getMaxAvisos();
-        return TareaResponse.builder().id("INC-" + incidencia.getId() + "-SEGUIMIENTO").tipo(incidencia.getContadorAvisos() >= maxAvisos ? "INCIDENCIA_PENDIENTE_ARCHIVAR" : "INCIDENCIA_PENDIENTE_NOTIFICAR").ambito("GESTION")
+        String tipo = incidencia.getContadorAvisos() >= maxAvisos
+                ? "INCIDENCIA_PENDIENTE_ARCHIVAR"
+                : incidencia.getContadorAvisos() == 0 ? "INCIDENCIA_PENDIENTE_NOTIFICAR" : "INCIDENCIA_RECORDATORIO_PENDIENTE";
+        return TareaResponse.builder().id("INC-" + incidencia.getId() + "-SEGUIMIENTO").tipo(tipo).ambito("GESTION")
                 .prioridad("ALTA").titulo(incidencia.getContadorAvisos() >= maxAvisos ? "Seguimiento pendiente de archivar" : incidencia.getContadorAvisos() == 0 ? "Solicitud al cliente pendiente de aviso" : "Recordatorio de solicitud vencido")
                 .detalle(incidencia.getContadorAvisos() >= maxAvisos ? "Se ha completado el ciclo de avisos sin respuesta." : incidencia.getContadorAvisos() == 0 ? "Debe enviarse la primera notificacion al cliente antes de pasarla a seguimiento." : "Debe renovarse la notificacion al cliente.")
                 .contexto(contextoIncidencia(incidencia))
                 .entidad("INCIDENCIA").entidadId(incidencia.getId()).matricula(incidencia.getExpediente().getMatricula())
+                .clienteId(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getId() : null)
                 .cliente(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getNombre() : null)
                 .fechaReferencia(format(fecha)).diasPendiente(dias(fecha))
                 .enlace("/expedientes/" + incidencia.getExpediente().getId()).build();
@@ -221,6 +232,7 @@ public class TareaApiController {
                 .entidad("WHATSAPP")
                 .entidadId(evento.getId())
                 .matricula(expediente.getMatricula())
+                .clienteId(expediente.getCliente() != null ? expediente.getCliente().getId() : null)
                 .cliente(expediente.getCliente() != null ? expediente.getCliente().getNombre() : null)
                 .fechaReferencia(format(fecha))
                 .diasPendiente(dias(fecha))
@@ -244,6 +256,7 @@ public class TareaApiController {
                 .entidad("WHATSAPP_ADJUNTO")
                 .entidadId(adjunto.getId())
                 .matricula(adjunto.getExpediente() != null ? adjunto.getExpediente().getMatricula() : null)
+                .clienteId(adjunto.getCliente() != null ? adjunto.getCliente().getId() : null)
                 .cliente(adjunto.getCliente() != null ? adjunto.getCliente().getNombre() : "Sin asociar")
                 .fechaReferencia(format(fecha))
                 .diasPendiente(dias(fecha))
@@ -268,6 +281,7 @@ public class TareaApiController {
                 .entidad("WHATSAPP")
                 .entidadId(evento.getId())
                 .matricula(null)
+                .clienteId(evento.getCliente() != null ? evento.getCliente().getId() : null)
                 .cliente(evento.getCliente() != null ? evento.getCliente().getNombre() : null)
                 .fechaReferencia(format(fecha))
                 .diasPendiente(dias(fecha))
@@ -291,6 +305,7 @@ public class TareaApiController {
                 .entidad("WHATSAPP")
                 .entidadId(evento.getId())
                 .matricula(null)
+                .clienteId(null)
                 .cliente("Sin asociar")
                 .fechaReferencia(format(fecha))
                 .diasPendiente(dias(fecha))
@@ -391,6 +406,7 @@ public class TareaApiController {
                 .entidad("DOCUMENTO")
                 .entidadId(documento.getId())
                 .matricula(null)
+                .clienteId(documento.getCliente() != null ? documento.getCliente().getId() : null)
                 .cliente(cliente)
                 .fechaReferencia(format(documento.getFechaSubida()))
                 .diasPendiente(dias(documento.getFechaSubida()))
@@ -409,6 +425,7 @@ public class TareaApiController {
                 .detalle(cliente ? "Debes aportar la documentacion solicitada." : revision ? "El cliente ha aportado una subsanacion." : "La solicitud todavia no ha sido revisada.")
                 .contexto(contextoSolicitud(solicitud, revision))
                 .entidad("SOLICITUD").entidadId(solicitud.getId()).matricula(solicitud.getMatricula())
+                .clienteId(solicitud.getCliente() != null ? solicitud.getCliente().getId() : null)
                 .cliente(solicitud.getCliente() != null ? solicitud.getCliente().getNombre() : null)
                 .fechaReferencia(format(fecha)).diasPendiente(dias(fecha)).enlace("/solicitudes/" + solicitud.getId()).build();
     }
@@ -425,7 +442,8 @@ public class TareaApiController {
         LocalDateTime fecha = fechaReferencia(expediente);
         return TareaResponse.builder().id("EXP-" + expediente.getId() + "-" + tipo).tipo(tipo).ambito(ambito).prioridad(prioridad)
                 .titulo(titulo).detalle(detalle).contexto(limitar(contexto)).entidad("EXPEDIENTE").entidadId(expediente.getId())
-                .matricula(expediente.getMatricula()).cliente(expediente.getCliente() != null ? expediente.getCliente().getNombre() : null)
+                .matricula(expediente.getMatricula()).clienteId(expediente.getCliente() != null ? expediente.getCliente().getId() : null)
+                .cliente(expediente.getCliente() != null ? expediente.getCliente().getNombre() : null)
                 .fechaReferencia(format(fecha)).diasPendiente(dias(fecha)).enlace("CLIENTE".equals(ambito) ? "/cliente/expedientes/" + expediente.getId() : "/expedientes/" + expediente.getId()).build();
     }
 

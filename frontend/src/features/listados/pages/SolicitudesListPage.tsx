@@ -155,7 +155,7 @@ export function SolicitudesListPage() {
         }}
         onSubmit={() => applyFilters(draftFilters)}
         onClear={() => {
-          const resetFilters = { periodo: "ESTE_MES", archivo: "ACTIVAS", pagina: "0", tamanio: "25" };
+          const resetFilters = { periodo: "ULTIMA_SEMANA", archivo: "ACTIVAS", pagina: "0", tamanio: "25" };
           setDraftFilters(resetFilters);
           setAppliedFilters(resetFilters);
         }}
@@ -428,7 +428,7 @@ function SolicitudesTable({
 
 function readFilters(searchParams: URLSearchParams): ListFilters {
   return {
-    periodo: searchParams.get("periodo") || "ESTE_MES",
+    periodo: searchParams.get("periodo") || "ULTIMA_SEMANA",
     fechaDesde: searchParams.get("fechaDesde") || "",
     fechaHasta: searchParams.get("fechaHasta") || "",
     pagina: searchParams.get("pagina") || "0",

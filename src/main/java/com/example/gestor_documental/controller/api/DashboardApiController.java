@@ -56,7 +56,7 @@ public class DashboardApiController {
 
     @GetMapping("/productividad")
     public ProductividadDashboardResponse obtenerProductividad(
-            @RequestParam(defaultValue = "ESTE_MES") String periodo,
+            @RequestParam(defaultValue = "ULTIMA_SEMANA") String periodo,
             @RequestParam(required = false) LocalDate fechaDesde,
             @RequestParam(required = false) LocalDate fechaHasta,
             Authentication authentication

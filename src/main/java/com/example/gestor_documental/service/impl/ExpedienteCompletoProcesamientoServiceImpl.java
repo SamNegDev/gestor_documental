@@ -198,6 +198,12 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
                             + (lecturaIaMensaje != null ? " " + lecturaIaMensaje : "")
             );
         } catch (Exception exception) {
+            JobState job = jobs.get(jobId);
+            Long documentoId = job != null ? job.documentoId() : null;
+            Long solicitudId = job != null ? job.solicitudId() : null;
+            Long expedienteId = job != null ? job.expedienteId() : null;
+            log.warn("Error procesando expediente completo job {} documento {} solicitud {} expediente {}",
+                    jobId, documentoId, solicitudId, expedienteId, exception);
             actualizar(jobId, EstadoJob.ERROR, 0, exception.getMessage() != null
                     ? exception.getMessage()
                     : "No se pudo separar el expediente completo.");

@@ -69,6 +69,7 @@ public class Solicitud {
     private List<Documento> documentos = new ArrayList<>();
     //Añadimos los campos de solicitudes simplemente para persistir los formularios, el registro definitivo se hara al convertir la solicitud en expediente.
     @Enumerated(EnumType.STRING)
+    @Column(length = 30)
     private RolInteresado interesado1Rol;
 
     private String interesado1Nombre;
@@ -82,6 +83,7 @@ public class Solicitud {
     private String interesado1Provincia;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 30)
     private RolInteresado interesado2Rol;
 
     private String interesado2Nombre;
@@ -95,6 +97,7 @@ public class Solicitud {
     private String interesado2Provincia;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 30)
     private RolInteresado interesado3Rol;
 
     private String interesado3Nombre;

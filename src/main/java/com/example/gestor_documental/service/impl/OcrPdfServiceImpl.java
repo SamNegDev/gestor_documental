@@ -21,12 +21,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class OcrPdfServiceImpl implements OcrPdfService {
 
     private static final Logger log = LoggerFactory.getLogger(OcrPdfServiceImpl.class);
+    private static final Pattern BASTIDOR_PATTERN = Pattern.compile("\\b[A-HJ-NPR-Z0-9]{17}\\b");
+    private static final Pattern PRECIO_PATTERN = Pattern.compile("\\b\\d{1,3}(?:\\.\\d{3})*,\\d{2}\\b");
+    private static final Pattern IDENTIFICADOR_PATTERN = Pattern.compile("\\b(?:[A-Z]\\d{8}|\\d{8}[A-Z])\\b");
 
     private final OcrProperties ocrProperties;
 
@@ -196,12 +200,13 @@ public class OcrPdfServiceImpl implements OcrPdfService {
     }
 
     private String extraerTextoPaginaPorOcr(PDFRenderer renderer, int pageIndex) throws IOException {
+        float dpi = Math.min(ocrProperties.getDpi(), 100f);
         BufferedImage imagen = renderer.renderImageWithDPI(
                 pageIndex,
-                ocrProperties.getDpi(),
+                dpi,
                 ImageType.GRAY
         );
-        return extraerTexto(imagen);
+        return extraerTexto(imagen, dpi, Math.min(8, ocrProperties.getPageTimeoutSeconds()));
     }
 
     private String extraerTextoEmbebido(PDDocument document, int pageIndex) {
@@ -218,6 +223,10 @@ public class OcrPdfServiceImpl implements OcrPdfService {
 
 
     private String extraerTexto(BufferedImage imagen) {
+        return extraerTexto(imagen, ocrProperties.getDpi(), ocrProperties.getPageTimeoutSeconds());
+    }
+
+    private String extraerTexto(BufferedImage imagen, float dpi, int timeoutSeconds) {
         Path tempImage = null;
 
         try {
@@ -231,7 +240,7 @@ public class OcrPdfServiceImpl implements OcrPdfService {
                     "-l", ocrProperties.getLanguage(),
                     "--psm", "6",
                     "--oem", "1",
-                    "-c", "user_defined_dpi=" + (int) ocrProperties.getDpi()
+                    "-c", "user_defined_dpi=" + Math.max(70, Math.round(dpi))
             );
 
             if (ocrProperties.getTessdataPath() != null && !ocrProperties.getTessdataPath().isBlank()) {
@@ -241,11 +250,11 @@ public class OcrPdfServiceImpl implements OcrPdfService {
 
             Process process = processBuilder.start();
 
-            boolean terminado = process.waitFor(Math.max(1, ocrProperties.getPageTimeoutSeconds()), TimeUnit.SECONDS);
+            boolean terminado = process.waitFor(Math.max(1, timeoutSeconds), TimeUnit.SECONDS);
             if (!terminado) {
                 process.destroyForcibly();
                 log.warn("Tesseract supero el limite de {} segundos al procesar una pagina OCR.",
-                        ocrProperties.getPageTimeoutSeconds());
+                        timeoutSeconds);
                 return "";
             }
 
@@ -307,7 +316,8 @@ public class OcrPdfServiceImpl implements OcrPdfService {
         if ((t.contains("contrato") && t.contains("compraventa")) ||
                 t.contains("vehiculo usado entre particulares") ||
                 t.contains("reunidos") ||
-                t.contains("estipulaciones")) {
+                t.contains("estipulaciones") ||
+                pareceContratoCompraventaRellenado(t)) {
             return TipoDocumento.CONTRATO_COMPRAVENTA;
         }
 
@@ -384,6 +394,22 @@ public class OcrPdfServiceImpl implements OcrPdfService {
                 .replace("ú", "u")
                 .replaceAll("\\s+", " ")
                 .trim();
+    }
+
+    private boolean pareceContratoCompraventaRellenado(String texto) {
+        if (texto == null || texto.isBlank()) {
+            return false;
+        }
+        String compacto = texto.toUpperCase()
+                .replaceAll("[^A-Z0-9,\\.]", " ");
+        boolean tieneBastidor = BASTIDOR_PATTERN.matcher(compacto).find();
+        boolean tienePrecio = PRECIO_PATTERN.matcher(compacto).find();
+        long identificadores = IDENTIFICADOR_PATTERN.matcher(compacto).results().limit(3).count();
+        boolean tieneVehiculo = texto.contains("dacia")
+                || texto.contains("renault")
+                || texto.contains("matricula")
+                || texto.matches(".*\\b\\d{4}\\s?[bcdfghjklmnpqrstvwxyz]{3}\\b.*");
+        return tieneBastidor && tienePrecio && identificadores >= 2 && tieneVehiculo;
     }
 
     private boolean esImagen(MultipartFile archivo) {

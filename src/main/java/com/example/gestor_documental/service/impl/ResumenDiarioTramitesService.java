@@ -2,13 +2,20 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Cliente;
+import com.example.gestor_documental.model.ConfiguracionSeguimiento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.HistorialCambio;
 import com.example.gestor_documental.model.Incidencia;
+import com.example.gestor_documental.model.AvisoIncidencia;
+import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.HistorialCambioRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
+import com.example.gestor_documental.repository.AvisoIncidenciaRepository;
+import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
 import com.example.gestor_documental.service.CorreoService;
+import com.example.gestor_documental.service.HistorialCambioService;
+import com.example.gestor_documental.service.MensajeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -33,7 +41,7 @@ public class ResumenDiarioTramitesService {
 
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter FECHA_CORTA = DateTimeFormatter.ofPattern("dd/MM");
+    private static final DateTimeFormatter FECHA_HORA_CORTA = DateTimeFormatter.ofPattern("dd/MM HH:mm");
     private static final String LOGO_CID = "gestoria-cn-logo";
     private static final CorreoService.ImagenInline LOGO_INLINE = new CorreoService.ImagenInline(
             LOGO_CID,
@@ -45,7 +53,11 @@ public class ResumenDiarioTramitesService {
     private final HistorialCambioRepository historialCambioRepository;
     private final IncidenciaRepository incidenciaRepository;
     private final ClienteRepository clienteRepository;
+    private final AvisoIncidenciaRepository avisoIncidenciaRepository;
     private final CorreoService correoService;
+    private final ConfiguracionSeguimientoService configuracionSeguimientoService;
+    private final MensajeService mensajeService;
+    private final HistorialCambioService historialCambioService;
 
     @Value("${app.daily-summary.enabled:false}")
     private boolean enabled;
@@ -88,6 +100,49 @@ public class ResumenDiarioTramitesService {
             return new ResultadoResumenDiario(1, totalElementos(finalizaciones, incidencias), List.of());
         }
         return new ResultadoResumenDiario(0, totalElementos(finalizaciones, incidencias), List.of("No se pudo enviar a " + cliente.getEmail() + ": " + resultado.error()));
+    }
+
+    public ResultadoResumenDiario enviarListadoIncidenciasManual(Long clienteId, Usuario admin) {
+        RangoDia rango = rangoDia();
+        List<Incidencia> incidencias = clienteId != null
+                ? incidenciaRepository.findActivasResumenByCliente(clienteId)
+                : incidenciaRepository.findActivasResumen();
+        return enviarListadoIncidencias(rango, incidencias, admin, "No hay incidencias activas con cliente y email configurado.", "Listado diario de incidencias");
+    }
+
+    public ResultadoResumenDiario enviarListadoIncidenciasPendientesNotificar(Long clienteId, Usuario admin) {
+        RangoDia rango = rangoDia();
+        List<Incidencia> incidencias = clienteId != null
+                ? incidenciaRepository.findPendientesPrimerAvisoByCliente(clienteId)
+                : incidenciaRepository.findPendientesPrimerAviso();
+        return enviarListadoIncidencias(rango, incidencias, admin, "No hay avisos pendientes de notificar con cliente y email configurado.", "Aviso conjunto de incidencias");
+    }
+
+    private ResultadoResumenDiario enviarListadoIncidencias(RangoDia rango, List<Incidencia> incidencias, Usuario admin,
+                                                            String mensajeSinDestinatarios, String asuntoAviso) {
+        Map<Long, List<Incidencia>> incidenciasPorCliente = incidenciasPorCliente(incidencias);
+        List<Cliente> clientes = clientesDestinatarios(false, Map.of(), incidenciasPorCliente);
+        if (clientes.isEmpty()) {
+            return new ResultadoResumenDiario(0, incidencias.size(), List.of(mensajeSinDestinatarios));
+        }
+
+        List<String> avisos = new ArrayList<>();
+        int enviados = 0;
+        for (Cliente cliente : clientes) {
+            List<Incidencia> incidenciasCliente = incidenciasPorCliente.getOrDefault(cliente.getId(), List.of());
+            if (incidenciasCliente.isEmpty()) {
+                continue;
+            }
+            ResumenCliente resumen = new ResumenCliente(cliente, List.of(), incidenciasCliente);
+            CorreoService.ResultadoCorreo resultado = enviarResumen(cliente, rango, resumen);
+            if (resultado.exito()) {
+                enviados++;
+                registrarSeguimientoIncidencias(incidenciasCliente, admin, resultado.simulado(), construirTexto(resumen, rango), asuntoAviso);
+            } else {
+                avisos.add("No se pudo enviar a " + cliente.getEmail() + ": " + resultado.error());
+            }
+        }
+        return new ResultadoResumenDiario(enviados, incidencias.size(), avisos);
     }
 
     private ResultadoResumenDiario enviarResumenDiario(boolean incluirClientesSinCambios) {
@@ -146,12 +201,7 @@ public class ResumenDiarioTramitesService {
         mensaje.append("Finalizados hoy: ").append(expedientesFinalizados(resumen.finalizaciones()).size()).append("\n");
         expedientesFinalizados(resumen.finalizaciones()).forEach(expediente ->
                 mensaje.append(" - ").append(tituloExpediente(expediente)).append("\n"));
-        mensaje.append("\nIncidencias activas: ").append(resumen.incidencias().size()).append("\n");
-        resumen.incidencias().forEach(incidencia ->
-                mensaje.append(" - ").append(tituloExpediente(incidencia.getExpediente()))
-                        .append(": ").append(tipoIncidencia(incidencia))
-                        .append(StringUtils.hasText(incidencia.getObservaciones()) ? " - " + limpiar(incidencia.getObservaciones()) : "")
-                        .append("\n"));
+        appendIncidenciasTexto(mensaje, resumen.incidencias(), rango);
         if (resumen.finalizaciones().isEmpty() && resumen.incidencias().isEmpty()) {
             mensaje.append("\nNo hay tramites finalizados ni incidencias activas en este momento.\n");
         }
@@ -233,7 +283,7 @@ public class ResumenDiarioTramitesService {
                 finalizados.size(),
                 resumen.incidencias().size(),
                 bloqueFinalizados(finalizados),
-                bloqueIncidencias(resumen.incidencias()),
+                bloquesIncidencias(resumen.incidencias(), rango),
                 LOGO_CID
         );
     }
@@ -256,10 +306,63 @@ public class ResumenDiarioTramitesService {
         return bloqueTabla("Tramites finalizados", filas.toString());
     }
 
-    private String bloqueIncidencias(List<Incidencia> incidencias) {
+    private void appendIncidenciasTexto(StringBuilder mensaje, List<Incidencia> incidencias, RangoDia rango) {
+        mensaje.append("\nIncidencias activas: ").append(incidencias.size()).append("\n");
+        if (incidencias.isEmpty()) {
+            return;
+        }
+        List<Incidencia> nuevasHoy = incidenciasNuevasHoy(incidencias, rango);
+        List<Incidencia> pendientesPrimerAviso = incidencias.stream()
+                .filter(incidencia -> incidencia.getContadorAvisos() == 0)
+                .filter(incidencia -> !nuevasHoy.contains(incidencia))
+                .toList();
+        List<Incidencia> recordatorios = incidencias.stream()
+                .filter(incidencia -> incidencia.getContadorAvisos() > 0)
+                .toList();
+        appendGrupoIncidenciasTexto(mensaje, "Incidencias nuevas obtenidas hoy", nuevasHoy, rango);
+        appendGrupoIncidenciasTexto(mensaje, "Incidencias pendientes de primer aviso", pendientesPrimerAviso, rango);
+        appendGrupoIncidenciasTexto(mensaje, "Recordatorios pendientes", recordatorios, rango);
+    }
+
+    private void appendGrupoIncidenciasTexto(StringBuilder mensaje, String titulo, List<Incidencia> incidencias, RangoDia rango) {
+        if (incidencias.isEmpty()) {
+            return;
+        }
+        mensaje.append("\n").append(titulo).append(": ").append(incidencias.size()).append("\n");
+        incidencias.forEach(incidencia ->
+                mensaje.append(" - ").append(tituloExpediente(incidencia.getExpediente()))
+                        .append(": ").append(tipoIncidencia(incidencia))
+                        .append(" (").append(detalleSeguimiento(incidencia, rango)).append(")")
+                        .append(StringUtils.hasText(incidencia.getObservaciones()) ? " - " + limpiar(incidencia.getObservaciones()) : "")
+                        .append("\n"));
+    }
+
+    private String bloquesIncidencias(List<Incidencia> incidencias, RangoDia rango) {
         if (incidencias.isEmpty()) {
             return bloqueVacio("Incidencias activas", "No hay tramites con incidencia activa.");
         }
+        StringBuilder bloques = new StringBuilder();
+        List<Incidencia> nuevasHoy = incidenciasNuevasHoy(incidencias, rango);
+        List<Incidencia> pendientesPrimerAviso = incidencias.stream()
+                .filter(incidencia -> incidencia.getContadorAvisos() == 0)
+                .filter(incidencia -> !nuevasHoy.contains(incidencia))
+                .toList();
+        List<Incidencia> recordatorios = incidencias.stream()
+                .filter(incidencia -> incidencia.getContadorAvisos() > 0)
+                .toList();
+        if (!nuevasHoy.isEmpty()) {
+            bloques.append(bloqueIncidencias("Incidencias nuevas obtenidas hoy", nuevasHoy, rango));
+        }
+        if (!pendientesPrimerAviso.isEmpty()) {
+            bloques.append(bloqueIncidencias("Incidencias pendientes de primer aviso", pendientesPrimerAviso, rango));
+        }
+        if (!recordatorios.isEmpty()) {
+            bloques.append(bloqueIncidencias("Recordatorios pendientes", recordatorios, rango));
+        }
+        return bloques.toString();
+    }
+
+    private String bloqueIncidencias(String titulo, List<Incidencia> incidencias, RangoDia rango) {
         StringBuilder filas = new StringBuilder();
         for (Incidencia incidencia : incidencias) {
             filas.append("""
@@ -273,11 +376,57 @@ public class ResumenDiarioTramitesService {
                     """.formatted(
                     escapeHtml(tituloExpediente(incidencia.getExpediente())),
                     escapeHtml(tipoIncidencia(incidencia)),
-                    escapeHtml("Abierta desde " + fecha(incidencia.getFechaCreacion())),
+                    escapeHtml(detalleSeguimiento(incidencia, rango)),
                     StringUtils.hasText(incidencia.getObservaciones()) ? " - " + escapeHtml(limpiar(incidencia.getObservaciones())) : ""
             ));
         }
-        return bloqueTabla("Incidencias activas", filas.toString());
+        return bloqueTabla(titulo, filas.toString());
+    }
+
+    private List<Incidencia> incidenciasNuevasHoy(List<Incidencia> incidencias, RangoDia rango) {
+        return incidencias.stream()
+                .filter(incidencia -> incidencia.getContadorAvisos() == 0)
+                .filter(incidencia -> estaEnRango(incidencia.getFechaCreacion(), rango))
+                .toList();
+    }
+
+    private boolean estaEnRango(LocalDateTime fecha, RangoDia rango) {
+        return fecha != null && !fecha.isBefore(rango.desde()) && !fecha.isAfter(rango.hasta());
+    }
+
+    private String detalleSeguimiento(Incidencia incidencia, RangoDia rango) {
+        if (incidencia.getContadorAvisos() > 0) {
+            String ultimoAviso = incidencia.getFechaUltimoAviso() != null
+                    ? "ultimo aviso " + fechaHora(incidencia.getFechaUltimoAviso()) + ", " + tiempoDesde(incidencia.getFechaUltimoAviso(), rango.hasta())
+                    : "ultimo aviso sin fecha registrada";
+            return "Recordatorio: " + ultimoAviso + ". Avisos enviados: " + incidencia.getContadorAvisos();
+        }
+        if (estaEnRango(incidencia.getFechaCreacion(), rango)) {
+            return "Nueva incidencia obtenida hoy a las " + (incidencia.getFechaCreacion() != null ? incidencia.getFechaCreacion().format(HORA) : "hora no registrada");
+        }
+        return "Pendiente de primer aviso desde " + fechaHora(incidencia.getFechaCreacion());
+    }
+
+    private String tiempoDesde(LocalDateTime fecha, LocalDateTime referencia) {
+        if (fecha == null || referencia == null) {
+            return "sin referencia temporal";
+        }
+        if (fecha.isAfter(referencia)) {
+            return "programado para mas adelante";
+        }
+        long dias = ChronoUnit.DAYS.between(fecha, referencia);
+        if (dias > 0) {
+            return "hace " + dias + " " + (dias == 1 ? "dia" : "dias");
+        }
+        long horas = ChronoUnit.HOURS.between(fecha, referencia);
+        if (horas > 0) {
+            return "hace " + horas + " " + (horas == 1 ? "hora" : "horas");
+        }
+        long minutos = ChronoUnit.MINUTES.between(fecha, referencia);
+        if (minutos > 0) {
+            return "hace " + minutos + " " + (minutos == 1 ? "minuto" : "minutos");
+        }
+        return "hace menos de 1 minuto";
     }
 
     private String bloqueTabla(String titulo, String filas) {
@@ -368,6 +517,50 @@ public class ResumenDiarioTramitesService {
         return expedientesFinalizados(finalizaciones).size() + incidencias.size();
     }
 
+    private void registrarSeguimientoIncidencias(List<Incidencia> incidencias, Usuario admin, boolean simulado, String texto, String asuntoAviso) {
+        ConfiguracionSeguimiento config = configuracionSeguimientoService.obtener();
+        LocalDateTime ahora = LocalDateTime.now();
+        for (Incidencia incidencia : incidencias) {
+            if (incidencia.getExpediente() == null || incidencia.getContadorAvisos() >= config.getMaxAvisos()) {
+                continue;
+            }
+            int numero = incidencia.getContadorAvisos() + 1;
+            AvisoIncidencia aviso = new AvisoIncidencia();
+            aviso.setIncidencia(incidencia);
+            aviso.setNumeroAviso(numero);
+            aviso.setEnviadoPor(admin);
+            aviso.setMensaje(texto);
+            aviso.setDestinatario(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getEmail() : null);
+            aviso.setAsunto(asuntoAviso);
+            aviso.setCanal("EMAIL_RESUMEN");
+            aviso.setEstadoEnvio(simulado ? "SIMULADO" : "ENVIADO");
+            avisoIncidenciaRepository.save(aviso);
+
+            incidencia.setContadorAvisos(numero);
+            incidencia.setFechaUltimoAviso(ahora);
+            incidencia.setProximoAviso(siguienteVencimiento(ahora, numero, config));
+            incidencia.setSeguimientoArchivado(false);
+            incidencia.setFechaArchivoSeguimiento(null);
+            incidencia.setSeguimientoArchivadoPor(null);
+            incidenciaRepository.save(incidencia);
+            mensajeService.añadirAExpediente(incidencia.getExpediente().getId(), texto, admin);
+            historialCambioService.registrarCambioExpediente(incidencia.getExpediente(), admin, "LISTADO INCIDENCIAS",
+                    "Incidencia incluida en el listado diario enviado al cliente" + (simulado ? " (simulado)." : "."));
+        }
+    }
+
+    private LocalDateTime siguienteVencimiento(LocalDateTime fecha, int numeroAviso, ConfiguracionSeguimiento config) {
+        int dias = switch (numeroAviso) {
+            case 1 -> config.getDiasAviso1();
+            case 2 -> config.getDiasAviso2();
+            case 3 -> config.getDiasAviso3();
+            case 4 -> config.getDiasAviso4();
+            case 5 -> config.getDiasAviso5();
+            default -> 0;
+        };
+        return numeroAviso >= config.getMaxAvisos() || dias <= 0 ? null : fecha.plusDays(dias);
+    }
+
     private List<String> copiasOcultas(String destinatario) {
         String principal = destinatario != null ? destinatario.trim() : "";
         return parseCorreos(bccRecipients).stream()
@@ -419,8 +612,8 @@ public class ResumenDiarioTramitesService {
         return StringUtils.hasText(cliente.getNombre()) ? " " + escapeHtml(cliente.getNombre()) : "";
     }
 
-    private String fecha(LocalDateTime value) {
-        return value != null ? value.format(FECHA_CORTA) : "sin fecha";
+    private String fechaHora(LocalDateTime value) {
+        return value != null ? value.format(FECHA_HORA_CORTA) : "sin fecha";
     }
 
     private String limpiar(String valor) {

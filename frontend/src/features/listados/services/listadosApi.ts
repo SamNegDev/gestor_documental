@@ -105,7 +105,7 @@ export function getDashboard() {
 
 export function getProductivity(filters: Pick<ListFilters, "periodo" | "fechaDesde" | "fechaHasta">) {
   const params = new URLSearchParams();
-  params.set("periodo", filters.periodo || "ESTE_MES");
+  params.set("periodo", filters.periodo || "ULTIMA_SEMANA");
   if (filters.fechaDesde) params.set("fechaDesde", filters.fechaDesde);
   if (filters.fechaHasta) params.set("fechaHasta", filters.fechaHasta);
   return apiGet<ProductivityData>(`/api/dashboard/productividad?${params.toString()}`);

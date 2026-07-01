@@ -5967,6 +5967,11 @@ input.records-table-filter {
   background: oklch(98% 0.02 236);
 }
 
+.solicitud-ia-result--danger {
+  border-color: oklch(72% 0.16 28);
+  background: oklch(98% 0.025 28);
+}
+
 .solicitud-ia-result__heading {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

@@ -6,7 +6,7 @@ import { getVehiculosRegistro } from "../services/registroApi";
 import { RegistroFilters } from "../components/RegistroFilters";
 
 export function VehiculosRegistroPage() {
-  const [search, setSearch] = useState(""); const [periodo, setPeriodo] = useState("ESTE_MES"); const [fechaDesde, setFechaDesde] = useState(""); const [fechaHasta, setFechaHasta] = useState(""); const deferredSearch = useDeferredValue(search);
+  const [search, setSearch] = useState(""); const [periodo, setPeriodo] = useState("ULTIMA_SEMANA"); const [fechaDesde, setFechaDesde] = useState(""); const [fechaHasta, setFechaHasta] = useState(""); const deferredSearch = useDeferredValue(search);
   const query = useQuery({ queryKey: ["registro", "vehiculos", deferredSearch, periodo, fechaDesde, fechaHasta], queryFn: () => getVehiculosRegistro(deferredSearch, periodo, fechaDesde, fechaHasta) });
   const vehiculos = query.data ?? [];
   return <main className="records-page registry-page"><header className="records-header"><div><p className="eyebrow">Registro relacionado</p><h2>Vehiculos</h2><p>Historial consolidado por matricula.</p></div><span className="records-count">{vehiculos.length} vehiculos</span></header>

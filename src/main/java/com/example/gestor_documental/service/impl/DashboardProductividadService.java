@@ -136,9 +136,13 @@ public class DashboardProductividadService {
 
     private DateRange rango(String periodo, LocalDate fechaDesde, LocalDate fechaHasta) {
         LocalDate hoy = LocalDate.now(APP_ZONE);
-        String value = periodo != null ? periodo : "ESTE_MES";
+        String value = periodo != null ? periodo : "ULTIMA_SEMANA";
         return switch (value) {
             case "ULTIMA_SEMANA" -> new DateRange(hoy.minusDays(6), hoy.plusDays(1), "Ultima semana");
+            case "MES_ANTERIOR" -> {
+                YearMonth anterior = YearMonth.from(hoy).minusMonths(1);
+                yield new DateRange(anterior.atDay(1), anterior.plusMonths(1).atDay(1), "Mes anterior");
+            }
             case "ULTIMOS_3_MESES" -> new DateRange(hoy.minusMonths(3), hoy.plusDays(1), "Ultimos 3 meses");
             case "ESTE_ANIO" -> new DateRange(hoy.withDayOfYear(1), hoy.plusDays(1), "Este ano");
             case "TODO" -> new DateRange(

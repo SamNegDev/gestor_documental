@@ -16,6 +16,7 @@ public class TareaResponse {
     private String entidad;
     private Long entidadId;
     private String matricula;
+    private Long clienteId;
     private String cliente;
     private String fechaReferencia;
     private long diasPendiente;

@@ -13,7 +13,7 @@ import "../../expedientes/styles/expedienteDetail.css";
 
 export function InteresadosRegistroPage() {
   const [search, setSearch] = useState("");
-  const [periodo, setPeriodo] = useState("ESTE_MES");
+  const [periodo, setPeriodo] = useState("ULTIMA_SEMANA");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [creating, setCreating] = useState(false);

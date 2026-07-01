@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2, LockKeyhole, Mail } from "lucide-react";
 import { login } from "../../../shared/api/authApi";
+import { getSessionUser } from "../../../shared/api/sessionApi";
 import { ApiError } from "../../../shared/api/http";
 import "../../expedientes/styles/expedienteDetail.css";
 
@@ -29,7 +30,8 @@ export function LoginPage() {
     setMessage(null);
     try {
       const target = await login(username.trim(), password);
-      window.location.href = target || "/admin/dashboard";
+      await getSessionUser();
+      window.location.replace(target || "/admin/dashboard");
     } catch (cause) {
       const text = cause instanceof ApiError && cause.details ? cause.details : "No se pudo iniciar sesión.";
       setMessage({ tone: "danger", text });

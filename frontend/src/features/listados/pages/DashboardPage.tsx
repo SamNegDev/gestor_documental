@@ -12,7 +12,7 @@ export function DashboardPage() {
   const location = useLocation();
   const isClientView = location.pathname.startsWith("/cliente/");
   const isAdmin = user?.rol === "ADMIN" && !isClientView;
-  const [productivityFilters, setProductivityFilters] = useState<ListFilters>({ periodo: "ESTE_MES" });
+  const [productivityFilters, setProductivityFilters] = useState<ListFilters>({ periodo: "ULTIMA_SEMANA" });
   const dashboardQuery = useQuery({
     queryKey: ["dashboard"],
     queryFn: getDashboard,
@@ -345,9 +345,10 @@ function ProductivityPeriodFilter({ filters, onChange }: { filters: ListFilters;
       <CalendarRange size={16} />
       <label>
         <span>Periodo</span>
-        <select value={filters.periodo || "ESTE_MES"} onChange={(event) => selectPeriod(event.target.value)}>
+        <select value={filters.periodo || "ULTIMA_SEMANA"} onChange={(event) => selectPeriod(event.target.value)}>
           <option value="ULTIMA_SEMANA">Ultima semana</option>
           <option value="ESTE_MES">Este mes</option>
+          <option value="MES_ANTERIOR">Mes anterior</option>
           <option value="ULTIMOS_3_MESES">Ultimos 3 meses</option>
           <option value="ESTE_ANIO">Este ano</option>
           <option value="TODO">Todo el historico</option>
