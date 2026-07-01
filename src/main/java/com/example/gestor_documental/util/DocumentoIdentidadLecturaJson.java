@@ -204,7 +204,7 @@ public final class DocumentoIdentidadLecturaJson {
                 primerNoVacio(preferida.razonSocial(), respaldo.razonSocial()),
                 primerNoVacio(preferida.fechaNacimiento(), respaldo.fechaNacimiento()),
                 primerNoVacio(preferida.fechaCaducidad(), respaldo.fechaCaducidad()),
-                primerNoVacio(preferida.direccionTexto(), respaldo.direccionTexto()),
+                direccionMasCompleta(preferida.direccionTexto(), respaldo.direccionTexto()),
                 confianzaMaxima(first.confianzaGlobal(), second.confianzaGlobal()),
                 first.requiereRevision() && second.requiereRevision(),
                 primerNoVacio(preferida.observaciones(), respaldo.observaciones())
@@ -242,6 +242,39 @@ public final class DocumentoIdentidadLecturaJson {
             return secondId;
         }
         return primerNoVacio(firstId, secondId);
+    }
+
+    private static String direccionMasCompleta(String first, String second) {
+        String firstClean = limpiarTexto(first);
+        String secondClean = limpiarTexto(second);
+        if (firstClean == null) {
+            return secondClean;
+        }
+        if (secondClean == null) {
+            return firstClean;
+        }
+        return puntuacionDireccion(secondClean) > puntuacionDireccion(firstClean) ? secondClean : firstClean;
+    }
+
+    private static int puntuacionDireccion(String value) {
+        if (value == null || value.isBlank()) {
+            return 0;
+        }
+        String normalized = value.toUpperCase(Locale.ROOT);
+        int score = Math.min(8, normalized.split("[\\s,]+").length)
+                + Math.min(5, normalized.length() / 20);
+        if (normalized.matches(".*\\d.*")) {
+            score += 6;
+        }
+        if (normalized.matches(".*\\b\\d{5}\\b.*")) {
+            score += 4;
+        }
+        if (normalized.matches(".*\\b(CALLE|CARRETERA|CTRA|AVENIDA|AVDA|PLAZA|PASEO|CAMINO|RAMBLA|TRAVESIA|URBANIZACION|URB)\\b.*")
+                || normalized.contains("C/")
+                || normalized.contains("C.")) {
+            score += 5;
+        }
+        return score;
     }
 
     private static Double confianzaMaxima(Double first, Double second) {

@@ -466,9 +466,25 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             return;
         }
         IdentidadSolicitud actual = identidades.get(identidad.identificador());
-        if (actual == null || confianza(identidad.confianzaGlobal()) > confianza(actual.confianzaGlobal())) {
+        if (actual == null) {
             identidades.put(identidad.identificador(), identidad);
+            return;
         }
+        identidades.put(identidad.identificador(), combinarIdentidad(actual, identidad));
+    }
+
+    private IdentidadSolicitud combinarIdentidad(IdentidadSolicitud actual, IdentidadSolicitud candidata) {
+        boolean candidataMasFiable = confianza(candidata.confianzaGlobal()) > confianza(actual.confianzaGlobal());
+        IdentidadSolicitud base = candidataMasFiable ? candidata : actual;
+        IdentidadSolicitud respaldo = candidataMasFiable ? actual : candidata;
+        return new IdentidadSolicitud(
+                base.identificador(),
+                nombreMasCompleto(base.nombreCompleto(), respaldo.nombreCompleto(), null),
+                direccionMasCompleta(base.direccionTexto(), respaldo.direccionTexto()),
+                Math.max(confianza(actual.confianzaGlobal()), confianza(candidata.confianzaGlobal())),
+                actual.requiereRevision() && candidata.requiereRevision(),
+                base.lecturaPrincipal() != null ? base.lecturaPrincipal() : respaldo.lecturaPrincipal()
+        );
     }
 
     private IdentidadSolicitud identidadDesdeLecturaPrincipal(DocumentoIdentidadLectura lectura) {
@@ -596,7 +612,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return new PersonaSolicitud(
                 identificador,
                 nombreMasCompleto(nombreIdentidad, nombreRoles, nombreCatalogo),
-                primerNoVacio(direccionIdentidad, direccionBate, direccionCom)
+                direccionMasCompleta(direccionIdentidad, direccionBate, direccionCom)
         );
     }
 
@@ -723,7 +739,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return new PersonaSolicitud(
                 identificador,
                 nombreMasCompleto(nombreIdentidad, nombreRoles, nombreCatalogo),
-                direccionIdentidad != null ? direccionIdentidad : direccionRoles
+                direccionMasCompleta(direccionIdentidad, direccionRoles)
         );
     }
 
@@ -1103,13 +1119,45 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 && solicitud.getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM;
     }
 
-    private String primerNoVacio(String... values) {
+    private String direccionMasCompleta(String... values) {
+        String mejor = null;
+        int mejorScore = -1;
         for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                return value;
+            String normalizada = normalizarTexto(value);
+            if (normalizada == null) {
+                continue;
+            }
+            int score = puntuacionDireccion(normalizada);
+            if (score > mejorScore) {
+                mejor = normalizada;
+                mejorScore = score;
             }
         }
-        return null;
+        return mejor;
+    }
+
+    private int puntuacionDireccion(String value) {
+        if (value == null || value.isBlank()) {
+            return 0;
+        }
+        String normalized = normalizarTexto(value);
+        if (normalized == null) {
+            return 0;
+        }
+        int score = Math.min(8, normalized.split("[\\s,]+").length)
+                + Math.min(5, normalized.length() / 20);
+        if (normalized.matches(".*\\d.*")) {
+            score += 6;
+        }
+        if (normalized.matches(".*\\b\\d{5}\\b.*")) {
+            score += 4;
+        }
+        if (normalized.matches(".*\\b(CALLE|CARRETERA|CTRA|AVENIDA|AVDA|PLAZA|PASEO|CAMINO|RAMBLA|TRAVESIA|URBANIZACION|URB)\\b.*")
+                || normalized.contains("C/")
+                || normalized.contains("C.")) {
+            score += 5;
+        }
+        return score;
     }
 
     private String nombreDocumento(Documento documento) {

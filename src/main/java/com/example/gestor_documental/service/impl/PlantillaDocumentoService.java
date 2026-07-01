@@ -135,9 +135,6 @@ public class PlantillaDocumentoService {
     @Transactional
     public DocumentoGeneradoResponse generarSolicitud(Long solicitudId, GenerarPlantillaRequest request, Usuario usuario) {
         Solicitud solicitud = solicitud(solicitudId, usuario);
-        if (usuario.getRolUsuario() != RolUsuario.ADMIN) {
-            throw new AccesoDenegadoException("Solo el administrador puede generar documentos");
-        }
         Expediente contexto = contextoSolicitud(solicitud);
         List<ExpedienteInteresado> relaciones = relacionesSolicitud(solicitud, contexto);
         TipoPlantilla plantilla = tipo(request != null ? request.codigo() : null);

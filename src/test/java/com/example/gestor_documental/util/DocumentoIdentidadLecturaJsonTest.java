@@ -20,6 +20,7 @@ class DocumentoIdentidadLecturaJsonTest {
                       "nombre": "MARIA LUISA",
                       "apellido1": "MENENDEZ",
                       "apellido2": "MOREJUDO",
+                      "direccionTexto": "CALLE ROSARIO DE GAYA, 89, 2A, 38329 EL ROSARIO DE TENERIFE, SANTA CRUZ DE TENERIFE",
                       "confianzaGlobal": 0.95,
                       "requiereRevision": false
                     },
@@ -63,5 +64,7 @@ class DocumentoIdentidadLecturaJsonTest {
                 .containsExactly("50975033H", "42793999S");
         assertThat(identidades).extracting(IdentidadDetectada::nombre)
                 .containsExactly("MARIA LUISA", "ANTONIO");
+        assertThat(identidades.get(0).direccionTexto())
+                .isEqualTo("CALLE ROSARIO DE GAYA, 89, 2A, 38329 EL ROSARIO DE TENERIFE, SANTA CRUZ DE TENERIFE");
     }
 }

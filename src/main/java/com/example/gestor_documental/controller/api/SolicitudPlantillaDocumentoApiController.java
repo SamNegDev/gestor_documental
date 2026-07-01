@@ -27,22 +27,22 @@ public class SolicitudPlantillaDocumentoApiController {
 
     @GetMapping
     public PlantillasExpedienteResponse catalogo(@PathVariable Long solicitudId, Authentication authentication) {
-        return plantillaService.catalogoSolicitud(solicitudId, requireAdmin(authentication));
+        return plantillaService.catalogoSolicitud(solicitudId, usuario(authentication));
     }
 
     @PostMapping("/preview")
     public PlantillaPreviewResponse preview(@PathVariable Long solicitudId,
             @RequestBody PlantillaPreviewRequest request, Authentication authentication) {
-        return plantillaService.previewSolicitud(solicitudId, request, requireAdmin(authentication));
+        return plantillaService.previewSolicitud(solicitudId, request, usuario(authentication));
     }
 
     @PostMapping("/generar")
     public DocumentoGeneradoResponse generar(@PathVariable Long solicitudId,
             @RequestBody GenerarPlantillaRequest request, Authentication authentication) {
-        return plantillaService.generarSolicitud(solicitudId, request, requireAdmin(authentication));
+        return plantillaService.generarSolicitud(solicitudId, request, usuario(authentication));
     }
 
-    private Usuario requireAdmin(Authentication authentication) {
-        return currentUserService.requireAdmin(authentication);
+    private Usuario usuario(Authentication authentication) {
+        return currentUserService.requireUser(authentication);
     }
 }

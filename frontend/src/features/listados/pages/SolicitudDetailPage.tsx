@@ -442,6 +442,12 @@ export function SolicitudDetailPage() {
             Volver
           </Link>
           {!isAdmin && !isClosed ? (
+            <button className="soft-button soft-button--compact" onClick={() => setTemplateDialogOpen(true)} type="button">
+              <FileSignature size={16} />
+              Generar docs
+            </button>
+          ) : null}
+          {!isAdmin && !isClosed ? (
             <Link className="soft-button soft-button--compact" to={`/cliente/solicitudes/${solicitud.id}/editar`}>
               <Pencil size={16} />
               Editar
