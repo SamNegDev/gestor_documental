@@ -33,6 +33,9 @@ public interface DocumentoService {
     Documento guardarGeneradoParaExpediente(Long expedienteId, byte[] contenido, TipoDocumento tipoDocumento,
             String nombreArchivoOriginal, String descripcion, Usuario usuario);
 
+    Documento guardarGeneradoParaSolicitud(Long solicitudId, byte[] contenido, TipoDocumento tipoDocumento,
+            String nombreArchivoOriginal, String descripcion, Usuario usuario);
+
     Documento guardarParaIncidencia(Long incidenciaId, MultipartFile archivo, TipoDocumento tipoDocumento, Usuario usuario);
 
     Documento vincularAIncidencia(Long incidenciaId, Long documentoId, Usuario usuario);

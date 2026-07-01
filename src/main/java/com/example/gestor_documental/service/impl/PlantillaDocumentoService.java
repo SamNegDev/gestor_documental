@@ -19,11 +19,14 @@ import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.Interesado;
+import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
+import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.SolicitudService;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,7 +56,9 @@ public class PlantillaDocumentoService {
     private static final DateTimeFormatter DATE_LONG = DateTimeFormatter.ofPattern("dd 'DE' MMMM 'DE' yyyy", new Locale("es", "ES"));
     private final ExpedienteRepository expedienteRepository;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final SolicitudRepository solicitudRepository;
     private final ExpedienteService expedienteService;
+    private final SolicitudService solicitudService;
     private final DocumentoService documentoService;
 
     @Transactional(readOnly = true)
@@ -75,7 +80,8 @@ public class PlantillaDocumentoService {
     public PlantillaPreviewResponse preview(Long expedienteId, PlantillaPreviewRequest request, Usuario usuario) {
         Expediente expediente = expediente(expedienteId, usuario);
         TipoPlantilla plantilla = tipo(request != null ? request.codigo() : null);
-        return construirPreview(expediente, plantilla, request != null ? request.campos() : null);
+        return construirPreview(expediente, referencia(expediente), plantilla, request != null ? request.campos() : null,
+                relaciones(expediente.getId()));
     }
 
     @Transactional
@@ -85,10 +91,12 @@ public class PlantillaDocumentoService {
             throw new AccesoDenegadoException("Solo el administrador puede generar documentos");
         }
         TipoPlantilla plantilla = tipo(request != null ? request.codigo() : null);
-        PlantillaPreviewResponse preview = construirPreview(expediente, plantilla, request != null ? request.campos() : null);
+        List<ExpedienteInteresado> relaciones = relaciones(expediente.getId());
+        PlantillaPreviewResponse preview = construirPreview(expediente, referencia(expediente), plantilla,
+                request != null ? request.campos() : null, relaciones);
         validarRequeridos(preview.campos());
         Map<String, String> valores = valores(preview.campos());
-        byte[] pdf = rellenarPdf(expediente, plantilla, valores);
+        byte[] pdf = rellenarPdf(expediente, plantilla, valores, relaciones);
         Documento documento = documentoService.guardarGeneradoParaExpediente(
                 expedienteId,
                 pdf,
@@ -99,8 +107,57 @@ public class PlantillaDocumentoService {
         return new DocumentoGeneradoResponse(documento.getId(), documento.getNombreArchivoOriginal(), documento.getTipoDocumento().name());
     }
 
-    private PlantillaPreviewResponse construirPreview(Expediente expediente, TipoPlantilla plantilla, Map<String, String> cambios) {
-        List<ExpedienteInteresado> relaciones = relaciones(expediente.getId());
+    @Transactional(readOnly = true)
+    public PlantillasExpedienteResponse catalogoSolicitud(Long solicitudId, Usuario usuario) {
+        Solicitud solicitud = solicitud(solicitudId, usuario);
+        Expediente contexto = contextoSolicitud(solicitud);
+        List<PlantillaDestinatarioResponse> interesados = relacionesSolicitud(solicitud, contexto).stream()
+                .map(this::mapInteresado)
+                .toList();
+        return new PlantillasExpedienteResponse(
+                referencia(solicitud),
+                valor(solicitud.getMatricula()),
+                tipoTramite(solicitud),
+                solicitud.getCliente() != null ? valor(solicitud.getCliente().getNombre()) : "SIN CLIENTE",
+                Arrays.stream(TipoPlantilla.values()).map(this::mapPlantilla).toList(),
+                interesados);
+    }
+
+    @Transactional(readOnly = true)
+    public PlantillaPreviewResponse previewSolicitud(Long solicitudId, PlantillaPreviewRequest request, Usuario usuario) {
+        Solicitud solicitud = solicitud(solicitudId, usuario);
+        Expediente contexto = contextoSolicitud(solicitud);
+        TipoPlantilla plantilla = tipo(request != null ? request.codigo() : null);
+        return construirPreview(contexto, referencia(solicitud), plantilla, request != null ? request.campos() : null,
+                relacionesSolicitud(solicitud, contexto));
+    }
+
+    @Transactional
+    public DocumentoGeneradoResponse generarSolicitud(Long solicitudId, GenerarPlantillaRequest request, Usuario usuario) {
+        Solicitud solicitud = solicitud(solicitudId, usuario);
+        if (usuario.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo el administrador puede generar documentos");
+        }
+        Expediente contexto = contextoSolicitud(solicitud);
+        List<ExpedienteInteresado> relaciones = relacionesSolicitud(solicitud, contexto);
+        TipoPlantilla plantilla = tipo(request != null ? request.codigo() : null);
+        PlantillaPreviewResponse preview = construirPreview(contexto, referencia(solicitud), plantilla,
+                request != null ? request.campos() : null, relaciones);
+        validarRequeridos(preview.campos());
+        Map<String, String> valores = valores(preview.campos());
+        byte[] pdf = rellenarPdf(contexto, plantilla, valores, relaciones);
+        Documento documento = documentoService.guardarGeneradoParaSolicitud(
+                solicitudId,
+                pdf,
+                plantilla.tipoDocumento,
+                preview.nombreArchivo(),
+                "Documento generado a partir del modelo oficial " + plantilla.nombre,
+                usuario);
+        return new DocumentoGeneradoResponse(documento.getId(), documento.getNombreArchivoOriginal(), documento.getTipoDocumento().name());
+    }
+
+    private PlantillaPreviewResponse construirPreview(Expediente expediente, String referencia,
+            TipoPlantilla plantilla, Map<String, String> cambios, List<ExpedienteInteresado> relaciones) {
         Map<String, String> valores = valoresIniciales(expediente, plantilla, relaciones);
         if (cambios != null) {
             cambios.forEach((clave, valor) -> {
@@ -117,7 +174,7 @@ public class PlantillaDocumentoService {
         return new PlantillaPreviewResponse(
                 plantilla.name(),
                 plantilla.nombre,
-                nombreArchivo(expediente, plantilla),
+                nombreArchivo(expediente, referencia, plantilla),
                 plantilla.tipoDocumento.name(),
                 campos,
                 avisos);
@@ -235,14 +292,14 @@ public class PlantillaDocumentoService {
         };
     }
 
-    private byte[] rellenarPdf(Expediente expediente, TipoPlantilla plantilla, Map<String, String> valores) {
+    private byte[] rellenarPdf(Expediente expediente, TipoPlantilla plantilla, Map<String, String> valores,
+            List<ExpedienteInteresado> relaciones) {
         ClassPathResource resource = new ClassPathResource("plantillas/" + plantilla.archivo);
         try (InputStream input = resource.getInputStream();
                 PDDocument document = PDDocument.load(input);
                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PDAcroForm form = document.getDocumentCatalog().getAcroForm();
             if (form == null) throw new IOException("El modelo no contiene campos rellenables");
-            List<ExpedienteInteresado> relaciones = relaciones(expediente.getId());
             switch (plantilla) {
                 case MANDATO -> rellenarMandato(form, valores, relaciones);
                 case CAMBIO_TITULARIDAD -> rellenarCambioTitularidad(form, expediente, valores, relaciones);
@@ -351,10 +408,72 @@ public class PlantillaDocumentoService {
         return expediente;
     }
 
+    private Solicitud solicitud(Long id, Usuario usuario) {
+        Solicitud solicitud = solicitudRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+        if (!solicitudService.tienePermisoSolicitud(solicitud, usuario)) {
+            throw new AccesoDenegadoException("No tienes permiso para consultar las plantillas de esta solicitud");
+        }
+        return solicitud;
+    }
+
+    private Expediente contextoSolicitud(Solicitud solicitud) {
+        Expediente contexto = new Expediente();
+        contexto.setId(solicitud.getId());
+        contexto.setMatricula(solicitud.getMatricula());
+        contexto.setCliente(solicitud.getCliente());
+        contexto.setTipoTramite(solicitud.getTipoTramite());
+        return contexto;
+    }
+
     private List<ExpedienteInteresado> relaciones(Long expedienteId) {
         return expedienteInteresadoRepository.findByExpedienteId(expedienteId).stream()
                 .sorted(Comparator.comparingInt(item -> ordenRol(item.getRol())))
                 .toList();
+    }
+
+    private List<ExpedienteInteresado> relacionesSolicitud(Solicitud solicitud, Expediente contexto) {
+        List<ExpedienteInteresado> relaciones = new ArrayList<>();
+        agregarInteresadoSolicitud(relaciones, contexto, 1L, solicitud.getInteresado1Rol(),
+                solicitud.getInteresado1Nombre(), solicitud.getInteresado1Dni(), solicitud.getInteresado1Telefono(),
+                solicitud.getInteresado1Direccion(), solicitud.getInteresado1TipoVia(),
+                solicitud.getInteresado1NombreVia(), solicitud.getInteresado1CodigoPostal(),
+                solicitud.getInteresado1Municipio(), solicitud.getInteresado1Provincia());
+        agregarInteresadoSolicitud(relaciones, contexto, 2L, solicitud.getInteresado2Rol(),
+                solicitud.getInteresado2Nombre(), solicitud.getInteresado2Dni(), solicitud.getInteresado2Telefono(),
+                solicitud.getInteresado2Direccion(), solicitud.getInteresado2TipoVia(),
+                solicitud.getInteresado2NombreVia(), solicitud.getInteresado2CodigoPostal(),
+                solicitud.getInteresado2Municipio(), solicitud.getInteresado2Provincia());
+        agregarInteresadoSolicitud(relaciones, contexto, 3L, solicitud.getInteresado3Rol(),
+                solicitud.getInteresado3Nombre(), solicitud.getInteresado3Dni(), solicitud.getInteresado3Telefono(),
+                solicitud.getInteresado3Direccion(), solicitud.getInteresado3TipoVia(),
+                solicitud.getInteresado3NombreVia(), solicitud.getInteresado3CodigoPostal(),
+                solicitud.getInteresado3Municipio(), solicitud.getInteresado3Provincia());
+        return relaciones.stream()
+                .sorted(Comparator.comparingInt(item -> ordenRol(item.getRol())))
+                .toList();
+    }
+
+    private void agregarInteresadoSolicitud(List<ExpedienteInteresado> relaciones, Expediente contexto, Long id,
+            RolInteresado rol, String nombre, String dni, String telefono, String direccion, String tipoVia,
+            String nombreVia, String codigoPostal, String municipio, String provincia) {
+        if (vacio(nombre) && vacio(dni) && rol == null && vacio(telefono) && vacio(direccion)
+                && vacio(nombreVia) && vacio(codigoPostal) && vacio(municipio) && vacio(provincia)) {
+            return;
+        }
+        Interesado interesado = new Interesado();
+        interesado.setId(id);
+        interesado.setNombre(limpiar(nombre));
+        interesado.setDni(limpiar(dni));
+        interesado.setTelefono(limpiar(telefono));
+        interesado.setDireccion(limpiar(direccion));
+        interesado.setTipoVia(limpiar(tipoVia));
+        interesado.setNombreVia(limpiar(nombreVia));
+        interesado.setCodigoPostal(limpiar(codigoPostal));
+        interesado.setMunicipio(limpiar(municipio));
+        interesado.setProvincia(limpiar(provincia));
+        interesado.setTipoPersona(inferirTipoPersona(dni));
+        relaciones.add(new ExpedienteInteresado(contexto, interesado, rol));
     }
 
     private Interesado interesado(List<ExpedienteInteresado> relaciones, String id, boolean requerido) {
@@ -447,10 +566,10 @@ public class PlantillaDocumentoService {
         }
     }
 
-    private String nombreArchivo(Expediente expediente, TipoPlantilla plantilla) {
+    private String nombreArchivo(Expediente expediente, String referencia, TipoPlantilla plantilla) {
         String base = !vacio(expediente.getMatricula())
                 ? expediente.getMatricula().trim().toUpperCase(Locale.ROOT)
-                : referencia(expediente);
+                : referencia;
         return base + "_" + plantilla.tipoDocumento.name() + ".pdf";
     }
 
@@ -474,14 +593,32 @@ public class PlantillaDocumentoService {
         return "EXP-" + expediente.getId();
     }
 
+    private String referencia(Solicitud solicitud) {
+        return "SOL-" + solicitud.getId();
+    }
+
     private String tipoTramite(Expediente expediente) {
         return expediente.getTipoTramite() != null && expediente.getTipoTramite().getNombre() != null
                 ? expediente.getTipoTramite().getNombre().name().replace('_', ' ')
                 : "SIN TIPO";
     }
 
+    private String tipoTramite(Solicitud solicitud) {
+        return solicitud.getTipoTramite() != null && solicitud.getTipoTramite().getNombre() != null
+                ? solicitud.getTipoTramite().getNombre().name().replace('_', ' ')
+                : "SIN TIPO";
+    }
+
     private String valor(String valor) {
         return vacio(valor) ? "NO CONSTA" : limpiar(valor);
+    }
+
+    private TipoPersona inferirTipoPersona(String identificador) {
+        String normalizado = limpiar(identificador).replaceAll("[^A-Z0-9]", "");
+        if (normalizado.matches("^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$")) {
+            return TipoPersona.EMPRESA;
+        }
+        return TipoPersona.PARTICULAR;
     }
 
     private int ordenRol(RolInteresado rol) {

@@ -22,6 +22,7 @@ import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRep
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
 import com.example.gestor_documental.service.IncidenciaService;
+import com.example.gestor_documental.util.MensajeAutomaticoUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -138,7 +139,12 @@ public class SeguimientoClienteApiController {
         }
         if (tipo == TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL) {
             String mensaje = ultimoMensajeAdmin(incidencia.getExpediente().getId());
-            return mensaje != null ? mensaje : incidencia.getObservaciones();
+            if (mensaje != null) {
+                return mensaje;
+            }
+            return MensajeAutomaticoUtils.esMensajeAutomaticoSeguimiento(incidencia.getObservaciones())
+                    ? "RESPONDER A LA INFORMACION SOLICITADA"
+                    : incidencia.getObservaciones();
         }
         return incidencia.getObservaciones();
     }
@@ -155,7 +161,8 @@ public class SeguimientoClienteApiController {
         for (int index = mensajes.size() - 1; index >= 0; index--) {
             Mensaje mensaje = mensajes.get(index);
             if (mensaje.getAutor() != null && mensaje.getAutor().getRolUsuario() == RolUsuario.ADMIN
-                    && mensaje.getContenido() != null && !mensaje.getContenido().isBlank()) {
+                    && mensaje.getContenido() != null && !mensaje.getContenido().isBlank()
+                    && !MensajeAutomaticoUtils.esMensajeAutomaticoSeguimiento(mensaje.getContenido())) {
                 return mensaje.getContenido().trim();
             }
         }

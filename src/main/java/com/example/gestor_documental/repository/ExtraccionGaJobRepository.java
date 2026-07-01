@@ -20,6 +20,13 @@ public interface ExtraccionGaJobRepository extends JpaRepository<ExtraccionGaJob
     List<ExtraccionGaJob> findByEstadoInOrderByFechaCreacionAsc(Collection<EstadoExtraccionGaJob> estados, Pageable pageable);
 
     @Query("""
+            select count(j) from ExtraccionGaJob j
+            where j.expediente.id = :expedienteId
+              and j.usoCliente = true
+            """)
+    long countUsosClienteByExpedienteId(@Param("expedienteId") Long expedienteId);
+
+    @Query("""
             select j from ExtraccionGaJob j
             join fetch j.expediente e
             left join fetch e.cliente

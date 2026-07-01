@@ -69,6 +69,7 @@ export const router = createBrowserRouter([
       { path: "cliente/expedientes/:id", element: <RequireRole allow={["CLIENTE"]}><ClienteExpedientePage /></RequireRole> },
       { path: "solicitudes", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><SolicitudesListPage /></RequireRole> },
       { path: "solicitudes/:id", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><SolicitudDetailPage /></RequireRole> },
+      { path: "solicitudes/:id/editar", element: <RequireRole allow={["ADMIN"]}><SolicitudFormPage /></RequireRole> },
       { path: "cliente/solicitudes/creacion-multiple", element: <RequireRole allow={["CLIENTE"]}><SolicitudBulkCreatePage /></RequireRole> },
       { path: "interesados", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><InteresadosRegistroPage /></RequireRole> },
       { path: "interesados/:id", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><InteresadoRegistroDetailPage /></RequireRole> },

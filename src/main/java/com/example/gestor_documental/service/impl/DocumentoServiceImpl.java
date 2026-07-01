@@ -29,6 +29,8 @@ import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.*;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +53,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DocumentoServiceImpl implements DocumentoService {
 
+    private static final Logger log = LoggerFactory.getLogger(DocumentoServiceImpl.class);
     private static final String ACCION_CARGAR_DOCUMENTO = "CARGAR DOCUMENTO";
 
     private final DocumentoRepository documentoRepository;
@@ -157,6 +160,30 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     @Override
     @Transactional
+    public Documento guardarGeneradoParaSolicitud(Long solicitudId, byte[] contenido, TipoDocumento tipoDocumento,
+            String nombreArchivoOriginal, String descripcion, Usuario usuario) {
+        if (contenido == null || contenido.length == 0) {
+            throw new OperacionInvalidaException("El documento generado esta vacio");
+        }
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+        if (!solicitudService.tienePermisoSolicitud(solicitud, usuario)) {
+            throw new AccesoDenegadoException("No tienes permiso para generar documentos en esta solicitud");
+        }
+        try {
+            Documento documento = construirDocumentoBase(contenido, nombreArchivoOriginal, tipoDocumento, usuario);
+            documento.setDescripcionArchivo(descripcion);
+            documento.setSolicitud(solicitud);
+            documentoRepository.save(documento);
+            registrarCargaDocumentoSolicitud(solicitud, documento, usuario);
+            return documento;
+        } catch (IOException exception) {
+            throw new RuntimeException("No se pudo guardar el documento generado", exception);
+        }
+    }
+
+    @Override
+    @Transactional
     public Documento guardarExpedienteCompletoOriginalParaExpediente(Long expedienteId, MultipartFile archivo, Long operacionId, Usuario usuario) {
         if (archivo == null || archivo.isEmpty()) {
             return null;
@@ -202,14 +229,26 @@ public class DocumentoServiceImpl implements DocumentoService {
             }
 
             byte[] pdfOriginal = Files.readAllBytes(rutaOriginal);
+            log.info("OCR_DIAG separacion-inicio tipo=EXPEDIENTE documentoId={} expedienteId={} archivo={} bytes={}",
+                    docOriginal.getId(),
+                    docOriginal.getExpediente().getId(),
+                    docOriginal.getNombreArchivoOriginal(),
+                    pdfOriginal.length);
             MultipartFile archivoProcesable = new PathMultipartFile(
                     rutaOriginal,
                     docOriginal.getNombreArchivoOriginal(),
                     "application/pdf"
             );
             List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivoProcesable);
+            log.info("OCR_DIAG separacion-detectados tipo=EXPEDIENTE documentoId={} expedienteId={} bloques={}",
+                    docOriginal.getId(),
+                    docOriginal.getExpediente().getId(),
+                    resumenDetectados(documentosDetectados));
 
             if (documentosDetectados == null || documentosDetectados.isEmpty()) {
+                log.warn("OCR_DIAG separacion-sin-detectados tipo=EXPEDIENTE documentoId={} expedienteId={}",
+                        docOriginal.getId(),
+                        docOriginal.getExpediente().getId());
                 registrarProcesamientoExpedienteCompleto(docOriginal.getExpediente(), docOriginal, usuario, 0);
                 return 0;
             }
@@ -217,7 +256,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             int generados = 0;
             for (DocumentoDetectadoDto detectado : documentosDetectados) {
                 byte[] pdfSeparado = pdfSplitService.extraerPaginas(pdfOriginal, detectado.getPaginas());
-                guardarDocumentoGeneradoParaExpediente(
+                Documento generado = guardarDocumentoGeneradoParaExpediente(
                         docOriginal.getExpediente(),
                         pdfSeparado,
                         detectado.getTipoDocumento(),
@@ -225,6 +264,13 @@ public class DocumentoServiceImpl implements DocumentoService {
                         docOriginal.getExpediente().getMatricula() + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf",
                         docOriginal.getOperacion(),
                         false);
+                log.info("OCR_DIAG separacion-generado tipo=EXPEDIENTE originalId={} generadoId={} expedienteId={} tipoDocumento={} paginas={} bytes={}",
+                        docOriginal.getId(),
+                        generado.getId(),
+                        docOriginal.getExpediente().getId(),
+                        detectado.getTipoDocumento(),
+                        paginasHumanas(detectado.getPaginas()),
+                        pdfSeparado.length);
                 generados++;
             }
             registrarProcesamientoExpedienteCompleto(docOriginal.getExpediente(), docOriginal, usuario, generados);
@@ -968,14 +1014,26 @@ public class DocumentoServiceImpl implements DocumentoService {
             }
 
             byte[] pdfOriginal = Files.readAllBytes(rutaOriginal);
+            log.info("OCR_DIAG separacion-inicio tipo=SOLICITUD documentoId={} solicitudId={} archivo={} bytes={}",
+                    docOriginal.getId(),
+                    docOriginal.getSolicitud().getId(),
+                    docOriginal.getNombreArchivoOriginal(),
+                    pdfOriginal.length);
             MultipartFile archivoProcesable = new PathMultipartFile(
                     rutaOriginal,
                     docOriginal.getNombreArchivoOriginal(),
                     "application/pdf"
             );
             List<DocumentoDetectadoDto> documentosDetectados = ocrPdfService.detectarDocumentos(archivoProcesable);
+            log.info("OCR_DIAG separacion-detectados tipo=SOLICITUD documentoId={} solicitudId={} bloques={}",
+                    docOriginal.getId(),
+                    docOriginal.getSolicitud().getId(),
+                    resumenDetectados(documentosDetectados));
 
             if (documentosDetectados == null || documentosDetectados.isEmpty()) {
+                log.warn("OCR_DIAG separacion-sin-detectados tipo=SOLICITUD documentoId={} solicitudId={}",
+                        docOriginal.getId(),
+                        docOriginal.getSolicitud().getId());
                 registrarProcesamientoExpedienteCompleto(docOriginal.getSolicitud(), docOriginal, usuario, 0);
                 return 0;
             }
@@ -983,13 +1041,20 @@ public class DocumentoServiceImpl implements DocumentoService {
             int generados = 0;
             for (DocumentoDetectadoDto detectado : documentosDetectados) {
                 byte[] pdfSeparado = pdfSplitService.extraerPaginas(pdfOriginal, detectado.getPaginas());
-                guardarDocumentoGeneradoParaSolicitud(
+                Documento generado = guardarDocumentoGeneradoParaSolicitud(
                         docOriginal.getSolicitud(),
                         pdfSeparado,
                         detectado.getTipoDocumento(),
                         usuario,
                         docOriginal.getSolicitud().getMatricula() + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf",
                         false);
+                log.info("OCR_DIAG separacion-generado tipo=SOLICITUD originalId={} generadoId={} solicitudId={} tipoDocumento={} paginas={} bytes={}",
+                        docOriginal.getId(),
+                        generado.getId(),
+                        docOriginal.getSolicitud().getId(),
+                        detectado.getTipoDocumento(),
+                        paginasHumanas(detectado.getPaginas()),
+                        pdfSeparado.length);
                 generados++;
             }
             registrarProcesamientoExpedienteCompleto(docOriginal.getSolicitud(), docOriginal, usuario, generados);
@@ -1055,6 +1120,24 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     private Path obtenerCarpetaUploads() {
         return Paths.get(uploadDir).toAbsolutePath().normalize();
+    }
+
+    private String resumenDetectados(List<DocumentoDetectadoDto> documentosDetectados) {
+        if (documentosDetectados == null || documentosDetectados.isEmpty()) {
+            return "[]";
+        }
+        return documentosDetectados.stream()
+                .map(documento -> documento.getTipoDocumento() + ":" + paginasHumanas(documento.getPaginas()))
+                .collect(Collectors.joining(", ", "[", "]"));
+    }
+
+    private String paginasHumanas(List<Integer> paginas) {
+        if (paginas == null || paginas.isEmpty()) {
+            return "[]";
+        }
+        return paginas.stream()
+                .map(pagina -> String.valueOf(pagina + 1))
+                .collect(Collectors.joining("-", "[", "]"));
     }
 
     private record PathMultipartFile(Path path, String originalFilename, String contentType) implements MultipartFile {

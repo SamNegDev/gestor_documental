@@ -60,6 +60,12 @@ public class ExtraccionGaJob {
     @Column(length = 1000)
     private String mensajeError;
 
+    @Column
+    private Boolean usoCliente = false;
+
+    @Column(length = 40)
+    private String origen;
+
     @Column(nullable = false)
     private Integer intentos = 0;
 

@@ -1,5 +1,20 @@
 import { apiGet, apiPostJson } from "../../../shared/api/http";
+import type { ExtraccionGaJob } from "../../ia/types";
 import type { ClienteResumen, DocumentoExpediente, HistorialExpediente, IncidenciaExpediente, MensajeExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
+
+export interface LecturaIaCliente {
+  expedienteId: number;
+  apiKeyConfigurada: boolean;
+  documentacionSuficiente: boolean;
+  puedeSolicitar: boolean;
+  jobCreado: boolean;
+  bloqueosDocumentales: string[];
+  usosConsumidos: number;
+  usosMaximos: number;
+  usosRestantes: number;
+  mensaje?: string | null;
+  ultimoJob?: ExtraccionGaJob | null;
+}
 
 export interface ExpedienteCliente {
   id: number;
@@ -13,6 +28,7 @@ export interface ExpedienteCliente {
   siguienteMensaje?: string | null;
   cliente?: ClienteResumen | null;
   mensajesNoLeidos?: number;
+  lecturaIa?: LecturaIaCliente | null;
   documentos: DocumentoExpediente[];
   requisitosDocumentales: RequisitoDocumental[];
   incidencias: IncidenciaExpediente[];
@@ -30,6 +46,7 @@ export async function getClienteExpediente(id: string | number): Promise<Expedie
     incidencias: expediente.incidencias ?? [],
     mensajes: expediente.mensajes ?? [],
     historial: expediente.historial ?? [],
+    lecturaIa: expediente.lecturaIa ?? null,
   };
 }
 
@@ -43,4 +60,8 @@ export function markClienteExpedienteMessagesRead(expedienteId: string | number)
 
 export function answerAdditionalInfo(expedienteId: string | number, contenido: string): Promise<void> {
   return apiPostJson(`/api/cliente/expedientes/${expedienteId}/informacion-adicional/respuesta`, { contenido });
+}
+
+export function requestClienteExpedienteIaReading(expedienteId: string | number): Promise<LecturaIaCliente> {
+  return apiPostJson(`/api/cliente/expedientes/${expedienteId}/lectura-ia`, {});
 }

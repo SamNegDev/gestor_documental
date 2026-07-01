@@ -1,6 +1,7 @@
 package com.example.gestor_documental.dto.expediente;
 
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
+import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -8,6 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.stream.Stream;
 
 @Getter
@@ -39,6 +41,8 @@ public class DocumentoIdentidadLecturaResponse {
     private String mensaje;
     private String modelo;
     private String fechaLectura;
+    private int identidadesDetectadasTotal;
+    private List<DocumentoIdentidadDetectadaResponse> identidadesDetectadas;
 
     public static DocumentoIdentidadLecturaResponse from(DocumentoIdentidadLectura lectura) {
         if (lectura == null) {
@@ -65,6 +69,10 @@ public class DocumentoIdentidadLecturaResponse {
                 .mensaje(lectura.getMensaje())
                 .modelo(lectura.getModelo())
                 .fechaLectura(lectura.getFechaLectura() != null ? FORMATTER.format(lectura.getFechaLectura()) : null)
+                .identidadesDetectadasTotal(DocumentoIdentidadLecturaJson.extraer(lectura).size())
+                .identidadesDetectadas(DocumentoIdentidadLecturaJson.extraer(lectura).stream()
+                        .map(DocumentoIdentidadDetectadaResponse::from)
+                        .toList())
                 .build();
     }
 

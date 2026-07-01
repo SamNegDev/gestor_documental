@@ -75,8 +75,13 @@ export function convertirSolicitud(id: number) {
   return apiPostJson<{ id: number }>(`/api/solicitudes/${id}/convertir`, {});
 }
 
-export function procesarSolicitudDocumentacionIa(id: number) {
-  return apiPostJson<SolicitudDocumentacionIaResponse>(`/api/solicitudes/${id}/documentacion-ia/procesar`, {});
+export function procesarSolicitudDocumentacionIa(id: number, options?: { forzarRelectura?: boolean }) {
+  const query = options?.forzarRelectura ? "?forzarRelectura=true" : "";
+  return apiPostJson<SolicitudDocumentacionIaResponse>(`/api/solicitudes/${id}/documentacion-ia/procesar${query}`, {});
+}
+
+export function procesarSolicitudDocumentacionIaCliente(id: number) {
+  return apiPostJson<SolicitudDocumentacionIaResponse>(`/api/solicitudes/${id}/documentacion-ia/cliente`, {});
 }
 
 export function getSolicitudInteresadoCoincidencias(id: number) {

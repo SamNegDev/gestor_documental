@@ -2,6 +2,7 @@ package com.example.gestor_documental.controller.api;
 
 import com.example.gestor_documental.dto.expediente.ExpedienteClienteResponse;
 import com.example.gestor_documental.dto.expediente.ExpedienteDetailResponse;
+import com.example.gestor_documental.dto.ia.LecturaIaClienteResponse;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
@@ -11,6 +12,7 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.ExtraccionGaIaService;
 import com.example.gestor_documental.service.MensajeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +32,7 @@ public class ClienteExpedienteApiController {
 
     private final ExpedienteDetalleApiService expedienteDetalleApiService;
     private final ExpedienteService expedienteService;
+    private final ExtraccionGaIaService extraccionGaIaService;
     private final MensajeService mensajeService;
     private final CurrentUserService currentUserService;
 
@@ -59,7 +62,13 @@ public class ClienteExpedienteApiController {
                 .incidencias(detalle.getIncidencias())
                 .mensajes(detalle.getMensajes())
                 .historial(detalle.getHistorial())
+                .lecturaIa(extraccionGaIaService.obtenerLecturaCliente(id, usuarioLogueado))
                 .build();
+    }
+
+    @PostMapping("/{id}/lectura-ia")
+    public LecturaIaClienteResponse solicitarLecturaIaCliente(@PathVariable Long id, Authentication authentication) {
+        return extraccionGaIaService.solicitarLecturaCliente(id, currentUserService.requireUser(authentication));
     }
 
     @PostMapping("/{id}/mensajes")

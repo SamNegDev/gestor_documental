@@ -52,6 +52,7 @@ import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.impl.CorreoEntranteSolicitudService;
 import com.example.gestor_documental.security.CurrentUserService;
+import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
 import com.example.gestor_documental.util.TextNormalizer;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
@@ -171,7 +172,7 @@ public class SolicitudApiController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permiso para acceder a esta solicitud");
         }
 
-        return mapSolicitudDetail(solicitud);
+        return mapSolicitudDetail(solicitud, usuarioLogueado);
     }
 
     @PostMapping("/{id}/convertir")
@@ -184,10 +185,20 @@ public class SolicitudApiController {
     @PostMapping("/{id}/documentacion-ia/procesar")
     public SolicitudDocumentacionIaResponse procesarDocumentacionIa(
             @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "false") boolean forzarRelectura,
             Authentication authentication
     ) {
         Usuario usuarioLogueado = requireAdmin(authentication);
-        return solicitudDocumentacionIaService.procesarDocumentacion(id, usuarioLogueado);
+        return solicitudDocumentacionIaService.procesarDocumentacion(id, usuarioLogueado, forzarRelectura);
+    }
+
+    @PostMapping("/{id}/documentacion-ia/cliente")
+    public SolicitudDocumentacionIaResponse procesarDocumentacionIaCliente(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = usuario(authentication);
+        return solicitudDocumentacionIaService.procesarDocumentacionCliente(id, usuarioLogueado);
     }
 
     @GetMapping("/{id}/interesados/coincidencias")
@@ -538,7 +549,7 @@ public class SolicitudApiController {
                 : null;
     }
 
-    private SolicitudDetailResponse mapSolicitudDetail(Solicitud solicitud) {
+    private SolicitudDetailResponse mapSolicitudDetail(Solicitud solicitud, Usuario usuarioLogueado) {
         List<Documento> documentos = documentoService.listarPorSolicitud(solicitud.getId());
         List<InteresadoSolicitudResponse> interesados = mapInteresados(solicitud, documentos, true);
         return SolicitudDetailResponse.builder()
@@ -564,6 +575,9 @@ public class SolicitudApiController {
                         : null)
                 .creadoPor(mapUsuario(solicitud.getCreadoPor()))
                 .modificadoPor(mapUsuario(solicitud.getModificadoPor()))
+                .lecturaIaCliente(usuarioLogueado.getRolUsuario() == RolUsuario.CLIENTE
+                        ? solicitudDocumentacionIaService.obtenerLecturaCliente(solicitud.getId(), usuarioLogueado)
+                        : null)
                 .interesados(interesados)
                 .documentos(documentos.stream().map(this::mapDocumento).toList())
                 .incidencias(incidenciaService.listarPorSolicitud(solicitud.getId()).stream().map(this::mapIncidencia).toList())
@@ -788,7 +802,12 @@ public class SolicitudApiController {
         if (lectura == null || lectura.getConfianzaGlobal() == null || lectura.getConfianzaGlobal() < CONFIANZA_MINIMA_IDENTIDAD_SOLICITUD) {
             return false;
         }
-        return identificador.equals(normalizarIdentificador(lectura.getIdentificador()));
+        if (identificador.equals(normalizarIdentificador(lectura.getIdentificador()))) {
+            return true;
+        }
+        return DocumentoIdentidadLecturaJson.extraer(lectura).stream()
+                .filter(item -> item.confianzaGlobal() != null && item.confianzaGlobal() >= CONFIANZA_MINIMA_IDENTIDAD_SOLICITUD)
+                .anyMatch(item -> identificador.equals(normalizarIdentificador(item.identificador())));
     }
 
     private boolean esPersonaJuridica(String identificador) {

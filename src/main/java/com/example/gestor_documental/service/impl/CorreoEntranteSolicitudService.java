@@ -1,5 +1,6 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.dto.expediente.SolicitudDocumentacionIaResponse;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
@@ -292,7 +293,15 @@ public class CorreoEntranteSolicitudService {
 
     private void intentarLecturaIaSolicitud(Solicitud solicitud, Usuario admin) {
         try {
-            solicitudDocumentacionIaService.procesarDocumentacion(solicitud.getId(), admin);
+            SolicitudDocumentacionIaResponse response = solicitudDocumentacionIaService.procesarDocumentacion(solicitud.getId(), admin);
+            if (response.isDatosAplicados() || response.isYaEstabaCorrecta()) {
+                log.info("Solicitud {} lectura IA correo completada: {}", solicitud.getId(), response.getMensaje());
+            } else {
+                log.info("Solicitud {} lectura IA correo pendiente: {} Detalles: {}",
+                        solicitud.getId(),
+                        response.getMensaje(),
+                        response.getDetalles() != null ? String.join(" | ", response.getDetalles()) : "");
+            }
         } catch (RuntimeException exception) {
             log.info("Solicitud {} creada desde correo, pero la lectura IA queda pendiente: {}",
                     solicitud.getId(), exception.getMessage());

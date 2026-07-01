@@ -15,7 +15,6 @@ import com.example.gestor_documental.repository.AvisoIncidenciaRepository;
 import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
 import com.example.gestor_documental.service.CorreoService;
 import com.example.gestor_documental.service.HistorialCambioService;
-import com.example.gestor_documental.service.MensajeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,7 +55,6 @@ public class ResumenDiarioTramitesService {
     private final AvisoIncidenciaRepository avisoIncidenciaRepository;
     private final CorreoService correoService;
     private final ConfiguracionSeguimientoService configuracionSeguimientoService;
-    private final MensajeService mensajeService;
     private final HistorialCambioService historialCambioService;
 
     @Value("${app.daily-summary.enabled:false}")
@@ -543,7 +541,6 @@ public class ResumenDiarioTramitesService {
             incidencia.setFechaArchivoSeguimiento(null);
             incidencia.setSeguimientoArchivadoPor(null);
             incidenciaRepository.save(incidencia);
-            mensajeService.añadirAExpediente(incidencia.getExpediente().getId(), texto, admin);
             historialCambioService.registrarCambioExpediente(incidencia.getExpediente(), admin, "LISTADO INCIDENCIAS",
                     "Incidencia incluida en el listado diario enviado al cliente" + (simulado ? " (simulado)." : "."));
         }

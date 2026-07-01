@@ -105,6 +105,24 @@ export interface DocumentoIdentidadLectura {
   mensaje?: string | null;
   modelo?: string | null;
   fechaLectura?: string | null;
+  identidadesDetectadasTotal?: number;
+  identidadesDetectadas?: DocumentoIdentidadDetectada[];
+}
+
+export interface DocumentoIdentidadDetectada {
+  tipoDocumentoDetectado?: string | null;
+  identificador?: string | null;
+  nombre?: string | null;
+  apellido1?: string | null;
+  apellido2?: string | null;
+  razonSocial?: string | null;
+  nombreCompleto?: string | null;
+  fechaNacimiento?: string | null;
+  fechaCaducidad?: string | null;
+  direccionTexto?: string | null;
+  confianzaGlobal?: number | null;
+  requiereRevision: boolean;
+  observaciones?: string | null;
 }
 
 export interface DocumentoRolesLectura {

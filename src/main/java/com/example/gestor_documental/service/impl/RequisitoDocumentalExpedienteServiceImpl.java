@@ -18,6 +18,7 @@ import com.example.gestor_documental.model.ClienteInteresado;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.GestionPersonaRepresentanteCatalogo;
+import com.example.gestor_documental.model.ExtraccionGaRevision;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.OperacionExpediente;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
@@ -25,6 +26,7 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.repository.ExtraccionGaRevisionRepository;
 import com.example.gestor_documental.repository.GestionPersonaRepresentanteCatalogoRepository;
 import com.example.gestor_documental.repository.HitoExpedienteRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
@@ -34,6 +36,8 @@ import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,7 +68,9 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     private final GestionPersonaRepresentanteCatalogoRepository representanteCatalogoRepository;
     private final HitoExpedienteRepository hitoRepository;
     private final OperacionExpedienteRepository operacionRepository;
+    private final ExtraccionGaRevisionRepository extraccionGaRevisionRepository;
     private final HistorialCambioService historialCambioService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional
@@ -251,6 +257,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
 
     private void reconciliarConDocumentos(Expediente expediente, List<Documento> documentos, Usuario usuario) {
         List<RequisitoDocumentalExpediente> requisitos = requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId());
+        Map<String, Documento> identidadesGa = identidadesGaPorDocumento(expediente, documentos);
 
         for (RequisitoDocumentalExpediente requisito : requisitos) {
             if (requisito.getDocumento() != null || requisito.getEstado() == EstadoRequisitoDocumental.OMITIDO) {
@@ -262,6 +269,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                     .findFirst()
                     .or(() -> documentoHabitualCubreRequisito(expediente, requisito))
                     .or(() -> documentoClienteCubreRequisito(expediente, requisito))
+                    .or(() -> documentoIdentidadGaCubreRequisito(identidadesGa, requisito))
                     .ifPresent(documento -> {
                         vincularDocumentoIdentidadSiProcede(documento, requisito);
                         requisito.setDocumento(documento);
@@ -892,6 +900,157 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         }
         TipoDocumento tipoDetectado = lectura.getTipoDocumentoDetectado();
         return tipoDetectado == null || tipoDocumentoCubreRequisito(tipoDetectado, requisito.getTipoDocumento());
+    }
+
+    private Optional<Documento> documentoIdentidadGaCubreRequisito(
+            Map<String, Documento> identidadesGa,
+            RequisitoDocumentalExpediente requisito
+    ) {
+        if (identidadesGa.isEmpty() || !esDocumentoIdentidad(requisito.getTipoDocumento()) || requisito.getInteresado() == null) {
+            return Optional.empty();
+        }
+        String identificador = normalizarIdentificador(requisito.getInteresado().getDni());
+        if (identificador.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(identidadesGa.get(identificador));
+    }
+
+    private Map<String, Documento> identidadesGaPorDocumento(Expediente expediente, List<Documento> documentos) {
+        Map<String, Documento> resultado = new LinkedHashMap<>();
+        if (expediente == null || expediente.getId() == null || documentos == null || documentos.isEmpty()) {
+            return resultado;
+        }
+        List<Documento> documentosIdentidad = documentos.stream()
+                .filter(documento -> documento.getId() != null)
+                .filter(documento -> documento.getTipoDocumento() == TipoDocumento.DNI || documento.getTipoDocumento() == TipoDocumento.CIF)
+                .toList();
+        if (documentosIdentidad.isEmpty()) {
+            return resultado;
+        }
+        ExtraccionGaRevision revision = extraccionGaRevisionRepository.findByExpedienteId(expediente.getId()).orElse(null);
+        JsonNode personas = personasDniGa(revision);
+        if (personas == null || !personas.isArray()) {
+            return resultado;
+        }
+        for (JsonNode persona : personas) {
+            String identificador = normalizarIdentificador(valorCampoGa(persona.path("dni")));
+            if (identificador.isBlank() || !confianzaSuficienteGa(persona.path("dni"))) {
+                continue;
+            }
+            Documento documento = documentoOrigenGa(persona, documentosIdentidad);
+            if (documento != null) {
+                resultado.putIfAbsent(identificador, documento);
+            }
+        }
+        return resultado;
+    }
+
+    private JsonNode personasDniGa(ExtraccionGaRevision revision) {
+        if (revision == null) {
+            return null;
+        }
+        JsonNode root = leerJsonRevisionGa(revision.getDatosValidadosJson());
+        if (root == null) {
+            root = leerJsonRevisionGa(revision.getResultadoIaJson());
+        }
+        if (root == null) {
+            return null;
+        }
+        JsonNode personas = root.path("bloqueDni").path("resultado").path("personas");
+        if (!personas.isArray()) {
+            personas = root.path("bloqueDni").path("personas");
+        }
+        return personas.isArray() ? personas : null;
+    }
+
+    private JsonNode leerJsonRevisionGa(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(json);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private boolean confianzaSuficienteGa(JsonNode campo) {
+        Double confianza = numeroCampoGa(campo);
+        return confianza != null && confianza >= CONFIANZA_MINIMA_IDENTIDAD;
+    }
+
+    private Documento documentoOrigenGa(JsonNode persona, List<Documento> documentosIdentidad) {
+        Long documentoId = parseLong(valorCampoGa(persona.path("documentoId")));
+        if (documentoId != null) {
+            Optional<Documento> porId = documentosIdentidad.stream()
+                    .filter(documento -> documentoId.equals(documento.getId()))
+                    .findFirst();
+            if (porId.isPresent()) {
+                return porId.get();
+            }
+        }
+        String documentoNombre = normalizarTextoGa(valorCampoGa(persona.path("documentoNombre")));
+        if (!documentoNombre.isBlank()) {
+            Optional<Documento> porNombre = documentosIdentidad.stream()
+                    .filter(documento -> nombreDocumentoGaCoincide(documento, documentoNombre))
+                    .findFirst();
+            if (porNombre.isPresent()) {
+                return porNombre.get();
+            }
+        }
+        return documentosIdentidad.size() == 1 ? documentosIdentidad.get(0) : null;
+    }
+
+    private boolean nombreDocumentoGaCoincide(Documento documento, String documentoNombre) {
+        String original = normalizarTextoGa(documento.getNombreArchivoOriginal());
+        String almacenado = normalizarTextoGa(documento.getNombreArchivo());
+        return (!original.isBlank() && (original.contains(documentoNombre) || documentoNombre.contains(original)))
+                || (!almacenado.isBlank() && (almacenado.contains(documentoNombre) || documentoNombre.contains(almacenado)));
+    }
+
+    private String valorCampoGa(JsonNode campo) {
+        if (campo == null || campo.isMissingNode() || campo.isNull()) {
+            return null;
+        }
+        JsonNode valor = campo.path("valor");
+        if (!valor.isMissingNode() && !valor.isNull()) {
+            return valor.asText(null);
+        }
+        return campo.isTextual() || campo.isNumber() ? campo.asText(null) : null;
+    }
+
+    private Double numeroCampoGa(JsonNode campo) {
+        if (campo == null || campo.isMissingNode() || campo.isNull()) {
+            return null;
+        }
+        JsonNode confianza = campo.path("confianza");
+        if (confianza.isNumber()) {
+            return confianza.asDouble();
+        }
+        if (campo.isNumber()) {
+            return campo.asDouble();
+        }
+        return null;
+    }
+
+    private Long parseLong(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        String soloDigitos = valor.replaceAll("[^0-9]", "");
+        if (soloDigitos.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(soloDigitos);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private String normalizarTextoGa(String valor) {
+        return valor == null ? "" : valor.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
     }
 
     private void vincularDocumentoIdentidadSiProcede(Documento documento, RequisitoDocumentalExpediente requisito) {

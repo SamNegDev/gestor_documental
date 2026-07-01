@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, Scissors, Send, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, FileSignature, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, RefreshCw, Scissors, Send, Sparkles, UserRound } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { ApiError } from "../../../shared/api/http";
 import { uppercaseInput } from "../../../shared/utils/text";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { CompleteExpedienteUploadPanel } from "../../expedientes/components/CompleteExpedienteUploadPanel";
+import { DocumentTemplateDialog } from "../../expedientes/components/DocumentTemplateDialog";
 import { OcrReviewDialog } from "../../expedientes/components/OcrReviewDialog";
 import {
   deleteDocument,
@@ -28,8 +29,9 @@ import {
   getSolicitudInteresadoCoincidencias,
   getSolicitudDetail,
   procesarSolicitudDocumentacionIa,
+  procesarSolicitudDocumentacionIaCliente,
 } from "../services/listadosApi";
-import type { SolicitudDetail, SolicitudDocumentacionIaResponse } from "../types";
+import type { LecturaIaSolicitudCliente, SolicitudDetail, SolicitudDocumentacionIaResponse } from "../types";
 
 const COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX = "gestor.solicitudCompleta.job.";
 const COMPLETE_DOCUMENT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
@@ -48,6 +50,7 @@ export function SolicitudDetailPage() {
   const [checkingInteresados, setCheckingInteresados] = useState(false);
   const [iaResult, setIaResult] = useState<SolicitudDocumentacionIaResponse | null>(null);
   const [iaError, setIaError] = useState<string | null>(null);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
 
@@ -91,7 +94,12 @@ export function SolicitudDetailPage() {
   });
 
   const procesarDocumentacionMutation = useMutation({
-    mutationFn: (solicitudId: number) => procesarSolicitudDocumentacionIa(solicitudId),
+    mutationFn: ({ solicitudId, forzarRelectura }: { solicitudId: number; forzarRelectura?: boolean }) =>
+      procesarSolicitudDocumentacionIa(solicitudId, { forzarRelectura }),
+  });
+
+  const procesarDocumentacionClienteMutation = useMutation({
+    mutationFn: (solicitudId: number) => procesarSolicitudDocumentacionIaCliente(solicitudId),
   });
 
   const refreshSolicitud = async () => {
@@ -298,15 +306,17 @@ export function SolicitudDetailPage() {
     }
   };
 
-  const handleProcessDocumentacionIa = async () => {
+  const handleProcessDocumentacionIa = async (forzarRelectura = false) => {
     const solicitudActual = solicitudQuery.data;
     if (!solicitudActual) return;
     const confirmed = await confirm({
-      title: "Procesar documentacion",
-      description: solicitudActual.tipoTramite === "BATECOM"
-        ? "Se leeran DNI/CIF y contratos/facturas. El sistema buscara la compraventa que aparece como comprador en una operacion y vendedor en otra."
-        : "Se leeran solo los DNI/CIF y factura/contrato que no tengan lectura previa. Si ya hay una lectura correcta se reutilizara para actualizar comprador y vendedor.",
-      confirmLabel: "Procesar",
+      title: forzarRelectura ? "Releer documentacion con IA" : "Procesar documentacion",
+      description: forzarRelectura
+        ? "Se volveran a leer DNI/CIF y contratos/facturas aunque ya tengan lectura previa. Las nuevas lecturas sustituiran a las anteriores para recalcular comprador y vendedor."
+        : solicitudActual.tipoTramite === "BATECOM"
+          ? "Se leeran DNI/CIF y contratos/facturas. El sistema buscara la compraventa que aparece como comprador en una operacion y vendedor en otra."
+          : "Se leeran solo los DNI/CIF y factura/contrato que no tengan lectura previa. Si ya hay una lectura correcta se reutilizara para actualizar comprador y vendedor.",
+      confirmLabel: forzarRelectura ? "Releer" : "Procesar",
       cancelLabel: "Cancelar",
       tone: "default",
     });
@@ -314,7 +324,32 @@ export function SolicitudDetailPage() {
     try {
       setIaResult(null);
       setIaError(null);
-      const response = await procesarDocumentacionMutation.mutateAsync(solicitudActual.id);
+      const response = await procesarDocumentacionMutation.mutateAsync({ solicitudId: solicitudActual.id, forzarRelectura });
+      await refreshSolicitud();
+      setIaResult(response);
+    } catch (cause) {
+      setIaError(cause instanceof ApiError ? cause.details || "No se pudo procesar la documentacion." : "No se pudo procesar la documentacion.");
+    }
+  };
+
+  const handleProcessClienteIa = async () => {
+    const solicitudActual = solicitudQuery.data;
+    if (!solicitudActual) return;
+    const lecturaIa = solicitudActual.lecturaIaCliente;
+    const confirmed = await confirm({
+      title: "Solicitar lectura IA",
+      description: lecturaIa
+        ? `Se revisara la documentacion aportada con IA. Te quedaran ${Math.max(0, lecturaIa.usosRestantes - 1)} de ${lecturaIa.usosMaximos} usos en esta solicitud.`
+        : "Se revisara la documentacion aportada con IA.",
+      confirmLabel: "Solicitar",
+      cancelLabel: "Cancelar",
+      tone: "default",
+    });
+    if (!confirmed) return;
+    try {
+      setIaResult(null);
+      setIaError(null);
+      const response = await procesarDocumentacionClienteMutation.mutateAsync(solicitudActual.id);
       await refreshSolicitud();
       setIaResult(response);
     } catch (cause) {
@@ -334,6 +369,7 @@ export function SolicitudDetailPage() {
   const isClosed = solicitud.estado === "CONVERTIDA" || solicitud.estado === "RECHAZADO";
   const interesadosVisibles = solicitud.interesados.filter(hasInteresadoData);
   const preparationItems = buildSolicitudPreparationItems(solicitud);
+  const hasSolicitudDocuments = solicitud.documentos.some((documento) => documento.id);
 
   return (
     <section className="request-page">
@@ -374,7 +410,12 @@ export function SolicitudDetailPage() {
           solicitud={solicitud}
           isClosed={isClosed}
           onConvert={handleConvertSolicitud}
+          onOpenTemplates={() => setTemplateDialogOpen(true)}
+          onReadWithIa={() => handleProcessDocumentacionIa(false)}
+          onForceReadWithIa={() => handleProcessDocumentacionIa(true)}
           onStateChange={(estado) => estadoMutation.mutate({ solicitudId: solicitud.id, estado })}
+          canReadWithIa={hasSolicitudDocuments}
+          iaPending={procesarDocumentacionMutation.isPending}
           pending={checkingInteresados || convertirMutation.isPending || estadoMutation.isPending || procesarDocumentacionMutation.isPending}
         />
       ) : null}
@@ -383,6 +424,13 @@ export function SolicitudDetailPage() {
       {iaError ? <SolicitudIaErrorPanel message={iaError} onDismiss={() => setIaError(null)} /> : null}
 
       {!isAdmin ? <ClientStatusCallout solicitud={solicitud} expedientePath={isAdmin ? undefined : "/cliente/expedientes"} /> : null}
+      {!isAdmin && !isClosed ? (
+        <SolicitudClienteIaPanel
+          lecturaIa={solicitud.lecturaIaCliente}
+          loading={procesarDocumentacionClienteMutation.isPending}
+          onRequest={() => void handleProcessClienteIa()}
+        />
+      ) : null}
 
       {!isClosed ? (
         <>
@@ -448,20 +496,9 @@ export function SolicitudDetailPage() {
           <div className="panel-heading">
             <h2>Documentos</h2>
             <div className="button-group">
-              {isAdmin && !isClosed ? (
-                <button
-                  className="primary-button primary-button--compact"
-                  disabled={procesarDocumentacionMutation.isPending || !solicitud.documentos.some((documento) => documento.id)}
-                  onClick={handleProcessDocumentacionIa}
-                  type="button"
-                >
-                  {procesarDocumentacionMutation.isPending ? <Loader2 size={16} /> : <FileText size={16} />}
-                  {procesarDocumentacionMutation.isPending ? "Procesando" : "Leer y actualizar"}
-                </button>
-              ) : null}
               <button
                 className="soft-button soft-button--compact"
-                disabled={!solicitud.documentos.some((documento) => documento.id)}
+                disabled={!hasSolicitudDocuments}
                 onClick={handleOpenDocumentReview}
                 type="button"
               >
@@ -552,6 +589,13 @@ export function SolicitudDetailPage() {
         onClose={() => setOcrReviewOpen(false)}
         open={ocrReviewOpen}
       />
+      <DocumentTemplateDialog
+        solicitudId={solicitud.id}
+        scope="solicitud"
+        onClose={() => setTemplateDialogOpen(false)}
+        onGenerated={() => refreshSolicitud()}
+        open={templateDialogOpen}
+      />
       {procesarDocumentacionMutation.isPending ? <SolicitudIaProgressModal /> : null}
       {dialog}
     </section>
@@ -565,10 +609,19 @@ function SolicitudDocumentReading({ documento }: { documento: DocumentoExpedient
     return null;
   }
   if (identidad) {
+    const detectadas = identidad.identidadesDetectadas?.filter((item) => item.identificador || item.nombreCompleto) ?? [];
     return (
       <div className={identidad.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
-        <strong>DNI/CIF detectado</strong>
-        <span>{[identidad.identificador, identidad.nombreCompleto].filter(Boolean).join(" - ") || "Sin identificacion clara"}</span>
+        <strong>{detectadas.length > 1 ? `${detectadas.length} DNI/CIF detectados` : "DNI/CIF detectado"}</strong>
+        {detectadas.length > 1 ? (
+          detectadas.slice(0, 4).map((item) => (
+            <span key={`${item.identificador}-${item.nombreCompleto}`}>
+              {[item.identificador, item.nombreCompleto].filter(Boolean).join(" - ") || "Sin identificacion clara"}
+            </span>
+          ))
+        ) : (
+          <span>{[identidad.identificador, identidad.nombreCompleto].filter(Boolean).join(" - ") || "Sin identificacion clara"}</span>
+        )}
         {identidad.fechaNacimiento ? <small>Nacimiento: {identidad.fechaNacimiento}</small> : null}
         {identidad.direccionTexto ? <small>{identidad.direccionTexto}</small> : null}
         <em>{confidenceLabel(identidad.confianzaGlobal)} · {identidad.mensaje || (identidad.requiereRevision ? "Revisar lectura" : "Lectura valida")}</em>
@@ -673,17 +726,84 @@ function SolicitudIaResultPanel({ response, onDismiss }: { response: SolicitudDo
   );
 }
 
+function SolicitudClienteIaPanel({
+  lecturaIa,
+  loading,
+  onRequest,
+}: {
+  lecturaIa?: LecturaIaSolicitudCliente | null;
+  loading: boolean;
+  onRequest: () => void;
+}) {
+  const disabled = loading || !lecturaIa?.puedeSolicitar;
+  const buttonText = loading
+    ? "Solicitando"
+    : !lecturaIa
+      ? "No disponible"
+      : lecturaIa.usosRestantes <= 0
+        ? "Limite alcanzado"
+        : !lecturaIa.documentacionSuficiente
+          ? "Documentacion pendiente"
+          : "Solicitar lectura IA";
+  return (
+    <section className="client-ai-panel" aria-label="Lectura IA de la solicitud">
+      <div className="exp-panel__heading">
+        <div>
+          <p className="eyebrow">Lectura IA</p>
+          <h3>Revision automatica</h3>
+        </div>
+        <span className="exp-panel__counter">
+          {lecturaIa ? `${lecturaIa.usosRestantes}/${lecturaIa.usosMaximos}` : "0/3"}
+        </span>
+      </div>
+      <div className="client-ai-panel__body">
+        <span className={`client-ai-panel__icon ${loading ? "client-ai-panel__icon--active" : ""}`}>
+          {loading ? <Loader2 size={18} /> : <Sparkles size={18} />}
+        </span>
+        <div>
+          <strong>{lecturaIa?.mensaje || "Lectura IA no disponible."}</strong>
+          <small>
+            Usos consumidos: {lecturaIa?.usosConsumidos ?? 0} de {lecturaIa?.usosMaximos ?? 3}
+            {lecturaIa ? ` - Documentos: ${lecturaIa.documentosIdentidad} identidad / ${lecturaIa.documentosRoles} contrato o factura` : ""}
+          </small>
+          {lecturaIa && !lecturaIa.documentacionSuficiente && lecturaIa.bloqueosDocumentales.length > 0 ? (
+            <ul className="client-ai-blockers">
+              {lecturaIa.bloqueosDocumentales.slice(0, 3).map((bloqueo) => (
+                <li key={bloqueo}>{bloqueo}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        <button className="primary-button primary-button--compact" disabled={disabled} onClick={onRequest} type="button">
+          {loading ? <Loader2 size={15} /> : <Sparkles size={15} />}
+          {buttonText}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function AdminActions({
   solicitud,
   isClosed,
   pending,
+  iaPending,
+  canReadWithIa,
   onConvert,
+  onOpenTemplates,
+  onReadWithIa,
+  onForceReadWithIa,
   onStateChange,
 }: {
   solicitud: SolicitudDetail;
   isClosed: boolean;
   pending: boolean;
+  iaPending: boolean;
+  canReadWithIa: boolean;
   onConvert: () => void;
+  onOpenTemplates: () => void;
+  onReadWithIa: () => void;
+  onForceReadWithIa: () => void;
   onStateChange: (estado: string) => void;
 }) {
   return (
@@ -696,6 +816,22 @@ function AdminActions({
       <div className="button-group">
         {!isClosed ? (
           <>
+            <button className="primary-button primary-button--compact" disabled={pending || !canReadWithIa} onClick={onReadWithIa}>
+              {iaPending ? <Loader2 size={16} /> : <FileText size={16} />}
+              {iaPending ? "Leyendo IA" : "Lectura IA"}
+            </button>
+            <button className="soft-button soft-button--compact" disabled={pending || !canReadWithIa} onClick={onForceReadWithIa}>
+              {iaPending ? <Loader2 size={16} /> : <RefreshCw size={16} />}
+              Releer IA
+            </button>
+            <button className="soft-button soft-button--compact" disabled={pending} onClick={onOpenTemplates} type="button">
+              <FileSignature size={16} />
+              Generar docs
+            </button>
+            <Link className="soft-button soft-button--compact" to={`/solicitudes/${solicitud.id}/editar`}>
+              <Pencil size={16} />
+              Editar datos
+            </Link>
             <button className="primary-button primary-button--compact" disabled={pending} onClick={onConvert}>
               <FolderCheck size={16} />
               Convertir

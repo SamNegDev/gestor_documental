@@ -12,10 +12,12 @@ import com.example.gestor_documental.dto.ia.ExtraccionGaResponse;
 import com.example.gestor_documental.dto.ia.ExtraccionGaRevisionRequest;
 import com.example.gestor_documental.dto.ia.ExtraccionGaRevisionResponse;
 import com.example.gestor_documental.dto.ia.ExtraccionGaSincronizacionResponse;
+import com.example.gestor_documental.dto.ia.LecturaIaClienteResponse;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoExtraccionGaJob;
 import com.example.gestor_documental.enums.EstadoRevisionGa;
 import com.example.gestor_documental.enums.RolInteresado;
+import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
@@ -141,6 +143,7 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
     private static final long LIMITE_BYTES_REQUEST = 50L * 1024L * 1024L;
     private static final int DNI_RENDER_DPI = 300;
     private static final int DNI_MAX_PAGINAS_PROCESADAS = 2;
+    private static final int MAX_USOS_LECTURA_CLIENTE = 3;
     private static final DateTimeFormatter FORMATO_FECHA_GA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter FORMATO_DOCUMENTO_GA = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final Charset XML_GA_CHARSET = Charset.forName("ISO-8859-1");
@@ -334,7 +337,14 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
         if (estado == EstadoRevisionGa.BORRADOR) {
             revision.setFechaPreparado(null);
         }
-        return mapRevision(extraccionGaRevisionRepository.save(revision));
+        ExtraccionGaRevision guardada = extraccionGaRevisionRepository.save(revision);
+        requisitoDocumentalService.sincronizarYListar(
+                expediente,
+                expedienteInteresadoRepository.findByExpedienteId(expediente.getId()),
+                documentoRepository.findByExpedienteId(expediente.getId()),
+                admin
+        );
+        return mapRevision(guardada);
     }
 
     private String normalizarDatosValidadosParaXml(JsonNode datosValidados) {
@@ -448,19 +458,88 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
         }
 
         for (Expediente expediente : expedientesPreparados) {
-            ExtraccionGaJob job = new ExtraccionGaJob();
-            job.setExpediente(expediente);
-            job.setCreadoPor(admin);
-            job.setModelo(modelo);
-            job.setEstado(EstadoExtraccionGaJob.PENDIENTE);
-            job.setProgreso(0);
-            job.setFaseActual("En cola");
-            ExtraccionGaJob guardado = extraccionGaJobRepository.save(job);
+            ExtraccionGaJob guardado = crearJobExtraccion(expediente, admin, modelo, "ADMIN", false, "En cola");
             respuestas.add(mapJob(guardado));
             jobsCreados.add(guardado.getId());
         }
         jobsCreados.forEach(this::programarJob);
         return respuestas;
+    }
+
+    @Override
+    public ExtraccionGaJobResponse crearLecturaInicialSiProcede(Long expedienteId, Usuario usuario) {
+        Expediente expediente = obtenerExpedienteConPermiso(expedienteId, usuario);
+        Optional<ExtraccionGaJob> activo = extraccionGaJobRepository.findTopByExpedienteIdOrderByFechaCreacionDesc(expedienteId)
+                .filter(job -> esJobActivo(job.getEstado()));
+        if (activo.isPresent()) {
+            return null;
+        }
+        if (extraccionGaRevisionRepository.findByExpedienteId(expediente.getId()).isPresent()) {
+            return null;
+        }
+        if (!openAiProperties.hasApiKey()) {
+            return null;
+        }
+        DocumentacionExtraccion documentacion = validarDocumentacionExtraccion(expediente, usuario);
+        if (documentacion.bloqueada() || !hayDocumentosSeleccionables(expediente)) {
+            return null;
+        }
+
+        ExtraccionGaJob job = crearJobExtraccion(
+                expediente,
+                usuario,
+                modeloNormalizado(null),
+                "AUTO_INICIAL",
+                false,
+                "Lectura IA inicial en cola"
+        );
+        programarJob(job.getId());
+        return mapJob(job);
+    }
+
+    @Override
+    @Transactional
+    public LecturaIaClienteResponse obtenerLecturaCliente(Long expedienteId, Usuario cliente) {
+        Expediente expediente = obtenerExpedienteConPermiso(expedienteId, cliente);
+        return construirEstadoLecturaCliente(expediente, cliente, false, null);
+    }
+
+    @Override
+    public LecturaIaClienteResponse solicitarLecturaCliente(Long expedienteId, Usuario cliente) {
+        Expediente expediente = obtenerExpedienteConPermiso(expedienteId, cliente);
+        Optional<ExtraccionGaJob> activo = extraccionGaJobRepository.findTopByExpedienteIdOrderByFechaCreacionDesc(expedienteId)
+                .filter(job -> esJobActivo(job.getEstado()));
+        if (activo.isPresent()) {
+            return construirEstadoLecturaCliente(expediente, cliente, false, "Ya hay una lectura IA en curso.");
+        }
+
+        boolean usoCliente = cliente != null && cliente.getRolUsuario() == RolUsuario.CLIENTE;
+        long usosCliente = extraccionGaJobRepository.countUsosClienteByExpedienteId(expediente.getId());
+        if (usoCliente && usosCliente >= MAX_USOS_LECTURA_CLIENTE) {
+            return construirEstadoLecturaCliente(expediente, cliente, false, "Limite de lecturas IA alcanzado para este expediente.");
+        }
+        if (!openAiProperties.hasApiKey()) {
+            return construirEstadoLecturaCliente(expediente, cliente, false, "La lectura IA no esta disponible en este momento.");
+        }
+
+        DocumentacionExtraccion documentacion = validarDocumentacionExtraccion(expediente, cliente);
+        if (documentacion.bloqueada()) {
+            return construirEstadoLecturaCliente(expediente, cliente, false, "Falta documentacion minima para iniciar la lectura IA.");
+        }
+        if (!hayDocumentosSeleccionables(expediente)) {
+            return construirEstadoLecturaCliente(expediente, cliente, false, "No hay documentos relevantes para iniciar la lectura IA.");
+        }
+
+        ExtraccionGaJob job = crearJobExtraccion(
+                expediente,
+                cliente,
+                modeloNormalizado(null),
+                usoCliente ? "CLIENTE" : "PORTAL_CLIENTE",
+                usoCliente,
+                "Lectura IA solicitada por cliente"
+        );
+        programarJob(job.getId());
+        return construirEstadoLecturaCliente(expediente, cliente, true, "Lectura IA en cola.");
     }
 
     @Override
@@ -485,6 +564,94 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
             throw new OperacionInvalidaException("No tienes permiso para consultar este trabajo");
         }
         return mapJob(job);
+    }
+
+    private ExtraccionGaJob crearJobExtraccion(
+            Expediente expediente,
+            Usuario usuario,
+            String modelo,
+            String origen,
+            boolean usoCliente,
+            String fase
+    ) {
+        ExtraccionGaJob job = new ExtraccionGaJob();
+        job.setExpediente(expediente);
+        job.setCreadoPor(usuario);
+        job.setModelo(modelo);
+        job.setEstado(EstadoExtraccionGaJob.PENDIENTE);
+        job.setProgreso(0);
+        job.setFaseActual(fase);
+        job.setOrigen(origen);
+        job.setUsoCliente(usoCliente);
+        return extraccionGaJobRepository.save(job);
+    }
+
+    private LecturaIaClienteResponse construirEstadoLecturaCliente(
+            Expediente expediente,
+            Usuario cliente,
+            boolean jobCreado,
+            String mensajePreferente
+    ) {
+        long usosCliente = extraccionGaJobRepository.countUsosClienteByExpedienteId(expediente.getId());
+        int usosConsumidos = Math.toIntExact(Math.min(usosCliente, MAX_USOS_LECTURA_CLIENTE));
+        int usosRestantes = Math.max(0, MAX_USOS_LECTURA_CLIENTE - usosConsumidos);
+        Optional<ExtraccionGaJob> ultimo = extraccionGaJobRepository.findTopByExpedienteIdOrderByFechaCreacionDesc(expediente.getId());
+        boolean jobActivo = ultimo.filter(job -> esJobActivo(job.getEstado())).isPresent();
+        DocumentacionExtraccion documentacion = validarDocumentacionExtraccion(expediente, cliente);
+        boolean hayDocumentos = hayDocumentosSeleccionables(expediente);
+        boolean documentacionSuficiente = !documentacion.bloqueada() && hayDocumentos;
+        boolean apiKeyConfigurada = openAiProperties.hasApiKey();
+        boolean limiteAlcanzado = usosRestantes <= 0;
+        boolean puedeSolicitar = apiKeyConfigurada && documentacionSuficiente && !jobActivo && !limiteAlcanzado;
+        String mensaje = mensajePreferente != null
+                ? mensajePreferente
+                : mensajeLecturaCliente(apiKeyConfigurada, documentacionSuficiente, hayDocumentos, jobActivo, limiteAlcanzado);
+        return new LecturaIaClienteResponse(
+                expediente.getId(),
+                apiKeyConfigurada,
+                documentacionSuficiente,
+                puedeSolicitar,
+                jobCreado,
+                documentacion.bloqueosDocumentales(),
+                usosConsumidos,
+                MAX_USOS_LECTURA_CLIENTE,
+                usosRestantes,
+                mensaje,
+                ultimo.map(this::mapJob).orElse(null)
+        );
+    }
+
+    private String mensajeLecturaCliente(
+            boolean apiKeyConfigurada,
+            boolean documentacionSuficiente,
+            boolean hayDocumentos,
+            boolean jobActivo,
+            boolean limiteAlcanzado
+    ) {
+        if (jobActivo) {
+            return "Lectura IA en curso.";
+        }
+        if (limiteAlcanzado) {
+            return "Limite de lecturas IA alcanzado para este expediente.";
+        }
+        if (!apiKeyConfigurada) {
+            return "La lectura IA no esta disponible en este momento.";
+        }
+        if (!hayDocumentos) {
+            return "No hay documentos relevantes para iniciar la lectura IA.";
+        }
+        if (!documentacionSuficiente) {
+            return "Falta documentacion minima para iniciar la lectura IA.";
+        }
+        return "Lectura IA disponible.";
+    }
+
+    private boolean hayDocumentosSeleccionables(Expediente expediente) {
+        try {
+            return !seleccionarDocumentos(expediente).isEmpty();
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     @Override
@@ -1288,13 +1455,25 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
                 admin
         );
         Set<String> bloqueos = new LinkedHashSet<>();
+        boolean hayDocumentoIdentidad = documentos.stream()
+                .anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.DNI || documento.getTipoDocumento() == TipoDocumento.CIF);
         requisitos.stream()
                 .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
                 .filter(requisito -> !esRequisitoPosteriorExtraccion(requisito))
+                .filter(requisito -> !esRequisitoIdentidadPotencialmenteAgrupado(requisito, hayDocumentoIdentidad))
                 .map(this::descripcionBloqueoDocumental)
                 .filter(descripcion -> !descripcion.isBlank())
                 .forEach(bloqueos::add);
         return new DocumentacionExtraccion(List.copyOf(bloqueos));
+    }
+
+    private boolean esRequisitoIdentidadPotencialmenteAgrupado(
+            RequisitoDocumentalExpediente requisito,
+            boolean hayDocumentoIdentidad
+    ) {
+        return hayDocumentoIdentidad
+                && requisito.getInteresado() != null
+                && (requisito.getTipoDocumento() == TipoDocumento.DNI || requisito.getTipoDocumento() == TipoDocumento.CIF);
     }
 
     private boolean esRequisitoPosteriorExtraccion(RequisitoDocumentalExpediente requisito) {
@@ -2886,7 +3065,11 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
     private ObjectNode personaDni() {
         ObjectNode persona = personaCompacta(true);
         ((ObjectNode) persona.get("properties")).set("rolSugerido", campoExtraido());
+        ((ObjectNode) persona.get("properties")).set("documentoId", campoExtraido());
+        ((ObjectNode) persona.get("properties")).set("documentoNombre", campoExtraido());
         ((ArrayNode) persona.get("required")).add("rolSugerido");
+        ((ArrayNode) persona.get("required")).add("documentoId");
+        ((ArrayNode) persona.get("required")).add("documentoNombre");
         return persona;
     }
 
@@ -3042,6 +3225,7 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
                 Usa imagen DNI preprocesada y tambien documentos CIF, MANDATO o MANDATO_REPRESENTACION si existen.
                 Si se aporta EXPEDIENTE_COMPLETO como apoyo, busca dentro del PDF documentos de identidad visibles del comprador/adquirente antes de reutilizar documentos historicos del cliente.
                 Extrae todas las personas visibles: una persona por cada DNI/CIF/anverso-reverso o representante identificado en mandato.
+                En documentoId indica el id numerico del documento origen cuando aparezca en la nota previa a la imagen o archivo; en documentoNombre indica su nombre.
                 No te quedes con el primer documento si hay varios. Extrae documento, nombre, apellidos, sexo, nacimiento, domicilio, numero, codigo postal, municipio y localidad/pueblo si se leen.
                 En DNI/NIE/TIE y MRZ, diferencia apellidos y nombre: en MRZ el separador "<<" divide apellidos antes y nombre despues; no cambies el orden de campos.
                 rolSugerido debe ser REPRESENTANTE_TRANSMITENTE, ADMINISTRADOR_TRANSMITENTE o APODERADO_TRANSMITENTE solo si el documento lo indica o lo vincula claramente con la empresa transmitente; si no, null.

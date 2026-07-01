@@ -29,6 +29,7 @@ import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
+import com.example.gestor_documental.util.MensajeAutomaticoUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
@@ -471,6 +472,12 @@ public class TareaApiController {
                 ? incidencia.getTipoIncidencia().getNombre().name().replace('_', ' ')
                 : "INCIDENCIA";
         String observaciones = limpiar(incidencia.getObservaciones());
+        if (MensajeAutomaticoUtils.esMensajeAutomaticoSeguimiento(observaciones)) {
+            observaciones = incidencia.getTipoIncidencia() != null
+                    && incidencia.getTipoIncidencia().getNombre() == com.example.gestor_documental.enums.TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL
+                    ? "RESPONDER A LA INFORMACION SOLICITADA"
+                    : null;
+        }
         return limitar(observaciones != null ? tipo + ": " + observaciones : tipo);
     }
 
@@ -517,7 +524,8 @@ public class TareaApiController {
     private String ultimoMensaje(List<Mensaje> mensajes, RolUsuario rol) {
         for (int index = mensajes.size() - 1; index >= 0; index--) {
             Mensaje mensaje = mensajes.get(index);
-            if (mensaje.getAutor() != null && mensaje.getAutor().getRolUsuario() == rol) {
+            if (mensaje.getAutor() != null && mensaje.getAutor().getRolUsuario() == rol
+                    && !MensajeAutomaticoUtils.esMensajeAutomaticoSeguimiento(mensaje.getContenido())) {
                 return limitar(mensaje.getContenido());
             }
         }

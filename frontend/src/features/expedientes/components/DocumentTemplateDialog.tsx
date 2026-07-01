@@ -2,12 +2,21 @@ import { AlertTriangle, FileCheck2, FileSignature, Loader2, X } from "lucide-rea
 import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../../shared/api/http";
 import { uppercaseInput } from "../../../shared/utils/text";
-import { generateDocumentTemplate, getDocumentTemplates, previewDocumentTemplate } from "../services/documentosApi";
+import {
+  generateDocumentTemplate,
+  generateSolicitudDocumentTemplate,
+  getDocumentTemplates,
+  getSolicitudDocumentTemplates,
+  previewDocumentTemplate,
+  previewSolicitudDocumentTemplate,
+} from "../services/documentosApi";
 import type { DocumentoGenerado, PlantillaPreview, PlantillasExpediente } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
 
 type Props = {
-  expedienteId: number;
+  expedienteId?: number;
+  solicitudId?: number;
+  scope?: "expediente" | "solicitud";
   open: boolean;
   onClose: () => void;
   onGenerated: (documento: DocumentoGenerado) => void;
@@ -18,33 +27,37 @@ function messageFor(error: unknown) {
   return "No se pudo completar la operacion.";
 }
 
-export function DocumentTemplateDialog({ expedienteId, open, onClose, onGenerated }: Props) {
+export function DocumentTemplateDialog({ expedienteId, solicitudId, scope = "expediente", open, onClose, onGenerated }: Props) {
   const [catalogo, setCatalogo] = useState<PlantillasExpediente | null>(null);
   const [preview, setPreview] = useState<PlantillaPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const targetId = scope === "solicitud" ? solicitudId : expedienteId;
+  const contenedor = scope === "solicitud" ? "solicitud" : "expediente";
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !targetId) return;
     let active = true;
     setLoading(true);
     setError(null);
     setCatalogo(null);
     setPreview(null);
-    getDocumentTemplates(expedienteId)
+    const loadTemplates = scope === "solicitud" ? getSolicitudDocumentTemplates : getDocumentTemplates;
+    const loadPreview = scope === "solicitud" ? previewSolicitudDocumentTemplate : previewDocumentTemplate;
+    loadTemplates(targetId)
       .then(async (data) => {
         if (!active) return;
         setCatalogo(data);
         const first = data.plantillas[0];
-        if (first) setPreview(await previewDocumentTemplate(expedienteId, first.codigo));
+        if (first) setPreview(await loadPreview(targetId, first.codigo));
       })
       .catch((requestError) => active && setError(messageFor(requestError)))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [expedienteId, open]);
+  }, [open, scope, targetId]);
 
   const values = useMemo(
     () => Object.fromEntries((preview?.campos ?? []).map((campo) => [campo.codigo, campo.valor])),
@@ -54,10 +67,12 @@ export function DocumentTemplateDialog({ expedienteId, open, onClose, onGenerate
   if (!open) return null;
 
   const selectTemplate = async (codigo: string) => {
+    if (!targetId) return;
     setLoading(true);
     setError(null);
     try {
-      setPreview(await previewDocumentTemplate(expedienteId, codigo));
+      const loadPreview = scope === "solicitud" ? previewSolicitudDocumentTemplate : previewDocumentTemplate;
+      setPreview(await loadPreview(targetId, codigo));
     } catch (requestError) {
       setError(messageFor(requestError));
     } finally {
@@ -72,11 +87,12 @@ export function DocumentTemplateDialog({ expedienteId, open, onClose, onGenerate
   };
 
   const generate = async () => {
-    if (!preview) return;
+    if (!preview || !targetId) return;
     setGenerating(true);
     setError(null);
     try {
-      const documento = await generateDocumentTemplate(expedienteId, preview.codigo, values);
+      const generateTemplate = scope === "solicitud" ? generateSolicitudDocumentTemplate : generateDocumentTemplate;
+      const documento = await generateTemplate(targetId, preview.codigo, values);
       onGenerated(documento);
       onClose();
       window.open(`/documentos/ver/${documento.documentoId}`, "_blank", "noopener,noreferrer");
@@ -169,7 +185,7 @@ export function DocumentTemplateDialog({ expedienteId, open, onClose, onGenerate
                 <div><dt>Cliente</dt><dd>{catalogo.cliente}</dd></div>
                 <div><dt>Formato</dt><dd>PDF oficial</dd></div>
               </dl>
-              <p>El documento se guardara automaticamente dentro del expediente y se abrira para su revision.</p>
+              <p>El documento se guardara automaticamente dentro de la {contenedor} y se abrira para su revision.</p>
               {incomplete ? <div className="template-dialog__notice"><AlertTriangle size={15} /> Completa los campos obligatorios.</div> : null}
             </aside>
           </div>

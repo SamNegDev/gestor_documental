@@ -95,11 +95,26 @@ export interface SolicitudDetail {
   cliente?: ClienteResumen | null;
   creadoPor?: UsuarioResumen | null;
   modificadoPor?: UsuarioResumen | null;
+  lecturaIaCliente?: LecturaIaSolicitudCliente | null;
   interesados: InteresadoSolicitud[];
   documentos: DocumentoExpediente[];
   incidencias: IncidenciaExpediente[];
   historial: HistorialExpediente[];
   mensajes: MensajeExpediente[];
+}
+
+export interface LecturaIaSolicitudCliente {
+  solicitudId: number;
+  apiKeyConfigurada: boolean;
+  documentacionSuficiente: boolean;
+  puedeSolicitar: boolean;
+  bloqueosDocumentales: string[];
+  usosConsumidos: number;
+  usosMaximos: number;
+  usosRestantes: number;
+  documentosIdentidad: number;
+  documentosRoles: number;
+  mensaje?: string | null;
 }
 
 export interface SolicitudInteresadoCoincidencia {

@@ -9,6 +9,7 @@ import com.example.gestor_documental.dto.ia.ExtraccionGaResponse;
 import com.example.gestor_documental.dto.ia.ExtraccionGaRevisionRequest;
 import com.example.gestor_documental.dto.ia.ExtraccionGaRevisionResponse;
 import com.example.gestor_documental.dto.ia.ExtraccionGaSincronizacionResponse;
+import com.example.gestor_documental.dto.ia.LecturaIaClienteResponse;
 import com.example.gestor_documental.model.Usuario;
 
 import java.util.List;
@@ -32,6 +33,12 @@ public interface ExtraccionGaIaService {
     List<ExtraccionGaQueueItemResponse> listarPendientesRevision(Usuario admin);
 
     List<ExtraccionGaJobResponse> crearJobs(ExtraccionGaJobRequest request, Usuario admin);
+
+    ExtraccionGaJobResponse crearLecturaInicialSiProcede(Long expedienteId, Usuario usuario);
+
+    LecturaIaClienteResponse obtenerLecturaCliente(Long expedienteId, Usuario cliente);
+
+    LecturaIaClienteResponse solicitarLecturaCliente(Long expedienteId, Usuario cliente);
 
     List<ExtraccionGaJobResponse> listarJobsActivos(Usuario admin);
 

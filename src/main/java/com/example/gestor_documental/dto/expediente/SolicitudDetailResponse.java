@@ -26,6 +26,7 @@ public class SolicitudDetailResponse {
     private ClienteResumenResponse cliente;
     private UsuarioResumenResponse creadoPor;
     private UsuarioResumenResponse modificadoPor;
+    private LecturaIaSolicitudClienteResponse lecturaIaCliente;
 
     @Builder.Default
     private List<InteresadoSolicitudResponse> interesados = new ArrayList<>();

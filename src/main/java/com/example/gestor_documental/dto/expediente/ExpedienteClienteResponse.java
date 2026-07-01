@@ -1,5 +1,7 @@
 package com.example.gestor_documental.dto.expediente;
 
+import com.example.gestor_documental.dto.ia.LecturaIaClienteResponse;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,6 +28,7 @@ public class ExpedienteClienteResponse {
     private String siguienteMensaje;
     private ClienteResumenResponse cliente;
     private int mensajesNoLeidos;
+    private LecturaIaClienteResponse lecturaIa;
 
     @Builder.Default
     private List<DocumentoExpedienteResponse> documentos = new ArrayList<>();

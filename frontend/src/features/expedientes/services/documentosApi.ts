@@ -111,6 +111,10 @@ export function getDocumentTemplates(expedienteId: number): Promise<PlantillasEx
   return apiGet<PlantillasExpediente>(`/api/expedientes/${expedienteId}/plantillas`);
 }
 
+export function getSolicitudDocumentTemplates(solicitudId: number): Promise<PlantillasExpediente> {
+  return apiGet<PlantillasExpediente>(`/api/solicitudes/${solicitudId}/plantillas`);
+}
+
 export function previewDocumentTemplate(
   expedienteId: number,
   codigo: string,
@@ -119,10 +123,26 @@ export function previewDocumentTemplate(
   return apiPostJson<PlantillaPreview>(`/api/expedientes/${expedienteId}/plantillas/preview`, { codigo, campos });
 }
 
+export function previewSolicitudDocumentTemplate(
+  solicitudId: number,
+  codigo: string,
+  campos: Record<string, string> = {},
+): Promise<PlantillaPreview> {
+  return apiPostJson<PlantillaPreview>(`/api/solicitudes/${solicitudId}/plantillas/preview`, { codigo, campos });
+}
+
 export function generateDocumentTemplate(
   expedienteId: number,
   codigo: string,
   campos: Record<string, string>,
 ): Promise<DocumentoGenerado> {
   return apiPostJson<DocumentoGenerado>(`/api/expedientes/${expedienteId}/plantillas/generar`, { codigo, campos });
+}
+
+export function generateSolicitudDocumentTemplate(
+  solicitudId: number,
+  codigo: string,
+  campos: Record<string, string>,
+): Promise<DocumentoGenerado> {
+  return apiPostJson<DocumentoGenerado>(`/api/solicitudes/${solicitudId}/plantillas/generar`, { codigo, campos });
 }

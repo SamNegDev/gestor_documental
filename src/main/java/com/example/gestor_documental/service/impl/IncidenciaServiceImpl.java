@@ -20,6 +20,7 @@ import com.example.gestor_documental.repository.MensajeRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.TipoIncidenciaRepository;
 import com.example.gestor_documental.service.*;
+import com.example.gestor_documental.util.MensajeAutomaticoUtils;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -559,7 +560,8 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         for (int index = mensajes.size() - 1; index >= 0; index--) {
             Mensaje mensaje = mensajes.get(index);
             if (mensaje.getAutor() != null && mensaje.getAutor().getRolUsuario() == RolUsuario.ADMIN
-                    && mensaje.getContenido() != null && !mensaje.getContenido().isBlank()) {
+                    && mensaje.getContenido() != null && !mensaje.getContenido().isBlank()
+                    && !MensajeAutomaticoUtils.esMensajeAutomaticoSeguimiento(mensaje.getContenido())) {
                 return mensaje.getContenido().trim();
             }
         }
@@ -570,7 +572,8 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         if (observaciones == null || observaciones.isBlank()) return true;
         String normalizado = observaciones.trim();
         return "INFORMACION PENDIENTE DE RESPUESTA DEL CLIENTE".equals(normalizado)
-                || "DOCUMENTACION PENDIENTE DE APORTACION DEL CLIENTE".equals(normalizado);
+                || "DOCUMENTACION PENDIENTE DE APORTACION DEL CLIENTE".equals(normalizado)
+                || MensajeAutomaticoUtils.esMensajeAutomaticoSeguimiento(normalizado);
     }
 
     private String correoCliente(Incidencia incidencia) {

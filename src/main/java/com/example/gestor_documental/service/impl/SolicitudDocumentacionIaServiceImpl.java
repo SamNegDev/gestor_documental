@@ -1,5 +1,7 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.config.OpenAiProperties;
+import com.example.gestor_documental.dto.expediente.LecturaIaSolicitudClienteResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudDocumentacionIaResponse;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolInteresado;
@@ -19,15 +21,20 @@ import com.example.gestor_documental.repository.DocumentoIdentidadLecturaReposit
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.GestionPersonaCatalogoRepository;
+import com.example.gestor_documental.repository.HistorialCambioRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
+import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
+import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson.IdentidadDetectada;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
 import com.example.gestor_documental.validation.DniNieValidator;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,33 +54,74 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentacionIaService {
 
+    private static final Logger log = LoggerFactory.getLogger(SolicitudDocumentacionIaServiceImpl.class);
     private static final double CONFIANZA_MINIMA_IDENTIDAD = 0.80;
     private static final double CONFIANZA_MINIMA_ROLES = 0.90;
+    private static final int MAX_USOS_CLIENTE_SOLICITUD = 3;
+    private static final String ACCION_IA_CLIENTE_SOLICITUD = "IA DOCUMENTACION CLIENTE";
 
     private final SolicitudRepository solicitudRepository;
     private final DocumentoRepository documentoRepository;
     private final DocumentoIdentidadLecturaRepository identidadLecturaRepository;
     private final DocumentoRolesLecturaRepository rolesLecturaRepository;
     private final GestionPersonaCatalogoRepository gestionPersonaCatalogoRepository;
+    private final HistorialCambioRepository historialCambioRepository;
     private final DocumentoIdentidadLecturaService documentoIdentidadLecturaService;
     private final DocumentoRolesLecturaService documentoRolesLecturaService;
     private final HistorialCambioService historialCambioService;
     private final DniNieValidator dniNieValidator;
+    private final OpenAiProperties openAiProperties;
 
     @Override
     @Transactional
     public SolicitudDocumentacionIaResponse procesarDocumentacion(Long solicitudId, Usuario admin) {
         validarAdmin(admin);
-        return procesarDocumentacion(solicitudId, admin, false);
+        return procesarDocumentacion(solicitudId, admin, false, false);
+    }
+
+    @Override
+    @Transactional
+    public SolicitudDocumentacionIaResponse procesarDocumentacion(Long solicitudId, Usuario admin, boolean forzarRelectura) {
+        validarAdmin(admin);
+        return procesarDocumentacion(solicitudId, admin, false, forzarRelectura);
     }
 
     @Override
     @Transactional
     public SolicitudDocumentacionIaResponse procesarDocumentacionInterna(Long solicitudId, Usuario usuario) {
-        return procesarDocumentacion(solicitudId, usuario, true);
+        return procesarDocumentacion(solicitudId, usuario, true, false);
     }
 
-    private SolicitudDocumentacionIaResponse procesarDocumentacion(Long solicitudId, Usuario usuario, boolean automatica) {
+    @Override
+    @Transactional(readOnly = true)
+    public LecturaIaSolicitudClienteResponse obtenerLecturaCliente(Long solicitudId, Usuario cliente) {
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+        validarClienteSolicitud(solicitud, cliente);
+        return construirEstadoLecturaCliente(solicitud, null);
+    }
+
+    @Override
+    @Transactional
+    public SolicitudDocumentacionIaResponse procesarDocumentacionCliente(Long solicitudId, Usuario cliente) {
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+        validarClienteSolicitud(solicitud, cliente);
+        LecturaIaSolicitudClienteResponse estado = construirEstadoLecturaCliente(solicitud, null);
+        if (!estado.puedeSolicitar()) {
+            throw new OperacionInvalidaException(estado.mensaje());
+        }
+
+        SolicitudDocumentacionIaResponse response = procesarDocumentacion(solicitudId, cliente, true, false);
+        historialCambioService.registrarCambioSolicitud(
+                solicitud,
+                cliente,
+                ACCION_IA_CLIENTE_SOLICITUD,
+                "El cliente solicito lectura IA de documentacion (" + (estado.usosConsumidos() + 1) + "/" + MAX_USOS_CLIENTE_SOLICITUD + ").");
+        return response;
+    }
+
+    private SolicitudDocumentacionIaResponse procesarDocumentacion(Long solicitudId, Usuario usuario, boolean automatica, boolean forzarRelectura) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
         if (automatica) {
@@ -99,10 +147,14 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         List<String> detalles = new ArrayList<>();
         Contadores contadores = new Contadores();
         boolean permitirRelectura = usuario != null && usuario.getRolUsuario() == RolUsuario.ADMIN;
-        leerIdentidades(documentosIdentidad, usuario, contadores, detalles, permitirRelectura);
-        leerRoles(documentosRoles, usuario, contadores, detalles, permitirRelectura);
+        boolean forzarLecturasExistentes = forzarRelectura && permitirRelectura;
+        if (forzarLecturasExistentes) {
+            detalles.add("Se forzo la relectura de DNI/CIF y roles ya leidos previamente.");
+        }
+        leerIdentidades(documentosIdentidad, usuario, contadores, detalles, permitirRelectura, forzarLecturasExistentes);
+        leerRoles(documentosRoles, usuario, contadores, detalles, permitirRelectura, forzarLecturasExistentes);
 
-        Map<String, DocumentoIdentidadLectura> identidades = mejoresIdentidades(documentosIdentidad);
+        Map<String, IdentidadSolicitud> identidades = mejoresIdentidades(documentosIdentidad);
         if (esBatecom(solicitud)) {
             return procesarBatecom(solicitud, documentosIdentidad, documentosRoles, identidades, contadores, detalles, usuario);
         }
@@ -161,7 +213,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             Solicitud solicitud,
             List<Documento> documentosIdentidad,
             List<Documento> documentosRoles,
-            Map<String, DocumentoIdentidadLectura> identidades,
+            Map<String, IdentidadSolicitud> identidades,
             Contadores contadores,
             List<String> detalles,
             Usuario admin
@@ -241,6 +293,87 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
     }
 
+    private void validarClienteSolicitud(Solicitud solicitud, Usuario usuario) {
+        if (usuario == null || usuario.getRolUsuario() != RolUsuario.CLIENTE) {
+            throw new AccesoDenegadoException("Solo el cliente puede solicitar esta lectura.");
+        }
+        validarPermisoSolicitud(solicitud, usuario);
+    }
+
+    private LecturaIaSolicitudClienteResponse construirEstadoLecturaCliente(Solicitud solicitud, String mensajePreferente) {
+        DocumentacionSolicitudCliente documentacion = documentacionSolicitudCliente(solicitud);
+        long usos = historialCambioRepository.countBySolicitudIdAndAccion(solicitud.getId(), ACCION_IA_CLIENTE_SOLICITUD);
+        int usosConsumidos = Math.toIntExact(Math.min(usos, MAX_USOS_CLIENTE_SOLICITUD));
+        int usosRestantes = Math.max(0, MAX_USOS_CLIENTE_SOLICITUD - usosConsumidos);
+        boolean apiKeyConfigurada = openAiProperties.hasApiKey();
+        boolean limiteAlcanzado = usosRestantes <= 0;
+        boolean cerrada = solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA
+                || solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO
+                || solicitud.getExpediente() != null;
+        boolean puedeSolicitar = apiKeyConfigurada && documentacion.suficiente() && !limiteAlcanzado && !cerrada;
+        String mensaje = mensajePreferente != null
+                ? mensajePreferente
+                : mensajeLecturaClienteSolicitud(apiKeyConfigurada, documentacion.suficiente(), limiteAlcanzado, cerrada);
+        return new LecturaIaSolicitudClienteResponse(
+                solicitud.getId(),
+                apiKeyConfigurada,
+                documentacion.suficiente(),
+                puedeSolicitar,
+                documentacion.bloqueos(),
+                usosConsumidos,
+                MAX_USOS_CLIENTE_SOLICITUD,
+                usosRestantes,
+                documentacion.documentosIdentidad(),
+                documentacion.documentosRoles(),
+                mensaje
+        );
+    }
+
+    private DocumentacionSolicitudCliente documentacionSolicitudCliente(Solicitud solicitud) {
+        List<Documento> documentos = documentoRepository.findBySolicitudId(solicitud.getId()).stream()
+                .filter(documento -> documento.getId() != null)
+                .toList();
+        int documentosIdentidad = (int) documentos.stream()
+                .filter(documento -> esIdentidad(documento.getTipoDocumento()))
+                .count();
+        int documentosRoles = (int) documentos.stream()
+                .filter(documento -> esDocumentoRoles(documento.getTipoDocumento()))
+                .count();
+        List<String> bloqueos = new ArrayList<>();
+        if (documentosIdentidad == 0) {
+            bloqueos.add("Falta DNI/CIF para validar la identidad.");
+        }
+        if (esBatecom(solicitud)) {
+            if (documentosRoles < 2) {
+                bloqueos.add("Faltan dos contratos/facturas para detectar las operaciones BATECOM.");
+            }
+        } else if (documentosRoles == 0) {
+            bloqueos.add("Falta factura o contrato para determinar comprador y vendedor.");
+        }
+        return new DocumentacionSolicitudCliente(documentosIdentidad, documentosRoles, bloqueos);
+    }
+
+    private String mensajeLecturaClienteSolicitud(
+            boolean apiKeyConfigurada,
+            boolean documentacionSuficiente,
+            boolean limiteAlcanzado,
+            boolean cerrada
+    ) {
+        if (cerrada) {
+            return "La solicitud ya no admite lectura IA.";
+        }
+        if (!apiKeyConfigurada) {
+            return "La lectura IA no esta disponible en este momento.";
+        }
+        if (limiteAlcanzado) {
+            return "Has alcanzado el limite de 3 lecturas IA para esta solicitud.";
+        }
+        if (!documentacionSuficiente) {
+            return "Falta documentacion minima para iniciar la lectura IA.";
+        }
+        return "Puedes solicitar lectura IA de la documentacion aportada.";
+    }
+
     private void validarSolicitudAbierta(Solicitud solicitud) {
         if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA || solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO) {
             throw new OperacionInvalidaException("No se puede procesar una solicitud cerrada.");
@@ -255,12 +388,13 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             Usuario usuario,
             Contadores contadores,
             List<String> detalles,
-            boolean permitirRelectura
+            boolean permitirRelectura,
+            boolean forzarLecturasExistentes
     ) {
         for (Documento documento : documentos) {
             DocumentoIdentidadLectura lecturaExistente = identidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
             boolean existente = lecturaExistente != null;
-            boolean forzar = permitirRelectura && existente && !identidadUsable(lecturaExistente);
+            boolean forzar = existente && (forzarLecturasExistentes || (permitirRelectura && !identidadUsable(lecturaExistente)));
             try {
                 if (existente && !forzar) {
                     contadores.identidadReutilizada++;
@@ -274,6 +408,8 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 }
             } catch (RuntimeException exception) {
                 detalles.add("No se pudo leer identidad en " + nombreDocumento(documento) + ": " + mensaje(exception));
+                log.warn("No se pudo leer identidad de solicitud en documento {} ({})",
+                        documento.getId(), nombreDocumento(documento), exception);
             }
         }
     }
@@ -283,12 +419,13 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             Usuario usuario,
             Contadores contadores,
             List<String> detalles,
-            boolean permitirRelectura
+            boolean permitirRelectura,
+            boolean forzarLecturasExistentes
     ) {
         for (Documento documento : documentos) {
             DocumentoRolesLectura lecturaExistente = rolesLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
             boolean existente = lecturaExistente != null;
-            boolean forzar = permitirRelectura && existente && !rolesUsables(lecturaExistente);
+            boolean forzar = existente && (forzarLecturasExistentes || (permitirRelectura && !rolesUsables(lecturaExistente)));
             try {
                 if (existente && !forzar) {
                     contadores.rolesReutilizada++;
@@ -302,26 +439,70 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 }
             } catch (RuntimeException exception) {
                 detalles.add("No se pudo leer roles en " + nombreDocumento(documento) + ": " + mensaje(exception));
+                log.warn("No se pudo leer roles de solicitud en documento {} ({})",
+                        documento.getId(), nombreDocumento(documento), exception);
             }
         }
     }
 
-    private Map<String, DocumentoIdentidadLectura> mejoresIdentidades(List<Documento> documentosIdentidad) {
+    private Map<String, IdentidadSolicitud> mejoresIdentidades(List<Documento> documentosIdentidad) {
         List<Long> documentoIds = documentosIdentidad.stream().map(Documento::getId).toList();
         if (documentoIds.isEmpty()) {
             return Map.of();
         }
-        Map<String, DocumentoIdentidadLectura> result = new HashMap<>();
+        Map<String, IdentidadSolicitud> result = new HashMap<>();
         identidadLecturaRepository.findByDocumentoIdIn(documentoIds).stream()
-                .filter(this::identidadUsable)
                 .forEach(lectura -> {
-                    String identificador = normalizarIdentificador(lectura.getIdentificador());
-                    DocumentoIdentidadLectura actual = result.get(identificador);
-                    if (actual == null || confianza(lectura.getConfianzaGlobal()) > confianza(actual.getConfianzaGlobal())) {
-                        result.put(identificador, lectura);
-                    }
+                    agregarIdentidad(result, identidadDesdeLecturaPrincipal(lectura));
+                    DocumentoIdentidadLecturaJson.extraer(lectura).stream()
+                            .map(identidad -> identidadDesdeDetectada(lectura, identidad))
+                            .forEach(identidad -> agregarIdentidad(result, identidad));
                 });
         return result;
+    }
+
+    private void agregarIdentidad(Map<String, IdentidadSolicitud> identidades, IdentidadSolicitud identidad) {
+        if (!identidadUsable(identidad)) {
+            return;
+        }
+        IdentidadSolicitud actual = identidades.get(identidad.identificador());
+        if (actual == null || confianza(identidad.confianzaGlobal()) > confianza(actual.confianzaGlobal())) {
+            identidades.put(identidad.identificador(), identidad);
+        }
+    }
+
+    private IdentidadSolicitud identidadDesdeLecturaPrincipal(DocumentoIdentidadLectura lectura) {
+        if (lectura == null) {
+            return null;
+        }
+        return new IdentidadSolicitud(
+                normalizarIdentificador(lectura.getIdentificador()),
+                nombreCompletoIdentidad(lectura),
+                normalizarTexto(lectura.getDireccionTexto()),
+                lectura.getConfianzaGlobal(),
+                lectura.isRequiereRevision(),
+                lectura
+        );
+    }
+
+    private IdentidadSolicitud identidadDesdeDetectada(DocumentoIdentidadLectura lectura, IdentidadDetectada identidad) {
+        if (identidad == null) {
+            return null;
+        }
+        return new IdentidadSolicitud(
+                normalizarIdentificador(identidad.identificador()),
+                nombreCompletoIdentidad(identidad),
+                normalizarTexto(identidad.direccionTexto()),
+                identidad.confianzaGlobal(),
+                identidad.requiereRevision(),
+                mismaIdentidad(lectura, identidad) ? lectura : null
+        );
+    }
+
+    private boolean mismaIdentidad(DocumentoIdentidadLectura lectura, IdentidadDetectada identidad) {
+        String principal = lectura != null ? normalizarIdentificador(lectura.getIdentificador()) : null;
+        String detectada = identidad != null ? normalizarIdentificador(identidad.identificador()) : null;
+        return principal != null && principal.equals(detectada);
     }
 
     private DocumentoRolesLectura mejorLecturaRoles(List<Documento> documentosRoles) {
@@ -361,7 +542,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
 
     private BatecomPartes detectarPartesBatecom(
             List<DocumentoRolesLectura> lecturas,
-            Map<String, DocumentoIdentidadLectura> identidades
+            Map<String, IdentidadSolicitud> identidades
     ) {
         BatecomPartes mejor = null;
         double mejorConfianza = 0;
@@ -400,16 +581,16 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private PersonaSolicitud personaCompraventaBatecom(
             DocumentoRolesLectura lecturaBate,
             DocumentoRolesLectura lecturaCom,
-            Map<String, DocumentoIdentidadLectura> identidades
+            Map<String, IdentidadSolicitud> identidades
     ) {
         String identificador = normalizarIdentificador(lecturaBate.getCompradorIdentificador());
-        DocumentoIdentidadLectura identidad = identificador != null ? identidades.get(identificador) : null;
+        IdentidadSolicitud identidad = identificador != null ? identidades.get(identificador) : null;
         String nombreIdentidad = nombreCompletoIdentidad(identidad);
         String nombreBate = normalizarNombreRol(lecturaBate.getCompradorNombre(), identificador);
         String nombreCom = normalizarNombreRol(lecturaCom.getVendedorNombre(), identificador);
         String nombreRoles = nombreMasCompleto(nombreBate, nombreCom, null);
         String nombreCatalogo = nombreCatalogoGestion(identificador);
-        String direccionIdentidad = identidad != null ? normalizarTexto(identidad.getDireccionTexto()) : null;
+        String direccionIdentidad = identidad != null ? identidad.direccionTexto() : null;
         String direccionBate = normalizarTexto(lecturaBate.getCompradorDireccion());
         String direccionCom = normalizarTexto(lecturaCom.getVendedorDireccion());
         return new PersonaSolicitud(
@@ -424,6 +605,13 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 && normalizarIdentificador(lectura.getIdentificador()) != null
                 && identificadorValido(normalizarIdentificador(lectura.getIdentificador()))
                 && confianza(lectura.getConfianzaGlobal()) >= CONFIANZA_MINIMA_IDENTIDAD;
+    }
+
+    private boolean identidadUsable(IdentidadSolicitud identidad) {
+        return identidad != null
+                && identidad.identificador() != null
+                && identificadorValido(identidad.identificador())
+                && confianza(identidad.confianzaGlobal()) >= CONFIANZA_MINIMA_IDENTIDAD;
     }
 
     private boolean rolesUsables(DocumentoRolesLectura lectura) {
@@ -447,7 +635,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             Solicitud solicitud,
             PersonaSolicitud vendedor,
             PersonaSolicitud comprador,
-            Map<String, DocumentoIdentidadLectura> identidades
+            Map<String, IdentidadSolicitud> identidades
     ) {
         List<String> faltas = new ArrayList<>();
         if (!identidadCorroboraRol(solicitud, vendedor.identificador(), identidades)) {
@@ -462,7 +650,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private List<String> faltasCorroboracionIdentidadBatecom(
             Solicitud solicitud,
             BatecomPartes partes,
-            Map<String, DocumentoIdentidadLectura> identidades
+            Map<String, IdentidadSolicitud> identidades
     ) {
         List<String> faltas = new ArrayList<>();
         if (!identidadCorroboraRol(solicitud, partes.vendedor().identificador(), identidades)) {
@@ -477,7 +665,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return faltas;
     }
 
-    private boolean identidadCorroboraRol(Solicitud solicitud, String identificador, Map<String, DocumentoIdentidadLectura> identidades) {
+    private boolean identidadCorroboraRol(Solicitud solicitud, String identificador, Map<String, IdentidadSolicitud> identidades) {
         if (identificador == null) {
             return false;
         }
@@ -490,7 +678,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
 
     private List<String> avisosNombreIdentidad(
             DocumentoRolesLectura lecturaRoles,
-            Map<String, DocumentoIdentidadLectura> identidades
+            Map<String, IdentidadSolicitud> identidades
     ) {
         List<String> avisos = new ArrayList<>();
         avisarNombreIdentidad(lecturaRoles.getVendedorIdentificador(), lecturaRoles.getVendedorNombre(), "vendedor", identidades, avisos);
@@ -502,14 +690,14 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             String identificador,
             String nombreRoles,
             String etiqueta,
-            Map<String, DocumentoIdentidadLectura> identidades,
+            Map<String, IdentidadSolicitud> identidades,
             List<String> avisos
     ) {
         String identificadorNormalizado = normalizarIdentificador(identificador);
         if (identificadorNormalizado == null) {
             return;
         }
-        DocumentoIdentidadLectura identidad = identidades.get(identificadorNormalizado);
+        IdentidadSolicitud identidad = identidades.get(identificadorNormalizado);
         if (identidad == null) {
             return;
         }
@@ -523,12 +711,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private PersonaSolicitud personaDesdeLectura(
             DocumentoRolesLectura lectura,
             boolean vendedor,
-            Map<String, DocumentoIdentidadLectura> identidades
+            Map<String, IdentidadSolicitud> identidades
     ) {
         String identificador = normalizarIdentificador(vendedor ? lectura.getVendedorIdentificador() : lectura.getCompradorIdentificador());
-        DocumentoIdentidadLectura identidad = identificador != null ? identidades.get(identificador) : null;
+        IdentidadSolicitud identidad = identificador != null ? identidades.get(identificador) : null;
         String nombreIdentidad = nombreCompletoIdentidad(identidad);
-        String direccionIdentidad = identidad != null ? normalizarTexto(identidad.getDireccionTexto()) : null;
+        String direccionIdentidad = identidad != null ? identidad.direccionTexto() : null;
         String nombreRoles = normalizarNombreRol(vendedor ? lectura.getVendedorNombre() : lectura.getCompradorNombre(), identificador);
         String nombreCatalogo = nombreCatalogoGestion(identificador);
         String direccionRoles = normalizarTexto(vendedor ? lectura.getVendedorDireccion() : lectura.getCompradorDireccion());
@@ -680,10 +868,11 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
     }
 
-    private void marcarIdentidadesUsadas(Map<String, DocumentoIdentidadLectura> identidades, PersonaSolicitud... personas) {
+    private void marcarIdentidadesUsadas(Map<String, IdentidadSolicitud> identidades, PersonaSolicitud... personas) {
         for (PersonaSolicitud persona : personas) {
-            DocumentoIdentidadLectura lectura = identidades.get(persona.identificador());
-            if (lectura == null) {
+            IdentidadSolicitud identidad = identidades.get(persona.identificador());
+            DocumentoIdentidadLectura lectura = identidad != null ? identidad.lecturaPrincipal() : null;
+            if (lectura == null || lectura.getId() == null) {
                 continue;
             }
             lectura.setRequiereRevision(false);
@@ -747,6 +936,27 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                         lectura.getApellido2() != null ? lectura.getApellido2() : ""
                 )).replaceAll("\\s+", " ").trim();
         return normalizarNombre(joined);
+    }
+
+    private String nombreCompletoIdentidad(IdentidadDetectada identidad) {
+        if (identidad == null) {
+            return null;
+        }
+        String razonSocial = normalizarNombre(identidad.razonSocial());
+        if (razonSocial != null) {
+            return razonSocial;
+        }
+        String joined = String.join(" ",
+                List.of(
+                        identidad.nombre() != null ? identidad.nombre() : "",
+                        identidad.apellido1() != null ? identidad.apellido1() : "",
+                        identidad.apellido2() != null ? identidad.apellido2() : ""
+                )).replaceAll("\\s+", " ").trim();
+        return normalizarNombre(joined);
+    }
+
+    private String nombreCompletoIdentidad(IdentidadSolicitud identidad) {
+        return identidad != null ? identidad.nombreCompleto() : null;
     }
 
     private String nombreCatalogoGestion(String identificador) {
@@ -922,6 +1132,16 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private record PersonaSolicitud(String identificador, String nombre, String direccion) {
     }
 
+    private record IdentidadSolicitud(
+            String identificador,
+            String nombreCompleto,
+            String direccionTexto,
+            Double confianzaGlobal,
+            boolean requiereRevision,
+            DocumentoIdentidadLectura lecturaPrincipal
+    ) {
+    }
+
     private record BatecomPartes(
             PersonaSolicitud vendedor,
             PersonaSolicitud compraventa,
@@ -932,5 +1152,11 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     }
 
     private record NombreCandidato(String valor, int prioridad) {
+    }
+
+    private record DocumentacionSolicitudCliente(int documentosIdentidad, int documentosRoles, List<String> bloqueos) {
+        private boolean suficiente() {
+            return bloqueos.isEmpty();
+        }
     }
 }
