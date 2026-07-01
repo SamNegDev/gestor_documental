@@ -205,6 +205,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 No determines comprador, vendedor, titular ni ningun rol de la operacion.
                 Devuelve una entrada por cada identidad distinta visible. Si hay dos DNI en el mismo PDF o pagina, devuelve dos entradas.
                 Identificador: mayusculas, sin espacios, guiones ni puntos.
+                No uses codigos MRZ o codigos de lectura mecanica que empiecen por IDESP como identificador; usa el DNI/NIE/CIF impreso de la persona o empresa.
                 Personas fisicas: separa nombre, apellido1 y apellido2 exactamente como aparezcan; no cambies el orden.
                 Si el documento tiene campos "Apellidos" y "Nombre", apellido1/apellido2 salen de Apellidos y nombre sale de Nombre.
                 Empresas: usa razonSocial y deja nombre/apellidos en null.

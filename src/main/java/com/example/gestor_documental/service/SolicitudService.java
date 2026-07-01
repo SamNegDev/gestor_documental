@@ -5,6 +5,7 @@ import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.dto.expediente.SolicitudIdentidadDetectadaRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 
 import java.util.List;
@@ -57,6 +58,8 @@ public interface SolicitudService {
     void cambiarEstadoSolicitud(Long id, EstadoSolicitud nuevoEstado, Usuario admin);
 
     Solicitud actualizarSolicitud(Long id, Solicitud solicitudActualizada, Usuario usuarioLogueado, Long tipoTramiteId);
+
+    Solicitud anadirInteresadoDetectado(Long id, SolicitudIdentidadDetectadaRequest request, Usuario usuarioLogueado);
 
     void eliminarSolicitudErronea(Long id, Usuario admin);
 }

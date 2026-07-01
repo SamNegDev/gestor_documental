@@ -2788,6 +2788,65 @@ select {
   color: var(--muted);
 }
 
+.solicitud-reading-identities {
+  display: grid;
+  gap: 7px;
+}
+
+.solicitud-reading-identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid color-mix(in oklch, var(--line) 70%, transparent);
+  padding-top: 7px;
+}
+
+.solicitud-reading-identity:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.solicitud-reading-identity > div:first-child {
+  min-width: 0;
+}
+
+.solicitud-reading-identity__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.solicitud-reading-identity__actions select {
+  min-width: 116px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.solicitud-reading-identity__actions .soft-button {
+  min-height: 32px;
+}
+
+@media (max-width: 760px) {
+  .solicitud-reading-identity {
+    grid-template-columns: 1fr;
+  }
+
+  .solicitud-reading-identity__actions {
+    justify-content: stretch;
+  }
+
+  .solicitud-reading-identity__actions select,
+  .solicitud-reading-identity__actions .soft-button {
+    flex: 1 1 0;
+  }
+}
+
 .panel--messages {
   min-height: 420px;
 }

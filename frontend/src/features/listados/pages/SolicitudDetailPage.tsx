@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CheckCircle2, FileSignature, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, RefreshCw, Scissors, Send, Sparkles, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, FileSignature, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, RefreshCw, Scissors, Send, Sparkles, UserPlus, UserRound } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { ApiError } from "../../../shared/api/http";
@@ -19,10 +19,11 @@ import {
   startCompleteSolicitudProcessing,
   updateDocument,
 } from "../../expedientes/services/documentosApi";
-import type { DocumentoExpediente, ProcesamientoExpedienteCompleto } from "../../expedientes/types/expedienteDetail.types";
+import type { DocumentoIdentidadDetectada, DocumentoIdentidadLectura, DocumentoExpediente, ProcesamientoExpedienteCompleto } from "../../expedientes/types/expedienteDetail.types";
 import { formatDocumentType } from "../../expedientes/utils/formatters";
 import "../../expedientes/styles/expedienteDetail.css";
 import {
+  anadirIdentidadDetectadaSolicitud,
   cambiarEstadoSolicitud,
   convertirSolicitud,
   enviarMensajeSolicitud,
@@ -31,10 +32,10 @@ import {
   procesarSolicitudDocumentacionIa,
   procesarSolicitudDocumentacionIaCliente,
 } from "../services/listadosApi";
-import type { LecturaIaSolicitudCliente, SolicitudDetail, SolicitudDocumentacionIaResponse } from "../types";
-
+import type { LecturaIaSolicitudCliente, SolicitudDetail, SolicitudDocumentacionIaResponse, SolicitudIdentidadDetectadaInput } from "../types";
 const COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX = "gestor.solicitudCompleta.job.";
 const COMPLETE_DOCUMENT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
+const SOLICITUD_ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
 
 export function SolicitudDetailPage() {
   const { id } = useParams();
@@ -100,6 +101,19 @@ export function SolicitudDetailPage() {
 
   const procesarDocumentacionClienteMutation = useMutation({
     mutationFn: (solicitudId: number) => procesarSolicitudDocumentacionIaCliente(solicitudId),
+  });
+
+  const anadirIdentidadDetectadaMutation = useMutation({
+    mutationFn: ({ solicitudId, input }: { solicitudId: number; input: SolicitudIdentidadDetectadaInput }) =>
+      anadirIdentidadDetectadaSolicitud(solicitudId, input),
+    onSuccess: async (actualizada) => {
+      queryClient.setQueryData(["solicitudes", "detalle", id], actualizada);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
+        queryClient.invalidateQueries({ queryKey: ["tareas"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
+    },
   });
 
   const refreshSolicitud = async () => {
@@ -357,6 +371,32 @@ export function SolicitudDetailPage() {
     }
   };
 
+  const handleAddDetectedIdentity = async (identidad: DocumentoIdentidadDetectada, rol: string) => {
+    const solicitudActual = solicitudQuery.data;
+    if (!solicitudActual) return;
+    if (!rol) {
+      alert("Selecciona el rol antes de anadir la identidad.");
+      return;
+    }
+    try {
+      await anadirIdentidadDetectadaMutation.mutateAsync({
+        solicitudId: solicitudActual.id,
+        input: {
+          rol,
+          identificador: identidad.identificador,
+          nombre: identidad.nombre,
+          apellido1: identidad.apellido1,
+          apellido2: identidad.apellido2,
+          razonSocial: identidad.razonSocial,
+          nombreCompleto: identidad.nombreCompleto,
+          direccionTexto: identidad.direccionTexto,
+        },
+      });
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo anadir la identidad." : "No se pudo anadir la identidad.");
+    }
+  };
+
   if (solicitudQuery.isLoading) {
     return <div className="records-empty">Cargando solicitud...</div>;
   }
@@ -368,6 +408,11 @@ export function SolicitudDetailPage() {
   const solicitud = solicitudQuery.data;
   const isClosed = solicitud.estado === "CONVERTIDA" || solicitud.estado === "RECHAZADO";
   const interesadosVisibles = solicitud.interesados.filter(hasInteresadoData);
+  const existingIdentityIdentifiers = new Set(
+    solicitud.interesados
+      .map((interesado) => normalizeIdentityIdentifier(interesado.dni))
+      .filter((value): value is string => Boolean(value)),
+  );
   const preparationItems = buildSolicitudPreparationItems(solicitud);
   const hasSolicitudDocuments = solicitud.documentos.some((documento) => documento.id);
 
@@ -515,7 +560,13 @@ export function SolicitudDetailPage() {
                 <div className="document-table__main">
                   <strong>{documento.nombreOriginal || documento.nombre}</strong>
                   <span>{formatDocumentType(documento.tipo)}{documento.interesadoNombre ? ` - ${documento.interesadoNombre}` : ""}</span>
-                  <SolicitudDocumentReading documento={documento} />
+                  <SolicitudDocumentReading
+                    documento={documento}
+                    canAddIdentity={!isClosed}
+                    existingIdentifiers={existingIdentityIdentifiers}
+                    addingIdentity={anadirIdentidadDetectadaMutation.isPending}
+                    onAddIdentity={handleAddDetectedIdentity}
+                  />
                 </div>
                 <small>{documento.fechaSubida || "Sin fecha"}</small>
                 <a className="soft-button soft-button--compact" href={`/documentos/ver/${documento.id}`} target="_blank" rel="noreferrer">
@@ -602,28 +653,74 @@ export function SolicitudDetailPage() {
   );
 }
 
-function SolicitudDocumentReading({ documento }: { documento: DocumentoExpediente }) {
+function SolicitudDocumentReading({
+  documento,
+  canAddIdentity = false,
+  existingIdentifiers,
+  addingIdentity,
+  onAddIdentity,
+}: {
+  documento: DocumentoExpediente;
+  canAddIdentity?: boolean;
+  existingIdentifiers: Set<string>;
+  addingIdentity: boolean;
+  onAddIdentity: (identidad: DocumentoIdentidadDetectada, rol: string) => void;
+}) {
+  const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
   const identidad = documento.lecturaIdentidad;
   const roles = documento.lecturaRoles;
   if (!identidad && !roles) {
     return null;
   }
   if (identidad) {
-    const detectadas = identidad.identidadesDetectadas?.filter((item) => item.identificador || item.nombreCompleto) ?? [];
+    const detectadas = compactIdentityOptions(
+      identidad.identidadesDetectadas?.length ? identidad.identidadesDetectadas : [lecturaPrincipalComoIdentidad(identidad)],
+    );
     return (
       <div className={identidad.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
         <strong>{detectadas.length > 1 ? `${detectadas.length} DNI/CIF detectados` : "DNI/CIF detectado"}</strong>
-        {detectadas.length > 1 ? (
-          detectadas.slice(0, 4).map((item) => (
-            <span key={`${item.identificador}-${item.nombreCompleto}`}>
-              {[item.identificador, item.nombreCompleto].filter(Boolean).join(" - ") || "Sin identificacion clara"}
-            </span>
-          ))
-        ) : (
-          <span>{[identidad.identificador, identidad.nombreCompleto].filter(Boolean).join(" - ") || "Sin identificacion clara"}</span>
-        )}
-        {identidad.fechaNacimiento ? <small>Nacimiento: {identidad.fechaNacimiento}</small> : null}
-        {identidad.direccionTexto ? <small>{identidad.direccionTexto}</small> : null}
+        <div className="solicitud-reading-identities">
+          {detectadas.map((item, index) => {
+            const key = identityKey(item, index);
+            const normalizedId = normalizeIdentityIdentifier(item.identificador);
+            const alreadyAdded = Boolean(normalizedId && existingIdentifiers.has(normalizedId));
+            const selectedRole = selectedRoles[key] || "";
+            return (
+              <div className="solicitud-reading-identity" key={key}>
+                <div>
+                  <span>{identityTitle(item)}</span>
+                  {item.fechaNacimiento ? <small>Nacimiento: {item.fechaNacimiento}</small> : null}
+                  {item.direccionTexto ? <small>{item.direccionTexto}</small> : null}
+                  {item.observaciones ? <small>{item.observaciones}</small> : null}
+                </div>
+                {canAddIdentity ? (
+                  <div className="solicitud-reading-identity__actions">
+                    <select
+                      aria-label="Rol del interesado"
+                      disabled={addingIdentity || alreadyAdded}
+                      onChange={(event) => setSelectedRoles((current) => ({ ...current, [key]: event.target.value }))}
+                      value={selectedRole}
+                    >
+                      <option value="">Rol</option>
+                      {SOLICITUD_ROLES.map((rol) => (
+                        <option key={rol} value={rol}>{formatEnum(rol)}</option>
+                      ))}
+                    </select>
+                    <button
+                      className="soft-button soft-button--compact"
+                      disabled={addingIdentity || alreadyAdded || !selectedRole || !normalizedId}
+                      onClick={() => onAddIdentity(item, selectedRole)}
+                      type="button"
+                    >
+                      {addingIdentity ? <Loader2 size={14} /> : <UserPlus size={14} />}
+                      {alreadyAdded ? "Incluido" : "Anadir"}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
         <em>{confidenceLabel(identidad.confianzaGlobal)} · {identidad.mensaje || (identidad.requiereRevision ? "Revisar lectura" : "Lectura valida")}</em>
       </div>
     );
@@ -641,6 +738,101 @@ function SolicitudDocumentReading({ documento }: { documento: DocumentoExpedient
 
 function confidenceLabel(value?: number | null) {
   return typeof value === "number" ? `${Math.round(value * 100)}% confianza` : "Sin confianza";
+}
+
+function lecturaPrincipalComoIdentidad(lectura: DocumentoIdentidadLectura): DocumentoIdentidadDetectada {
+  return {
+    tipoDocumentoDetectado: lectura.tipoDocumentoDetectado,
+    identificador: lectura.identificador,
+    nombre: lectura.nombre,
+    apellido1: lectura.apellido1,
+    apellido2: lectura.apellido2,
+    razonSocial: lectura.razonSocial,
+    nombreCompleto: lectura.nombreCompleto,
+    fechaNacimiento: lectura.fechaNacimiento,
+    fechaCaducidad: lectura.fechaCaducidad,
+    direccionTexto: lectura.direccionTexto,
+    confianzaGlobal: lectura.confianzaGlobal,
+    requiereRevision: lectura.requiereRevision,
+    observaciones: lectura.mensaje,
+  };
+}
+
+function compactIdentityOptions(identidades: DocumentoIdentidadDetectada[]) {
+  const result: DocumentoIdentidadDetectada[] = [];
+  identidades.forEach((item) => {
+    const normalizedId = normalizeIdentityIdentifier(item.identificador);
+    const normalizedItem = {
+      ...item,
+      identificador: normalizedId?.startsWith("IDESP") ? null : normalizedId || item.identificador,
+    };
+    if (!normalizedItem.identificador && !identityDisplayName(normalizedItem)) {
+      return;
+    }
+    const index = result.findIndex((existing) => sameIdentityOption(existing, normalizedItem));
+    if (index >= 0) {
+      result[index] = mergeIdentityOption(result[index], normalizedItem);
+    } else {
+      result.push(normalizedItem);
+    }
+  });
+  return result;
+}
+
+function sameIdentityOption(first: DocumentoIdentidadDetectada, second: DocumentoIdentidadDetectada) {
+  const firstId = normalizeIdentityIdentifier(first.identificador);
+  const secondId = normalizeIdentityIdentifier(second.identificador);
+  if (firstId && secondId && firstId === secondId) {
+    return true;
+  }
+  const firstName = normalizeIdentityName(first);
+  const secondName = normalizeIdentityName(second);
+  return Boolean(firstName && firstName === secondName && (!firstId || !secondId));
+}
+
+function mergeIdentityOption(first: DocumentoIdentidadDetectada, second: DocumentoIdentidadDetectada): DocumentoIdentidadDetectada {
+  const firstId = normalizeIdentityIdentifier(first.identificador);
+  const secondId = normalizeIdentityIdentifier(second.identificador);
+  return {
+    ...first,
+    ...second,
+    identificador: firstId || secondId || first.identificador || second.identificador,
+    nombre: second.nombre || first.nombre,
+    apellido1: second.apellido1 || first.apellido1,
+    apellido2: second.apellido2 || first.apellido2,
+    razonSocial: second.razonSocial || first.razonSocial,
+    nombreCompleto: second.nombreCompleto || first.nombreCompleto,
+    fechaNacimiento: second.fechaNacimiento || first.fechaNacimiento,
+    fechaCaducidad: second.fechaCaducidad || first.fechaCaducidad,
+    direccionTexto: second.direccionTexto || first.direccionTexto,
+    confianzaGlobal: Math.max(first.confianzaGlobal ?? 0, second.confianzaGlobal ?? 0) || first.confianzaGlobal || second.confianzaGlobal,
+    requiereRevision: first.requiereRevision && second.requiereRevision,
+    observaciones: second.observaciones || first.observaciones,
+  };
+}
+
+function identityKey(item: DocumentoIdentidadDetectada, index: number) {
+  return normalizeIdentityIdentifier(item.identificador) || `${normalizeIdentityName(item) || "identidad"}-${index}`;
+}
+
+function identityTitle(item: DocumentoIdentidadDetectada) {
+  return [normalizeIdentityIdentifier(item.identificador), identityDisplayName(item)].filter(Boolean).join(" - ") || "Sin identificacion clara";
+}
+
+function identityDisplayName(item: DocumentoIdentidadDetectada) {
+  return item.nombreCompleto
+    || item.razonSocial
+    || [item.nombre, item.apellido1, item.apellido2].filter(Boolean).join(" ").trim()
+    || null;
+}
+
+function normalizeIdentityName(item: DocumentoIdentidadDetectada) {
+  return identityDisplayName(item)?.toUpperCase().replace(/[^A-Z0-9]/g, "") || null;
+}
+
+function normalizeIdentityIdentifier(value?: string | null) {
+  const normalized = value?.toUpperCase().replace(/[^A-Z0-9]/g, "") || "";
+  return normalized || null;
 }
 
 type SolicitudPreparationItem = {

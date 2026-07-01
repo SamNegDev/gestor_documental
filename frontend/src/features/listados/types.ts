@@ -129,6 +129,17 @@ export interface SolicitudInteresadoCoincidencia {
   camposDiferentes: string[];
 }
 
+export interface SolicitudIdentidadDetectadaInput {
+  rol: string;
+  identificador?: string | null;
+  nombre?: string | null;
+  apellido1?: string | null;
+  apellido2?: string | null;
+  razonSocial?: string | null;
+  nombreCompleto?: string | null;
+  direccionTexto?: string | null;
+}
+
 export interface SolicitudDocumentacionIaResponse {
   solicitudId: number;
   documentosIdentidad: number;

@@ -1,6 +1,7 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.InteresadoFormDto;
+import com.example.gestor_documental.dto.expediente.SolicitudIdentidadDetectadaRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoSolicitud;
@@ -676,6 +677,120 @@ public class SolicitudServiceImpl implements SolicitudService {
         );
 
         return solicitudGuardada;
+    }
+
+    @Override
+    @Transactional
+    public Solicitud anadirInteresadoDetectado(Long id, SolicitudIdentidadDetectadaRequest request, Usuario usuarioLogueado) {
+        if (request == null || request.getRol() == null) {
+            throw new OperacionInvalidaException("Selecciona el rol del interesado");
+        }
+
+        Solicitud solicitud = solicitudRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+        if (!tienePermisoSolicitud(solicitud, usuarioLogueado)) {
+            throw new AccesoDenegadoException("No tienes permiso para modificar esta solicitud");
+        }
+        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA ||
+                solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO) {
+            throw new OperacionInvalidaException("No se puede editar una solicitud convertida o rechazada");
+        }
+
+        String identificador = TextNormalizer.upperOrNull(request.getIdentificador());
+        if (identificador != null) {
+            identificador = identificador.replaceAll("[^A-Z0-9]", "");
+        }
+        if (identificador == null || identificador.isBlank()) {
+            throw new OperacionInvalidaException("La identidad detectada no tiene DNI/CIF legible");
+        }
+        if (dniYaPresente(solicitud, identificador)) {
+            throw new OperacionInvalidaException("Ese DNI/CIF ya esta incluido en la solicitud");
+        }
+
+        String nombre = nombreInteresadoDetectado(request, identificador);
+        int slot = primerHuecoInteresado(solicitud);
+        if (slot == 0) {
+            throw new OperacionInvalidaException("La solicitud ya tiene los tres interesados ocupados");
+        }
+
+        aplicarInteresadoDetectado(solicitud, slot, request.getRol(), nombre, identificador, request.getDireccionTexto());
+        validarInteresadosSolicitud(solicitud);
+        Solicitud guardada = solicitudRepository.save(solicitud);
+        historialCambioService.registrarCambioSolicitud(
+                guardada,
+                usuarioLogueado,
+                "IDENTIDAD DETECTADA",
+                "Se incorporo " + request.getRol().name() + " " + nombre + " (" + identificador + ") desde lectura de documento."
+        );
+        return guardada;
+    }
+
+    private boolean dniYaPresente(Solicitud solicitud, String identificador) {
+        String normalizado = TextNormalizer.upperOrNull(identificador);
+        return normalizado != null && (
+                normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()))
+                        || normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado2Dni()))
+                        || normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado3Dni()))
+        );
+    }
+
+    private int primerHuecoInteresado(Solicitud solicitud) {
+        if (interesadoSolicitudVacio(solicitud.getInteresado1Nombre(), solicitud.getInteresado1Dni(), solicitud.getInteresado1Rol())) {
+            return 1;
+        }
+        if (interesadoSolicitudVacio(solicitud.getInteresado2Nombre(), solicitud.getInteresado2Dni(), solicitud.getInteresado2Rol())) {
+            return 2;
+        }
+        if (interesadoSolicitudVacio(solicitud.getInteresado3Nombre(), solicitud.getInteresado3Dni(), solicitud.getInteresado3Rol())) {
+            return 3;
+        }
+        return 0;
+    }
+
+    private void aplicarInteresadoDetectado(
+            Solicitud solicitud,
+            int slot,
+            RolInteresado rol,
+            String nombre,
+            String identificador,
+            String direccion
+    ) {
+        String direccionNormalizada = TextNormalizer.upperOrNull(direccion);
+        if (slot == 1) {
+            solicitud.setInteresado1Rol(rol);
+            solicitud.setInteresado1Nombre(nombre);
+            solicitud.setInteresado1Dni(identificador);
+            solicitud.setInteresado1Direccion(direccionNormalizada);
+        } else if (slot == 2) {
+            solicitud.setInteresado2Rol(rol);
+            solicitud.setInteresado2Nombre(nombre);
+            solicitud.setInteresado2Dni(identificador);
+            solicitud.setInteresado2Direccion(direccionNormalizada);
+        } else {
+            solicitud.setInteresado3Rol(rol);
+            solicitud.setInteresado3Nombre(nombre);
+            solicitud.setInteresado3Dni(identificador);
+            solicitud.setInteresado3Direccion(direccionNormalizada);
+        }
+    }
+
+    private String nombreInteresadoDetectado(SolicitudIdentidadDetectadaRequest request, String fallback) {
+        String razonSocial = NombrePersonaNormalizer.normalizar(request.getRazonSocial());
+        if (razonSocial != null) {
+            return razonSocial;
+        }
+        String nombreCompleto = NombrePersonaNormalizer.normalizar(request.getNombreCompleto());
+        if (nombreCompleto != null) {
+            return nombreCompleto;
+        }
+        String joined = String.join(" ",
+                List.of(
+                        request.getNombre() != null ? request.getNombre() : "",
+                        request.getApellido1() != null ? request.getApellido1() : "",
+                        request.getApellido2() != null ? request.getApellido2() : ""
+                )).replaceAll("\\s+", " ").trim();
+        String nombre = NombrePersonaNormalizer.normalizar(joined);
+        return nombre != null ? nombre : fallback;
     }
 
     @Override

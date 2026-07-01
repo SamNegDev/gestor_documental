@@ -19,6 +19,7 @@ import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertResponse
 import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertResponse.SolicitudBulkConvertResult;
 import com.example.gestor_documental.dto.expediente.SolicitudDetailResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudDocumentacionIaResponse;
+import com.example.gestor_documental.dto.expediente.SolicitudIdentidadDetectadaRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudListItemResponse;
 import com.example.gestor_documental.dto.expediente.TipoTramiteResumenResponse;
@@ -208,6 +209,17 @@ public class SolicitudApiController {
     ) {
         Usuario usuarioLogueado = requireAdmin(authentication);
         return solicitudService.buscarCoincidenciasInteresadosConDiferencias(id, usuarioLogueado);
+    }
+
+    @PostMapping("/{id}/interesados/detectados")
+    public SolicitudDetailResponse anadirInteresadoDetectado(
+            @PathVariable Long id,
+            @RequestBody SolicitudIdentidadDetectadaRequest request,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = usuario(authentication);
+        Solicitud solicitud = solicitudService.anadirInteresadoDetectado(id, request, usuarioLogueado);
+        return mapSolicitudDetail(solicitud, usuarioLogueado);
     }
 
     @PostMapping("/convertir-masivo")

@@ -48,6 +48,7 @@ public class DocumentoIdentidadLecturaResponse {
         if (lectura == null) {
             return null;
         }
+        var identidadesDetectadas = DocumentoIdentidadLecturaJson.extraer(lectura);
         return DocumentoIdentidadLecturaResponse.builder()
                 .id(lectura.getId())
                 .documentoId(lectura.getDocumento() != null ? lectura.getDocumento().getId() : null)
@@ -66,11 +67,11 @@ public class DocumentoIdentidadLecturaResponse {
                 .vinculadoAutomaticamente(lectura.isVinculadoAutomaticamente())
                 .interesadoVinculadoId(lectura.getInteresadoVinculado() != null ? lectura.getInteresadoVinculado().getId() : null)
                 .interesadoVinculadoNombre(lectura.getInteresadoVinculado() != null ? lectura.getInteresadoVinculado().getNombre() : null)
-                .mensaje(lectura.getMensaje())
+                .mensaje(mensajeNormalizado(lectura.getMensaje(), identidadesDetectadas.size()))
                 .modelo(lectura.getModelo())
                 .fechaLectura(lectura.getFechaLectura() != null ? FORMATTER.format(lectura.getFechaLectura()) : null)
-                .identidadesDetectadasTotal(DocumentoIdentidadLecturaJson.extraer(lectura).size())
-                .identidadesDetectadas(DocumentoIdentidadLecturaJson.extraer(lectura).stream()
+                .identidadesDetectadasTotal(identidadesDetectadas.size())
+                .identidadesDetectadas(identidadesDetectadas.stream()
                         .map(DocumentoIdentidadDetectadaResponse::from)
                         .toList())
                 .build();
@@ -84,5 +85,12 @@ public class DocumentoIdentidadLecturaResponse {
                 .filter(valor -> valor != null && !valor.isBlank())
                 .reduce("", (actual, valor) -> actual.isBlank() ? valor.trim() : actual + " " + valor.trim());
         return nombre.isBlank() ? null : nombre;
+    }
+
+    private static String mensajeNormalizado(String mensaje, int identidadesDetectadas) {
+        if (identidadesDetectadas > 1 && mensaje != null && mensaje.startsWith("Se detectaron ")) {
+            return "Se detectaron " + identidadesDetectadas + " identidades en el documento; revisar asignacion si procede.";
+        }
+        return mensaje;
     }
 }
