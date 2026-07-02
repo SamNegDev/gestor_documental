@@ -4,6 +4,7 @@ import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.dto.expediente.DocumentoIdentidadLecturaResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaResponse;
+import com.example.gestor_documental.dto.expediente.DocumentoVehiculoLecturaResponse;
 import com.example.gestor_documental.dto.expediente.ProcesamientoExpedienteCompletoResponse;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Usuario;
@@ -11,6 +12,7 @@ import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
 import com.example.gestor_documental.service.DocumentoService;
+import com.example.gestor_documental.service.DocumentoVehiculoLecturaService;
 import com.example.gestor_documental.service.ExpedienteCompletoProcesamientoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -38,6 +40,7 @@ public class DocumentoApiController {
     private final DocumentoService documentoService;
     private final DocumentoIdentidadLecturaService documentoIdentidadLecturaService;
     private final DocumentoRolesLecturaService documentoRolesLecturaService;
+    private final DocumentoVehiculoLecturaService documentoVehiculoLecturaService;
     private final ExpedienteCompletoProcesamientoService expedienteCompletoProcesamientoService;
     private final CurrentUserService currentUserService;
 
@@ -166,6 +169,29 @@ public class DocumentoApiController {
     ) {
         Usuario admin = currentUserService.requireAdmin(authentication);
         return ResponseEntity.ok(documentoRolesLecturaService.aplicarDatos(id, admin));
+    }
+
+    @GetMapping("/documentos/{id}/lectura-vehiculo")
+    public ResponseEntity<DocumentoVehiculoLecturaResponse> obtenerLecturaVehiculo(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
+        DocumentoVehiculoLecturaResponse lectura = documentoVehiculoLecturaService.obtenerLectura(id, usuarioLogueado);
+        if (lectura == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(lectura);
+    }
+
+    @PostMapping("/documentos/{id}/lectura-vehiculo")
+    public ResponseEntity<DocumentoVehiculoLecturaResponse> leerVehiculo(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean forzar,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = currentUserService.requireUser(authentication);
+        return ResponseEntity.ok(documentoVehiculoLecturaService.leerVehiculo(id, forzar, usuarioLogueado));
     }
 
     @PatchMapping("/documentos/{id}/paginas")

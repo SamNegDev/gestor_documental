@@ -28,4 +28,5 @@ public class DocumentoExpedienteResponse {
     private boolean requeridoAhora;
     private DocumentoIdentidadLecturaResponse lecturaIdentidad;
     private DocumentoRolesLecturaResponse lecturaRoles;
+    private DocumentoVehiculoLecturaResponse lecturaVehiculo;
 }

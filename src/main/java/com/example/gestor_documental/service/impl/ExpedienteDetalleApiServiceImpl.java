@@ -30,6 +30,7 @@ import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
+import com.example.gestor_documental.model.DocumentoVehiculoLectura;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.HistorialCambio;
@@ -43,6 +44,7 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.model.WhatsappWebhookEvento;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
+import com.example.gestor_documental.repository.DocumentoVehiculoLecturaRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.service.DocumentoService;
@@ -91,6 +93,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
     private final DocumentoIdentidadLecturaRepository documentoIdentidadLecturaRepository;
     private final DocumentoRolesLecturaRepository documentoRolesLecturaRepository;
+    private final DocumentoVehiculoLecturaRepository documentoVehiculoLecturaRepository;
     private final WhatsappWebhookEventoRepository whatsappWebhookEventoRepository;
 
     @Override
@@ -757,23 +760,34 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .stream()
                 .filter(lectura -> lectura.getDocumento() != null && lectura.getDocumento().getId() != null)
                 .collect(Collectors.toMap(lectura -> lectura.getDocumento().getId(), lectura -> lectura, (actual, repetida) -> actual));
+        Map<Long, DocumentoVehiculoLectura> lecturasVehiculoPorDocumento = documentoIds.isEmpty()
+                ? Map.of()
+                : documentoVehiculoLecturaRepository.findByDocumentoIdIn(documentoIds)
+                .stream()
+                .filter(lectura -> lectura.getDocumento() != null && lectura.getDocumento().getId() != null)
+                .collect(Collectors.toMap(lectura -> lectura.getDocumento().getId(), lectura -> lectura, (actual, repetida) -> actual));
 
         documentos.stream()
                 .sorted(Comparator.comparing(Documento::getFechaSubida, Comparator.nullsLast(Comparator.reverseOrder())))
-                .map(documento -> mapDocumentoSubido(documento, lecturasPorDocumento.get(documento.getId()), lecturasRolesPorDocumento.get(documento.getId())))
+                .map(documento -> mapDocumentoSubido(
+                        documento,
+                        lecturasPorDocumento.get(documento.getId()),
+                        lecturasRolesPorDocumento.get(documento.getId()),
+                        lecturasVehiculoPorDocumento.get(documento.getId())))
                 .forEach(resultado::add);
 
         return resultado;
     }
 
     private DocumentoExpedienteResponse mapDocumentoSubido(Documento documento) {
-        return mapDocumentoSubido(documento, null, null);
+        return mapDocumentoSubido(documento, null, null, null);
     }
 
     private DocumentoExpedienteResponse mapDocumentoSubido(
             Documento documento,
             DocumentoIdentidadLectura lecturaIdentidad,
-            DocumentoRolesLectura lecturaRoles
+            DocumentoRolesLectura lecturaRoles,
+            DocumentoVehiculoLectura lecturaVehiculo
     ) {
         return DocumentoExpedienteResponse.builder()
                 .id(documento.getId())
@@ -794,6 +808,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .requeridoAhora(false)
                 .lecturaIdentidad(com.example.gestor_documental.dto.expediente.DocumentoIdentidadLecturaResponse.from(lecturaIdentidad))
                 .lecturaRoles(com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaResponse.from(lecturaRoles))
+                .lecturaVehiculo(com.example.gestor_documental.dto.expediente.DocumentoVehiculoLecturaResponse.from(lecturaVehiculo))
                 .build();
     }
 

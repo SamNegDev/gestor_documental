@@ -14,17 +14,20 @@ import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
+import com.example.gestor_documental.model.DocumentoVehiculoLectura;
 import com.example.gestor_documental.model.GestionPersonaCatalogo;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
+import com.example.gestor_documental.repository.DocumentoVehiculoLecturaRepository;
 import com.example.gestor_documental.repository.GestionPersonaCatalogoRepository;
 import com.example.gestor_documental.repository.HistorialCambioRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
+import com.example.gestor_documental.service.DocumentoVehiculoLecturaService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
@@ -65,10 +68,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private final DocumentoRepository documentoRepository;
     private final DocumentoIdentidadLecturaRepository identidadLecturaRepository;
     private final DocumentoRolesLecturaRepository rolesLecturaRepository;
+    private final DocumentoVehiculoLecturaRepository vehiculoLecturaRepository;
     private final GestionPersonaCatalogoRepository gestionPersonaCatalogoRepository;
     private final HistorialCambioRepository historialCambioRepository;
     private final DocumentoIdentidadLecturaService documentoIdentidadLecturaService;
     private final DocumentoRolesLecturaService documentoRolesLecturaService;
+    private final DocumentoVehiculoLecturaService documentoVehiculoLecturaService;
     private final HistorialCambioService historialCambioService;
     private final DniNieValidator dniNieValidator;
     private final OpenAiProperties openAiProperties;
@@ -140,9 +145,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         List<Documento> documentosRoles = documentos.stream()
                 .filter(documento -> esDocumentoRoles(documento.getTipoDocumento()))
                 .toList();
+        List<Documento> documentosVehiculo = documentos.stream()
+                .filter(documento -> esDocumentoVehiculo(documento.getTipoDocumento()))
+                .toList();
 
-        if (documentosIdentidad.isEmpty() && documentosRoles.isEmpty()) {
-            throw new OperacionInvalidaException("No hay DNI/CIF ni factura/contrato en la solicitud.");
+        if (documentosIdentidad.isEmpty() && documentosRoles.isEmpty() && documentosVehiculo.isEmpty()) {
+            throw new OperacionInvalidaException("No hay DNI/CIF, factura/contrato ni documentacion de vehiculo en la solicitud.");
         }
 
         List<String> detalles = new ArrayList<>();
@@ -150,14 +158,17 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         boolean permitirRelectura = usuario != null && usuario.getRolUsuario() == RolUsuario.ADMIN;
         boolean forzarLecturasExistentes = forzarRelectura && permitirRelectura;
         if (forzarLecturasExistentes) {
-            detalles.add("Se forzo la relectura de DNI/CIF y roles ya leidos previamente.");
+            detalles.add("Se forzo la relectura de DNI/CIF, roles y vehiculo ya leidos previamente.");
         }
         leerIdentidades(documentosIdentidad, usuario, contadores, detalles, permitirRelectura, forzarLecturasExistentes);
+        leerVehiculo(documentosVehiculo, usuario, contadores, detalles, permitirRelectura, forzarLecturasExistentes);
         leerRoles(documentosRoles, usuario, contadores, detalles, permitirRelectura, forzarLecturasExistentes);
 
         Map<String, IdentidadSolicitud> identidades = mejoresIdentidades(documentosIdentidad);
+        DocumentoVehiculoLectura lecturaVehiculo = mejorLecturaVehiculo(documentosVehiculo);
+        boolean vehiculoActualizado = aplicarVehiculoSiProcede(solicitud, lecturaVehiculo, detalles);
         if (esBatecom(solicitud)) {
-            return procesarBatecom(solicitud, documentosIdentidad, documentosRoles, identidades, contadores, detalles, usuario);
+            return procesarBatecom(solicitud, documentosIdentidad, documentosRoles, identidades, contadores, detalles, usuario, vehiculoActualizado);
         }
 
         DocumentoRolesLectura lecturaRoles = mejorLecturaRoles(documentosRoles);
@@ -165,6 +176,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             detalles.add(documentosRoles.isEmpty()
                     ? "Falta factura o contrato para determinar comprador y vendedor."
                     : "La factura/contrato aun no tiene comprador y vendedor con confianza suficiente.");
+            if (vehiculoActualizado) {
+                guardarVehiculoActualizado(solicitud, usuario, "Se actualizaron datos de vehiculo desde permiso/ficha/informe DGT.");
+                detalles.add("Datos de vehiculo actualizados en la solicitud.");
+                return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, true, false, true,
+                        "Datos de vehiculo actualizados; falta revision para comprador y vendedor.", detalles);
+            }
             return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, false, false, true,
                     "Lecturas realizadas, pero falta revision antes de actualizar datos.", detalles);
         }
@@ -179,12 +196,18 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         List<String> faltasCorroboracion = faltasCorroboracionIdentidad(solicitud, vendedor, comprador, identidades);
         if (!faltasCorroboracion.isEmpty()) {
             detalles.addAll(faltasCorroboracion);
+            if (vehiculoActualizado) {
+                guardarVehiculoActualizado(solicitud, usuario, "Se actualizaron datos de vehiculo desde permiso/ficha/informe DGT.");
+                detalles.add("Datos de vehiculo actualizados en la solicitud.");
+                return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, true, false, true,
+                        "Datos de vehiculo actualizados; falta validar identidad antes de actualizar comprador y vendedor.", detalles);
+            }
             return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, false, false, true,
                     "Lecturas realizadas, pero falta validar identidad antes de actualizar datos.", detalles);
         }
         detalles.addAll(avisosNombreIdentidad(lecturaRoles, identidades));
 
-        boolean vehiculoActualizado = aplicarVehiculoSiProcede(solicitud, lecturaRoles, detalles);
+        vehiculoActualizado |= aplicarVehiculoSiProcede(solicitud, lecturaRoles, detalles);
         boolean yaCorrecta = solicitudYaCoincide(solicitud, vendedor, comprador);
         if (yaCorrecta) {
             marcarIdentidadesUsadas(identidades, vendedor, comprador);
@@ -230,7 +253,8 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             Map<String, IdentidadSolicitud> identidades,
             Contadores contadores,
             List<String> detalles,
-            Usuario admin
+            Usuario admin,
+            boolean vehiculoActualizado
     ) {
         List<DocumentoRolesLectura> lecturas = lecturasRolesUsables(documentosRoles);
         BatecomPartes partes = detectarPartesBatecom(lecturas, identidades);
@@ -238,6 +262,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             detalles.add(lecturas.size() < 2
                     ? "BATECOM necesita dos lecturas validas: entrega a compraventa y venta final al comprador."
                     : "No se ha detectado una compraventa comun que aparezca como comprador en una operacion y vendedor en otra.");
+            if (vehiculoActualizado) {
+                guardarVehiculoActualizado(solicitud, admin, "Se actualizaron datos de vehiculo desde permiso/ficha/informe DGT.");
+                detalles.add("Datos de vehiculo actualizados en la solicitud.");
+                return respuesta(solicitud.getId(), documentosIdentidad.size(), documentosRoles.size(), contadores, true, false, true,
+                        "Datos de vehiculo actualizados; falta identificar las dos operaciones BATECOM.", detalles);
+            }
             return respuesta(solicitud.getId(), documentosIdentidad.size(), documentosRoles.size(), contadores, false, false, true,
                     "Lecturas realizadas, pero falta identificar las dos operaciones BATECOM.", detalles);
         }
@@ -254,13 +284,19 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         List<String> faltasCorroboracion = faltasCorroboracionIdentidadBatecom(solicitud, partes, identidades);
         if (!faltasCorroboracion.isEmpty()) {
             detalles.addAll(faltasCorroboracion);
+            if (vehiculoActualizado) {
+                guardarVehiculoActualizado(solicitud, admin, "Se actualizaron datos de vehiculo desde permiso/ficha/informe DGT.");
+                detalles.add("Datos de vehiculo actualizados en la solicitud.");
+                return respuesta(solicitud.getId(), documentosIdentidad.size(), documentosRoles.size(), contadores, true, false, true,
+                        "Datos de vehiculo actualizados; falta validar identidad antes de actualizar partes BATECOM.", detalles);
+            }
             return respuesta(solicitud.getId(), documentosIdentidad.size(), documentosRoles.size(), contadores, false, false, true,
                     "Lecturas realizadas, pero falta validar identidad antes de actualizar datos.", detalles);
         }
         detalles.addAll(avisosNombreIdentidad(partes.lecturaBate(), identidades));
         detalles.addAll(avisosNombreIdentidad(partes.lecturaCom(), identidades));
 
-        boolean vehiculoActualizado = aplicarVehiculoSiProcede(solicitud, partes.lecturaBate(), detalles);
+        vehiculoActualizado |= aplicarVehiculoSiProcede(solicitud, partes.lecturaBate(), detalles);
         vehiculoActualizado |= aplicarVehiculoSiProcede(solicitud, partes.lecturaCom(), detalles);
         if (solicitudBatecomYaCoincide(solicitud, partes)) {
             marcarIdentidadesUsadas(identidades, partes.vendedor(), partes.compraventa(), partes.comprador());
@@ -478,6 +514,37 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
     }
 
+    private void leerVehiculo(
+            List<Documento> documentos,
+            Usuario usuario,
+            Contadores contadores,
+            List<String> detalles,
+            boolean permitirRelectura,
+            boolean forzarLecturasExistentes
+    ) {
+        for (Documento documento : documentos) {
+            DocumentoVehiculoLectura lecturaExistente = vehiculoLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
+            boolean existente = lecturaExistente != null;
+            boolean forzar = existente && (forzarLecturasExistentes || (permitirRelectura && !vehiculoUsable(lecturaExistente)));
+            try {
+                if (existente && !forzar) {
+                    contadores.vehiculoReutilizada++;
+                    continue;
+                }
+                documentoVehiculoLecturaService.leerVehiculo(documento.getId(), forzar, usuario);
+                if (existente && !forzar) {
+                    contadores.vehiculoReutilizada++;
+                } else {
+                    contadores.vehiculoNueva++;
+                }
+            } catch (RuntimeException exception) {
+                detalles.add("No se pudo leer vehiculo en " + nombreDocumento(documento) + ": " + mensaje(exception));
+                log.warn("No se pudo leer vehiculo de solicitud en documento {} ({})",
+                        documento.getId(), nombreDocumento(documento), exception);
+            }
+        }
+    }
+
     private Map<String, IdentidadSolicitud> mejoresIdentidades(List<Documento> documentosIdentidad) {
         List<Long> documentoIds = documentosIdentidad.stream().map(Documento::getId).toList();
         if (documentoIds.isEmpty()) {
@@ -567,6 +634,25 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 .filter(this::rolesUsables)
                 .sorted(Comparator
                         .comparing((DocumentoRolesLectura lectura) -> confianza(lectura.getConfianzaGlobal())).reversed()
+                        .thenComparing(lectura -> orden.getOrDefault(lectura.getDocumento() != null ? lectura.getDocumento().getId() : null, Integer.MAX_VALUE)))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private DocumentoVehiculoLectura mejorLecturaVehiculo(List<Documento> documentosVehiculo) {
+        List<Long> documentoIds = documentosVehiculo.stream().map(Documento::getId).toList();
+        if (documentoIds.isEmpty()) {
+            return null;
+        }
+        Map<Long, Integer> orden = new HashMap<>();
+        for (int index = 0; index < documentoIds.size(); index++) {
+            orden.put(documentoIds.get(index), index);
+        }
+        return vehiculoLecturaRepository.findByDocumentoIdIn(documentoIds).stream()
+                .filter(this::vehiculoUsable)
+                .sorted(Comparator
+                        .comparingInt(this::vehiculoScore).reversed()
+                        .thenComparing(Comparator.comparing((DocumentoVehiculoLectura lectura) -> confianza(lectura.getConfianzaGlobal())).reversed())
                         .thenComparing(lectura -> orden.getOrDefault(lectura.getDocumento() != null ? lectura.getDocumento().getId() : null, Integer.MAX_VALUE)))
                 .findFirst()
                 .orElse(null);
@@ -678,6 +764,34 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 && !vendedor.equals(comprador)
                 && !enBlanco(lectura.getVendedorNombre())
                 && !enBlanco(lectura.getCompradorNombre());
+    }
+
+    private boolean vehiculoUsable(DocumentoVehiculoLectura lectura) {
+        return lectura != null
+                && !lectura.isRequiereRevision()
+                && confianza(lectura.getConfianzaGlobal()) >= 0.75
+                && vehiculoScore(lectura) > 0;
+    }
+
+    private int vehiculoScore(DocumentoVehiculoLectura lectura) {
+        if (lectura == null) {
+            return 0;
+        }
+        int score = 0;
+        if (!enBlanco(lectura.getMatricula())) {
+            score += 2;
+        }
+        if (!enBlanco(lectura.getMarca())) {
+            score += 2;
+        }
+        if (!enBlanco(lectura.getModeloVehiculo())) {
+            score += 2;
+        }
+        String bastidor = normalizarIdentificador(lectura.getBastidor());
+        if (bastidor != null && bastidor.length() >= 6) {
+            score += 3;
+        }
+        return score;
     }
 
     private List<String> faltasCorroboracionIdentidad(
@@ -902,6 +1016,55 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
     }
 
+    private boolean aplicarVehiculoSiProcede(Solicitud solicitud, DocumentoVehiculoLectura lecturaVehiculo, List<String> detalles) {
+        if (lecturaVehiculo == null) {
+            return false;
+        }
+        boolean actualizado = false;
+        String origen = lecturaVehiculo.getDocumento() != null ? nombreDocumento(lecturaVehiculo.getDocumento()) : "documentacion de vehiculo";
+
+        String matriculaLeida = normalizarMatricula(lecturaVehiculo.getMatricula());
+        String matriculaSolicitud = normalizarMatricula(solicitud.getMatricula());
+        if (matriculaLeida != null && matriculaSolicitud == null) {
+            solicitud.setMatricula(matriculaLeida);
+            actualizado = true;
+        } else if (matriculaLeida != null && !matriculaSolicitud.equals(matriculaLeida)) {
+            detalles.add("La matricula de " + origen + " (" + matriculaLeida + ") no coincide con la solicitud (" + matriculaSolicitud + ").");
+        }
+
+        String marcaLeida = TextNormalizer.upperOrNull(lecturaVehiculo.getMarca());
+        String marcaSolicitud = TextNormalizer.upperOrNull(solicitud.getVehiculoMarca());
+        if (marcaLeida != null && marcaSolicitud == null) {
+            solicitud.setVehiculoMarca(marcaLeida);
+            actualizado = true;
+        } else if (marcaLeida != null && !marcaSolicitud.equals(marcaLeida)) {
+            detalles.add("La marca de " + origen + " (" + marcaLeida + ") no coincide con la guardada (" + marcaSolicitud + ").");
+        }
+
+        String modeloLeido = TextNormalizer.upperOrNull(lecturaVehiculo.getModeloVehiculo());
+        String modeloSolicitud = TextNormalizer.upperOrNull(solicitud.getVehiculoModelo());
+        if (modeloLeido != null && modeloSolicitud == null) {
+            solicitud.setVehiculoModelo(modeloLeido);
+            actualizado = true;
+        } else if (modeloLeido != null && !modeloSolicitud.equals(modeloLeido)) {
+            detalles.add("El modelo de " + origen + " (" + modeloLeido + ") no coincide con el guardado (" + modeloSolicitud + ").");
+        }
+
+        String bastidorLeido = normalizarIdentificador(lecturaVehiculo.getBastidor());
+        String bastidorSolicitud = normalizarIdentificador(solicitud.getVehiculoBastidor());
+        if (bastidorLeido != null && bastidorLeido.length() >= 6 && bastidorSolicitud == null) {
+            solicitud.setVehiculoBastidor(bastidorLeido);
+            actualizado = true;
+        } else if (bastidorLeido != null && bastidorLeido.length() >= 6 && !bastidorSolicitud.equals(bastidorLeido)) {
+            detalles.add("El bastidor de " + origen + " (" + bastidorLeido + ") no coincide con el guardado (" + bastidorSolicitud + ").");
+        }
+
+        if (actualizado) {
+            detalles.add("Datos de vehiculo leidos desde " + origen + ".");
+        }
+        return actualizado;
+    }
+
     private boolean aplicarVehiculoSiProcede(Solicitud solicitud, DocumentoRolesLectura lecturaRoles, List<String> detalles) {
         if (lecturaRoles == null) {
             return false;
@@ -930,6 +1093,17 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             detalles.add("El bastidor de factura/contrato (" + bastidorLeido + ") no coincide con el guardado (" + bastidorSolicitud + ").");
         }
         return actualizado;
+    }
+
+    private void guardarVehiculoActualizado(Solicitud solicitud, Usuario usuario, String descripcionHistorial) {
+        solicitud.setFechaUltimaModificacion(LocalDateTime.now());
+        solicitud.setModificadoPor(usuario);
+        solicitudRepository.save(solicitud);
+        historialCambioService.registrarCambioSolicitud(
+                solicitud,
+                usuario,
+                "IA DOCUMENTACION",
+                descripcionHistorial);
     }
 
     private void marcarIdentidadesUsadas(Map<String, IdentidadSolicitud> identidades, PersonaSolicitud... personas) {
@@ -979,6 +1153,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
 
     private boolean esDocumentoRoles(TipoDocumento tipoDocumento) {
         return tipoDocumento == TipoDocumento.FACTURA || tipoDocumento == TipoDocumento.CONTRATO_COMPRAVENTA;
+    }
+
+    private boolean esDocumentoVehiculo(TipoDocumento tipoDocumento) {
+        return tipoDocumento == TipoDocumento.PERMISO_CIRCULACION
+                || tipoDocumento == TipoDocumento.FICHA_TECNICA
+                || tipoDocumento == TipoDocumento.INFORME_DGT;
     }
 
     private boolean bloqueVacio(RolInteresado rol, String dni, String nombre) {
@@ -1223,6 +1403,8 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         private int identidadReutilizada;
         private int rolesNueva;
         private int rolesReutilizada;
+        private int vehiculoNueva;
+        private int vehiculoReutilizada;
     }
 
     private record PersonaSolicitud(String identificador, String nombre, String direccion) {

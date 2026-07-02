@@ -2,21 +2,25 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.config.OpenAiProperties;
 import com.example.gestor_documental.dto.expediente.LecturaIaSolicitudClienteResponse;
+import com.example.gestor_documental.dto.expediente.SolicitudDocumentacionIaResponse;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.model.DocumentoVehiculoLectura;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
+import com.example.gestor_documental.repository.DocumentoVehiculoLecturaRepository;
 import com.example.gestor_documental.repository.GestionPersonaCatalogoRepository;
 import com.example.gestor_documental.repository.HistorialCambioRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
+import com.example.gestor_documental.service.DocumentoVehiculoLecturaService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.validation.DniNieValidator;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +47,8 @@ class SolicitudDocumentacionIaServiceImplTest {
     @Mock
     private DocumentoRolesLecturaRepository rolesLecturaRepository;
     @Mock
+    private DocumentoVehiculoLecturaRepository vehiculoLecturaRepository;
+    @Mock
     private GestionPersonaCatalogoRepository gestionPersonaCatalogoRepository;
     @Mock
     private HistorialCambioRepository historialCambioRepository;
@@ -50,6 +56,8 @@ class SolicitudDocumentacionIaServiceImplTest {
     private DocumentoIdentidadLecturaService documentoIdentidadLecturaService;
     @Mock
     private DocumentoRolesLecturaService documentoRolesLecturaService;
+    @Mock
+    private DocumentoVehiculoLecturaService documentoVehiculoLecturaService;
     @Mock
     private HistorialCambioService historialCambioService;
 
@@ -66,10 +74,12 @@ class SolicitudDocumentacionIaServiceImplTest {
                 documentoRepository,
                 identidadLecturaRepository,
                 rolesLecturaRepository,
+                vehiculoLecturaRepository,
                 gestionPersonaCatalogoRepository,
                 historialCambioRepository,
                 documentoIdentidadLecturaService,
                 documentoRolesLecturaService,
+                documentoVehiculoLecturaService,
                 historialCambioService,
                 new DniNieValidator(),
                 openAiProperties
@@ -117,6 +127,40 @@ class SolicitudDocumentacionIaServiceImplTest {
         assertThat(response.documentacionSuficiente()).isTrue();
         assertThat(response.puedeSolicitar()).isTrue();
         assertThat(response.documentosVehiculo()).isEqualTo(1);
+    }
+
+    @Test
+    void lecturaClienteAplicaVehiculoAunqueFalteContrato() {
+        Solicitud solicitud = solicitudCliente(32L);
+        Documento dni = documento(6L, TipoDocumento.DNI);
+        Documento permiso = documento(7L, TipoDocumento.PERMISO_CIRCULACION);
+        Documento ficha = documento(8L, TipoDocumento.FICHA_TECNICA);
+        DocumentoVehiculoLectura lectura = new DocumentoVehiculoLectura();
+        lectura.setDocumento(permiso);
+        lectura.setMatricula("1234ABC");
+        lectura.setMarca("SEAT");
+        lectura.setModeloVehiculo("LEON");
+        lectura.setBastidor("VSSZZZ1PZ9R000001");
+        lectura.setConfianzaGlobal(0.93);
+        lectura.setRequiereRevision(false);
+
+        when(solicitudRepository.findById(32L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(32L)).thenReturn(List.of(dni, permiso, ficha));
+        when(historialCambioRepository.countBySolicitudIdAndAccion(32L, "IA DOCUMENTACION CLIENTE")).thenReturn(0L);
+        when(identidadLecturaRepository.findByDocumentoId(6L)).thenReturn(Optional.empty());
+        when(vehiculoLecturaRepository.findByDocumentoId(7L)).thenReturn(Optional.empty());
+        when(vehiculoLecturaRepository.findByDocumentoId(8L)).thenReturn(Optional.empty());
+        when(vehiculoLecturaRepository.findByDocumentoIdIn(List.of(7L, 8L))).thenReturn(List.of(lectura));
+        when(solicitudRepository.save(solicitud)).thenReturn(solicitud);
+
+        SolicitudDocumentacionIaResponse response = service.procesarDocumentacionCliente(32L, usuarioCliente);
+
+        assertThat(response.isDatosAplicados()).isTrue();
+        assertThat(response.isRequiereRevision()).isTrue();
+        assertThat(solicitud.getMatricula()).isEqualTo("1234ABC");
+        assertThat(solicitud.getVehiculoMarca()).isEqualTo("SEAT");
+        assertThat(solicitud.getVehiculoModelo()).isEqualTo("LEON");
+        assertThat(solicitud.getVehiculoBastidor()).isEqualTo("VSSZZZ1PZ9R000001");
     }
 
     private Solicitud solicitudCliente(Long id) {

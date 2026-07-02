@@ -804,7 +804,8 @@ function SolicitudDocumentReading({
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
   const identidad = documento.lecturaIdentidad;
   const roles = documento.lecturaRoles;
-  if (!identidad && !roles) {
+  const vehiculo = documento.lecturaVehiculo;
+  if (!identidad && !roles && !vehiculo) {
     return null;
   }
   if (identidad) {
@@ -856,19 +857,29 @@ function SolicitudDocumentReading({
             );
           })}
         </div>
-        <em>{confidenceLabel(identidad.confianzaGlobal)} · {identidad.mensaje || (identidad.requiereRevision ? "Revisar lectura" : "Lectura valida")}</em>
+        <em>{confidenceLabel(identidad.confianzaGlobal)} / {identidad.mensaje || (identidad.requiereRevision ? "Revisar lectura" : "Lectura valida")}</em>
       </div>
     );
   }
-  return (
-    <div className={roles?.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
-      <strong>Roles detectados</strong>
-      <span>Vendedor: {[roles?.vendedorIdentificador, roles?.vendedorNombre].filter(Boolean).join(" - ") || "Sin dato"}</span>
-      <span>Comprador: {[roles?.compradorIdentificador, roles?.compradorNombre].filter(Boolean).join(" - ") || "Sin dato"}</span>
-      {[roles?.matricula, roles?.bastidor].filter(Boolean).length ? <small>{[roles?.matricula, roles?.bastidor].filter(Boolean).join(" · ")}</small> : null}
-      <em>{confidenceLabel(roles?.confianzaGlobal)} · {roles?.mensaje || roles?.motivoAplicacion || "Lectura registrada"}</em>
+  if (roles) {
+    return (
+      <div className={roles.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
+        <strong>Roles detectados</strong>
+        <span>Vendedor: {[roles.vendedorIdentificador, roles.vendedorNombre].filter(Boolean).join(" - ") || "Sin dato"}</span>
+        <span>Comprador: {[roles.compradorIdentificador, roles.compradorNombre].filter(Boolean).join(" - ") || "Sin dato"}</span>
+        {[roles.matricula, roles.bastidor].filter(Boolean).length ? <small>{[roles.matricula, roles.bastidor].filter(Boolean).join(" / ")}</small> : null}
+        <em>{confidenceLabel(roles.confianzaGlobal)} / {roles.mensaje || roles.motivoAplicacion || "Lectura registrada"}</em>
+      </div>
+    );
+  }
+  return vehiculo ? (
+    <div className={vehiculo.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
+      <strong>Vehiculo detectado</strong>
+      <span>{[vehiculo.marca, vehiculo.modeloVehiculo].filter(Boolean).join(" ") || "Sin marca/modelo"}</span>
+      {[vehiculo.matricula, vehiculo.bastidor].filter(Boolean).length ? <small>{[vehiculo.matricula, vehiculo.bastidor].filter(Boolean).join(" / ")}</small> : null}
+      <em>{confidenceLabel(vehiculo.confianzaGlobal)} / {vehiculo.mensaje || "Lectura registrada"}</em>
     </div>
-  );
+  ) : null;
 }
 
 function confidenceLabel(value?: number | null) {

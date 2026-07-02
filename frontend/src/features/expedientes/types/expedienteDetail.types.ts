@@ -82,6 +82,7 @@ export interface DocumentoExpediente {
   requeridoAhora: boolean;
   lecturaIdentidad?: DocumentoIdentidadLectura | null;
   lecturaRoles?: DocumentoRolesLectura | null;
+  lecturaVehiculo?: DocumentoVehiculoLectura | null;
 }
 
 export interface DocumentoIdentidadLectura {
@@ -149,6 +150,23 @@ export interface DocumentoRolesLectura {
   motivoAplicacion?: string | null;
   aplicadoExpediente: boolean;
   fechaAplicacion?: string | null;
+  mensaje?: string | null;
+  modelo?: string | null;
+  fechaLectura?: string | null;
+}
+
+export interface DocumentoVehiculoLectura {
+  id: number;
+  documentoId: number;
+  tipoDocumentoDetectado?: string | null;
+  matricula?: string | null;
+  marca?: string | null;
+  modeloVehiculo?: string | null;
+  bastidor?: string | null;
+  fechaMatriculacion?: string | null;
+  fechaPrimeraMatriculacion?: string | null;
+  confianzaGlobal?: number | null;
+  requiereRevision: boolean;
   mensaje?: string | null;
   modelo?: string | null;
   fechaLectura?: string | null;

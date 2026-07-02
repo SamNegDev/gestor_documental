@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPatchForm, apiPostForm, apiPostJson, apiPostJsonBlob } from "../../../shared/api/http";
-import type { DocumentoIdentidadLectura, DocumentoRolesLectura, PlantillaPreview, PlantillasExpediente, ProcesamientoExpedienteCompleto } from "../types/expedienteDetail.types";
+import type { DocumentoIdentidadLectura, DocumentoRolesLectura, DocumentoVehiculoLectura, PlantillaPreview, PlantillasExpediente, ProcesamientoExpedienteCompleto } from "../types/expedienteDetail.types";
 
 export function uploadExpedienteDocument(expedienteId: number, tipoDocumento: string, archivo: File, operacionId?: number | null): Promise<void> {
   const formData = new FormData();
@@ -61,6 +61,10 @@ export function readDocumentIdentity(documentoId: number, forzar = false): Promi
 
 export function readDocumentRoles(documentoId: number, forzar = false): Promise<DocumentoRolesLectura> {
   return apiPostJson<DocumentoRolesLectura>(`/api/documentos/${documentoId}/lectura-roles?forzar=${forzar ? "true" : "false"}`, {});
+}
+
+export function readDocumentVehicle(documentoId: number, forzar = false): Promise<DocumentoVehiculoLectura> {
+  return apiPostJson<DocumentoVehiculoLectura>(`/api/documentos/${documentoId}/lectura-vehiculo?forzar=${forzar ? "true" : "false"}`, {});
 }
 
 export function applyDocumentRoles(documentoId: number): Promise<DocumentoRolesLectura> {

@@ -1,4 +1,4 @@
-import { ClipboardCheck, Eye, FilePlus2, FileText, IdCard, Loader2, Pencil, Scissors, Trash2, Upload, UsersRound } from "lucide-react";
+import { CarFront, ClipboardCheck, Eye, FilePlus2, FileText, IdCard, Loader2, Pencil, Scissors, Trash2, Upload, UsersRound } from "lucide-react";
 import type { DocumentoExpediente } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 
@@ -71,6 +71,7 @@ export function DocumentsPanel({
           const applyingRoles = Boolean(documento.id && applyingRolesId === documento.id);
           const lectura = documento.lecturaIdentidad;
           const lecturaRoles = documento.lecturaRoles;
+          const lecturaVehiculo = documento.lecturaVehiculo;
 
           return (
             <article className={`document-row document-row--${documento.estado.toLowerCase()}`} key={`${documento.tipo}-${documento.id ?? index}`}>
@@ -104,6 +105,14 @@ export function DocumentsPanel({
                     <span>Vendedor: {lecturaRoles.vendedorNombre || lecturaRoles.vendedorIdentificador || "sin leer"}</span>
                     <span>Comprador: {lecturaRoles.compradorNombre || lecturaRoles.compradorIdentificador || "sin leer"}</span>
                     <em>{lecturaRoles.aplicadoExpediente ? "aplicado al expediente" : lecturaRoles.mensaje || lecturaRoles.motivoAplicacion || "roles leidos"}</em>
+                  </div>
+                ) : null}
+                {lecturaVehiculo ? (
+                  <div className={`document-roles ${lecturaVehiculo.requiereRevision ? "document-roles--review" : "document-roles--linked"}`}>
+                    <CarFront size={14} />
+                    <span>{[lecturaVehiculo.marca, lecturaVehiculo.modeloVehiculo].filter(Boolean).join(" ") || "Vehiculo sin marca/modelo"}</span>
+                    <span>{[lecturaVehiculo.matricula, lecturaVehiculo.bastidor].filter(Boolean).join(" - ") || "Sin matricula/bastidor"}</span>
+                    <em>{lecturaVehiculo.mensaje || "vehiculo leido"}</em>
                   </div>
                 ) : null}
               </div>
