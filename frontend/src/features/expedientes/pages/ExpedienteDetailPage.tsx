@@ -1460,7 +1460,6 @@ export function ExpedienteDetailPage() {
       <DocumentTemplateDialog
         expedienteId={expediente.id}
         onClose={() => setTemplateDialogOpen(false)}
-        onGenerated={() => refreshExpediente()}
         open={templateDialogOpen}
       />
       <OcrReviewDialog

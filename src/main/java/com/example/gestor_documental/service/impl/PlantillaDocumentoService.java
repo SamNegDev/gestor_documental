@@ -15,7 +15,6 @@ import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
-import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.Interesado;
@@ -24,7 +23,6 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
-import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.SolicitudService;
 import java.io.ByteArrayOutputStream;
@@ -59,7 +57,6 @@ public class PlantillaDocumentoService {
     private final SolicitudRepository solicitudRepository;
     private final ExpedienteService expedienteService;
     private final SolicitudService solicitudService;
-    private final DocumentoService documentoService;
 
     @Transactional(readOnly = true)
     public PlantillasExpedienteResponse catalogo(Long expedienteId, Usuario usuario) {
@@ -86,25 +83,7 @@ public class PlantillaDocumentoService {
 
     @Transactional
     public DocumentoGeneradoResponse generar(Long expedienteId, GenerarPlantillaRequest request, Usuario usuario) {
-        Expediente expediente = expediente(expedienteId, usuario);
-        if (usuario.getRolUsuario() != RolUsuario.ADMIN) {
-            throw new AccesoDenegadoException("Solo el administrador puede generar documentos");
-        }
-        TipoPlantilla plantilla = tipo(request != null ? request.codigo() : null);
-        List<ExpedienteInteresado> relaciones = relaciones(expediente.getId());
-        PlantillaPreviewResponse preview = construirPreview(expediente, referencia(expediente), plantilla,
-                request != null ? request.campos() : null, relaciones);
-        validarRequeridos(preview.campos());
-        Map<String, String> valores = valores(preview.campos());
-        byte[] pdf = rellenarPdf(expediente, plantilla, valores, relaciones);
-        Documento documento = documentoService.guardarGeneradoParaExpediente(
-                expedienteId,
-                pdf,
-                plantilla.tipoDocumento,
-                preview.nombreArchivo(),
-                "Documento generado a partir del modelo oficial " + plantilla.nombre,
-                usuario);
-        return new DocumentoGeneradoResponse(documento.getId(), documento.getNombreArchivoOriginal(), documento.getTipoDocumento().name());
+        throw new OperacionInvalidaException("Los documentos generados no se archivan automaticamente. Genera el PDF temporal y subelo firmado.");
     }
 
     @Transactional(readOnly = true)
@@ -134,6 +113,27 @@ public class PlantillaDocumentoService {
 
     @Transactional
     public DocumentoGeneradoResponse generarSolicitud(Long solicitudId, GenerarPlantillaRequest request, Usuario usuario) {
+        throw new OperacionInvalidaException("Los documentos generados no se archivan automaticamente. Genera el PDF temporal y subelo firmado.");
+    }
+
+    @Transactional(readOnly = true)
+    public PlantillaPdfFile generarPdfTemporal(Long expedienteId, GenerarPlantillaRequest request, Usuario usuario) {
+        Expediente expediente = expediente(expedienteId, usuario);
+        if (usuario.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo el administrador puede generar documentos en el expediente");
+        }
+        TipoPlantilla plantilla = tipo(request != null ? request.codigo() : null);
+        List<ExpedienteInteresado> relaciones = relaciones(expediente.getId());
+        PlantillaPreviewResponse preview = construirPreview(expediente, referencia(expediente), plantilla,
+                request != null ? request.campos() : null, relaciones);
+        validarRequeridos(preview.campos());
+        Map<String, String> valores = valores(preview.campos());
+        byte[] pdf = rellenarPdf(expediente, plantilla, valores, relaciones);
+        return new PlantillaPdfFile(preview.nombreArchivo(), pdf);
+    }
+
+    @Transactional(readOnly = true)
+    public PlantillaPdfFile generarPdfTemporalSolicitud(Long solicitudId, GenerarPlantillaRequest request, Usuario usuario) {
         Solicitud solicitud = solicitud(solicitudId, usuario);
         Expediente contexto = contextoSolicitud(solicitud);
         List<ExpedienteInteresado> relaciones = relacionesSolicitud(solicitud, contexto);
@@ -143,14 +143,7 @@ public class PlantillaDocumentoService {
         validarRequeridos(preview.campos());
         Map<String, String> valores = valores(preview.campos());
         byte[] pdf = rellenarPdf(contexto, plantilla, valores, relaciones);
-        Documento documento = documentoService.guardarGeneradoParaSolicitud(
-                solicitudId,
-                pdf,
-                plantilla.tipoDocumento,
-                preview.nombreArchivo(),
-                "Documento generado a partir del modelo oficial " + plantilla.nombre,
-                usuario);
-        return new DocumentoGeneradoResponse(documento.getId(), documento.getNombreArchivoOriginal(), documento.getTipoDocumento().name());
+        return new PlantillaPdfFile(preview.nombreArchivo(), pdf);
     }
 
     private PlantillaPreviewResponse construirPreview(Expediente expediente, String referencia,
@@ -653,5 +646,8 @@ public class PlantillaDocumentoService {
             this.tipoDocumento = tipoDocumento;
             this.archivo = archivo;
         }
+    }
+
+    public record PlantillaPdfFile(String nombreArchivo, byte[] contenido) {
     }
 }

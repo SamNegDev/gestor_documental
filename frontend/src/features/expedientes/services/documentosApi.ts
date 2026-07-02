@@ -1,5 +1,5 @@
-import { apiDelete, apiGet, apiPatchForm, apiPostForm, apiPostJson } from "../../../shared/api/http";
-import type { DocumentoGenerado, DocumentoIdentidadLectura, DocumentoRolesLectura, PlantillaPreview, PlantillasExpediente, ProcesamientoExpedienteCompleto } from "../types/expedienteDetail.types";
+import { apiDelete, apiGet, apiPatchForm, apiPostForm, apiPostJson, apiPostJsonBlob } from "../../../shared/api/http";
+import type { DocumentoIdentidadLectura, DocumentoRolesLectura, PlantillaPreview, PlantillasExpediente, ProcesamientoExpedienteCompleto } from "../types/expedienteDetail.types";
 
 export function uploadExpedienteDocument(expedienteId: number, tipoDocumento: string, archivo: File, operacionId?: number | null): Promise<void> {
   const formData = new FormData();
@@ -131,18 +131,18 @@ export function previewSolicitudDocumentTemplate(
   return apiPostJson<PlantillaPreview>(`/api/solicitudes/${solicitudId}/plantillas/preview`, { codigo, campos });
 }
 
-export function generateDocumentTemplate(
+export function printDocumentTemplate(
   expedienteId: number,
   codigo: string,
   campos: Record<string, string>,
-): Promise<DocumentoGenerado> {
-  return apiPostJson<DocumentoGenerado>(`/api/expedientes/${expedienteId}/plantillas/generar`, { codigo, campos });
+): Promise<{ blob: Blob; filename: string | null }> {
+  return apiPostJsonBlob(`/api/expedientes/${expedienteId}/plantillas/imprimir`, { codigo, campos });
 }
 
-export function generateSolicitudDocumentTemplate(
+export function printSolicitudDocumentTemplate(
   solicitudId: number,
   codigo: string,
   campos: Record<string, string>,
-): Promise<DocumentoGenerado> {
-  return apiPostJson<DocumentoGenerado>(`/api/solicitudes/${solicitudId}/plantillas/generar`, { codigo, campos });
+): Promise<{ blob: Blob; filename: string | null }> {
+  return apiPostJsonBlob(`/api/solicitudes/${solicitudId}/plantillas/imprimir`, { codigo, campos });
 }

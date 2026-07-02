@@ -1,16 +1,16 @@
-import { AlertTriangle, FileCheck2, FileSignature, Loader2, X } from "lucide-react";
+import { AlertTriangle, FileCheck2, FileSignature, Loader2, Printer, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../../shared/api/http";
 import { uppercaseInput } from "../../../shared/utils/text";
 import {
-  generateDocumentTemplate,
-  generateSolicitudDocumentTemplate,
   getDocumentTemplates,
   getSolicitudDocumentTemplates,
+  printDocumentTemplate,
+  printSolicitudDocumentTemplate,
   previewDocumentTemplate,
   previewSolicitudDocumentTemplate,
 } from "../services/documentosApi";
-import type { DocumentoGenerado, PlantillaPreview, PlantillasExpediente } from "../types/expedienteDetail.types";
+import type { PlantillaPreview, PlantillasExpediente } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
 
 type Props = {
@@ -19,7 +19,6 @@ type Props = {
   scope?: "expediente" | "solicitud";
   open: boolean;
   onClose: () => void;
-  onGenerated: (documento: DocumentoGenerado) => void;
 };
 
 function messageFor(error: unknown) {
@@ -27,7 +26,7 @@ function messageFor(error: unknown) {
   return "No se pudo completar la operacion.";
 }
 
-export function DocumentTemplateDialog({ expedienteId, solicitudId, scope = "expediente", open, onClose, onGenerated }: Props) {
+export function DocumentTemplateDialog({ expedienteId, solicitudId, scope = "expediente", open, onClose }: Props) {
   const [catalogo, setCatalogo] = useState<PlantillasExpediente | null>(null);
   const [preview, setPreview] = useState<PlantillaPreview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,6 +34,7 @@ export function DocumentTemplateDialog({ expedienteId, solicitudId, scope = "exp
   const [error, setError] = useState<string | null>(null);
   const targetId = scope === "solicitud" ? solicitudId : expedienteId;
   const contenedor = scope === "solicitud" ? "solicitud" : "expediente";
+  const actionLabel = scope === "solicitud" ? "Abrir PDF para subir firmado" : "Abrir PDF";
 
   useEffect(() => {
     if (!open || !targetId) return;
@@ -90,13 +90,26 @@ export function DocumentTemplateDialog({ expedienteId, solicitudId, scope = "exp
     if (!preview || !targetId) return;
     setGenerating(true);
     setError(null);
+    const pdfWindow = window.open("about:blank", "_blank");
     try {
-      const generateTemplate = scope === "solicitud" ? generateSolicitudDocumentTemplate : generateDocumentTemplate;
-      const documento = await generateTemplate(targetId, preview.codigo, values);
-      onGenerated(documento);
+      const printTemplate = scope === "solicitud" ? printSolicitudDocumentTemplate : printDocumentTemplate;
+      const { blob } = await printTemplate(targetId, preview.codigo, values);
+      const url = URL.createObjectURL(blob);
+      if (pdfWindow) {
+        pdfWindow.opener = null;
+        pdfWindow.location.href = url;
+      } else {
+        const opened = window.open(url, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          setError("El navegador ha bloqueado la ventana del PDF. Permite ventanas emergentes para abrirlo.");
+          URL.revokeObjectURL(url);
+          return;
+        }
+      }
       onClose();
-      window.open(`/documentos/ver/${documento.documentoId}`, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (requestError) {
+      if (pdfWindow && !pdfWindow.closed) pdfWindow.close();
       setError(messageFor(requestError));
     } finally {
       setGenerating(false);
@@ -112,7 +125,7 @@ export function DocumentTemplateDialog({ expedienteId, solicitudId, scope = "exp
         <div className="exp-modal__header">
           <div>
             <p className="eyebrow">Modelos documentales</p>
-            <h3 id="template-dialog-title">Generar y archivar documento</h3>
+            <h3 id="template-dialog-title">Generar PDF para imprimir</h3>
           </div>
           <button aria-label="Cerrar" className="icon-button" onClick={onClose} type="button">
             <X size={16} />
@@ -185,7 +198,7 @@ export function DocumentTemplateDialog({ expedienteId, solicitudId, scope = "exp
                 <div><dt>Cliente</dt><dd>{catalogo.cliente}</dd></div>
                 <div><dt>Formato</dt><dd>PDF oficial</dd></div>
               </dl>
-              <p>El documento se guardara automaticamente dentro de la {contenedor} y se abrira para su revision.</p>
+              <p>El PDF se abrira en una pestana nueva para imprimirlo o enviarlo. No se guardara dentro del {contenedor} hasta que se suba firmado.</p>
               {incomplete ? <div className="template-dialog__notice"><AlertTriangle size={15} /> Completa los campos obligatorios.</div> : null}
             </aside>
           </div>
@@ -194,8 +207,8 @@ export function DocumentTemplateDialog({ expedienteId, solicitudId, scope = "exp
         <footer className="exp-modal__footer">
           <button className="soft-button" onClick={onClose} type="button">Cancelar</button>
           <button className="primary-button" disabled={!preview || incomplete || generating || loading} onClick={generate} type="button">
-            {generating ? <Loader2 className="spin" size={16} /> : <FileCheck2 size={16} />}
-            {generating ? "Generando..." : "Generar y archivar"}
+            {generating ? <Loader2 className="spin" size={16} /> : <Printer size={16} />}
+            {generating ? "Generando..." : actionLabel}
           </button>
         </footer>
       </section>

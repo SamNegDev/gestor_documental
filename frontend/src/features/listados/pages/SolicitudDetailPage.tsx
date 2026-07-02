@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CheckCircle2, FileSignature, FileText, FolderCheck, Info, Loader2, MessageSquare, Pencil, RefreshCw, Scissors, Send, Sparkles, UserPlus, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, FileSignature, FileText, FolderCheck, IdCard, Info, Loader2, MapPin, MessageSquare, Pencil, Phone, RefreshCw, Scissors, Send, Sparkles, UserPlus, UserRound } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { ApiError } from "../../../shared/api/http";
@@ -34,6 +34,7 @@ import {
   procesarSolicitudDocumentacionIaCliente,
 } from "../services/listadosApi";
 import type {
+  InteresadoSolicitud,
   LecturaIaSolicitudCliente,
   SolicitudDetail,
   SolicitudDocumentacionIaResponse,
@@ -537,49 +538,65 @@ export function SolicitudDetailPage() {
         </>
       ) : null}
 
-      <div className="request-grid">
-        <section className="panel">
-          <h2>Informacion general</h2>
-          <dl className="facts facts--compact">
-            <div>
-              <dt>Cliente</dt>
-              <dd>{solicitud.cliente?.nombre || "Sin cliente"}</dd>
-            </div>
-            <div>
-              <dt>Fecha de creacion</dt>
-              <dd>{solicitud.fechaCreacion || "Sin fecha"}</dd>
-            </div>
-            <div>
-              <dt>Ultimo cambio</dt>
-              <dd>{solicitud.fechaUltimaModificacion || "Sin cambios"}</dd>
-            </div>
-            <div>
-              <dt>Documentacion</dt>
-              <dd>{solicitud.situacionDocumental ? formatEnum(solicitud.situacionDocumental) : "Sin revisar"}</dd>
-            </div>
-          </dl>
-          {solicitud.observaciones ? <p className="note">{solicitud.observaciones}</p> : null}
-        </section>
-
-        <section className="panel">
-          <h2>Interesados</h2>
-          <div className="entity-list">
-            {interesadosVisibles.length === 0 ? <p className="rail-muted">No hay interesados registrados.</p> : null}
-            {interesadosVisibles.map((interesado, index) => (
-              <div className="entity-row" key={`${interesado.dni}-${index}`}>
-                <div className="row-icon" aria-hidden="true">
-                  <UserRound size={18} />
-                </div>
-                <div>
-                  <strong>{interesado.nombre || "Interesado"}</strong>
-                  <span>{interesado.rol ? formatEnum(interesado.rol) : "Sin rol"}</span>
-                </div>
-                <small>{interesado.dni || interesado.telefono || ""}</small>
-              </div>
-            ))}
+      <section className="panel request-people-panel">
+        <div className="panel-heading request-people-heading">
+          <div>
+            <h2>Interesados</h2>
+            <p>{interesadosVisibles.length > 0 ? "Datos clave para preparar y firmar documentos." : "Anade comprador, vendedor o titular para continuar."}</p>
           </div>
-        </section>
-      </div>
+          {!isClosed ? (
+            <Link className="soft-button soft-button--compact" to={editSolicitudPath}>
+              <Pencil size={16} />
+              Revisar datos
+            </Link>
+          ) : null}
+        </div>
+        {interesadosVisibles.length === 0 ? <p className="rail-muted">No hay interesados registrados.</p> : null}
+        <div className="request-people-grid">
+          {interesadosVisibles.map((interesado, index) => {
+            const direccion = formatInteresadoAddress(interesado);
+            return (
+              <article className="request-person-card" key={`${interesado.dni}-${index}`}>
+                <header>
+                  <div className="row-icon" aria-hidden="true">
+                    <UserRound size={18} />
+                  </div>
+                  <div>
+                    <strong>{interesado.nombre || "Interesado"}</strong>
+                    <span>{interesado.rol ? formatEnum(interesado.rol) : "Sin rol asignado"}</span>
+                  </div>
+                  <StatusBadge tone={interesado.documentoIdentidadAportado ? "success" : "warning"}>
+                    {interesado.documentoIdentidadAportado ? "DNI/CIF aportado" : "Falta DNI/CIF"}
+                  </StatusBadge>
+                </header>
+                <dl className="request-person-facts">
+                  <div>
+                    <dt><IdCard size={14} /> Identificacion</dt>
+                    <dd>{interesado.dni || "No consta"}</dd>
+                  </div>
+                  <div>
+                    <dt><Phone size={14} /> Telefono</dt>
+                    <dd>{interesado.telefono || "No consta"}</dd>
+                  </div>
+                  <div className="request-person-facts__wide">
+                    <dt><MapPin size={14} /> Direccion</dt>
+                    <dd>{direccion || "No consta"}</dd>
+                  </div>
+                </dl>
+                {interesado.requiereRepresentanteLegal ? (
+                  <div className={interesado.representanteLegalAportado ? "request-person-note is-success" : "request-person-note is-warning"}>
+                    {interesado.representanteLegalAportado ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
+                    <span>
+                      Representante legal: {interesado.representanteLegalNombre || "pendiente"}
+                      {interesado.representanteLegalDni ? ` (${interesado.representanteLegalDni})` : ""}
+                    </span>
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      </section>
 
       <div className="request-grid request-grid--wide">
         <section className="panel" id="solicitud-documentos">
@@ -689,7 +706,6 @@ export function SolicitudDetailPage() {
         solicitudId={solicitud.id}
         scope="solicitud"
         onClose={() => setTemplateDialogOpen(false)}
-        onGenerated={() => refreshSolicitud()}
         open={templateDialogOpen}
       />
       {procesarDocumentacionMutation.isPending ? <SolicitudIaProgressModal /> : null}
@@ -1432,8 +1448,30 @@ function formatEnum(value?: string | null) {
   return value ? value.replaceAll("_", " ") : "Sin estado";
 }
 
-function hasInteresadoData(interesado: { nombre?: string | null; rol?: string | null; dni?: string | null; telefono?: string | null; direccion?: string | null }) {
-  return [interesado.nombre, interesado.rol, interesado.dni, interesado.telefono, interesado.direccion].some(
+function formatInteresadoAddress(interesado: InteresadoSolicitud) {
+  const via = [interesado.tipoVia, interesado.nombreVia]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(" ");
+  return [via || interesado.direccion, interesado.codigoPostal, interesado.municipio, interesado.provincia]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function hasInteresadoData(interesado: InteresadoSolicitud) {
+  return [
+    interesado.nombre,
+    interesado.rol,
+    interesado.dni,
+    interesado.telefono,
+    interesado.direccion,
+    interesado.tipoVia,
+    interesado.nombreVia,
+    interesado.codigoPostal,
+    interesado.municipio,
+    interesado.provincia,
+  ].some(
     (value) => value && value.trim() !== "",
   );
 }
