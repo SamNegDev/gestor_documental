@@ -74,14 +74,14 @@ public class RegistroApiController {
     public List<InteresadoRegistroResponse> listarInteresados(
             @RequestParam(required = false) String q,
             @RequestParam(required = false, defaultValue = "ULTIMA_SEMANA") String periodo,
-            @RequestParam(required = false, defaultValue = "HABITUALES") String vista,
+            @RequestParam(required = false, defaultValue = "RECIENTES") String vista,
             @RequestParam(required = false) LocalDate fechaDesde,
             @RequestParam(required = false) LocalDate fechaHasta,
             Authentication authentication
     ) {
         Usuario usuario = usuario(authentication);
         String query = normalizar(q);
-        String vistaNormalizada = vista != null ? vista.toUpperCase(Locale.ROOT) : "HABITUALES";
+        String vistaNormalizada = vista != null ? vista.toUpperCase(Locale.ROOT) : "RECIENTES";
         boolean soloHabituales = "HABITUALES".equals(vistaNormalizada);
         boolean incluirHabituales = soloHabituales || "TODOS".equals(vistaNormalizada);
         DateRange range = dateRange(periodo, fechaDesde, fechaHasta);

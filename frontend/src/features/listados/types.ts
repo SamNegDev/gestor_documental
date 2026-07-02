@@ -141,13 +141,18 @@ export interface SolicitudInteresadoCoincidencia {
 }
 
 export interface SolicitudIdentidadDetectadaInput {
+  documentoId?: number | null;
   rol: string;
+  tipoDocumentoDetectado?: string | null;
   identificador?: string | null;
+  identificadorOriginal?: string | null;
   nombre?: string | null;
   apellido1?: string | null;
   apellido2?: string | null;
   razonSocial?: string | null;
   nombreCompleto?: string | null;
+  fechaNacimiento?: string | null;
+  fechaCaducidad?: string | null;
   direccionTexto?: string | null;
 }
 

@@ -93,6 +93,7 @@ export function InteresadoRegistroDetailPage() {
   const canEdit = user?.rol === "ADMIN";
   const canManageHabitualDocs = user?.rol === "CLIENTE" && item.habitual;
   const canMarkAsHabitual = user?.rol === "CLIENTE" && !item.habitual;
+  const hasProfileActions = canMarkAsHabitual || canEdit;
 
   const updateField = (field: keyof InteresadoRegistroUpdateInput, value: string) => {
     setForm((current) => ({ ...current, [field]: uppercaseInput(value) }));
@@ -125,7 +126,7 @@ export function InteresadoRegistroDetailPage() {
 
   return <main className="records-page registry-detail-page">
     <Link className="registry-back" to="/interesados"><ArrowLeft size={16} /> Volver al registro</Link>
-    <section className="registry-profile"><span className="registry-profile__icon"><UserRound size={28} /></span><div><p className="eyebrow">{item.habitual ? "CLIENTE HABITUAL" : "INTERESADO PUNTUAL"} - {item.representanteLegal ? "REPRESENTANTE LEGAL" : item.tipoPersona || "INTERESADO"}</p><h2>{item.nombre}</h2><strong>{item.dni}</strong></div><div className="registry-profile__facts"><span><Phone size={16} />{item.telefono || "Sin telefono"}</span><span><MapPin size={16} />{item.direccion || "Sin direccion"}</span><span><strong>{item.totalTramites}</strong> tramites asociados</span></div>{canMarkAsHabitual ? <button className="primary-button primary-button--compact registry-profile__edit" disabled={markHabitualMutation.isPending} onClick={() => markHabitualMutation.mutate()} type="button"><UserCheck size={15} />Marcar habitual</button> : null}{canEdit ? <button className="soft-button soft-button--compact registry-profile__edit" onClick={() => setEditing(true)} type="button"><Pencil size={15} />Editar ficha</button> : null}</section>
+    <section className="registry-profile"><span className="registry-profile__icon"><UserRound size={28} /></span><div><p className="eyebrow">{item.habitual ? "CLIENTE HABITUAL" : "INTERESADO PUNTUAL"} - {item.representanteLegal ? "REPRESENTANTE LEGAL" : item.tipoPersona || "INTERESADO"}</p><h2>{item.nombre}</h2><strong>{item.dni}</strong></div><div className="registry-profile__facts"><span><Phone size={16} />{item.telefono || "Sin telefono"}</span><span><MapPin size={16} />{item.direccion || "Sin direccion"}</span><span><strong>{item.totalTramites}</strong> tramites asociados</span></div>{hasProfileActions ? <div className="registry-profile__actions">{canMarkAsHabitual ? <button className="primary-button primary-button--compact" disabled={markHabitualMutation.isPending} onClick={() => markHabitualMutation.mutate()} type="button"><UserCheck size={15} />Marcar habitual</button> : null}{canEdit ? <button className="soft-button soft-button--compact" onClick={() => setEditing(true)} type="button"><Pencil size={15} />Editar ficha</button> : null}</div> : null}</section>
     {editing ? (
       <section className="records-panel vehicle-edit-panel">
         <div className="records-panel__heading">

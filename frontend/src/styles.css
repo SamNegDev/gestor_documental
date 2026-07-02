@@ -2826,7 +2826,8 @@ select {
   gap: 6px;
 }
 
-.solicitud-reading-identity__actions select {
+.solicitud-reading-identity__actions select,
+.solicitud-reading-identity__identifier {
   min-width: 116px;
   height: 32px;
   border: 1px solid var(--line);
@@ -2835,6 +2836,11 @@ select {
   color: var(--ink);
   font-size: 0.75rem;
   font-weight: 800;
+}
+
+.solicitud-reading-identity__identifier {
+  width: 132px;
+  min-width: 132px;
 }
 
 .solicitud-reading-identity__actions .soft-button {
@@ -2851,6 +2857,7 @@ select {
   }
 
   .solicitud-reading-identity__actions select,
+  .solicitud-reading-identity__identifier,
   .solicitud-reading-identity__actions .soft-button {
     flex: 1 1 0;
   }
@@ -4132,7 +4139,7 @@ input.records-table-filter {
 
 .registry-profile {
   display: grid;
-  grid-template-columns: 54px minmax(230px, 1fr) minmax(280px, 1.2fr);
+  grid-template-columns: 54px minmax(230px, 1fr) minmax(280px, 1.2fr) auto;
   align-items: center;
   gap: 18px;
   border-block: 1px solid oklch(87% 0.012 92);
@@ -4206,6 +4213,18 @@ input.records-table-filter {
 .registry-profile__edit {
   align-self: center;
   justify-self: end;
+}
+
+.registry-profile__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.registry-profile__actions .primary-button,
+.registry-profile__actions .soft-button {
+  white-space: nowrap;
 }
 
 .registry-profile__people strong {
@@ -4638,6 +4657,11 @@ input.records-table-filter {
     justify-self: start;
   }
 
+  .registry-profile__actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+
   .vehicle-edit-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -4687,6 +4711,12 @@ input.records-table-filter {
   .registry-profile__facts--vehicle,
   .vehicle-edit-form {
     grid-template-columns: 1fr;
+  }
+
+  .registry-profile__actions .primary-button,
+  .registry-profile__actions .soft-button {
+    flex: 1 1 150px;
+    justify-content: center;
   }
 }
 
@@ -6420,6 +6450,20 @@ input.records-table-filter {
   font-weight: 650;
 }
 
+.request-assistant__tools {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.request-modal-panel {
+  gap: 0;
+}
+
+.request-assistant-modal__body {
+  display: grid;
+  gap: 14px;
+}
+
 .request-assistant__blocks {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -6546,6 +6590,15 @@ input.records-table-filter {
   .request-assistant__top,
   .request-assistant__action {
     grid-template-columns: 1fr;
+  }
+
+  .request-assistant__tools,
+  .request-assistant__tools .soft-button {
+    width: 100%;
+  }
+
+  .request-assistant__tools .soft-button {
+    justify-content: center;
   }
 
   .request-assistant__top {

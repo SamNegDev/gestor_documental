@@ -9,13 +9,13 @@ function registroQuery(value: string, periodo: string, fechaDesde = "", fechaHas
   return `?${params.toString()}`;
 }
 
-function interesadosQuery(value: string, periodo: string, fechaDesde = "", fechaHasta = "", vista = "HABITUALES") {
+function interesadosQuery(value: string, periodo: string, fechaDesde = "", fechaHasta = "", vista = "RECIENTES") {
   const params = new URLSearchParams(registroQuery(value, periodo, fechaDesde, fechaHasta).slice(1));
   params.set("vista", vista);
   return `?${params.toString()}`;
 }
 
-export const getInteresadosRegistro = (search = "", periodo = "ULTIMA_SEMANA", fechaDesde = "", fechaHasta = "", vista = "HABITUALES") => apiGet<InteresadoRegistro[]>(`/api/registro/interesados${interesadosQuery(search, periodo, fechaDesde, fechaHasta, vista)}`);
+export const getInteresadosRegistro = (search = "", periodo = "ULTIMA_SEMANA", fechaDesde = "", fechaHasta = "", vista = "RECIENTES") => apiGet<InteresadoRegistro[]>(`/api/registro/interesados${interesadosQuery(search, periodo, fechaDesde, fechaHasta, vista)}`);
 export const getInteresadoRegistro = (id: string | number) => apiGet<InteresadoRegistro>(`/api/registro/interesados/${id}`);
 export const createInteresadoHabitual = (input: InteresadoRegistroUpdateInput) => apiPostJson<InteresadoRegistro>("/api/registro/interesados", input);
 export const markInteresadoAsHabitual = (id: string | number) => apiPostJson<InteresadoRegistro>(`/api/registro/interesados/${id}/habitual`, {});

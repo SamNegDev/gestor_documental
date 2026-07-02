@@ -16,7 +16,7 @@ export function InteresadosRegistroPage() {
   const [periodo, setPeriodo] = useState("ULTIMA_SEMANA");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
-  const [vista, setVista] = useState<"HABITUALES" | "RECIENTES">("HABITUALES");
+  const [vista, setVista] = useState<"RECIENTES" | "HABITUALES">("RECIENTES");
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<InteresadoRegistroUpdateInput>({ tipoPersona: "PARTICULAR" });
   const { user } = useOutletContext<AppOutletContext>();
@@ -44,8 +44,8 @@ export function InteresadosRegistroPage() {
     <main className="records-page registry-page">
       <header className="records-header">
         <div>
-          <p className="eyebrow">Cartera reutilizable</p>
-          <h2>{showingHabituales ? "Clientes habituales" : "Interesados recientes"}</h2>
+          <p className="eyebrow">Registro de personas</p>
+          <h2>{showingHabituales ? "Clientes habituales" : "Interesados"}</h2>
           <p>{showingHabituales ? "Personas y empresas guardadas para reutilizar datos y documentacion." : "Personas que han participado en tramites, sin quedar guardadas como habituales."}</p>
         </div>
         <div className="records-header__actions">
@@ -59,11 +59,11 @@ export function InteresadosRegistroPage() {
         </div>
       </header>
       <div className="task-tabs registry-tabs" role="tablist" aria-label="Tipo de interesados">
+        <button className={vista === "RECIENTES" ? "is-active" : ""} type="button" onClick={() => setVista("RECIENTES")}>
+          Interesados
+        </button>
         <button className={vista === "HABITUALES" ? "is-active" : ""} type="button" onClick={() => setVista("HABITUALES")}>
           Clientes habituales
-        </button>
-        <button className={vista === "RECIENTES" ? "is-active" : ""} type="button" onClick={() => setVista("RECIENTES")}>
-          Interesados recientes
         </button>
       </div>
       <RegistroFilters
@@ -82,7 +82,7 @@ export function InteresadosRegistroPage() {
         {query.error ? <div className="records-empty records-empty--danger">No se pudieron cargar los interesados.</div> : null}
         {!query.isLoading && !query.error ? (
           <div className="registry-list">
-            {interesados.length === 0 ? <div className="records-empty">{showingHabituales ? "No hay clientes habituales que coincidan con la busqueda." : "No hay interesados recientes que coincidan con la busqueda."}</div> : null}
+            {interesados.length === 0 ? <div className="records-empty">{showingHabituales ? "No hay clientes habituales que coincidan con la busqueda." : "No hay interesados que coincidan con la busqueda."}</div> : null}
             {interesados.map((item) => (
               <Link className="registry-row" key={item.id} to={`/interesados/${item.id}`}>
                 <span className="registry-row__icon"><UserRound size={19} /></span>

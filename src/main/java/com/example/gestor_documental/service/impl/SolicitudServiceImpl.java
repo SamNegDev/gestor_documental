@@ -8,12 +8,14 @@ import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
+import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.HistorialCambioRepository;
@@ -32,6 +34,11 @@ import com.example.gestor_documental.util.DireccionFormatter;
 import com.example.gestor_documental.util.DireccionNormalizer;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
+import com.example.gestor_documental.validation.DniNieValidator;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,11 +58,14 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class SolicitudServiceImpl implements SolicitudService {
 
+    private static final double CONFIANZA_IDENTIDAD_VALIDADA_MANUALMENTE = 1.0;
+
     private final SolicitudRepository solicitudRepository;
     private final TipoTramiteService tipoTramiteService;
     private final ExpedienteRepository expedienteRepository;
     private final ExpedienteService expedienteService;
     private final DocumentoRepository documentoRepository;
+    private final DocumentoIdentidadLecturaRepository documentoIdentidadLecturaRepository;
     private final IncidenciaRepository incidenciaRepository;
     private final HistorialCambioRepository historialCambioRepository;
     private final MensajeRepository mensajeRepository;
@@ -66,6 +76,8 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final OperacionExpedienteService operacionExpedienteService;
     private final VehiculoService vehiculoService;
     private final ObjectProvider<RequisitoDocumentalExpedienteService> requisitoDocumentalExpedienteService;
+    private final DniNieValidator dniNieValidator;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -760,6 +772,9 @@ public class SolicitudServiceImpl implements SolicitudService {
         if (identificador == null || identificador.isBlank()) {
             throw new OperacionInvalidaException("La identidad detectada no tiene DNI/CIF legible");
         }
+        if (!identificadorDocumentoValido(identificador)) {
+            throw new OperacionInvalidaException("El DNI/NIE/CIF indicado no es valido. Corrigelo antes de anadirlo.");
+        }
         if (dniYaPresente(solicitud, identificador)) {
             throw new OperacionInvalidaException("Ese DNI/CIF ya esta incluido en la solicitud");
         }
@@ -770,14 +785,17 @@ public class SolicitudServiceImpl implements SolicitudService {
             throw new OperacionInvalidaException("La solicitud ya tiene los tres interesados ocupados");
         }
 
+        validarLecturaIdentidadManual(solicitud, request, identificador);
         aplicarInteresadoDetectado(solicitud, slot, request.getRol(), nombre, identificador, request.getDireccionTexto());
         validarInteresadosSolicitud(solicitud);
+        solicitud.setFechaUltimaModificacion(LocalDateTime.now());
+        solicitud.setModificadoPor(usuarioLogueado);
         Solicitud guardada = solicitudRepository.save(solicitud);
         historialCambioService.registrarCambioSolicitud(
                 guardada,
                 usuarioLogueado,
                 "IDENTIDAD DETECTADA",
-                "Se incorporo " + request.getRol().name() + " " + nombre + " (" + identificador + ") desde lectura de documento."
+                "Se incorporo " + request.getRol().name() + " " + nombre + " (" + identificador + ") desde lectura de documento validada."
         );
         return guardada;
     }
@@ -836,6 +854,130 @@ public class SolicitudServiceImpl implements SolicitudService {
                 "Se asigno " + request.getRol().name() + " " + nombre + " (" + identificador + ") desde la cartera habitual del cliente."
         );
         return guardada;
+    }
+
+    private void validarLecturaIdentidadManual(Solicitud solicitud, SolicitudIdentidadDetectadaRequest request, String identificador) {
+        if (request.getDocumentoId() == null) {
+            return;
+        }
+        Documento documento = documentoRepository.findByIdConRelaciones(request.getDocumentoId())
+                .orElseThrow(() -> new RecursoNoEncontradoException("Documento de identidad no encontrado"));
+        if (documento.getSolicitud() == null || solicitud.getId() == null
+                || !solicitud.getId().equals(documento.getSolicitud().getId())) {
+            throw new AccesoDenegadoException("El documento no pertenece a esta solicitud");
+        }
+        if (documento.getTipoDocumento() != TipoDocumento.DNI && documento.getTipoDocumento() != TipoDocumento.CIF) {
+            throw new OperacionInvalidaException("Solo se puede validar identidad sobre documentos DNI o CIF.");
+        }
+        TipoDocumento tipoDetectado = tipoIdentidadDetectado(request.getTipoDocumentoDetectado(), documento.getTipoDocumento(), identificador);
+        DocumentoIdentidadLectura lectura = documentoIdentidadLecturaRepository.findByDocumentoId(documento.getId())
+                .orElseGet(DocumentoIdentidadLectura::new);
+        lectura.setDocumento(documento);
+        lectura.setTipoDocumentoDetectado(tipoDetectado);
+        lectura.setIdentificador(identificador);
+        lectura.setNombre(limitarTexto(request.getNombre(), 160));
+        lectura.setApellido1(limitarTexto(request.getApellido1(), 160));
+        lectura.setApellido2(limitarTexto(request.getApellido2(), 160));
+        lectura.setRazonSocial(limitarTexto(request.getRazonSocial(), 220));
+        lectura.setFechaNacimiento(limitarTexto(request.getFechaNacimiento(), 20));
+        lectura.setFechaCaducidad(limitarTexto(request.getFechaCaducidad(), 20));
+        lectura.setDireccionTexto(limitarTexto(request.getDireccionTexto(), 500));
+        lectura.setConfianzaGlobal(CONFIANZA_IDENTIDAD_VALIDADA_MANUALMENTE);
+        lectura.setRequiereRevision(false);
+        lectura.setVinculadoAutomaticamente(false);
+        lectura.setInteresadoVinculado(null);
+        lectura.setFechaLectura(LocalDateTime.now());
+        lectura.setMensaje("Identidad corregida y validada manualmente.");
+        lectura.setResultadoJson(resultadoIdentidadManual(request, identificador, tipoDetectado));
+        documentoIdentidadLecturaRepository.save(lectura);
+        if (documento.getTipoDocumento() != tipoDetectado) {
+            documento.setTipoDocumento(tipoDetectado);
+            documentoRepository.save(documento);
+        }
+    }
+
+    private TipoDocumento tipoIdentidadDetectado(String tipoSolicitado, TipoDocumento fallback, String identificador) {
+        String normalizado = TextNormalizer.upperOrNull(tipoSolicitado);
+        if (normalizado != null && normalizado.contains("CIF")) {
+            return TipoDocumento.CIF;
+        }
+        if (normalizado != null && (normalizado.contains("DNI") || normalizado.contains("NIE"))) {
+            return TipoDocumento.DNI;
+        }
+        return esCif(identificador) ? TipoDocumento.CIF : fallback != null ? fallback : TipoDocumento.DNI;
+    }
+
+    private String resultadoIdentidadManual(SolicitudIdentidadDetectadaRequest request, String identificador, TipoDocumento tipoDetectado) {
+        ObjectNode root = objectMapper.createObjectNode();
+        ArrayNode identidades = objectMapper.createArrayNode();
+        ObjectNode identidad = objectMapper.createObjectNode();
+        identidad.put("tipoDocumento", tipoDetectado == TipoDocumento.CIF ? "CIF" : tipoNieDni(identificador));
+        identidad.put("identificador", identificador);
+        putNullable(identidad, "nombre", request.getNombre());
+        putNullable(identidad, "apellido1", request.getApellido1());
+        putNullable(identidad, "apellido2", request.getApellido2());
+        putNullable(identidad, "razonSocial", request.getRazonSocial());
+        putNullable(identidad, "fechaNacimiento", request.getFechaNacimiento());
+        putNullable(identidad, "fechaCaducidad", request.getFechaCaducidad());
+        putNullable(identidad, "direccionTexto", request.getDireccionTexto());
+        identidad.put("confianzaGlobal", CONFIANZA_IDENTIDAD_VALIDADA_MANUALMENTE);
+        identidad.put("requiereRevision", false);
+        identidad.put("observaciones", "Identidad corregida y validada manualmente.");
+        identidades.add(identidad);
+        root.set("identidades", identidades);
+        root.put("observaciones", "Lectura corregida manualmente desde revision de solicitud.");
+        return root.toString();
+    }
+
+    private JsonNode nullNode() {
+        return objectMapper.nullNode();
+    }
+
+    private void putNullable(ObjectNode node, String field, String value) {
+        String normalizado = value != null ? value.trim() : null;
+        if (normalizado == null || normalizado.isBlank()) {
+            node.set(field, nullNode());
+            return;
+        }
+        node.put(field, normalizado);
+    }
+
+    private String tipoNieDni(String identificador) {
+        return identificador != null && identificador.matches("[XYZ][0-9]{7}[A-Z]") ? "NIE" : "DNI";
+    }
+
+    private boolean identificadorDocumentoValido(String value) {
+        String identificador = normalizarIdentificadorDocumento(value);
+        if (identificador == null) {
+            return false;
+        }
+        if (identificador.matches("[0-9]{8}[A-Z]") || identificador.matches("[XYZ][0-9]{7}[A-Z]")) {
+            return dniNieValidator.esValido(identificador);
+        }
+        return esCif(identificador);
+    }
+
+    private boolean esCif(String identificador) {
+        return identificador != null && identificador.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
+    }
+
+    private String normalizarIdentificadorDocumento(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalizado = value.toUpperCase(java.util.Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+        return normalizado.isBlank() ? null : normalizado;
+    }
+
+    private String limitarTexto(String value, int max) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isBlank()) {
+            return null;
+        }
+        return trimmed.length() <= max ? trimmed : trimmed.substring(0, max);
     }
 
     private int slotParaInteresadoHabitual(Solicitud solicitud, RolInteresado rol, Interesado interesado, String identificador) {

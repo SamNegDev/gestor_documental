@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CarFront, CheckCircle2, FileSignature, FileText, FolderCheck, IdCard, Info, Loader2, MapPin, MessageSquare, Pencil, Phone, RefreshCw, RotateCcw, Scissors, Send, Sparkles, UserPlus, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CarFront, CheckCircle2, FileSignature, FileText, FolderCheck, IdCard, Info, Loader2, MapPin, MessageSquare, Pencil, Phone, RefreshCw, RotateCcw, Scissors, Send, Sparkles, UserPlus, UserRound, X } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { ApiError } from "../../../shared/api/http";
@@ -66,6 +66,7 @@ export function SolicitudDetailPage() {
   const [iaResult, setIaResult] = useState<SolicitudDocumentacionIaResponse | null>(null);
   const [iaError, setIaError] = useState<string | null>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [habitualModalOpen, setHabitualModalOpen] = useState(false);
   const [habitualSearch, setHabitualSearch] = useState("");
   const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
@@ -445,24 +446,34 @@ export function SolicitudDetailPage() {
     }
   };
 
-  const handleAddDetectedIdentity = async (identidad: DocumentoIdentidadDetectada, rol: string) => {
+  const handleAddDetectedIdentity = async (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string) => {
     const solicitudActual = solicitudQuery.data;
     if (!solicitudActual) return;
     if (!rol) {
       alert("Selecciona el rol antes de anadir la identidad.");
       return;
     }
+    const identificadorNormalizado = normalizeIdentityIdentifier(identificador);
+    if (!identificadorNormalizado) {
+      alert("Revisa el DNI/NIE/CIF antes de anadir la identidad.");
+      return;
+    }
     try {
       await anadirIdentidadDetectadaMutation.mutateAsync({
         solicitudId: solicitudActual.id,
         input: {
+          documentoId: documento.id,
           rol,
-          identificador: identidad.identificador,
+          tipoDocumentoDetectado: identidad.tipoDocumentoDetectado,
+          identificador: identificadorNormalizado,
+          identificadorOriginal: identidad.identificador,
           nombre: identidad.nombre,
           apellido1: identidad.apellido1,
           apellido2: identidad.apellido2,
           razonSocial: identidad.razonSocial,
           nombreCompleto: identidad.nombreCompleto,
+          fechaNacimiento: identidad.fechaNacimiento,
+          fechaCaducidad: identidad.fechaCaducidad,
           direccionTexto: identidad.direccionTexto,
         },
       });
@@ -620,10 +631,16 @@ export function SolicitudDetailPage() {
             <p>{interesadosVisibles.length > 0 ? "Datos clave para preparar y firmar documentos." : "Anade comprador, vendedor o titular para continuar."}</p>
           </div>
           {!isClosed ? (
-            <Link className="soft-button soft-button--compact" to={editSolicitudPath}>
-              <Pencil size={16} />
-              Revisar datos
-            </Link>
+            <div className="button-group">
+              <button className="soft-button soft-button--compact" onClick={() => setHabitualModalOpen(true)} type="button">
+                <UserPlus size={16} />
+                Habituales
+              </button>
+              <Link className="soft-button soft-button--compact" to={editSolicitudPath}>
+                <Pencil size={16} />
+                Revisar datos
+              </Link>
+            </div>
           ) : null}
         </div>
         {interesadosVisibles.length === 0 ? <p className="rail-muted">No hay interesados registrados.</p> : null}
@@ -676,17 +693,6 @@ export function SolicitudDetailPage() {
             );
           })}
         </div>
-        {!isClosed ? (
-          <SolicitudHabitualesPanel
-            adding={asignarHabitualMutation.isPending}
-            existingIdentifiers={existingIdentityIdentifiers}
-            habituales={habitualesQuery.data ?? []}
-            loading={habitualesQuery.isLoading}
-            onAssign={handleAssignHabitual}
-            onSearch={setHabitualSearch}
-            search={habitualSearch}
-          />
-        ) : null}
       </section>
 
       <div className="request-grid request-grid--wide">
@@ -781,6 +787,32 @@ export function SolicitudDetailPage() {
             ))}
           </div>
         </section>
+      ) : null}
+
+      {habitualModalOpen && !isClosed ? (
+        <div className="exp-modal" role="presentation">
+          <button className="exp-modal__backdrop" onClick={() => setHabitualModalOpen(false)} type="button" aria-label="Cerrar clientes habituales" />
+          <section aria-labelledby="habituales-solicitud-title" aria-modal="true" className="exp-modal__panel exp-modal__panel--wide request-modal-panel" role="dialog">
+            <div className="exp-modal__header">
+              <div>
+                <p className="eyebrow">Asignacion rapida</p>
+                <h3 id="habituales-solicitud-title">Clientes habituales</h3>
+              </div>
+              <button className="icon-button" onClick={() => setHabitualModalOpen(false)} type="button" aria-label="Cerrar">
+                <X size={16} />
+              </button>
+            </div>
+            <SolicitudHabitualesPanel
+              adding={asignarHabitualMutation.isPending}
+              existingIdentifiers={existingIdentityIdentifiers}
+              habituales={habitualesQuery.data ?? []}
+              loading={habitualesQuery.isLoading}
+              onAssign={handleAssignHabitual}
+              onSearch={setHabitualSearch}
+              search={habitualSearch}
+            />
+          </section>
+        </div>
       ) : null}
 
       <OcrReviewDialog
@@ -943,9 +975,10 @@ function SolicitudDocumentReading({
   canAddIdentity?: boolean;
   existingIdentifiers: Set<string>;
   addingIdentity: boolean;
-  onAddIdentity: (identidad: DocumentoIdentidadDetectada, rol: string) => void;
+  onAddIdentity: (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string) => void;
 }) {
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
+  const [identifiers, setIdentifiers] = useState<Record<string, string>>({});
   const identidad = documento.lecturaIdentidad;
   const roles = documento.lecturaRoles;
   const vehiculo = documento.lecturaVehiculo;
@@ -963,7 +996,9 @@ function SolicitudDocumentReading({
           {detectadas.map((item, index) => {
             const key = identityKey(item, index);
             const normalizedId = normalizeIdentityIdentifier(item.identificador);
-            const alreadyAdded = Boolean(normalizedId && existingIdentifiers.has(normalizedId));
+            const identifierValue = identifiers[key] ?? normalizedId ?? "";
+            const normalizedEditedId = normalizeIdentityIdentifier(identifierValue);
+            const alreadyAdded = Boolean(normalizedEditedId && existingIdentifiers.has(normalizedEditedId));
             const selectedRole = selectedRoles[key] || "";
             return (
               <div className="solicitud-reading-identity" key={key}>
@@ -975,6 +1010,14 @@ function SolicitudDocumentReading({
                 </div>
                 {canAddIdentity ? (
                   <div className="solicitud-reading-identity__actions">
+                    <input
+                      aria-label="DNI/NIE/CIF revisado"
+                      className="solicitud-reading-identity__identifier"
+                      disabled={addingIdentity || alreadyAdded}
+                      onChange={(event) => setIdentifiers((current) => ({ ...current, [key]: uppercaseInput(event.target.value) }))}
+                      placeholder="DNI/NIE/CIF"
+                      value={identifierValue}
+                    />
                     <select
                       aria-label="Rol del interesado"
                       disabled={addingIdentity || alreadyAdded}
@@ -988,8 +1031,8 @@ function SolicitudDocumentReading({
                     </select>
                     <button
                       className="soft-button soft-button--compact"
-                      disabled={addingIdentity || alreadyAdded || !selectedRole || !normalizedId}
-                      onClick={() => onAddIdentity(item, selectedRole)}
+                      disabled={addingIdentity || alreadyAdded || !selectedRole || !normalizedEditedId}
+                      onClick={() => onAddIdentity(documento, item, selectedRole, identifierValue)}
                       type="button"
                     >
                       {addingIdentity ? <Loader2 size={14} /> : <UserPlus size={14} />}
@@ -1148,6 +1191,8 @@ function SolicitudPreparationAssistant({
   onReadWithIa: () => void;
   onOpenTemplates: () => void;
 }) {
+  const [detailOpen, setDetailOpen] = useState(false);
+
   if (loading) {
     return (
       <section className="request-assistant request-assistant--loading" aria-label={title}>
@@ -1226,22 +1271,46 @@ function SolicitudPreparationAssistant({
           />
         </div>
       ) : null}
-      <div className="request-assistant__blocks">
-        {preparation.bloques.map((bloque) => (
-          <SolicitudPreparationBlock bloque={bloque} key={bloque.codigo} />
-        ))}
+      <div className="request-assistant__tools">
+        <button className="soft-button soft-button--compact" onClick={() => setDetailOpen(true)} type="button">
+          <Info size={16} />
+          Ver detalle
+        </button>
       </div>
-      {preparation.documentosGenerables.length > 0 ? (
-        <div className="request-assistant__documents">
-          <div className="request-assistant__section-title">
-            <FileSignature size={16} />
-            <strong>Documentos</strong>
-          </div>
-          <ul>
-            {preparation.documentosGenerables.map((documento) => (
-              <SolicitudPreparationDocument documento={documento} key={documento.codigo} />
-            ))}
-          </ul>
+      {detailOpen ? (
+        <div className="exp-modal" role="presentation">
+          <button className="exp-modal__backdrop" onClick={() => setDetailOpen(false)} type="button" aria-label="Cerrar detalle del asistente" />
+          <section aria-labelledby="preparation-detail-title" aria-modal="true" className="exp-modal__panel exp-modal__panel--wide request-modal-panel request-assistant-modal" role="dialog">
+            <div className="exp-modal__header">
+              <div>
+                <p className="eyebrow">{title}</p>
+                <h3 id="preparation-detail-title">Detalle de preparacion</h3>
+              </div>
+              <button className="icon-button" onClick={() => setDetailOpen(false)} type="button" aria-label="Cerrar">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="request-assistant-modal__body">
+              <div className="request-assistant__blocks">
+                {preparation.bloques.map((bloque) => (
+                  <SolicitudPreparationBlock bloque={bloque} key={bloque.codigo} />
+                ))}
+              </div>
+              {preparation.documentosGenerables.length > 0 ? (
+                <div className="request-assistant__documents">
+                  <div className="request-assistant__section-title">
+                    <FileSignature size={16} />
+                    <strong>Documentos</strong>
+                  </div>
+                  <ul>
+                    {preparation.documentosGenerables.map((documento) => (
+                      <SolicitudPreparationDocument documento={documento} key={documento.codigo} />
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          </section>
         </div>
       ) : null}
     </section>
