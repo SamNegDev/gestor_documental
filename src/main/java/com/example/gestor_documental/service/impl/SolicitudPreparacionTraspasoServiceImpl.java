@@ -334,7 +334,11 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                 tramite != null ? null : "Completar tramite"
         ));
 
-        boolean rolesMinimos = context.rolesEsperados().stream().allMatch(rol -> interesadosPorRol(context.interesados()).containsKey(rol));
+        Map<RolInteresado, InteresadoSlot> porRol = interesadosPorRol(context.interesados());
+        boolean rolesMinimos = context.rolesEsperados().stream().allMatch(porRol::containsKey);
+        boolean rolesConDatosRevisados = context.rolesEsperados().stream()
+                .map(porRol::get)
+                .allMatch(interesado -> interesado != null && datosPersonaSuficientes(interesado));
         items.add(item(
                 "roles_operacion",
                 "Roles de la operacion",
@@ -365,13 +369,18 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
         ));
 
         DocumentoRolesLectura lecturaRoles = mejorLecturaRoles(context);
+        boolean lecturaRolesResuelta = lecturaRoles != null || rolesConDatosRevisados;
         items.add(item(
                 "lectura_roles",
                 "Lectura comprador/vendedor",
-                lecturaRoles != null ? EstadoItem.OK : EstadoItem.AVISO,
-                lecturaRoles != null ? "Hay una lectura de roles aplicable con confianza suficiente." : "No hay lectura aplicable de contrato/factura; se usaran los datos revisados de la solicitud.",
-                lecturaRoles != null ? null : "REVISAR_IA",
-                lecturaRoles != null ? null : "Revisar lectura"
+                lecturaRolesResuelta ? EstadoItem.OK : EstadoItem.AVISO,
+                lecturaRoles != null
+                        ? "Hay una lectura de roles aplicable con confianza suficiente."
+                        : rolesConDatosRevisados
+                                ? "Se usaran los datos revisados de la solicitud."
+                                : "No hay lectura aplicable de contrato/factura; se usaran los datos revisados de la solicitud.",
+                lecturaRolesResuelta ? null : "REVISAR_IA",
+                lecturaRolesResuelta ? null : "Revisar lectura"
         ));
         return bloque("OPERACION", "Operacion", items);
     }

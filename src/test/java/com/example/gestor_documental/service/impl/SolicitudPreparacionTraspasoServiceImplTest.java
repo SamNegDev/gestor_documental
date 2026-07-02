@@ -276,6 +276,7 @@ class SolicitudPreparacionTraspasoServiceImplTest {
         SolicitudPreparacionTraspasoResponse response = service.obtenerPreparacion(15L, usuario);
 
         assertThat(itemEstado(response, "OPERACION", "precio")).isEqualTo("OK");
+        assertThat(itemEstado(response, "OPERACION", "lectura_roles")).isEqualTo("OK");
         assertThat(documento(response, "CONTRATO_COMPRAVENTA").faltantes()).doesNotContain("Precio");
     }
 
