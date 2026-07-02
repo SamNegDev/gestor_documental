@@ -34,6 +34,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.imageio.ImageIO;
@@ -87,7 +88,7 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public DocumentoRolesLecturaResponse leerRoles(Long documentoId, boolean forzar, Usuario usuario) {
         Documento documento = documentoService.obtenerDocumentoConPermiso(documentoId, usuario);
         validarTipoDocumento(documento);

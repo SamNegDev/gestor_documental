@@ -22,6 +22,7 @@ import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.imageio.ImageIO;
@@ -69,7 +70,7 @@ public class DocumentoVehiculoLecturaServiceImpl implements DocumentoVehiculoLec
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public DocumentoVehiculoLecturaResponse leerVehiculo(Long documentoId, boolean forzar, Usuario usuario) {
         Documento documento = documentoService.obtenerDocumentoConPermiso(documentoId, usuario);
         validarTipoDocumento(documento);
