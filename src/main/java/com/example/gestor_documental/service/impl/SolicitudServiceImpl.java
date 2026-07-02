@@ -2,6 +2,7 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.dto.expediente.SolicitudIdentidadDetectadaRequest;
+import com.example.gestor_documental.dto.expediente.SolicitudInteresadoHabitualRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoSolicitud;
@@ -12,6 +13,7 @@ import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.HistorialCambioRepository;
@@ -59,6 +61,7 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final MensajeRepository mensajeRepository;
     private final HistorialCambioService historialCambioService;
     private final InteresadoService interesadoService;
+    private final ClienteInteresadoRepository clienteInteresadoRepository;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
     private final OperacionExpedienteService operacionExpedienteService;
     private final VehiculoService vehiculoService;
@@ -777,6 +780,197 @@ public class SolicitudServiceImpl implements SolicitudService {
                 "Se incorporo " + request.getRol().name() + " " + nombre + " (" + identificador + ") desde lectura de documento."
         );
         return guardada;
+    }
+
+    @Override
+    @Transactional
+    public Solicitud asignarInteresadoHabitual(Long id, SolicitudInteresadoHabitualRequest request, Usuario usuarioLogueado) {
+        if (request == null || request.getInteresadoId() == null || request.getRol() == null) {
+            throw new OperacionInvalidaException("Selecciona un interesado habitual y el rol que ocupa");
+        }
+
+        Solicitud solicitud = solicitudRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+        if (!tienePermisoSolicitud(solicitud, usuarioLogueado)) {
+            throw new AccesoDenegadoException("No tienes permiso para modificar esta solicitud");
+        }
+        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA ||
+                solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO) {
+            throw new OperacionInvalidaException("No se puede editar una solicitud convertida o rechazada");
+        }
+        if (solicitud.getCliente() == null || solicitud.getCliente().getId() == null) {
+            throw new OperacionInvalidaException("La solicitud no tiene cliente asociado");
+        }
+
+        ClienteInteresado relacion = clienteInteresadoRepository
+                .findByClienteIdAndInteresadoId(solicitud.getCliente().getId(), request.getInteresadoId())
+                .orElseThrow(() -> new AccesoDenegadoException("El interesado no pertenece a la cartera habitual del cliente"));
+        Interesado interesado = relacion.getInteresado();
+        if (interesado == null) {
+            throw new RecursoNoEncontradoException("Interesado habitual no encontrado");
+        }
+        String identificador = TextNormalizer.upperOrNull(interesado.getDni());
+        if (identificador != null) {
+            identificador = identificador.replaceAll("[^A-Z0-9]", "");
+        }
+        String nombre = NombrePersonaNormalizer.normalizar(interesado.getNombre());
+        if (identificador == null || nombre == null) {
+            throw new OperacionInvalidaException("El interesado habitual necesita DNI/CIF y nombre para asignarse");
+        }
+
+        int slot = slotParaInteresadoHabitual(solicitud, request.getRol(), interesado, identificador);
+        if (slot == 0) {
+            throw new OperacionInvalidaException("La solicitud ya tiene los tres interesados ocupados");
+        }
+
+        aplicarInteresadoHabitual(solicitud, slot, request.getRol(), interesado, identificador, nombre);
+        validarInteresadosSolicitud(solicitud);
+        normalizarSolicitud(solicitud);
+        solicitud.setFechaUltimaModificacion(LocalDateTime.now());
+        solicitud.setModificadoPor(usuarioLogueado);
+        Solicitud guardada = solicitudRepository.save(solicitud);
+        historialCambioService.registrarCambioSolicitud(
+                guardada,
+                usuarioLogueado,
+                "INTERESADO HABITUAL",
+                "Se asigno " + request.getRol().name() + " " + nombre + " (" + identificador + ") desde la cartera habitual del cliente."
+        );
+        return guardada;
+    }
+
+    private int slotParaInteresadoHabitual(Solicitud solicitud, RolInteresado rol, Interesado interesado, String identificador) {
+        int slotMismoDni = slotPorDni(solicitud, identificador);
+        if (slotMismoDni != 0) {
+            RolInteresado rolActual = rolSlot(solicitud, slotMismoDni);
+            if (rolActual != null && rolActual != rol) {
+                throw new OperacionInvalidaException("Ese DNI/CIF ya esta incluido con otro rol en la solicitud");
+            }
+            return slotMismoDni;
+        }
+
+        int slotRol = slotPorRol(solicitud, rol);
+        if (slotRol != 0) {
+            String dniActual = dniSlot(solicitud, slotRol);
+            if (TextNormalizer.upperOrNull(dniActual) != null && !identificador.equals(TextNormalizer.upperOrNull(dniActual))) {
+                throw new OperacionInvalidaException("Ya existe otro interesado como " + rol.name() + " en la solicitud");
+            }
+            String nombreActual = nombreSlot(solicitud, slotRol);
+            if (TextNormalizer.upperOrNull(nombreActual) != null
+                    && !NombrePersonaNormalizer.equivalentes(nombreActual, interesado.getNombre())) {
+                throw new OperacionInvalidaException("El rol " + rol.name() + " ya tiene otro nombre informado");
+            }
+            return slotRol;
+        }
+
+        return primerHuecoInteresado(solicitud);
+    }
+
+    private int slotPorDni(Solicitud solicitud, String identificador) {
+        String normalizado = TextNormalizer.upperOrNull(identificador);
+        if (normalizado == null) {
+            return 0;
+        }
+        if (normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()))) {
+            return 1;
+        }
+        if (normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado2Dni()))) {
+            return 2;
+        }
+        if (normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado3Dni()))) {
+            return 3;
+        }
+        return 0;
+    }
+
+    private int slotPorRol(Solicitud solicitud, RolInteresado rol) {
+        if (rol == solicitud.getInteresado1Rol()) {
+            return 1;
+        }
+        if (rol == solicitud.getInteresado2Rol()) {
+            return 2;
+        }
+        if (rol == solicitud.getInteresado3Rol()) {
+            return 3;
+        }
+        return 0;
+    }
+
+    private RolInteresado rolSlot(Solicitud solicitud, int slot) {
+        return switch (slot) {
+            case 1 -> solicitud.getInteresado1Rol();
+            case 2 -> solicitud.getInteresado2Rol();
+            case 3 -> solicitud.getInteresado3Rol();
+            default -> null;
+        };
+    }
+
+    private String dniSlot(Solicitud solicitud, int slot) {
+        return switch (slot) {
+            case 1 -> solicitud.getInteresado1Dni();
+            case 2 -> solicitud.getInteresado2Dni();
+            case 3 -> solicitud.getInteresado3Dni();
+            default -> null;
+        };
+    }
+
+    private String nombreSlot(Solicitud solicitud, int slot) {
+        return switch (slot) {
+            case 1 -> solicitud.getInteresado1Nombre();
+            case 2 -> solicitud.getInteresado2Nombre();
+            case 3 -> solicitud.getInteresado3Nombre();
+            default -> null;
+        };
+    }
+
+    private void aplicarInteresadoHabitual(
+            Solicitud solicitud,
+            int slot,
+            RolInteresado rol,
+            Interesado interesado,
+            String identificador,
+            String nombre
+    ) {
+        String direccion = direccionSolicitud(
+                interesado.getDireccion(),
+                interesado.getTipoVia(),
+                interesado.getNombreVia(),
+                interesado.getCodigoPostal(),
+                interesado.getMunicipio(),
+                interesado.getProvincia());
+        if (slot == 1) {
+            solicitud.setInteresado1Rol(rol);
+            solicitud.setInteresado1Nombre(nombre);
+            solicitud.setInteresado1Dni(identificador);
+            solicitud.setInteresado1Telefono(interesado.getTelefono());
+            solicitud.setInteresado1Direccion(direccion);
+            solicitud.setInteresado1TipoVia(interesado.getTipoVia());
+            solicitud.setInteresado1NombreVia(interesado.getNombreVia());
+            solicitud.setInteresado1CodigoPostal(interesado.getCodigoPostal());
+            solicitud.setInteresado1Municipio(interesado.getMunicipio());
+            solicitud.setInteresado1Provincia(interesado.getProvincia());
+        } else if (slot == 2) {
+            solicitud.setInteresado2Rol(rol);
+            solicitud.setInteresado2Nombre(nombre);
+            solicitud.setInteresado2Dni(identificador);
+            solicitud.setInteresado2Telefono(interesado.getTelefono());
+            solicitud.setInteresado2Direccion(direccion);
+            solicitud.setInteresado2TipoVia(interesado.getTipoVia());
+            solicitud.setInteresado2NombreVia(interesado.getNombreVia());
+            solicitud.setInteresado2CodigoPostal(interesado.getCodigoPostal());
+            solicitud.setInteresado2Municipio(interesado.getMunicipio());
+            solicitud.setInteresado2Provincia(interesado.getProvincia());
+        } else {
+            solicitud.setInteresado3Rol(rol);
+            solicitud.setInteresado3Nombre(nombre);
+            solicitud.setInteresado3Dni(identificador);
+            solicitud.setInteresado3Telefono(interesado.getTelefono());
+            solicitud.setInteresado3Direccion(direccion);
+            solicitud.setInteresado3TipoVia(interesado.getTipoVia());
+            solicitud.setInteresado3NombreVia(interesado.getNombreVia());
+            solicitud.setInteresado3CodigoPostal(interesado.getCodigoPostal());
+            solicitud.setInteresado3Municipio(interesado.getMunicipio());
+            solicitud.setInteresado3Provincia(interesado.getProvincia());
+        }
     }
 
     private boolean dniYaPresente(Solicitud solicitud, String identificador) {

@@ -21,7 +21,10 @@ export function InteresadosRegistroPage() {
   const { user } = useOutletContext<AppOutletContext>();
   const queryClient = useQueryClient();
   const deferredSearch = useDeferredValue(search);
-  const query = useQuery({ queryKey: ["registro", "interesados", deferredSearch, periodo, fechaDesde, fechaHasta], queryFn: () => getInteresadosRegistro(deferredSearch, periodo, fechaDesde, fechaHasta) });
+  const query = useQuery({
+    queryKey: ["registro", "interesados", deferredSearch, periodo, fechaDesde, fechaHasta],
+    queryFn: () => getInteresadosRegistro(deferredSearch, periodo, fechaDesde, fechaHasta),
+  });
   const mutation = useMutation({
     mutationFn: (input: InteresadoRegistroUpdateInput) => createInteresadoHabitual(input),
     onSuccess: async () => {
@@ -34,43 +37,98 @@ export function InteresadosRegistroPage() {
   const canCreateHabitual = user?.rol === "CLIENTE";
   const updateField = (field: keyof InteresadoRegistroUpdateInput, value: string) => setForm((current) => ({ ...current, [field]: uppercaseInput(value) }));
   const updateAddress = (value: AddressValue) => setForm((current) => ({ ...current, ...value, direccion: "" }));
-  return <main className="records-page registry-page">
-    <header className="records-header"><div><p className="eyebrow">Registro relacionado</p><h2>Interesados</h2><p>Personas y empresas vinculadas a los tramites accesibles.</p></div><div className="records-header__actions">{canCreateHabitual ? <button className="primary-button primary-button--compact" type="button" onClick={() => setCreating(true)}><Plus size={16} />Nuevo habitual</button> : null}<span className="records-count">{interesados.length} registros</span></div></header>
-    <RegistroFilters search={search} periodo={periodo} fechaDesde={fechaDesde} fechaHasta={fechaHasta} placeholder="Buscar por DNI, CIF o nombre" onSearch={setSearch} onPeriodo={setPeriodo} onFechaDesde={setFechaDesde} onFechaHasta={setFechaHasta} />
-    <section className="records-panel records-panel--ledger">
-      {query.isLoading ? <div className="records-skeleton"><span /><span /><span /></div> : null}
-      {query.error ? <div className="records-empty records-empty--danger">No se pudieron cargar los interesados.</div> : null}
-      {!query.isLoading && !query.error ? <div className="registry-list">
-        {interesados.length === 0 ? <div className="records-empty">No hay interesados que coincidan con la busqueda.</div> : null}
-        {interesados.map((item) => <Link className="registry-row" key={item.id} to={`/interesados/${item.id}`}>
-          <span className="registry-row__icon"><UserRound size={19} /></span><span className="registry-row__identity"><strong>{item.nombre}</strong><small>{item.dni}{item.representanteLegal ? " - representante legal" : ""}</small></span>
-          <span><small>Contacto</small><strong>{item.telefono || "Sin telefono"}</strong></span><span><small>Tramites</small><strong>{item.totalTramites}{item.habitual ? " · habitual" : ""}</strong></span>
-          <span><small>Ultima actividad</small><strong>{item.ultimaActividad || "Sin actividad"}</strong></span><ChevronRight size={18} />
-        </Link>)}
-      </div> : null}
-    </section>
-    {creating ? (
-      <div className="exp-modal" role="presentation">
-        <button className="exp-modal__backdrop" type="button" aria-label="Cerrar" onClick={() => setCreating(false)} />
-        <section className="exp-modal__panel exp-modal__panel--narrow" role="dialog" aria-modal="true" aria-labelledby="habitual-title">
-          <div className="exp-modal__header">
-            <div><p className="eyebrow">Cartera habitual</p><h3 id="habitual-title">Nuevo interesado</h3></div>
-            <button className="icon-button" type="button" aria-label="Cerrar" onClick={() => setCreating(false)}><X size={16} /></button>
+
+  return (
+    <main className="records-page registry-page">
+      <header className="records-header">
+        <div>
+          <p className="eyebrow">Cartera reutilizable</p>
+          <h2>Clientes habituales</h2>
+          <p>Personas y empresas guardadas para reutilizar datos y documentacion.</p>
+        </div>
+        <div className="records-header__actions">
+          {canCreateHabitual ? (
+            <button className="primary-button primary-button--compact" type="button" onClick={() => setCreating(true)}>
+              <Plus size={16} />
+              Nuevo cliente habitual
+            </button>
+          ) : null}
+          <span className="records-count">{interesados.length} registros</span>
+        </div>
+      </header>
+      <RegistroFilters
+        search={search}
+        periodo={periodo}
+        fechaDesde={fechaDesde}
+        fechaHasta={fechaHasta}
+        placeholder="Buscar por DNI, CIF o nombre"
+        onSearch={setSearch}
+        onPeriodo={setPeriodo}
+        onFechaDesde={setFechaDesde}
+        onFechaHasta={setFechaHasta}
+      />
+      <section className="records-panel records-panel--ledger">
+        {query.isLoading ? <div className="records-skeleton"><span /><span /><span /></div> : null}
+        {query.error ? <div className="records-empty records-empty--danger">No se pudieron cargar los clientes habituales.</div> : null}
+        {!query.isLoading && !query.error ? (
+          <div className="registry-list">
+            {interesados.length === 0 ? <div className="records-empty">No hay clientes habituales que coincidan con la busqueda.</div> : null}
+            {interesados.map((item) => (
+              <Link className="registry-row" key={item.id} to={`/interesados/${item.id}`}>
+                <span className="registry-row__icon"><UserRound size={19} /></span>
+                <span className="registry-row__identity">
+                  <strong>{item.nombre}</strong>
+                  <small>{item.dni}{item.representanteLegal ? " - representante legal" : ""}</small>
+                </span>
+                <span>
+                  <small>Tipo de ficha</small>
+                  <strong>{item.habitual ? "Cliente habitual" : "Interesado puntual"}</strong>
+                </span>
+                <span>
+                  <small>Tramites</small>
+                  <strong>{item.totalTramites}</strong>
+                </span>
+                <span>
+                  <small>Ultima actividad</small>
+                  <strong>{item.ultimaActividad || "Sin actividad"}</strong>
+                </span>
+                <ChevronRight size={18} />
+              </Link>
+            ))}
           </div>
-          <form className="vehicle-edit-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(form); }}>
-            <label><span>DNI / CIF</span><input required value={form.dni || ""} onChange={(event) => updateField("dni", event.target.value)} /></label>
-            <label><span>Nombre</span><input required value={form.nombre || ""} onChange={(event) => updateField("nombre", event.target.value)} /></label>
-            <label><span>Telefono</span><input value={form.telefono || ""} onChange={(event) => updateField("telefono", event.target.value)} /></label>
-            <label><span>Tipo</span><select value={form.tipoPersona || "PARTICULAR"} onChange={(event) => updateField("tipoPersona", event.target.value)}><option value="PARTICULAR">PARTICULAR</option><option value="EMPRESA">EMPRESA</option></select></label>
-            <AddressFields idPrefix="interesado-habitual" value={form} onChange={updateAddress} wideClassName="vehicle-edit-form__wide" />
-            {mutation.isError ? <p className="form-error">{mutation.error instanceof ApiError ? mutation.error.details || "No se pudo crear el interesado." : "No se pudo crear el interesado."}</p> : null}
-            <div className="vehicle-edit-form__actions">
-              <button className="soft-button" type="button" onClick={() => setCreating(false)}>Cancelar</button>
-              <button className="primary-button" disabled={mutation.isPending} type="submit"><Save size={16} /> Guardar habitual</button>
+        ) : null}
+      </section>
+      {creating ? (
+        <div className="exp-modal" role="presentation">
+          <button className="exp-modal__backdrop" type="button" aria-label="Cerrar" onClick={() => setCreating(false)} />
+          <section className="exp-modal__panel exp-modal__panel--narrow" role="dialog" aria-modal="true" aria-labelledby="habitual-title">
+            <div className="exp-modal__header">
+              <div>
+                <p className="eyebrow">Cartera reutilizable</p>
+                <h3 id="habitual-title">Nuevo cliente habitual</h3>
+              </div>
+              <button className="icon-button" type="button" aria-label="Cerrar" onClick={() => setCreating(false)}>
+                <X size={16} />
+              </button>
             </div>
-          </form>
-        </section>
-      </div>
-    ) : null}
-  </main>;
+            <form className="vehicle-edit-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(form); }}>
+              <label><span>DNI / CIF</span><input required value={form.dni || ""} onChange={(event) => updateField("dni", event.target.value)} /></label>
+              <label><span>Nombre</span><input required value={form.nombre || ""} onChange={(event) => updateField("nombre", event.target.value)} /></label>
+              <label><span>Telefono</span><input value={form.telefono || ""} onChange={(event) => updateField("telefono", event.target.value)} /></label>
+              <label><span>Tipo</span><select value={form.tipoPersona || "PARTICULAR"} onChange={(event) => updateField("tipoPersona", event.target.value)}><option value="PARTICULAR">PARTICULAR</option><option value="EMPRESA">EMPRESA</option></select></label>
+              <AddressFields idPrefix="interesado-habitual" value={form} onChange={updateAddress} wideClassName="vehicle-edit-form__wide" />
+              {mutation.isError ? <p className="form-error">{mutation.error instanceof ApiError ? mutation.error.details || "No se pudo crear el cliente habitual." : "No se pudo crear el cliente habitual."}</p> : null}
+              <div className="vehicle-edit-form__actions">
+                <button className="soft-button" type="button" onClick={() => setCreating(false)}>Cancelar</button>
+                <button className="primary-button" disabled={mutation.isPending} type="submit">
+                  <Save size={16} />
+                  Guardar cliente habitual
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+    </main>
+  );
 }

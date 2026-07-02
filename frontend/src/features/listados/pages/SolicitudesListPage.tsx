@@ -498,7 +498,7 @@ function SolicitudInterestedParties({ interesados }: { interesados?: SolicitudLi
       {visible.map((interesado, index) => (
         <span key={`${interesado.dni || interesado.nombre || "interesado"}-${index}`}>
           <strong>{interesado.nombre || "Sin nombre"}</strong>
-          <small>{[interesado.dni, interesado.rol ? formatEnum(interesado.rol) : null].filter(Boolean).join(" · ")}</small>
+          <small>{[interesado.dni, interesado.rol ? formatEnum(interesado.rol) : null, interesado.clienteHabitual ? "cliente habitual" : "interesado puntual"].filter(Boolean).join(" - ")}</small>
         </span>
       ))}
       {ordered.length > visible.length ? <em>+{ordered.length - visible.length} mas</em> : null}

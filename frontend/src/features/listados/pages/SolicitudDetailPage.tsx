@@ -23,10 +23,12 @@ import type { DocumentoIdentidadDetectada, DocumentoIdentidadLectura, DocumentoE
 import { formatDocumentType } from "../../expedientes/utils/formatters";
 import "../../expedientes/styles/expedienteDetail.css";
 import {
+  asignarInteresadoHabitualSolicitud,
   anadirIdentidadDetectadaSolicitud,
   cambiarEstadoSolicitud,
   convertirSolicitud,
   enviarMensajeSolicitud,
+  getSolicitudInteresadosHabituales,
   getSolicitudInteresadoCoincidencias,
   getSolicitudDetail,
   getSolicitudPreparacionTraspaso,
@@ -40,6 +42,7 @@ import type {
   SolicitudDetail,
   SolicitudDocumentacionIaResponse,
   SolicitudIdentidadDetectadaInput,
+  SolicitudInteresadoHabitual,
   SolicitudPreparacionBloque,
   SolicitudPreparacionDocumento,
   SolicitudPreparacionTraspaso,
@@ -63,6 +66,7 @@ export function SolicitudDetailPage() {
   const [iaResult, setIaResult] = useState<SolicitudDocumentacionIaResponse | null>(null);
   const [iaError, setIaError] = useState<string | null>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [habitualSearch, setHabitualSearch] = useState("");
   const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
 
@@ -75,6 +79,12 @@ export function SolicitudDetailPage() {
   const preparacionQuery = useQuery({
     queryKey: ["solicitudes", "preparacion-traspaso", id],
     queryFn: () => getSolicitudPreparacionTraspaso(id!),
+    enabled: Boolean(id),
+  });
+
+  const habitualesQuery = useQuery({
+    queryKey: ["solicitudes", "habituales", id, habitualSearch],
+    queryFn: () => getSolicitudInteresadosHabituales(id!, habitualSearch),
     enabled: Boolean(id),
   });
 
@@ -139,6 +149,20 @@ export function SolicitudDetailPage() {
   const anadirIdentidadDetectadaMutation = useMutation({
     mutationFn: ({ solicitudId, input }: { solicitudId: number; input: SolicitudIdentidadDetectadaInput }) =>
       anadirIdentidadDetectadaSolicitud(solicitudId, input),
+    onSuccess: async (actualizada) => {
+      queryClient.setQueryData(["solicitudes", "detalle", id], actualizada);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
+        queryClient.invalidateQueries({ queryKey: ["solicitudes", "preparacion-traspaso", id] }),
+        queryClient.invalidateQueries({ queryKey: ["tareas"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
+    },
+  });
+
+  const asignarHabitualMutation = useMutation({
+    mutationFn: ({ solicitudId, input }: { solicitudId: number; input: { interesadoId: number; rol: string } }) =>
+      asignarInteresadoHabitualSolicitud(solicitudId, input),
     onSuccess: async (actualizada) => {
       queryClient.setQueryData(["solicitudes", "detalle", id], actualizada);
       await Promise.all([
@@ -447,6 +471,23 @@ export function SolicitudDetailPage() {
     }
   };
 
+  const handleAssignHabitual = async (habitual: SolicitudInteresadoHabitual, rol: string) => {
+    const solicitudActual = solicitudQuery.data;
+    if (!solicitudActual) return;
+    if (!rol) {
+      alert("Selecciona el rol antes de asignar el cliente habitual.");
+      return;
+    }
+    try {
+      await asignarHabitualMutation.mutateAsync({
+        solicitudId: solicitudActual.id,
+        input: { interesadoId: habitual.id, rol },
+      });
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo asignar el cliente habitual." : "No se pudo asignar el cliente habitual.");
+    }
+  };
+
   if (solicitudQuery.isLoading) {
     return <div className="records-empty">Cargando solicitud...</div>;
   }
@@ -599,9 +640,14 @@ export function SolicitudDetailPage() {
                     <strong>{interesado.nombre || "Interesado"}</strong>
                     <span>{interesado.rol ? formatEnum(interesado.rol) : "Sin rol asignado"}</span>
                   </div>
-                  <StatusBadge tone={interesado.documentoIdentidadAportado ? "success" : "warning"}>
-                    {interesado.documentoIdentidadAportado ? "DNI/CIF aportado" : "Falta DNI/CIF"}
-                  </StatusBadge>
+                  <div className="request-person-card__badges">
+                    <StatusBadge tone={interesado.clienteHabitual ? "info" : "neutral"}>
+                      {interesado.clienteHabitual ? "Cliente habitual" : "Interesado puntual"}
+                    </StatusBadge>
+                    <StatusBadge tone={interesado.documentoIdentidadAportado ? "success" : "warning"}>
+                      {interesado.documentoIdentidadAportado ? "DNI/CIF aportado" : "Falta DNI/CIF"}
+                    </StatusBadge>
+                  </div>
                 </header>
                 <dl className="request-person-facts">
                   <div>
@@ -630,6 +676,17 @@ export function SolicitudDetailPage() {
             );
           })}
         </div>
+        {!isClosed ? (
+          <SolicitudHabitualesPanel
+            adding={asignarHabitualMutation.isPending}
+            existingIdentifiers={existingIdentityIdentifiers}
+            habituales={habitualesQuery.data ?? []}
+            loading={habitualesQuery.isLoading}
+            onAssign={handleAssignHabitual}
+            onSearch={setHabitualSearch}
+            search={habitualSearch}
+          />
+        ) : null}
       </section>
 
       <div className="request-grid request-grid--wide">
@@ -745,6 +802,93 @@ export function SolicitudDetailPage() {
       {procesarDocumentacionMutation.isPending ? <SolicitudIaProgressModal /> : null}
       {dialog}
     </section>
+  );
+}
+
+function SolicitudHabitualesPanel({
+  adding,
+  existingIdentifiers,
+  habituales,
+  loading,
+  onAssign,
+  onSearch,
+  search,
+}: {
+  adding: boolean;
+  existingIdentifiers: Set<string>;
+  habituales: SolicitudInteresadoHabitual[];
+  loading: boolean;
+  onAssign: (habitual: SolicitudInteresadoHabitual, rol: string) => void;
+  onSearch: (value: string) => void;
+  search: string;
+}) {
+  const [selectedRoles, setSelectedRoles] = useState<Record<number, string>>({});
+  return (
+    <div className="request-habituals">
+      <div className="request-habituals__heading">
+        <div>
+          <strong>Clientes habituales</strong>
+          <span>{habituales.length > 0 ? `${habituales.length} disponibles` : "Sin resultados"}</span>
+        </div>
+        <input
+          aria-label="Buscar cliente habitual"
+          onChange={(event) => onSearch(uppercaseInput(event.target.value))}
+          placeholder="Buscar por nombre o DNI"
+          value={search}
+        />
+      </div>
+      <div className="request-habituals__list">
+        {loading ? <p className="rail-muted">Cargando clientes habituales...</p> : null}
+        {!loading && habituales.length === 0 ? <p className="rail-muted">No hay clientes habituales que coincidan.</p> : null}
+        {habituales.map((habitual) => {
+          const normalizedId = normalizeIdentityIdentifier(habitual.dni);
+          const alreadyAdded = Boolean(normalizedId && existingIdentifiers.has(normalizedId));
+          const selectedRole = selectedRoles[habitual.id] || "";
+          const direccion = formatHabitualAddress(habitual);
+          return (
+            <article className="request-habitual-card" key={habitual.id}>
+              <div className="request-habitual-card__main">
+                <span className="row-icon" aria-hidden="true">
+                  <UserRound size={16} />
+                </span>
+                <div>
+                  <strong>{habitual.nombre || "Cliente habitual"}</strong>
+                  <small>{[habitual.dni, direccion].filter(Boolean).join(" · ") || "Sin datos adicionales"}</small>
+                </div>
+              </div>
+              <div className="request-habitual-card__meta">
+                <StatusBadge tone={habitual.documentoIdentidadAportado ? "success" : "warning"}>
+                  {habitual.documentoIdentidadAportado ? "DNI/CIF guardado" : "Sin DNI/CIF guardado"}
+                </StatusBadge>
+                <small>{habitual.documentos} doc.</small>
+              </div>
+              <div className="request-habitual-card__actions">
+                <select
+                  aria-label="Rol del cliente habitual"
+                  disabled={adding || alreadyAdded}
+                  onChange={(event) => setSelectedRoles((current) => ({ ...current, [habitual.id]: event.target.value }))}
+                  value={selectedRole}
+                >
+                  <option value="">Rol</option>
+                  {SOLICITUD_ROLES.map((rol) => (
+                    <option key={rol} value={rol}>{formatEnum(rol)}</option>
+                  ))}
+                </select>
+                <button
+                  className="soft-button soft-button--compact"
+                  disabled={adding || alreadyAdded || !selectedRole || !normalizedId}
+                  onClick={() => onAssign(habitual, selectedRole)}
+                  type="button"
+                >
+                  {adding ? <Loader2 size={14} /> : <UserPlus size={14} />}
+                  {alreadyAdded ? "Incluido" : "Asignar"}
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1535,6 +1679,17 @@ function formatEnum(value?: string | null) {
 }
 
 function formatInteresadoAddress(interesado: InteresadoSolicitud) {
+  const via = [interesado.tipoVia, interesado.nombreVia]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(" ");
+  return [via || interesado.direccion, interesado.codigoPostal, interesado.municipio, interesado.provincia]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function formatHabitualAddress(interesado: SolicitudInteresadoHabitual) {
   const via = [interesado.tipoVia, interesado.nombreVia]
     .map((value) => value?.trim())
     .filter(Boolean)

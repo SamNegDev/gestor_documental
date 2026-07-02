@@ -21,6 +21,8 @@ import com.example.gestor_documental.dto.expediente.SolicitudBulkConvertResponse
 import com.example.gestor_documental.dto.expediente.SolicitudDetailResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudDocumentacionIaResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudIdentidadDetectadaRequest;
+import com.example.gestor_documental.dto.expediente.SolicitudInteresadoHabitualResponse;
+import com.example.gestor_documental.dto.expediente.SolicitudInteresadoHabitualRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudListItemResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudPreparacionTraspasoResponse;
@@ -31,6 +33,8 @@ import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
+import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.ClienteInteresado;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
@@ -246,6 +250,42 @@ public class SolicitudApiController {
     ) {
         Usuario usuarioLogueado = usuario(authentication);
         Solicitud solicitud = solicitudService.anadirInteresadoDetectado(id, request, usuarioLogueado);
+        return mapSolicitudDetail(solicitud, usuarioLogueado);
+    }
+
+    @GetMapping("/{id}/interesados/habituales")
+    public List<SolicitudInteresadoHabitualResponse> listarInteresadosHabituales(
+            @PathVariable Long id,
+            @RequestParam(required = false) String q,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = usuario(authentication);
+        Solicitud solicitud = solicitudService.buscarPorId(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+        if (!solicitudService.tienePermisoSolicitud(solicitud, usuarioLogueado)) {
+            throw new AccesoDenegadoException("No tienes permiso para consultar esta solicitud");
+        }
+        if (solicitud.getCliente() == null || solicitud.getCliente().getId() == null) {
+            return List.of();
+        }
+        String texto = TextNormalizer.upperOrNull(q);
+        if (texto != null) {
+            texto = "%" + texto.replaceAll("\\s+", "%") + "%";
+        }
+        Long clienteId = solicitud.getCliente().getId();
+        return clienteInteresadoRepository.buscarPorClienteYTexto(clienteId, texto, PageRequest.of(0, 30)).stream()
+                .map(relacion -> mapInteresadoHabitual(clienteId, relacion.getInteresado()))
+                .toList();
+    }
+
+    @PostMapping("/{id}/interesados/habitual")
+    public SolicitudDetailResponse asignarInteresadoHabitual(
+            @PathVariable Long id,
+            @RequestBody SolicitudInteresadoHabitualRequest request,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = usuario(authentication);
+        Solicitud solicitud = solicitudService.asignarInteresadoHabitual(id, request, usuarioLogueado);
         return mapSolicitudDetail(solicitud, usuarioLogueado);
     }
 
@@ -638,6 +678,28 @@ public class SolicitudApiController {
                 .build();
     }
 
+    private SolicitudInteresadoHabitualResponse mapInteresadoHabitual(Long clienteId, Interesado interesado) {
+        List<Documento> documentos = documentoService.listarPorInteresadoHabitual(clienteId, interesado.getId());
+        boolean documentoIdentidad = documentos.stream()
+                .anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.DNI
+                        || documento.getTipoDocumento() == TipoDocumento.CIF);
+        return SolicitudInteresadoHabitualResponse.builder()
+                .id(interesado.getId())
+                .dni(interesado.getDni())
+                .nombre(interesado.getNombre())
+                .telefono(interesado.getTelefono())
+                .direccion(interesado.getDireccion())
+                .tipoVia(interesado.getTipoVia())
+                .nombreVia(interesado.getNombreVia())
+                .codigoPostal(interesado.getCodigoPostal())
+                .municipio(interesado.getMunicipio())
+                .provincia(interesado.getProvincia())
+                .tipoPersona(interesado.getTipoPersona() != null ? interesado.getTipoPersona().name() : null)
+                .documentos(documentos.size())
+                .documentoIdentidadAportado(documentoIdentidad)
+                .build();
+    }
+
     private List<InteresadoSolicitudResponse> mapInteresados(Solicitud solicitud, List<Documento> documentos, boolean incluirSoporteCliente) {
         java.util.ArrayList<InteresadoSolicitudResponse> interesados = new java.util.ArrayList<>();
         if (hasInteresadoData(
@@ -768,6 +830,7 @@ public class SolicitudApiController {
                 .municipio(municipio)
                 .provincia(provincia)
                 .personaJuridica(personaJuridica)
+                .clienteHabitual(clienteHabitual(solicitud, dni))
                 .documentoIdentidadAportado(identidad.aportado())
                 .documentoIdentidadOrigen(identidad.origen())
                 .requiereRepresentanteLegal(personaJuridica)
@@ -775,6 +838,20 @@ public class SolicitudApiController {
                 .representanteLegalNombre(representante.nombre())
                 .representanteLegalDni(representante.dni())
                 .build();
+    }
+
+    private boolean clienteHabitual(Solicitud solicitud, String dni) {
+        if (solicitud.getCliente() == null || solicitud.getCliente().getId() == null) {
+            return false;
+        }
+        String identificador = normalizarIdentificador(dni);
+        if (identificador.isBlank()) {
+            return false;
+        }
+        return clienteInteresadoRepository.existsByClienteIdAndInteresadoIdentificador(
+                solicitud.getCliente().getId(),
+                identificador
+        );
     }
 
     private DocumentoSoporte soporteIdentidad(

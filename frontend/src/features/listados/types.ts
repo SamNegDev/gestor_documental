@@ -74,6 +74,7 @@ export interface InteresadoSolicitud {
   municipio?: string | null;
   provincia?: string | null;
   personaJuridica?: boolean;
+  clienteHabitual?: boolean;
   documentoIdentidadAportado?: boolean;
   documentoIdentidadOrigen?: string | null;
   requiereRepresentanteLegal?: boolean;
@@ -148,6 +149,27 @@ export interface SolicitudIdentidadDetectadaInput {
   razonSocial?: string | null;
   nombreCompleto?: string | null;
   direccionTexto?: string | null;
+}
+
+export interface SolicitudInteresadoHabitual {
+  id: number;
+  dni?: string | null;
+  nombre?: string | null;
+  telefono?: string | null;
+  direccion?: string | null;
+  tipoVia?: string | null;
+  nombreVia?: string | null;
+  codigoPostal?: string | null;
+  municipio?: string | null;
+  provincia?: string | null;
+  tipoPersona?: string | null;
+  documentos: number;
+  documentoIdentidadAportado: boolean;
+}
+
+export interface SolicitudInteresadoHabitualInput {
+  interesadoId: number;
+  rol: string;
 }
 
 export interface SolicitudDocumentacionIaResponse {

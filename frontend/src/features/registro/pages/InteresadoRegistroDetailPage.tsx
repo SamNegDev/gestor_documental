@@ -115,14 +115,14 @@ export function InteresadoRegistroDetailPage() {
   };
 
   return <main className="records-page registry-detail-page">
-    <Link className="registry-back" to="/interesados"><ArrowLeft size={16} /> Volver a interesados</Link>
-    <section className="registry-profile"><span className="registry-profile__icon"><UserRound size={28} /></span><div><p className="eyebrow">{item.representanteLegal ? "REPRESENTANTE LEGAL" : item.tipoPersona || "INTERESADO"}</p><h2>{item.nombre}</h2><strong>{item.dni}</strong></div><div className="registry-profile__facts"><span><Phone size={16} />{item.telefono || "Sin telefono"}</span><span><MapPin size={16} />{item.direccion || "Sin direccion"}</span><span><strong>{item.totalTramites}</strong> tramites asociados</span></div>{canEdit ? <button className="soft-button soft-button--compact registry-profile__edit" onClick={() => setEditing(true)} type="button"><Pencil size={15} />Editar ficha</button> : null}</section>
+    <Link className="registry-back" to="/interesados"><ArrowLeft size={16} /> Volver a clientes habituales</Link>
+    <section className="registry-profile"><span className="registry-profile__icon"><UserRound size={28} /></span><div><p className="eyebrow">{item.habitual ? "CLIENTE HABITUAL" : "INTERESADO PUNTUAL"} - {item.representanteLegal ? "REPRESENTANTE LEGAL" : item.tipoPersona || "INTERESADO"}</p><h2>{item.nombre}</h2><strong>{item.dni}</strong></div><div className="registry-profile__facts"><span><Phone size={16} />{item.telefono || "Sin telefono"}</span><span><MapPin size={16} />{item.direccion || "Sin direccion"}</span><span><strong>{item.totalTramites}</strong> tramites asociados</span></div>{canEdit ? <button className="soft-button soft-button--compact registry-profile__edit" onClick={() => setEditing(true)} type="button"><Pencil size={15} />Editar ficha</button> : null}</section>
     {editing ? (
       <section className="records-panel vehicle-edit-panel">
         <div className="records-panel__heading">
           <div>
-            <h3>Datos del interesado</h3>
-            <span>Ficha maestra editable solo desde el registro de interesados</span>
+            <h3>{item.habitual ? "Datos del cliente habitual" : "Datos del interesado puntual"}</h3>
+            <span>Ficha reutilizable editable desde este registro</span>
           </div>
           <button className="icon-button" onClick={() => setEditing(false)} title="Cerrar edicion" type="button"><X size={16} /></button>
         </div>
@@ -132,7 +132,7 @@ export function InteresadoRegistroDetailPage() {
           <label><span>Telefono</span><input value={form.telefono || ""} onChange={(event) => updateField("telefono", event.target.value)} /></label>
           <label><span>Tipo</span><select value={form.tipoPersona || "PARTICULAR"} onChange={(event) => updateField("tipoPersona", event.target.value)}><option value="PARTICULAR">PARTICULAR</option><option value="EMPRESA">EMPRESA</option></select></label>
           <AddressFields idPrefix="interesado-registro" value={form} onChange={updateAddress} wideClassName="vehicle-edit-form__wide" />
-          {mutation.isError ? <p className="form-error">{mutation.error instanceof ApiError ? mutation.error.details || "No se pudo guardar el interesado." : "No se pudo guardar el interesado."}</p> : null}
+          {mutation.isError ? <p className="form-error">{mutation.error instanceof ApiError ? mutation.error.details || "No se pudo guardar la ficha." : "No se pudo guardar la ficha."}</p> : null}
           <div className="vehicle-edit-form__actions">
             <button className="soft-button" onClick={() => setEditing(false)} type="button">Cancelar</button>
             <button className="primary-button" disabled={mutation.isPending} type="submit"><Save size={16} /> Guardar ficha</button>
@@ -143,7 +143,7 @@ export function InteresadoRegistroDetailPage() {
     {canManageHabitualDocs ? (
       <section className="records-panel client-documents-panel">
         <div className="records-panel__heading">
-          <div><h3>Documentacion recurrente</h3><span>Estos PDFs se reutilizan cuando este interesado participa en tus expedientes.</span></div>
+          <div><h3>Documentacion recurrente</h3><span>Estos PDFs se reutilizan cuando este cliente habitual participa en tus expedientes.</span></div>
         </div>
         <div className="client-document-uploader">
           <label>Tipo<select value={documentType} onChange={(event) => setDocumentType(event.target.value)}>{INTERESADO_DOCUMENT_TYPES.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label}</option>)}</select></label>
@@ -162,7 +162,7 @@ export function InteresadoRegistroDetailPage() {
 
 function InteresadoDocuments({ documentos, busyId, onDelete }: { documentos: DocumentoExpediente[]; busyId?: number; onDelete: (documento: DocumentoExpediente) => void }) {
   if (!documentos.length) {
-    return <div className="client-documents-empty"><FileText size={18} /><span>No hay PDFs recurrentes registrados para este interesado.</span></div>;
+    return <div className="client-documents-empty"><FileText size={18} /><span>No hay PDFs recurrentes registrados para este cliente habitual.</span></div>;
   }
   return <div className="client-documents-list">{documentos.map((documento) => <article className="client-document-row" key={documento.id}>
     <div className="client-document-row__icon"><FileText size={17} /></div>

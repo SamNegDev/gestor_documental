@@ -5221,6 +5221,18 @@ input.records-table-filter {
   white-space: nowrap;
 }
 
+.request-person-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.request-person-card__badges .status-badge {
+  justify-self: auto;
+}
+
 .request-person-facts {
   display: grid;
   grid-template-columns: minmax(0, 0.72fr) minmax(0, 0.62fr);
@@ -5288,6 +5300,122 @@ input.records-table-filter {
 .request-person-note.is-warning {
   border-color: oklch(82% 0.11 75);
   color: oklch(46% 0.1 70);
+}
+
+.request-habituals {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.request-habituals__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.45fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.request-habituals__heading strong,
+.request-habituals__heading span {
+  display: block;
+}
+
+.request-habituals__heading strong {
+  color: var(--ink-strong);
+  font-size: 0.9rem;
+}
+
+.request-habituals__heading span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 760;
+}
+
+.request-habituals__heading input,
+.request-habitual-card__actions select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--ink-strong);
+  font-weight: 760;
+}
+
+.request-habituals__heading input {
+  padding: 0 11px;
+}
+
+.request-habitual-card__actions select {
+  padding: 0 9px;
+}
+
+.request-habituals__list {
+  display: grid;
+  gap: 8px;
+}
+
+.request-habitual-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.request-habitual-card__main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.request-habitual-card__main strong,
+.request-habitual-card__main small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.request-habitual-card__main strong {
+  color: var(--ink-strong);
+  font-size: 0.84rem;
+}
+
+.request-habitual-card__main small,
+.request-habitual-card__meta small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 730;
+}
+
+.request-habitual-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.request-habitual-card__meta .status-badge {
+  white-space: nowrap;
+}
+
+.request-habitual-card__actions {
+  display: grid;
+  grid-template-columns: minmax(116px, 0.68fr) auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .request-status-callout {
@@ -6975,6 +7103,16 @@ input.records-table-filter {
     grid-template-columns: 1fr;
   }
 
+  .request-habituals__heading,
+  .request-habitual-card,
+  .request-habitual-card__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .request-habitual-card__meta {
+    justify-content: flex-start;
+  }
+
   .productivity-kpis {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -7129,6 +7267,11 @@ input.records-table-filter {
   .request-person-card .status-badge {
     grid-column: 1 / -1;
     justify-self: start;
+  }
+
+  .request-person-card__badges {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
   }
 
   .content,

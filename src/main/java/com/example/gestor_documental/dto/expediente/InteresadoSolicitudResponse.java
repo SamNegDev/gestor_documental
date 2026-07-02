@@ -23,6 +23,7 @@ public class InteresadoSolicitudResponse {
     private String municipio;
     private String provincia;
     private boolean personaJuridica;
+    private boolean clienteHabitual;
     private boolean documentoIdentidadAportado;
     private String documentoIdentidadOrigen;
     private boolean requiereRepresentanteLegal;

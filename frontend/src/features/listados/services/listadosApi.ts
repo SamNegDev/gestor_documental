@@ -1,6 +1,6 @@
 import { apiDelete, apiGet, apiPostForm, apiPostJson, apiPutJson } from "../../../shared/api/http";
 import type { CreacionConProcesamiento } from "../../expedientes/types/expedienteDetail.types";
-import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudDocumentacionIaResponse, SolicitudIdentidadDetectadaInput, SolicitudInteresadoCoincidencia, SolicitudListItem, SolicitudPreparacionTraspaso, SolicitudUpsertInput } from "../types";
+import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudDocumentacionIaResponse, SolicitudIdentidadDetectadaInput, SolicitudInteresadoCoincidencia, SolicitudInteresadoHabitual, SolicitudInteresadoHabitualInput, SolicitudListItem, SolicitudPreparacionTraspaso, SolicitudUpsertInput } from "../types";
 
 function buildQuery(filters: ListFilters) {
   const params = new URLSearchParams();
@@ -98,6 +98,17 @@ export function getSolicitudInteresadoCoincidencias(id: number) {
 
 export function anadirIdentidadDetectadaSolicitud(id: number, input: SolicitudIdentidadDetectadaInput) {
   return apiPostJson<SolicitudDetail>(`/api/solicitudes/${id}/interesados/detectados`, input);
+}
+
+export function getSolicitudInteresadosHabituales(id: string | number, search = "") {
+  const params = new URLSearchParams();
+  if (search.trim()) params.set("q", search.trim());
+  const query = params.toString();
+  return apiGet<SolicitudInteresadoHabitual[]>(`/api/solicitudes/${id}/interesados/habituales${query ? `?${query}` : ""}`);
+}
+
+export function asignarInteresadoHabitualSolicitud(id: number, input: SolicitudInteresadoHabitualInput) {
+  return apiPostJson<SolicitudDetail>(`/api/solicitudes/${id}/interesados/habitual`, input);
 }
 
 export function bulkConvertSolicitudes(solicitudIds: number[]) {

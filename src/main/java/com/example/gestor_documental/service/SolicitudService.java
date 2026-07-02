@@ -6,6 +6,7 @@ import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.dto.expediente.SolicitudIdentidadDetectadaRequest;
+import com.example.gestor_documental.dto.expediente.SolicitudInteresadoHabitualRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 
 import java.util.List;
@@ -62,6 +63,8 @@ public interface SolicitudService {
     Solicitud resetDatosLecturaIa(Long id, Usuario admin);
 
     Solicitud anadirInteresadoDetectado(Long id, SolicitudIdentidadDetectadaRequest request, Usuario usuarioLogueado);
+
+    Solicitud asignarInteresadoHabitual(Long id, SolicitudInteresadoHabitualRequest request, Usuario usuarioLogueado);
 
     void eliminarSolicitudErronea(Long id, Usuario admin);
 }

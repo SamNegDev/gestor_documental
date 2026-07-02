@@ -36,7 +36,7 @@ function pageTitle(pathname: string) {
   if (pathname === "/expedientes") return "Expedientes";
   if (pathname === "/expedientes/creacion-multiple") return "Creacion multiple";
   if (pathname === "/solicitudes") return "Solicitudes";
-  if (pathname.startsWith("/interesados")) return pathname === "/interesados" ? "Interesados" : "Ficha del interesado";
+  if (pathname.startsWith("/interesados")) return pathname === "/interesados" ? "Clientes habituales" : "Ficha del cliente habitual";
   if (pathname.startsWith("/vehiculos")) return pathname === "/vehiculos" ? "Vehiculos" : "Ficha del vehiculo";
   if (pathname.includes("/cliente/solicitudes/") && pathname.endsWith("/editar")) return "Editar solicitud";
   if (pathname === "/cliente/solicitudes/creacion-multiple") return "Creacion multiple";
@@ -66,7 +66,7 @@ const adminMenuItems: MenuItemConfig[] = [
   { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Expedientes" },
   { id: "expedientes-bulk", to: "/expedientes/creacion-multiple", icon: FolderPlus, label: "Creacion multiple" },
   { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },
-  { id: "interesados", to: "/interesados", icon: UserRound, label: "Interesados" },
+  { id: "interesados", to: "/interesados", icon: UserRound, label: "Habituales" },
   { id: "vehiculos", to: "/vehiculos", icon: CarFront, label: "Vehiculos" },
   { id: "clientes", to: "/admin/clientes", icon: UsersRound, label: "Clientes" },
   { id: "usuarios", to: "/admin/usuarios", icon: UserRoundCheck, label: "Usuarios" },
@@ -83,7 +83,7 @@ const clientMenuItems: MenuItemConfig[] = [
   { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Mis expedientes" },
   { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },
   { id: "solicitudes-bulk", to: "/cliente/solicitudes/creacion-multiple", icon: FolderPlus, label: "Creacion multiple" },
-  { id: "interesados", to: "/interesados", icon: UserRound, label: "Interesados" },
+  { id: "interesados", to: "/interesados", icon: UserRound, label: "Clientes habituales" },
   { id: "vehiculos", to: "/vehiculos", icon: CarFront, label: "Vehiculos" },
 ];
 
