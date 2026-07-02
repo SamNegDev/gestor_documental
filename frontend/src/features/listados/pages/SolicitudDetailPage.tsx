@@ -368,12 +368,9 @@ export function SolicitudDetailPage() {
   const handleProcessClienteIa = async () => {
     const solicitudActual = solicitudQuery.data;
     if (!solicitudActual) return;
-    const lecturaIa = solicitudActual.lecturaIaCliente;
     const confirmed = await confirm({
       title: "Solicitar lectura IA",
-      description: lecturaIa
-        ? `Se revisara la documentacion aportada con IA. Te quedaran ${Math.max(0, lecturaIa.usosRestantes - 1)} de ${lecturaIa.usosMaximos} usos en esta solicitud.`
-        : "Se revisara la documentacion aportada con IA.",
+      description: "Se revisara la documentacion aportada con IA. Puedes volver a solicitar lectura si aportas nueva documentacion o corriges datos.",
       confirmLabel: "Solicitar",
       cancelLabel: "Cancelar",
       tone: "default",
@@ -1216,9 +1213,6 @@ function SolicitudClienteIaPanel({
           <p className="eyebrow">Lectura IA</p>
           <h3>Revision automatica</h3>
         </div>
-        <span className="exp-panel__counter">
-          {lecturaIa ? `${lecturaIa.usosRestantes}/${lecturaIa.usosMaximos}` : "0/3"}
-        </span>
       </div>
       <div className="client-ai-panel__body">
         <span className={`client-ai-panel__icon ${loading ? "client-ai-panel__icon--active" : ""}`}>
@@ -1227,8 +1221,7 @@ function SolicitudClienteIaPanel({
         <div>
           <strong>{lecturaIa?.mensaje || "Lectura IA no disponible."}</strong>
           <small>
-            Usos consumidos: {lecturaIa?.usosConsumidos ?? 0} de {lecturaIa?.usosMaximos ?? 3}
-            {lecturaIa ? ` - Documentos: ${lecturaIa.documentosIdentidad} identidad / ${lecturaIa.documentosVehiculo ?? 0} vehiculo` : ""}
+            {lecturaIa ? `Documentos: ${lecturaIa.documentosIdentidad} identidad / ${lecturaIa.documentosVehiculo ?? 0} vehiculo` : "Aporta la documentacion minima para habilitar la lectura."}
           </small>
           {lecturaIa && !lecturaIa.documentacionSuficiente && lecturaIa.bloqueosDocumentales.length > 0 ? (
             <ul className="client-ai-blockers">
@@ -1251,7 +1244,6 @@ function clienteIaButtonText(lecturaIa?: LecturaIaSolicitudCliente | null, loadi
   if (loading) return "Solicitando";
   if (!lecturaIa) return "No disponible";
   if (!lecturaIa.apiKeyConfigurada) return "IA no configurada";
-  if (lecturaIa.usosRestantes <= 0) return "Limite alcanzado";
   if (!lecturaIa.documentacionSuficiente) return "Documentacion pendiente";
   return "Solicitar lectura IA";
 }

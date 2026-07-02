@@ -57,7 +57,8 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private static final Logger log = LoggerFactory.getLogger(SolicitudDocumentacionIaServiceImpl.class);
     private static final double CONFIANZA_MINIMA_IDENTIDAD = 0.80;
     private static final double CONFIANZA_MINIMA_ROLES = 0.90;
-    private static final int MAX_USOS_CLIENTE_SOLICITUD = 3;
+    private static final int USOS_CLIENTE_SIN_LIMITE = 0;
+    private static final int USOS_RESTANTES_SIN_LIMITE = Integer.MAX_VALUE;
     private static final String ACCION_IA_CLIENTE_SOLICITUD = "IA DOCUMENTACION CLIENTE";
 
     private final SolicitudRepository solicitudRepository;
@@ -117,7 +118,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 solicitud,
                 cliente,
                 ACCION_IA_CLIENTE_SOLICITUD,
-                "El cliente solicito lectura IA de documentacion (" + (estado.usosConsumidos() + 1) + "/" + MAX_USOS_CLIENTE_SOLICITUD + ").");
+                "El cliente solicito lectura IA de documentacion.");
         return response;
     }
 
@@ -303,17 +304,15 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private LecturaIaSolicitudClienteResponse construirEstadoLecturaCliente(Solicitud solicitud, String mensajePreferente) {
         DocumentacionSolicitudCliente documentacion = documentacionSolicitudCliente(solicitud);
         long usos = historialCambioRepository.countBySolicitudIdAndAccion(solicitud.getId(), ACCION_IA_CLIENTE_SOLICITUD);
-        int usosConsumidos = Math.toIntExact(Math.min(usos, MAX_USOS_CLIENTE_SOLICITUD));
-        int usosRestantes = Math.max(0, MAX_USOS_CLIENTE_SOLICITUD - usosConsumidos);
+        int usosConsumidos = toIntSaturado(usos);
         boolean apiKeyConfigurada = openAiProperties.hasApiKey();
-        boolean limiteAlcanzado = usosRestantes <= 0;
         boolean cerrada = solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA
                 || solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO
                 || solicitud.getExpediente() != null;
-        boolean puedeSolicitar = apiKeyConfigurada && documentacion.suficiente() && !limiteAlcanzado && !cerrada;
+        boolean puedeSolicitar = apiKeyConfigurada && documentacion.suficiente() && !cerrada;
         String mensaje = mensajePreferente != null
                 ? mensajePreferente
-                : mensajeLecturaClienteSolicitud(apiKeyConfigurada, documentacion.suficiente(), limiteAlcanzado, cerrada);
+                : mensajeLecturaClienteSolicitud(apiKeyConfigurada, documentacion.suficiente(), cerrada);
         return new LecturaIaSolicitudClienteResponse(
                 solicitud.getId(),
                 apiKeyConfigurada,
@@ -321,8 +320,8 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 puedeSolicitar,
                 documentacion.bloqueos(),
                 usosConsumidos,
-                MAX_USOS_CLIENTE_SOLICITUD,
-                usosRestantes,
+                USOS_CLIENTE_SIN_LIMITE,
+                USOS_RESTANTES_SIN_LIMITE,
                 documentacion.documentosIdentidad(),
                 documentacion.documentosVehiculo(),
                 documentacion.documentosRoles(),
@@ -364,7 +363,6 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private String mensajeLecturaClienteSolicitud(
             boolean apiKeyConfigurada,
             boolean documentacionSuficiente,
-            boolean limiteAlcanzado,
             boolean cerrada
     ) {
         if (cerrada) {
@@ -373,13 +371,14 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         if (!apiKeyConfigurada) {
             return "La lectura IA no esta disponible en este momento.";
         }
-        if (limiteAlcanzado) {
-            return "Has alcanzado el limite de 3 lecturas IA para esta solicitud.";
-        }
         if (!documentacionSuficiente) {
             return "Falta documentacion minima para iniciar la lectura IA.";
         }
         return "Puedes solicitar lectura IA de la documentacion aportada.";
+    }
+
+    private int toIntSaturado(long valor) {
+        return valor > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.toIntExact(Math.max(0, valor));
     }
 
     private void validarSolicitudAbierta(Solicitud solicitud) {

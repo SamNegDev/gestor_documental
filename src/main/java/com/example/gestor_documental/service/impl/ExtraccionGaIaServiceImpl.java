@@ -143,7 +143,8 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
     private static final long LIMITE_BYTES_REQUEST = 50L * 1024L * 1024L;
     private static final int DNI_RENDER_DPI = 300;
     private static final int DNI_MAX_PAGINAS_PROCESADAS = 2;
-    private static final int MAX_USOS_LECTURA_CLIENTE = 3;
+    private static final int USOS_CLIENTE_SIN_LIMITE = 0;
+    private static final int USOS_RESTANTES_SIN_LIMITE = Integer.MAX_VALUE;
     private static final DateTimeFormatter FORMATO_FECHA_GA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter FORMATO_DOCUMENTO_GA = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final Charset XML_GA_CHARSET = Charset.forName("ISO-8859-1");
@@ -513,11 +514,6 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
             return construirEstadoLecturaCliente(expediente, cliente, false, "Ya hay una lectura IA en curso.");
         }
 
-        boolean usoCliente = cliente != null && cliente.getRolUsuario() == RolUsuario.CLIENTE;
-        long usosCliente = extraccionGaJobRepository.countUsosClienteByExpedienteId(expediente.getId());
-        if (usoCliente && usosCliente >= MAX_USOS_LECTURA_CLIENTE) {
-            return construirEstadoLecturaCliente(expediente, cliente, false, "Limite de lecturas IA alcanzado para este expediente.");
-        }
         if (!openAiProperties.hasApiKey()) {
             return construirEstadoLecturaCliente(expediente, cliente, false, "La lectura IA no esta disponible en este momento.");
         }
@@ -534,8 +530,8 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
                 expediente,
                 cliente,
                 modeloNormalizado(null),
-                usoCliente ? "CLIENTE" : "PORTAL_CLIENTE",
-                usoCliente,
+                cliente != null && cliente.getRolUsuario() == RolUsuario.CLIENTE ? "CLIENTE" : "PORTAL_CLIENTE",
+                cliente != null && cliente.getRolUsuario() == RolUsuario.CLIENTE,
                 "Lectura IA solicitada por cliente"
         );
         programarJob(job.getId());
@@ -590,22 +586,20 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
             Expediente expediente,
             Usuario cliente,
             boolean jobCreado,
-            String mensajePreferente
+        String mensajePreferente
     ) {
         long usosCliente = extraccionGaJobRepository.countUsosClienteByExpedienteId(expediente.getId());
-        int usosConsumidos = Math.toIntExact(Math.min(usosCliente, MAX_USOS_LECTURA_CLIENTE));
-        int usosRestantes = Math.max(0, MAX_USOS_LECTURA_CLIENTE - usosConsumidos);
+        int usosConsumidos = toIntSaturado(usosCliente);
         Optional<ExtraccionGaJob> ultimo = extraccionGaJobRepository.findTopByExpedienteIdOrderByFechaCreacionDesc(expediente.getId());
         boolean jobActivo = ultimo.filter(job -> esJobActivo(job.getEstado())).isPresent();
         DocumentacionExtraccion documentacion = validarDocumentacionExtraccion(expediente, cliente);
         boolean hayDocumentos = hayDocumentosSeleccionables(expediente);
         boolean documentacionSuficiente = !documentacion.bloqueada() && hayDocumentos;
         boolean apiKeyConfigurada = openAiProperties.hasApiKey();
-        boolean limiteAlcanzado = usosRestantes <= 0;
-        boolean puedeSolicitar = apiKeyConfigurada && documentacionSuficiente && !jobActivo && !limiteAlcanzado;
+        boolean puedeSolicitar = apiKeyConfigurada && documentacionSuficiente && !jobActivo;
         String mensaje = mensajePreferente != null
                 ? mensajePreferente
-                : mensajeLecturaCliente(apiKeyConfigurada, documentacionSuficiente, hayDocumentos, jobActivo, limiteAlcanzado);
+                : mensajeLecturaCliente(apiKeyConfigurada, documentacionSuficiente, hayDocumentos, jobActivo);
         return new LecturaIaClienteResponse(
                 expediente.getId(),
                 apiKeyConfigurada,
@@ -614,8 +608,8 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
                 jobCreado,
                 documentacion.bloqueosDocumentales(),
                 usosConsumidos,
-                MAX_USOS_LECTURA_CLIENTE,
-                usosRestantes,
+                USOS_CLIENTE_SIN_LIMITE,
+                USOS_RESTANTES_SIN_LIMITE,
                 mensaje,
                 ultimo.map(this::mapJob).orElse(null)
         );
@@ -625,14 +619,10 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
             boolean apiKeyConfigurada,
             boolean documentacionSuficiente,
             boolean hayDocumentos,
-            boolean jobActivo,
-            boolean limiteAlcanzado
+            boolean jobActivo
     ) {
         if (jobActivo) {
             return "Lectura IA en curso.";
-        }
-        if (limiteAlcanzado) {
-            return "Limite de lecturas IA alcanzado para este expediente.";
         }
         if (!apiKeyConfigurada) {
             return "La lectura IA no esta disponible en este momento.";
@@ -644,6 +634,10 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
             return "Falta documentacion minima para iniciar la lectura IA.";
         }
         return "Lectura IA disponible.";
+    }
+
+    private int toIntSaturado(long valor) {
+        return valor > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.toIntExact(Math.max(0, valor));
     }
 
     private boolean hayDocumentosSeleccionables(Expediente expediente) {
