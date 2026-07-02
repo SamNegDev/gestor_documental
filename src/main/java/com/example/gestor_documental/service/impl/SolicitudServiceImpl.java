@@ -25,6 +25,7 @@ import com.example.gestor_documental.service.OperacionExpedienteService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
+import com.example.gestor_documental.service.VehiculoService;
 import com.example.gestor_documental.util.DireccionFormatter;
 import com.example.gestor_documental.util.DireccionNormalizer;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
@@ -60,6 +61,7 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final InteresadoService interesadoService;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
     private final OperacionExpedienteService operacionExpedienteService;
+    private final VehiculoService vehiculoService;
     private final ObjectProvider<RequisitoDocumentalExpedienteService> requisitoDocumentalExpedienteService;
 
     @Value("${app.upload.dir:uploads}")
@@ -308,6 +310,9 @@ public class SolicitudServiceImpl implements SolicitudService {
         expediente.setEstadoExpediente(EstadoExpediente.EN_TRAMITE);
         expediente.setObservaciones(TextNormalizer.upperOrNull(solicitud.getObservaciones()));
         expediente.setCreadoPor(admin);
+        Vehiculo vehiculo = vehiculoService.obtenerOCrearPorMatricula(expediente.getMatricula());
+        completarVehiculoDesdeSolicitud(vehiculo, solicitud);
+        expediente.setVehiculo(vehiculo);
 
         Expediente expedienteGuardado = expedienteRepository.save(expediente);
         historialCambioService.registrarCambioExpediente(
@@ -601,10 +606,16 @@ public class SolicitudServiceImpl implements SolicitudService {
         TipoTramite tipoTramite = tipoTramiteService.buscarPorId(tipoTramiteId).orElseThrow(() -> new RecursoNoEncontradoException("Tipo de trámite no encontrado"));
 
         String matriculaAnterior = solicitudBase.getMatricula();
+        String vehiculoMarcaAnterior = solicitudBase.getVehiculoMarca();
+        String vehiculoModeloAnterior = solicitudBase.getVehiculoModelo();
+        String vehiculoBastidorAnterior = solicitudBase.getVehiculoBastidor();
         Long tipoTramiteAnterior = solicitudBase.getTipoTramite() != null ? solicitudBase.getTipoTramite().getId() : null;
 
         solicitudBase.setTipoTramite(tipoTramite);
         solicitudBase.setMatricula(TextNormalizer.upperOrNull(solicitudActualizada.getMatricula()));
+        solicitudBase.setVehiculoMarca(TextNormalizer.upperOrNull(solicitudActualizada.getVehiculoMarca()));
+        solicitudBase.setVehiculoModelo(TextNormalizer.upperOrNull(solicitudActualizada.getVehiculoModelo()));
+        solicitudBase.setVehiculoBastidor(normalizarCodigoVehiculo(solicitudActualizada.getVehiculoBastidor()));
 
         solicitudBase.setInteresado1Rol(solicitudActualizada.getInteresado1Rol());
         solicitudBase.setInteresado1Nombre(NombrePersonaNormalizer.normalizar(solicitudActualizada.getInteresado1Nombre()));
@@ -667,6 +678,12 @@ public class SolicitudServiceImpl implements SolicitudService {
             cambios.add("Tipo de trámite (" + tipoTramite.getNombre() + ")");
         }
         
+        if (!java.util.Objects.equals(vehiculoMarcaAnterior, solicitudBase.getVehiculoMarca())
+                || !java.util.Objects.equals(vehiculoModeloAnterior, solicitudBase.getVehiculoModelo())
+                || !java.util.Objects.equals(vehiculoBastidorAnterior, solicitudBase.getVehiculoBastidor())) {
+            cambios.add("Vehiculo");
+        }
+
         Solicitud solicitudGuardada = solicitudRepository.save(solicitudBase);
         
         historialCambioService.registrarCambioSolicitud(
@@ -677,6 +694,38 @@ public class SolicitudServiceImpl implements SolicitudService {
         );
 
         return solicitudGuardada;
+    }
+
+    @Override
+    @Transactional
+    public Solicitud resetDatosLecturaIa(Long id, Usuario admin) {
+        if (admin == null || admin.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo el administrador puede resetear datos de lectura IA");
+        }
+        Solicitud solicitud = solicitudRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
+        if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA ||
+                solicitud.getEstadoSolicitud() == EstadoSolicitud.RECHAZADO ||
+                solicitud.getExpediente() != null) {
+            throw new OperacionInvalidaException("No se pueden resetear datos de una solicitud cerrada");
+        }
+
+        limpiarInteresado1(solicitud);
+        limpiarInteresado2(solicitud);
+        limpiarInteresado3(solicitud);
+        solicitud.setVehiculoMarca(null);
+        solicitud.setVehiculoModelo(null);
+        solicitud.setVehiculoBastidor(null);
+        solicitud.setFechaUltimaModificacion(LocalDateTime.now());
+        solicitud.setModificadoPor(admin);
+
+        Solicitud guardada = solicitudRepository.save(solicitud);
+        historialCambioService.registrarCambioSolicitud(
+                guardada,
+                admin,
+                "RESET IA DOCUMENTACION",
+                "Se vaciaron interesados y datos de vehiculo para repetir la lectura IA.");
+        return guardada;
     }
 
     @Override
@@ -793,6 +842,45 @@ public class SolicitudServiceImpl implements SolicitudService {
         return nombre != null ? nombre : fallback;
     }
 
+    private void limpiarInteresado1(Solicitud solicitud) {
+        solicitud.setInteresado1Rol(null);
+        solicitud.setInteresado1Nombre(null);
+        solicitud.setInteresado1Dni(null);
+        solicitud.setInteresado1Telefono(null);
+        solicitud.setInteresado1Direccion(null);
+        solicitud.setInteresado1TipoVia(null);
+        solicitud.setInteresado1NombreVia(null);
+        solicitud.setInteresado1CodigoPostal(null);
+        solicitud.setInteresado1Municipio(null);
+        solicitud.setInteresado1Provincia(null);
+    }
+
+    private void limpiarInteresado2(Solicitud solicitud) {
+        solicitud.setInteresado2Rol(null);
+        solicitud.setInteresado2Nombre(null);
+        solicitud.setInteresado2Dni(null);
+        solicitud.setInteresado2Telefono(null);
+        solicitud.setInteresado2Direccion(null);
+        solicitud.setInteresado2TipoVia(null);
+        solicitud.setInteresado2NombreVia(null);
+        solicitud.setInteresado2CodigoPostal(null);
+        solicitud.setInteresado2Municipio(null);
+        solicitud.setInteresado2Provincia(null);
+    }
+
+    private void limpiarInteresado3(Solicitud solicitud) {
+        solicitud.setInteresado3Rol(null);
+        solicitud.setInteresado3Nombre(null);
+        solicitud.setInteresado3Dni(null);
+        solicitud.setInteresado3Telefono(null);
+        solicitud.setInteresado3Direccion(null);
+        solicitud.setInteresado3TipoVia(null);
+        solicitud.setInteresado3NombreVia(null);
+        solicitud.setInteresado3CodigoPostal(null);
+        solicitud.setInteresado3Municipio(null);
+        solicitud.setInteresado3Provincia(null);
+    }
+
     @Override
     @Transactional
     public void eliminarSolicitudErronea(Long id, Usuario admin) {
@@ -841,6 +929,9 @@ public class SolicitudServiceImpl implements SolicitudService {
 
     private void normalizarSolicitud(Solicitud solicitud) {
         solicitud.setMatricula(TextNormalizer.upperOrNull(solicitud.getMatricula()));
+        solicitud.setVehiculoMarca(TextNormalizer.upperOrNull(solicitud.getVehiculoMarca()));
+        solicitud.setVehiculoModelo(TextNormalizer.upperOrNull(solicitud.getVehiculoModelo()));
+        solicitud.setVehiculoBastidor(normalizarCodigoVehiculo(solicitud.getVehiculoBastidor()));
         solicitud.setObservaciones(TextNormalizer.upperOrNull(solicitud.getObservaciones()));
         solicitud.setInteresado1Nombre(NombrePersonaNormalizer.normalizar(solicitud.getInteresado1Nombre()));
         solicitud.setInteresado1Dni(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()));
@@ -895,6 +986,33 @@ public class SolicitudServiceImpl implements SolicitudService {
             return direccionNormalizada;
         }
         return DireccionFormatter.componer(tipoVia, nombreVia, codigoPostal, municipio, provincia);
+    }
+
+    private void completarVehiculoDesdeSolicitud(Vehiculo vehiculo, Solicitud solicitud) {
+        if (vehiculo == null) {
+            return;
+        }
+        String bastidor = normalizarCodigoVehiculo(solicitud.getVehiculoBastidor());
+        String marca = TextNormalizer.upperOrNull(solicitud.getVehiculoMarca());
+        String modelo = TextNormalizer.upperOrNull(solicitud.getVehiculoModelo());
+        if (bastidor != null) {
+            vehiculo.setBastidor(bastidor);
+        }
+        if (marca != null) {
+            vehiculo.setMarca(marca);
+        }
+        if (modelo != null) {
+            vehiculo.setModelo(modelo);
+        }
+    }
+
+    private String normalizarCodigoVehiculo(String value) {
+        String normalizado = TextNormalizer.upperOrNull(value);
+        if (normalizado == null) {
+            return null;
+        }
+        normalizado = normalizado.replaceAll("[^A-Z0-9]", "");
+        return normalizado.isBlank() ? null : normalizado;
     }
 }
 

@@ -2200,6 +2200,15 @@ select {
   background: oklch(94% 0.045 232);
 }
 
+.soft-button--danger {
+  border-color: oklch(72% 0.14 28);
+  color: oklch(44% 0.15 28);
+}
+
+.soft-button--danger:hover {
+  background: oklch(97% 0.035 28);
+}
+
 .tabs {
   display: grid;
   gap: 16px;
@@ -5091,6 +5100,65 @@ input.records-table-filter {
   grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
 }
 
+.request-vehicle-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.request-vehicle-heading {
+  margin-bottom: 0;
+}
+
+.request-vehicle-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+}
+
+.request-vehicle-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border-radius: 8px;
+  background: oklch(94% 0.035 176);
+  color: oklch(38% 0.09 176);
+}
+
+.request-vehicle-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.request-vehicle-grid div {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.request-vehicle-grid dt {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 840;
+  text-transform: uppercase;
+}
+
+.request-vehicle-grid dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink-strong);
+  font-size: 0.9rem;
+  font-weight: 820;
+}
+
 .request-people-panel {
   display: grid;
   gap: 14px;
@@ -6899,6 +6967,7 @@ input.records-table-filter {
   .case-layout,
   .record-grid,
   .request-people-grid,
+  .request-vehicle-grid,
   .list-filters-grid,
   .dashboard-grid,
   .request-grid,

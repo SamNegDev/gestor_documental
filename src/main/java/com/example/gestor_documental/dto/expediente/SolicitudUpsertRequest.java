@@ -9,6 +9,9 @@ import lombok.Setter;
 public class SolicitudUpsertRequest {
     private Long tipoTramiteId;
     private String matricula;
+    private String vehiculoMarca;
+    private String vehiculoModelo;
+    private String vehiculoBastidor;
     private String observaciones;
     private RolInteresado interesado1Rol;
     private String interesado1Nombre;

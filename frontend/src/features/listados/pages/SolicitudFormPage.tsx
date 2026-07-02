@@ -19,6 +19,9 @@ function emptyForm(): SolicitudUpsertInput {
   return {
     tipoTramiteId: 0,
     matricula: "",
+    vehiculoMarca: "",
+    vehiculoModelo: "",
+    vehiculoBastidor: "",
     observaciones: "",
     interesado1Rol: "",
     interesado1Nombre: "",
@@ -63,6 +66,9 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
   return {
     tipoTramiteId: 0,
     matricula: uppercaseInput(solicitud.matricula || ""),
+    vehiculoMarca: uppercaseInput(solicitud.vehiculo?.marca || ""),
+    vehiculoModelo: uppercaseInput(solicitud.vehiculo?.modelo || ""),
+    vehiculoBastidor: uppercaseInput(solicitud.vehiculo?.bastidor || ""),
     observaciones: uppercaseInput(solicitud.observaciones || ""),
     interesado1Rol: interesado1?.rol || "",
     interesado1Nombre: uppercaseInput(interesado1?.nombre || ""),
@@ -101,6 +107,9 @@ function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
   return {
     ...form,
     matricula: cleanUpperText(form.matricula) || "",
+    vehiculoMarca: cleanUpperText(form.vehiculoMarca),
+    vehiculoModelo: cleanUpperText(form.vehiculoModelo),
+    vehiculoBastidor: cleanUpperText(form.vehiculoBastidor),
     observaciones: cleanUpperText(form.observaciones),
     interesado1Rol: cleanUpperText(form.interesado1Rol),
     interesado1Nombre: cleanUpperText(form.interesado1Nombre),
@@ -292,6 +301,18 @@ export function SolicitudFormPage() {
             <label>
               Matricula
               <input value={form.matricula} onChange={(event) => setForm({ ...form, matricula: uppercaseInput(event.target.value) })} required />
+            </label>
+            <label>
+              Marca
+              <input value={form.vehiculoMarca || ""} onChange={(event) => setForm({ ...form, vehiculoMarca: uppercaseInput(event.target.value) })} />
+            </label>
+            <label>
+              Modelo
+              <input value={form.vehiculoModelo || ""} onChange={(event) => setForm({ ...form, vehiculoModelo: uppercaseInput(event.target.value) })} />
+            </label>
+            <label>
+              Bastidor
+              <input value={form.vehiculoBastidor || ""} onChange={(event) => setForm({ ...form, vehiculoBastidor: uppercaseInput(event.target.value) })} />
             </label>
             <label className="edit-form-grid__wide">
               Observaciones

@@ -85,6 +85,7 @@ export interface InteresadoSolicitud {
 export interface SolicitudDetail {
   id: number;
   matricula?: string | null;
+  vehiculo?: SolicitudVehiculo | null;
   tipoTramite?: string | null;
   estado?: string | null;
   fechaCreacion?: string | null;
@@ -101,6 +102,13 @@ export interface SolicitudDetail {
   incidencias: IncidenciaExpediente[];
   historial: HistorialExpediente[];
   mensajes: MensajeExpediente[];
+}
+
+export interface SolicitudVehiculo {
+  matricula?: string | null;
+  marca?: string | null;
+  modelo?: string | null;
+  bastidor?: string | null;
 }
 
 export interface LecturaIaSolicitudCliente {
@@ -202,6 +210,9 @@ export interface SolicitudPreparacionTraspaso {
 export interface SolicitudUpsertInput {
   tipoTramiteId: number;
   matricula: string;
+  vehiculoMarca?: string | null;
+  vehiculoModelo?: string | null;
+  vehiculoBastidor?: string | null;
   observaciones?: string | null;
   interesado1Rol?: string | null;
   interesado1Nombre?: string | null;

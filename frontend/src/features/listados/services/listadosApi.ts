@@ -88,6 +88,10 @@ export function procesarSolicitudDocumentacionIaCliente(id: number) {
   return apiPostJson<SolicitudDocumentacionIaResponse>(`/api/solicitudes/${id}/documentacion-ia/cliente`, {});
 }
 
+export function resetSolicitudDatosIa(id: number) {
+  return apiPostJson<SolicitudDetail>(`/api/solicitudes/${id}/documentacion-ia/reset`, {});
+}
+
 export function getSolicitudInteresadoCoincidencias(id: number) {
   return apiGet<SolicitudInteresadoCoincidencia[]>(`/api/solicitudes/${id}/interesados/coincidencias`);
 }

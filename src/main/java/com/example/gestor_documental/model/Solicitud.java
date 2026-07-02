@@ -39,6 +39,15 @@ public class Solicitud {
     @Column(length = 10)
     private String matricula;
 
+    @Column(name = "vehiculo_marca", length = 80)
+    private String vehiculoMarca;
+
+    @Column(name = "vehiculo_modelo", length = 120)
+    private String vehiculoModelo;
+
+    @Column(name = "vehiculo_bastidor", length = 40)
+    private String vehiculoBastidor;
+
     @Column(length = 200)
     private String observaciones;
 

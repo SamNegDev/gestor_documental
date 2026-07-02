@@ -166,6 +166,9 @@ class SolicitudPreparacionTraspasoServiceImplTest {
     @Test
     void aceptaInformeDgtComoAlternativaAPermisoYFicha() {
         Solicitud solicitud = solicitudBase(13L);
+        solicitud.setVehiculoMarca("Seat");
+        solicitud.setVehiculoModelo("Ibiza");
+        solicitud.setVehiculoBastidor("VF123456789ABCDE1");
         solicitud.setInteresado1Rol(RolInteresado.VENDEDOR);
         solicitud.setInteresado1Nombre("Maria Luisa Menendez Morejudo");
         solicitud.setInteresado1Dni("50975033H");
@@ -188,6 +191,9 @@ class SolicitudPreparacionTraspasoServiceImplTest {
         SolicitudPreparacionTraspasoResponse response = service.obtenerPreparacion(13L, usuario);
 
         assertThat(itemEstado(response, "VEHICULO", "documentacion_vehiculo")).isEqualTo("OK");
+        assertThat(itemEstado(response, "VEHICULO", "bastidor")).isEqualTo("OK");
+        assertThat(itemEstado(response, "VEHICULO", "marca_modelo")).isEqualTo("OK");
+        assertThat(documento(response, "CONTRATO_COMPRAVENTA").faltantes()).doesNotContain("Marca", "Modelo", "Bastidor");
     }
 
     private Solicitud solicitudBase(Long id) {

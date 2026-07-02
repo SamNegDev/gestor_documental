@@ -59,6 +59,8 @@ public interface SolicitudService {
 
     Solicitud actualizarSolicitud(Long id, Solicitud solicitudActualizada, Usuario usuarioLogueado, Long tipoTramiteId);
 
+    Solicitud resetDatosLecturaIa(Long id, Usuario admin);
+
     Solicitud anadirInteresadoDetectado(Long id, SolicitudIdentidadDetectadaRequest request, Usuario usuarioLogueado);
 
     void eliminarSolicitudErronea(Long id, Usuario admin);

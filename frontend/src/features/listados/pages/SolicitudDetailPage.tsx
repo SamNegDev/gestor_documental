@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CheckCircle2, FileSignature, FileText, FolderCheck, IdCard, Info, Loader2, MapPin, MessageSquare, Pencil, Phone, RefreshCw, Scissors, Send, Sparkles, UserPlus, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CarFront, CheckCircle2, FileSignature, FileText, FolderCheck, IdCard, Info, Loader2, MapPin, MessageSquare, Pencil, Phone, RefreshCw, RotateCcw, Scissors, Send, Sparkles, UserPlus, UserRound } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { ApiError } from "../../../shared/api/http";
@@ -32,6 +32,7 @@ import {
   getSolicitudPreparacionTraspaso,
   procesarSolicitudDocumentacionIa,
   procesarSolicitudDocumentacionIaCliente,
+  resetSolicitudDatosIa,
 } from "../services/listadosApi";
 import type {
   InteresadoSolicitud,
@@ -118,6 +119,21 @@ export function SolicitudDetailPage() {
 
   const procesarDocumentacionClienteMutation = useMutation({
     mutationFn: (solicitudId: number) => procesarSolicitudDocumentacionIaCliente(solicitudId),
+  });
+
+  const resetDatosIaMutation = useMutation({
+    mutationFn: (solicitudId: number) => resetSolicitudDatosIa(solicitudId),
+    onSuccess: async (actualizada) => {
+      queryClient.setQueryData(["solicitudes", "detalle", id], actualizada);
+      setIaResult(null);
+      setIaError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
+        queryClient.invalidateQueries({ queryKey: ["solicitudes", "preparacion-traspaso", id] }),
+        queryClient.invalidateQueries({ queryKey: ["tareas"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
+    },
   });
 
   const anadirIdentidadDetectadaMutation = useMutation({
@@ -387,6 +403,24 @@ export function SolicitudDetailPage() {
     }
   };
 
+  const handleResetDatosIa = async () => {
+    const solicitudActual = solicitudQuery.data;
+    if (!solicitudActual) return;
+    const confirmed = await confirm({
+      title: "Resetear datos IA",
+      description: "Se vaciaran interesados y datos de vehiculo guardados en la solicitud. No se borraran documentos, mensajes ni la matricula.",
+      confirmLabel: "Resetear",
+      cancelLabel: "Cancelar",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    try {
+      await resetDatosIaMutation.mutateAsync(solicitudActual.id);
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudieron resetear los datos IA." : "No se pudieron resetear los datos IA.");
+    }
+  };
+
   const handleAddDetectedIdentity = async (identidad: DocumentoIdentidadDetectada, rol: string) => {
     const solicitudActual = solicitudQuery.data;
     if (!solicitudActual) return;
@@ -488,10 +522,11 @@ export function SolicitudDetailPage() {
           onOpenTemplates={() => setTemplateDialogOpen(true)}
           onReadWithIa={() => handleProcessDocumentacionIa(false)}
           onForceReadWithIa={() => handleProcessDocumentacionIa(true)}
+          onResetIaData={() => void handleResetDatosIa()}
           onStateChange={(estado) => estadoMutation.mutate({ solicitudId: solicitud.id, estado })}
           canReadWithIa={hasSolicitudDocuments}
           iaPending={procesarDocumentacionMutation.isPending}
-          pending={checkingInteresados || convertirMutation.isPending || estadoMutation.isPending || procesarDocumentacionMutation.isPending}
+          pending={checkingInteresados || convertirMutation.isPending || estadoMutation.isPending || procesarDocumentacionMutation.isPending || resetDatosIaMutation.isPending}
         />
       ) : null}
 
@@ -534,6 +569,8 @@ export function SolicitudDetailPage() {
           />
         </>
       ) : null}
+
+      <SolicitudVehiclePanel solicitud={solicitud} editPath={editSolicitudPath} isClosed={isClosed} />
 
       <section className="panel request-people-panel">
         <div className="panel-heading request-people-heading">
@@ -707,6 +744,46 @@ export function SolicitudDetailPage() {
       />
       {procesarDocumentacionMutation.isPending ? <SolicitudIaProgressModal /> : null}
       {dialog}
+    </section>
+  );
+}
+
+function SolicitudVehiclePanel({ solicitud, editPath, isClosed }: { solicitud: SolicitudDetail; editPath: string; isClosed: boolean }) {
+  const vehiculo = solicitud.vehiculo;
+  const facts = [
+    { label: "Matricula", value: vehiculo?.matricula || solicitud.matricula },
+    { label: "Marca", value: vehiculo?.marca },
+    { label: "Modelo", value: vehiculo?.modelo },
+    { label: "Bastidor", value: vehiculo?.bastidor },
+  ];
+  const completed = facts.filter((item) => Boolean(item.value)).length;
+  return (
+    <section className="panel request-vehicle-panel">
+      <div className="panel-heading request-vehicle-heading">
+        <div className="request-vehicle-title">
+          <span className="request-vehicle-icon" aria-hidden="true">
+            <CarFront size={18} />
+          </span>
+          <div>
+            <h2>Vehiculo</h2>
+            <p>{completed === facts.length ? "Datos principales completos." : "Revisa marca, modelo y bastidor antes de generar documentos."}</p>
+          </div>
+        </div>
+        {!isClosed ? (
+          <Link className="soft-button soft-button--compact" to={editPath}>
+            <Pencil size={16} />
+            Editar vehiculo
+          </Link>
+        ) : null}
+      </div>
+      <dl className="request-vehicle-grid">
+        {facts.map((item) => (
+          <div key={item.label}>
+            <dt>{item.label}</dt>
+            <dd>{item.value || "No consta"}</dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }
@@ -1258,6 +1335,7 @@ function AdminActions({
   onOpenTemplates,
   onReadWithIa,
   onForceReadWithIa,
+  onResetIaData,
   onStateChange,
 }: {
   solicitud: SolicitudDetail;
@@ -1269,6 +1347,7 @@ function AdminActions({
   onOpenTemplates: () => void;
   onReadWithIa: () => void;
   onForceReadWithIa: () => void;
+  onResetIaData: () => void;
   onStateChange: (estado: string) => void;
 }) {
   return (
@@ -1288,6 +1367,10 @@ function AdminActions({
             <button className="soft-button soft-button--compact" disabled={pending || !canReadWithIa} onClick={onForceReadWithIa}>
               {iaPending ? <Loader2 size={16} /> : <RefreshCw size={16} />}
               Releer IA
+            </button>
+            <button className="soft-button soft-button--compact soft-button--danger" disabled={pending} onClick={onResetIaData} type="button">
+              <RotateCcw size={16} />
+              Reset datos IA
             </button>
             <button className="soft-button soft-button--compact" disabled={pending} onClick={onOpenTemplates} type="button">
               <FileSignature size={16} />

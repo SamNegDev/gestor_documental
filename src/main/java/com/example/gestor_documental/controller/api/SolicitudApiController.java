@@ -25,6 +25,7 @@ import com.example.gestor_documental.dto.expediente.SolicitudListItemResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudPreparacionTraspasoResponse;
 import com.example.gestor_documental.dto.expediente.TipoTramiteResumenResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
+import com.example.gestor_documental.dto.expediente.SolicitudVehiculoResponse;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
@@ -212,6 +213,16 @@ public class SolicitudApiController {
     ) {
         Usuario usuarioLogueado = usuario(authentication);
         return solicitudDocumentacionIaService.procesarDocumentacionCliente(id, usuarioLogueado);
+    }
+
+    @PostMapping("/{id}/documentacion-ia/reset")
+    public SolicitudDetailResponse resetDatosLecturaIa(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = requireAdmin(authentication);
+        Solicitud solicitud = solicitudService.resetDatosLecturaIa(id, usuarioLogueado);
+        return mapSolicitudDetail(solicitud, usuarioLogueado);
     }
 
     @GetMapping("/{id}/interesados/coincidencias")
@@ -416,6 +427,9 @@ public class SolicitudApiController {
     private Solicitud mapSolicitudRequest(SolicitudUpsertRequest request) {
         Solicitud solicitud = new Solicitud();
         solicitud.setMatricula(TextNormalizer.upperOrNull(request.getMatricula()));
+        solicitud.setVehiculoMarca(TextNormalizer.upperOrNull(request.getVehiculoMarca()));
+        solicitud.setVehiculoModelo(TextNormalizer.upperOrNull(request.getVehiculoModelo()));
+        solicitud.setVehiculoBastidor(TextNormalizer.upperOrNull(request.getVehiculoBastidor()));
         solicitud.setObservaciones(TextNormalizer.upperOrNull(request.getObservaciones()));
         solicitud.setInteresado1Rol(request.getInteresado1Rol());
         solicitud.setInteresado1Nombre(TextNormalizer.upperOrNull(request.getInteresado1Nombre()));
@@ -588,6 +602,11 @@ public class SolicitudApiController {
                 .observaciones(solicitud.getObservaciones())
                 .situacionDocumental(situacionDocumental(solicitud, documentos, interesados))
                 .expedienteId(solicitud.getExpediente() != null ? solicitud.getExpediente().getId() : null)
+                .vehiculo(new SolicitudVehiculoResponse(
+                        solicitud.getMatricula(),
+                        solicitud.getVehiculoMarca(),
+                        solicitud.getVehiculoModelo(),
+                        solicitud.getVehiculoBastidor()))
                 .cliente(solicitud.getCliente() != null
                         ? ClienteResumenResponse.builder()
                                 .id(solicitud.getCliente().getId())

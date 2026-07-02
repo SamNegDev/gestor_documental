@@ -20,6 +20,7 @@ import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.Vehiculo;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
@@ -175,6 +176,7 @@ public class PlantillaDocumentoService {
         Map<String, String> valores = new LinkedHashMap<>();
         String comprador = idPorRol(relaciones, RolInteresado.COMPRADOR, RolInteresado.TITULAR, RolInteresado.COMPRAVENTA);
         String vendedor = idPorRol(relaciones, RolInteresado.VENDEDOR);
+        Vehiculo vehiculo = expediente.getVehiculo();
         switch (plantilla) {
             case MANDATO -> {
                 valores.put("mandanteId", !comprador.isBlank() ? comprador : idPorRol(relaciones, RolInteresado.VENDEDOR));
@@ -203,9 +205,9 @@ public class PlantillaDocumentoService {
                 valores.put("vendedorId", vendedor);
                 valores.put("direccionComprador", "");
                 valores.put("direccionVendedor", "");
-                valores.put("marca", "");
-                valores.put("modelo", "");
-                valores.put("bastidor", "");
+                valores.put("marca", vehiculo != null ? limpiar(vehiculo.getMarca()) : "");
+                valores.put("modelo", vehiculo != null ? limpiar(vehiculo.getModelo()) : "");
+                valores.put("bastidor", vehiculo != null ? limpiar(vehiculo.getBastidor()) : "");
                 valores.put("cvf", "");
                 valores.put("precio", "");
                 valores.put("localidad", "SC DE TENERIFE");
@@ -413,7 +415,23 @@ public class PlantillaDocumentoService {
         contexto.setMatricula(solicitud.getMatricula());
         contexto.setCliente(solicitud.getCliente());
         contexto.setTipoTramite(solicitud.getTipoTramite());
+        contexto.setVehiculo(vehiculoSolicitud(solicitud));
         return contexto;
+    }
+
+    private Vehiculo vehiculoSolicitud(Solicitud solicitud) {
+        if (vacio(solicitud.getMatricula())
+                && vacio(solicitud.getVehiculoMarca())
+                && vacio(solicitud.getVehiculoModelo())
+                && vacio(solicitud.getVehiculoBastidor())) {
+            return null;
+        }
+        Vehiculo vehiculo = new Vehiculo();
+        vehiculo.setMatricula(limpiar(solicitud.getMatricula()));
+        vehiculo.setMarca(limpiar(solicitud.getVehiculoMarca()));
+        vehiculo.setModelo(limpiar(solicitud.getVehiculoModelo()));
+        vehiculo.setBastidor(limpiar(solicitud.getVehiculoBastidor()));
+        return vehiculo;
     }
 
     private List<ExpedienteInteresado> relaciones(Long expedienteId) {

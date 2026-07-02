@@ -246,6 +246,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
         ));
         items.add(itemDocumentacionVehiculo(context));
         String bastidor = mejorBastidor(context);
+        String marca = texto(context.solicitud().getVehiculoMarca());
+        String modelo = texto(context.solicitud().getVehiculoModelo());
         items.add(item(
                 "bastidor",
                 "Bastidor",
@@ -257,10 +259,12 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
         items.add(item(
                 "marca_modelo",
                 "Marca y modelo",
-                EstadoItem.AVISO,
-                "La solicitud aun no guarda marca/modelo como dato estructurado.",
-                "COMPLETAR_DATO",
-                "Completar vehiculo"
+                marca != null && modelo != null ? EstadoItem.OK : EstadoItem.PENDIENTE,
+                marca != null && modelo != null
+                        ? normalizarTexto(marca + " " + modelo)
+                        : "Falta completar marca y modelo para proponer el contrato.",
+                marca != null && modelo != null ? null : "COMPLETAR_DATO",
+                marca != null && modelo != null ? null : "Completar vehiculo"
         ));
         return bloque("VEHICULO", "Vehiculo", items);
     }
@@ -357,6 +361,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
         InteresadoSlot mandante = comprador != null ? comprador : vendedor;
         String matricula = texto(context.solicitud().getMatricula());
         String bastidor = mejorBastidor(context);
+        String marca = texto(context.solicitud().getVehiculoMarca());
+        String modelo = texto(context.solicitud().getVehiculoModelo());
         String precio = mejorPrecio(context);
 
         return List.of(
@@ -378,8 +384,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                         requisito(comprador != null && direccionNoVacia(comprador), "Domicilio del comprador"),
                         requisito(vendedor != null && direccionNoVacia(vendedor), "Domicilio del vendedor"),
                         requisito(matricula != null, "Matricula"),
-                        requisito(false, "Marca"),
-                        requisito(false, "Modelo"),
+                        requisito(marca != null, "Marca"),
+                        requisito(modelo != null, "Modelo"),
                         requisito(bastidor != null, "Bastidor"),
                         requisito(precio != null, "Precio")
                 ))
@@ -637,6 +643,10 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
     }
 
     private String mejorBastidor(PreparacionContext context) {
+        String bastidorSolicitud = normalizarIdentificador(context.solicitud().getVehiculoBastidor());
+        if (bastidorSolicitud != null && bastidorSolicitud.length() >= 6) {
+            return bastidorSolicitud;
+        }
         return context.lecturasRoles().values().stream()
                 .map(DocumentoRolesLectura::getBastidor)
                 .map(this::normalizarIdentificador)

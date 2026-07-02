@@ -184,17 +184,30 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
         detalles.addAll(avisosNombreIdentidad(lecturaRoles, identidades));
 
+        boolean vehiculoActualizado = aplicarVehiculoSiProcede(solicitud, lecturaRoles, detalles);
         boolean yaCorrecta = solicitudYaCoincide(solicitud, vendedor, comprador);
         if (yaCorrecta) {
             marcarIdentidadesUsadas(identidades, vendedor, comprador);
             detalles.add("La solicitud ya tenia comprador y vendedor coherentes con la lectura valida.");
+            if (vehiculoActualizado) {
+                solicitud.setFechaUltimaModificacion(LocalDateTime.now());
+                solicitud.setModificadoPor(usuario);
+                solicitudRepository.save(solicitud);
+                historialCambioService.registrarCambioSolicitud(
+                        solicitud,
+                        usuario,
+                        "IA DOCUMENTACION",
+                        "Se actualizaron datos de vehiculo desde factura/contrato.");
+                detalles.add("Datos de vehiculo actualizados en la solicitud.");
+                return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, true, false, false,
+                        "Datos de vehiculo actualizados desde la documentacion.", detalles);
+            }
             return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, false, true, false,
                     "Sin cambios: la documentacion ya estaba procesada correctamente.", detalles);
         }
 
         aplicarPersona(solicitud, RolInteresado.VENDEDOR, vendedor);
         aplicarPersona(solicitud, RolInteresado.COMPRADOR, comprador);
-        aplicarMatriculaSiProcede(solicitud, lecturaRoles, detalles);
         solicitud.setFechaUltimaModificacion(LocalDateTime.now());
         solicitud.setModificadoPor(usuario);
         solicitudRepository.save(solicitud);
@@ -247,9 +260,24 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         detalles.addAll(avisosNombreIdentidad(partes.lecturaBate(), identidades));
         detalles.addAll(avisosNombreIdentidad(partes.lecturaCom(), identidades));
 
+        boolean vehiculoActualizado = aplicarVehiculoSiProcede(solicitud, partes.lecturaBate(), detalles);
+        vehiculoActualizado |= aplicarVehiculoSiProcede(solicitud, partes.lecturaCom(), detalles);
         if (solicitudBatecomYaCoincide(solicitud, partes)) {
             marcarIdentidadesUsadas(identidades, partes.vendedor(), partes.compraventa(), partes.comprador());
             detalles.add("La solicitud ya tenia vendedor inicial, compraventa y comprador final coherentes con las lecturas validas.");
+            if (vehiculoActualizado) {
+                solicitud.setFechaUltimaModificacion(LocalDateTime.now());
+                solicitud.setModificadoPor(admin);
+                solicitudRepository.save(solicitud);
+                historialCambioService.registrarCambioSolicitud(
+                        solicitud,
+                        admin,
+                        "IA DOCUMENTACION BATECOM",
+                        "Se actualizaron datos de vehiculo desde contratos/facturas.");
+                detalles.add("Datos de vehiculo actualizados en la solicitud.");
+                return respuesta(solicitud.getId(), documentosIdentidad.size(), documentosRoles.size(), contadores, true, false, false,
+                        "Datos de vehiculo actualizados desde la documentacion BATECOM.", detalles);
+            }
             return respuesta(solicitud.getId(), documentosIdentidad.size(), documentosRoles.size(), contadores, false, true, false,
                     "Sin cambios: la documentacion BATECOM ya estaba procesada correctamente.", detalles);
         }
@@ -257,8 +285,6 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         aplicarPersona(solicitud, RolInteresado.VENDEDOR, partes.vendedor());
         aplicarPersona(solicitud, RolInteresado.COMPRAVENTA, partes.compraventa());
         aplicarPersona(solicitud, RolInteresado.COMPRADOR, partes.comprador());
-        aplicarMatriculaSiProcede(solicitud, partes.lecturaBate(), detalles);
-        aplicarMatriculaSiProcede(solicitud, partes.lecturaCom(), detalles);
         solicitud.setFechaUltimaModificacion(LocalDateTime.now());
         solicitud.setModificadoPor(admin);
         solicitudRepository.save(solicitud);
@@ -876,19 +902,34 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
     }
 
-    private void aplicarMatriculaSiProcede(Solicitud solicitud, DocumentoRolesLectura lecturaRoles, List<String> detalles) {
+    private boolean aplicarVehiculoSiProcede(Solicitud solicitud, DocumentoRolesLectura lecturaRoles, List<String> detalles) {
+        if (lecturaRoles == null) {
+            return false;
+        }
+        boolean actualizado = false;
         String matriculaLeida = normalizarMatricula(lecturaRoles.getMatricula());
         String matriculaSolicitud = normalizarMatricula(solicitud.getMatricula());
-        if (matriculaLeida == null) {
-            return;
-        }
-        if (matriculaSolicitud == null) {
+        if (matriculaLeida != null && matriculaSolicitud == null) {
             solicitud.setMatricula(matriculaLeida);
-            return;
-        }
-        if (!matriculaSolicitud.equals(matriculaLeida)) {
+            actualizado = true;
+        } else if (matriculaLeida != null && !matriculaSolicitud.equals(matriculaLeida)) {
             detalles.add("La matricula de factura/contrato (" + matriculaLeida + ") no coincide con la solicitud (" + matriculaSolicitud + ").");
         }
+
+        String bastidorLeido = normalizarIdentificador(lecturaRoles.getBastidor());
+        String bastidorSolicitud = normalizarIdentificador(solicitud.getVehiculoBastidor());
+        if (bastidorLeido == null || bastidorLeido.length() < 6) {
+            return actualizado;
+        }
+        if (bastidorSolicitud == null) {
+            solicitud.setVehiculoBastidor(bastidorLeido);
+            detalles.add("Bastidor detectado y guardado en la solicitud: " + bastidorLeido + ".");
+            return true;
+        }
+        if (!bastidorSolicitud.equals(bastidorLeido)) {
+            detalles.add("El bastidor de factura/contrato (" + bastidorLeido + ") no coincide con el guardado (" + bastidorSolicitud + ").");
+        }
+        return actualizado;
     }
 
     private void marcarIdentidadesUsadas(Map<String, IdentidadSolicitud> identidades, PersonaSolicitud... personas) {

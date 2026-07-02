@@ -23,6 +23,7 @@ public class SolicitudDetailResponse {
     private String observaciones;
     private String situacionDocumental;
     private Long expedienteId;
+    private SolicitudVehiculoResponse vehiculo;
     private ClienteResumenResponse cliente;
     private UsuarioResumenResponse creadoPor;
     private UsuarioResumenResponse modificadoPor;
