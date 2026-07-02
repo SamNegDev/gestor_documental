@@ -5,6 +5,7 @@ import com.example.gestor_documental.dto.expediente.SolicitudPreparacionTraspaso
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
+import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
@@ -14,6 +15,7 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.validation.DniNieValidator;
@@ -28,6 +30,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +45,8 @@ class SolicitudPreparacionTraspasoServiceImplTest {
     @Mock
     private DocumentoRolesLecturaRepository rolesLecturaRepository;
     @Mock
+    private ClienteInteresadoRepository clienteInteresadoRepository;
+    @Mock
     private SolicitudService solicitudService;
 
     private SolicitudPreparacionTraspasoServiceImpl service;
@@ -54,6 +59,7 @@ class SolicitudPreparacionTraspasoServiceImplTest {
                 documentoRepository,
                 identidadLecturaRepository,
                 rolesLecturaRepository,
+                clienteInteresadoRepository,
                 solicitudService,
                 new DniNieValidator()
         );
@@ -161,6 +167,46 @@ class SolicitudPreparacionTraspasoServiceImplTest {
         assertThat(itemEstado(response, "INTERESADOS", "soporte_identidad_2")).isEqualTo("OK");
         assertThat(itemEstado(response, "INTERESADOS", "direccion_2")).isEqualTo("AVISO");
         assertThat(documento(response, "CONTRATO_COMPRAVENTA").estado()).isEqualTo("YA_APORTADO");
+    }
+
+    @Test
+    void reconoceCifDelCompradorEnFichaCliente() {
+        Solicitud solicitud = solicitudBase(14L);
+        Cliente cliente = new Cliente("B38313607", "Farray Motor SL", "farray@example.com");
+        cliente.setId(3L);
+        solicitud.setCliente(cliente);
+        solicitud.setInteresado1Rol(RolInteresado.VENDEDOR);
+        solicitud.setInteresado1Nombre("Yunior Peraza Perez");
+        solicitud.setInteresado1Dni("43332629P");
+        solicitud.setInteresado1Direccion("C/ Isla de la Gomera 7, Santa Cruz de Tenerife");
+        solicitud.setInteresado2Rol(RolInteresado.COMPRADOR);
+        solicitud.setInteresado2Nombre("Farray Motor SL");
+        solicitud.setInteresado2Dni("B38313607");
+        solicitud.setInteresado2Direccion("San Isidro, Granadilla de Abona");
+
+        Documento dniVendedor = documento(40L, TipoDocumento.DNI);
+        Documento permiso = documento(41L, TipoDocumento.PERMISO_CIRCULACION);
+        Documento ficha = documento(42L, TipoDocumento.FICHA_TECNICA);
+        Documento mandato = documento(43L, TipoDocumento.MANDATO);
+        Documento cambio = documento(44L, TipoDocumento.CAMBIO_TITULARIDAD);
+        Documento contrato = documento(45L, TipoDocumento.CONTRATO_COMPRAVENTA);
+        Documento cifCliente = documento(56L, TipoDocumento.CIF);
+
+        when(solicitudRepository.findById(14L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(14L)).thenReturn(List.of(dniVendedor, permiso, ficha, mandato, cambio, contrato));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(40L, 41L, 42L, 43L, 44L, 45L))).thenReturn(List.of(
+                lecturaIdentidad(dniVendedor, "43332629P")
+        ));
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(40L, 41L, 42L, 43L, 44L, 45L))).thenReturn(List.of());
+        when(documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(eq(3L), any()))
+                .thenReturn(List.of(cifCliente));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(56L))).thenReturn(List.of());
+        when(clienteInteresadoRepository.findByClienteIdOrderByInteresadoNombreAsc(3L)).thenReturn(List.of());
+
+        SolicitudPreparacionTraspasoResponse response = service.obtenerPreparacion(14L, usuario);
+
+        assertThat(itemEstado(response, "INTERESADOS", "soporte_identidad_1")).isEqualTo("OK");
+        assertThat(itemEstado(response, "INTERESADOS", "soporte_identidad_2")).isEqualTo("OK");
     }
 
     @Test

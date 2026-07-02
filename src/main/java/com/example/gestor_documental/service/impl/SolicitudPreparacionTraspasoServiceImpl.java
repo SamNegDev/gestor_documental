@@ -8,6 +8,7 @@ import com.example.gestor_documental.dto.expediente.SolicitudPreparacionTraspaso
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
+import com.example.gestor_documental.model.ClienteInteresado;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Documento;
@@ -19,6 +20,7 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.SolicitudPreparacionTraspasoService;
 import com.example.gestor_documental.service.SolicitudService;
@@ -52,6 +54,7 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
     private final DocumentoRepository documentoRepository;
     private final DocumentoIdentidadLecturaRepository identidadLecturaRepository;
     private final DocumentoRolesLecturaRepository rolesLecturaRepository;
+    private final ClienteInteresadoRepository clienteInteresadoRepository;
     private final SolicitudService solicitudService;
     private final DniNieValidator dniNieValidator;
 
@@ -78,12 +81,31 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                 : rolesLecturaRepository.findByDocumentoIdIn(documentoIds).stream()
                         .filter(lectura -> lectura.getDocumento() != null && lectura.getDocumento().getId() != null)
                         .collect(Collectors.toMap(lectura -> lectura.getDocumento().getId(), lectura -> lectura, (first, second) -> first));
+        Long clienteId = solicitud.getCliente() != null ? solicitud.getCliente().getId() : null;
+        List<Documento> documentosCliente = clienteId == null
+                ? List.of()
+                : documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(clienteId, TIPOS_IDENTIDAD);
+        List<Long> documentosClienteIds = documentosCliente.stream()
+                .map(Documento::getId)
+                .filter(id -> id != null)
+                .toList();
+        Map<Long, DocumentoIdentidadLectura> lecturasIdentidadCliente = documentosClienteIds.isEmpty()
+                ? Map.of()
+                : identidadLecturaRepository.findByDocumentoIdIn(documentosClienteIds).stream()
+                        .filter(lectura -> lectura.getDocumento() != null && lectura.getDocumento().getId() != null)
+                        .collect(Collectors.toMap(lectura -> lectura.getDocumento().getId(), lectura -> lectura, (first, second) -> first));
+        List<ClienteInteresado> relacionesCliente = clienteId == null
+                ? List.of()
+                : clienteInteresadoRepository.findByClienteIdOrderByInteresadoNombreAsc(clienteId);
 
         PreparacionContext context = new PreparacionContext(
                 solicitud,
                 documentos,
                 lecturasIdentidad,
                 lecturasRoles,
+                documentosCliente,
+                lecturasIdentidadCliente,
+                relacionesCliente,
                 interesados(solicitud),
                 rolesEsperados(solicitud)
         );
@@ -197,7 +219,7 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                     "soporte_identidad_" + interesado.slot(),
                     "Documento identidad " + rolLabel,
                     EstadoItem.OK,
-                    "DNI/NIE/CIF localizado con lectura valida.",
+                    "DNI/NIE/CIF del " + rolLabel + " localizado.",
                     null,
                     null
             );
@@ -206,7 +228,7 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                 "soporte_identidad_" + interesado.slot(),
                 "Documento identidad " + rolLabel,
                 EstadoItem.PENDIENTE,
-                "Falta un DNI/NIE/CIF separado o una lectura valida que coincida.",
+                "Falta DNI/NIE/CIF del " + rolLabel + " separado o una lectura valida que coincida.",
                 "SUBIR_DOCUMENTO",
                 "Subir identidad"
         );
@@ -595,6 +617,13 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
     }
 
     private boolean documentoIdentidadAportado(PreparacionContext context, String identificador) {
+        if (documentoIdentidadAportadoEnSolicitud(context, identificador)) {
+            return true;
+        }
+        return documentoIdentidadAportadoEnFichaCliente(context, identificador);
+    }
+
+    private boolean documentoIdentidadAportadoEnSolicitud(PreparacionContext context, String identificador) {
         for (Documento documento : context.documentos()) {
             if (!TIPOS_IDENTIDAD.contains(documento.getTipoDocumento())) {
                 continue;
@@ -610,7 +639,58 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
         return false;
     }
 
+    private boolean documentoIdentidadAportadoEnFichaCliente(PreparacionContext context, String identificador) {
+        if (identificador == null || context.solicitud().getCliente() == null || context.solicitud().getCliente().getId() == null) {
+            return false;
+        }
+        TipoDocumento tipoEsperado = esPersonaJuridica(identificador) ? TipoDocumento.CIF : TipoDocumento.DNI;
+        String nifCliente = normalizarIdentificador(context.solicitud().getCliente().getNif());
+        if (identificador.equals(nifCliente)
+                && documentoFichaClienteCoincide(context, tipoEsperado, null, identificador)) {
+            return true;
+        }
+        return context.relacionesCliente().stream()
+                .filter(relacion -> relacion.getInteresado() != null)
+                .filter(relacion -> identificador.equals(normalizarIdentificador(relacion.getInteresado().getDni())))
+                .anyMatch(relacion -> documentoFichaClienteCoincide(
+                        context,
+                        tipoEsperado,
+                        relacion.getInteresado().getId(),
+                        identificador
+                ));
+    }
+
+    private boolean documentoFichaClienteCoincide(
+            PreparacionContext context,
+            TipoDocumento tipoEsperado,
+            Long interesadoId,
+            String identificador
+    ) {
+        return context.documentosCliente().stream()
+                .filter(documento -> documento.getTipoDocumento() == tipoEsperado)
+                .filter(documento -> interesadoId == null
+                        || (documento.getInteresado() != null && interesadoId.equals(documento.getInteresado().getId())))
+                .anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.CIF
+                        || documentoInteresadoCoincide(documento, identificador)
+                        || lecturaIdentidadCoincide(context.lecturasIdentidadCliente().get(documento.getId()), identificador));
+    }
+
+    private boolean documentoInteresadoCoincide(Documento documento, String identificador) {
+        if (documento == null || documento.getInteresado() == null) {
+            return false;
+        }
+        return identificador.equals(normalizarIdentificador(documento.getInteresado().getDni()));
+    }
+
+    private boolean esPersonaJuridica(String identificador) {
+        String normalizado = normalizarIdentificador(identificador);
+        return normalizado != null && normalizado.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
+    }
+
     private boolean lecturaIdentidadCoincide(DocumentoIdentidadLectura lectura, String identificador) {
+        if (lectura == null || identificador == null) {
+            return false;
+        }
         if (confianza(lectura.getConfianzaGlobal()) >= CONFIANZA_MINIMA_IDENTIDAD
                 && identificador.equals(normalizarIdentificador(lectura.getIdentificador()))) {
             return true;
@@ -804,6 +884,9 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
             List<Documento> documentos,
             Map<Long, DocumentoIdentidadLectura> lecturasIdentidad,
             Map<Long, DocumentoRolesLectura> lecturasRoles,
+            List<Documento> documentosCliente,
+            Map<Long, DocumentoIdentidadLectura> lecturasIdentidadCliente,
+            List<ClienteInteresado> relacionesCliente,
             List<InteresadoSlot> interesados,
             List<RolInteresado> rolesEsperados
     ) {
