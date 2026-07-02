@@ -39,6 +39,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.Normalizer;
@@ -79,21 +80,21 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private final OpenAiProperties openAiProperties;
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public SolicitudDocumentacionIaResponse procesarDocumentacion(Long solicitudId, Usuario admin) {
         validarAdmin(admin);
         return procesarDocumentacion(solicitudId, admin, false, false);
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public SolicitudDocumentacionIaResponse procesarDocumentacion(Long solicitudId, Usuario admin, boolean forzarRelectura) {
         validarAdmin(admin);
         return procesarDocumentacion(solicitudId, admin, false, forzarRelectura);
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public SolicitudDocumentacionIaResponse procesarDocumentacionInterna(Long solicitudId, Usuario usuario) {
         return procesarDocumentacion(solicitudId, usuario, true, false);
     }
@@ -108,7 +109,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public SolicitudDocumentacionIaResponse procesarDocumentacionCliente(Long solicitudId, Usuario cliente) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
