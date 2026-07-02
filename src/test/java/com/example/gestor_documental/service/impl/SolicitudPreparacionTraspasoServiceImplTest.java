@@ -182,22 +182,21 @@ class SolicitudPreparacionTraspasoServiceImplTest {
         solicitud.setInteresado2Rol(RolInteresado.COMPRADOR);
         solicitud.setInteresado2Nombre("Farray Motor SL");
         solicitud.setInteresado2Dni("B38313607");
-        solicitud.setInteresado2Direccion("San Isidro, Granadilla de Abona");
+        solicitud.setInteresado2Direccion("Cruce Autopista del Sur, San Isidro Granadilla de Abona. 38600.TFE");
 
         Documento dniVendedor = documento(40L, TipoDocumento.DNI);
         Documento permiso = documento(41L, TipoDocumento.PERMISO_CIRCULACION);
         Documento ficha = documento(42L, TipoDocumento.FICHA_TECNICA);
-        Documento mandato = documento(43L, TipoDocumento.MANDATO);
         Documento cambio = documento(44L, TipoDocumento.CAMBIO_TITULARIDAD);
         Documento contrato = documento(45L, TipoDocumento.CONTRATO_COMPRAVENTA);
         Documento cifCliente = documento(56L, TipoDocumento.CIF);
 
         when(solicitudRepository.findById(14L)).thenReturn(Optional.of(solicitud));
-        when(documentoRepository.findBySolicitudId(14L)).thenReturn(List.of(dniVendedor, permiso, ficha, mandato, cambio, contrato));
-        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(40L, 41L, 42L, 43L, 44L, 45L))).thenReturn(List.of(
+        when(documentoRepository.findBySolicitudId(14L)).thenReturn(List.of(dniVendedor, permiso, ficha, cambio, contrato));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(40L, 41L, 42L, 44L, 45L))).thenReturn(List.of(
                 lecturaIdentidad(dniVendedor, "43332629P")
         ));
-        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(40L, 41L, 42L, 43L, 44L, 45L))).thenReturn(List.of());
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(40L, 41L, 42L, 44L, 45L))).thenReturn(List.of());
         when(documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(eq(3L), any()))
                 .thenReturn(List.of(cifCliente));
         when(identidadLecturaRepository.findByDocumentoIdIn(List.of(56L))).thenReturn(List.of());
@@ -207,6 +206,9 @@ class SolicitudPreparacionTraspasoServiceImplTest {
 
         assertThat(itemEstado(response, "INTERESADOS", "soporte_identidad_1")).isEqualTo("OK");
         assertThat(itemEstado(response, "INTERESADOS", "soporte_identidad_2")).isEqualTo("OK");
+        assertThat(itemEstado(response, "INTERESADOS", "direccion_1")).isEqualTo("OK");
+        assertThat(itemEstado(response, "INTERESADOS", "direccion_2")).isEqualTo("OK");
+        assertThat(documento(response, "MANDATO").faltantes()).doesNotContain("Localidad del mandante");
     }
 
     @Test

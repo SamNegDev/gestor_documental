@@ -391,7 +391,7 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                 documento(context, "MANDATO", "Mandato", Set.of(TipoDocumento.MANDATO, TipoDocumento.MANDATO_REPRESENTACION), List.of(
                         requisito(mandante != null && datosPersonaSuficientes(mandante), "Mandante"),
                         requisito(mandante != null && direccionNoVacia(mandante), "Domicilio del mandante"),
-                        requisito(mandante != null && texto(mandante.municipio()) != null, "Localidad del mandante"),
+                        requisito(mandante != null && localidadNoVacia(mandante), "Localidad del mandante"),
                         requisito(matricula != null, "Matricula")
                 )),
                 documento(context, "CAMBIO_TITULARIDAD", "Cambio de titularidad", Set.of(TipoDocumento.CAMBIO_TITULARIDAD), List.of(
@@ -777,11 +777,26 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
             return false;
         }
         boolean pareceVia = direccion.matches(".*\\b(CALLE|CARRETERA|CTRA|AVENIDA|AVDA|PLAZA|PASEO|CAMINO|RAMBLA|TRAVESIA|URBANIZACION|URB)\\b.*")
+                || direccion.matches(".*\\b(CRUCE|AUTOPISTA|POLIGONO|POL)\\b.*")
                 || direccion.contains("C/")
                 || direccion.contains("C.");
         boolean tieneNumero = direccion.matches(".*\\d.*");
-        boolean tieneLocalidad = direccion.contains(",") || direccion.matches(".*\\b\\d{5}\\b.*");
-        return pareceVia && tieneNumero && tieneLocalidad;
+        boolean tieneCodigoPostal = tieneCodigoPostal(interesado);
+        boolean tieneLocalidad = direccion.contains(",") || tieneCodigoPostal;
+        return pareceVia && tieneLocalidad && (tieneNumero || tieneCodigoPostal);
+    }
+
+    private boolean localidadNoVacia(InteresadoSlot interesado) {
+        return texto(interesado.codigoPostal()) != null
+                || texto(interesado.municipio()) != null
+                || texto(interesado.provincia()) != null
+                || tieneCodigoPostal(interesado);
+    }
+
+    private boolean tieneCodigoPostal(InteresadoSlot interesado) {
+        return texto(interesado.codigoPostal()) != null
+                || (texto(interesado.direccion()) != null
+                && normalizarTexto(interesado.direccion()).matches(".*\\b\\d{5}\\b.*"));
     }
 
     private String direccionCompuesta(InteresadoSlot interesado) {

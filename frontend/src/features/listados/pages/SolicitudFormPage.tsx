@@ -77,7 +77,7 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     interesado1Direccion: uppercaseInput(interesado1?.direccion || ""),
     interesado1TipoVia: uppercaseInput(interesado1?.tipoVia || ""),
     interesado1NombreVia: uppercaseInput(interesado1?.nombreVia || ""),
-    interesado1CodigoPostal: uppercaseInput(interesado1?.codigoPostal || ""),
+    interesado1CodigoPostal: uppercaseInput(interesado1?.codigoPostal || postalCodeFromAddress(interesado1?.direccion) || ""),
     interesado1Municipio: uppercaseInput(interesado1?.municipio || ""),
     interesado1Provincia: uppercaseInput(interesado1?.provincia || ""),
     interesado2Rol: interesado2?.rol || "",
@@ -87,7 +87,7 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     interesado2Direccion: uppercaseInput(interesado2?.direccion || ""),
     interesado2TipoVia: uppercaseInput(interesado2?.tipoVia || ""),
     interesado2NombreVia: uppercaseInput(interesado2?.nombreVia || ""),
-    interesado2CodigoPostal: uppercaseInput(interesado2?.codigoPostal || ""),
+    interesado2CodigoPostal: uppercaseInput(interesado2?.codigoPostal || postalCodeFromAddress(interesado2?.direccion) || ""),
     interesado2Municipio: uppercaseInput(interesado2?.municipio || ""),
     interesado2Provincia: uppercaseInput(interesado2?.provincia || ""),
     interesado3Rol: interesado3?.rol || "",
@@ -97,10 +97,14 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     interesado3Direccion: uppercaseInput(interesado3?.direccion || ""),
     interesado3TipoVia: uppercaseInput(interesado3?.tipoVia || ""),
     interesado3NombreVia: uppercaseInput(interesado3?.nombreVia || ""),
-    interesado3CodigoPostal: uppercaseInput(interesado3?.codigoPostal || ""),
+    interesado3CodigoPostal: uppercaseInput(interesado3?.codigoPostal || postalCodeFromAddress(interesado3?.direccion) || ""),
     interesado3Municipio: uppercaseInput(interesado3?.municipio || ""),
     interesado3Provincia: uppercaseInput(interesado3?.provincia || ""),
   };
+}
+
+function postalCodeFromAddress(address?: string | null) {
+  return address?.match(/\b\d{5}\b/)?.[0] || "";
 }
 
 function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
@@ -375,7 +379,6 @@ function InteresadoFields({
       [field("CodigoPostal")]: value.codigoPostal,
       [field("Municipio")]: value.municipio,
       [field("Provincia")]: value.provincia,
-      [field("Direccion")]: "",
     });
   };
   const applyInteresado = (interesado: InteresadoSearchResult) => {
@@ -434,6 +437,14 @@ function InteresadoFields({
       <label>
         Telefono
         <input value={(form[field("Telefono")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Telefono")]: uppercaseInput(event.target.value) })} />
+      </label>
+      <label className="edit-form-grid__wide">
+        Direccion completa
+        <textarea
+          rows={2}
+          value={(form[field("Direccion")] as string) || ""}
+          onChange={(event) => onChange({ ...form, [field("Direccion")]: uppercaseInput(event.target.value) })}
+        />
       </label>
       <AddressFields idPrefix={`solicitud-${prefix}`} value={addressValue} onChange={updateAddress} wideClassName="edit-form-grid__wide" />
     </div>
