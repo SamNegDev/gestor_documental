@@ -12,6 +12,7 @@ public class SolicitudUpsertRequest {
     private String vehiculoMarca;
     private String vehiculoModelo;
     private String vehiculoBastidor;
+    private String operacionPrecioVenta;
     private String observaciones;
     private RolInteresado interesado1Rol;
     private String interesado1Nombre;

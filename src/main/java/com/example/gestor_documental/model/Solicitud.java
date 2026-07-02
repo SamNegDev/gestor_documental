@@ -48,6 +48,9 @@ public class Solicitud {
     @Column(name = "vehiculo_bastidor", length = 40)
     private String vehiculoBastidor;
 
+    @Column(name = "operacion_precio_venta", length = 30)
+    private String operacionPrecioVenta;
+
     @Column(length = 200)
     private String observaciones;
 

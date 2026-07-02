@@ -244,6 +244,41 @@ class SolicitudPreparacionTraspasoServiceImplTest {
         assertThat(documento(response, "CONTRATO_COMPRAVENTA").faltantes()).doesNotContain("Marca", "Modelo", "Bastidor");
     }
 
+    @Test
+    void usaPrecioManualDeSolicitudParaPrepararContrato() {
+        Solicitud solicitud = solicitudBase(15L);
+        solicitud.setVehiculoMarca("Seat");
+        solicitud.setVehiculoModelo("Ibiza");
+        solicitud.setVehiculoBastidor("VF123456789ABCDE1");
+        solicitud.setOperacionPrecioVenta("800");
+        solicitud.setInteresado1Rol(RolInteresado.VENDEDOR);
+        solicitud.setInteresado1Nombre("Maria Luisa Menendez Morejudo");
+        solicitud.setInteresado1Dni("50975033H");
+        solicitud.setInteresado1Direccion("Calle Rosario de Gaya 89, 38329 El Rosario");
+        solicitud.setInteresado2Rol(RolInteresado.COMPRADOR);
+        solicitud.setInteresado2Nombre("Antonio Maldonado Carmona");
+        solicitud.setInteresado2Dni("42793999S");
+        solicitud.setInteresado2Direccion("Calle Igone 4, 38000 Santa Cruz de Tenerife");
+
+        Documento dniVendedor = documento(60L, TipoDocumento.DNI);
+        Documento dniComprador = documento(61L, TipoDocumento.DNI);
+        Documento permiso = documento(62L, TipoDocumento.PERMISO_CIRCULACION);
+        Documento ficha = documento(63L, TipoDocumento.FICHA_TECNICA);
+
+        when(solicitudRepository.findById(15L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(15L)).thenReturn(List.of(dniVendedor, dniComprador, permiso, ficha));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(60L, 61L, 62L, 63L))).thenReturn(List.of(
+                lecturaIdentidad(dniVendedor, "50975033H"),
+                lecturaIdentidad(dniComprador, "42793999S")
+        ));
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(60L, 61L, 62L, 63L))).thenReturn(List.of());
+
+        SolicitudPreparacionTraspasoResponse response = service.obtenerPreparacion(15L, usuario);
+
+        assertThat(itemEstado(response, "OPERACION", "precio")).isEqualTo("OK");
+        assertThat(documento(response, "CONTRATO_COMPRAVENTA").faltantes()).doesNotContain("Precio");
+    }
+
     private Solicitud solicitudBase(Long id) {
         Solicitud solicitud = new Solicitud();
         solicitud.setId(id);

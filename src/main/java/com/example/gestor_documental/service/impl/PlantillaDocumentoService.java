@@ -109,7 +109,7 @@ public class PlantillaDocumentoService {
         Expediente contexto = contextoSolicitud(solicitud);
         TipoPlantilla plantilla = tipo(request != null ? request.codigo() : null);
         return construirPreview(contexto, referencia(solicitud), plantilla, request != null ? request.campos() : null,
-                relacionesSolicitud(solicitud, contexto));
+                relacionesSolicitud(solicitud, contexto), valoresSolicitud(solicitud));
     }
 
     @Transactional
@@ -140,7 +140,7 @@ public class PlantillaDocumentoService {
         List<ExpedienteInteresado> relaciones = relacionesSolicitud(solicitud, contexto);
         TipoPlantilla plantilla = tipo(request != null ? request.codigo() : null);
         PlantillaPreviewResponse preview = construirPreview(contexto, referencia(solicitud), plantilla,
-                request != null ? request.campos() : null, relaciones);
+                request != null ? request.campos() : null, relaciones, valoresSolicitud(solicitud));
         validarRequeridos(preview.campos());
         Map<String, String> valores = valores(preview.campos());
         byte[] pdf = rellenarPdf(contexto, plantilla, valores, relaciones);
@@ -149,7 +149,18 @@ public class PlantillaDocumentoService {
 
     private PlantillaPreviewResponse construirPreview(Expediente expediente, String referencia,
             TipoPlantilla plantilla, Map<String, String> cambios, List<ExpedienteInteresado> relaciones) {
+        return construirPreview(expediente, referencia, plantilla, cambios, relaciones, Map.of());
+    }
+
+    private PlantillaPreviewResponse construirPreview(Expediente expediente, String referencia,
+            TipoPlantilla plantilla, Map<String, String> cambios, List<ExpedienteInteresado> relaciones,
+            Map<String, String> valoresSolicitud) {
         Map<String, String> valores = valoresIniciales(expediente, plantilla, relaciones);
+        if (valoresSolicitud != null) {
+            valoresSolicitud.forEach((clave, valor) -> {
+                if (clave != null && !vacio(valor)) valores.put(clave, limpiar(valor));
+            });
+        }
         if (cambios != null) {
             cambios.forEach((clave, valor) -> {
                 if (clave != null) valores.put(clave, limpiar(valor));
@@ -432,6 +443,12 @@ public class PlantillaDocumentoService {
         vehiculo.setModelo(limpiar(solicitud.getVehiculoModelo()));
         vehiculo.setBastidor(limpiar(solicitud.getVehiculoBastidor()));
         return vehiculo;
+    }
+
+    private Map<String, String> valoresSolicitud(Solicitud solicitud) {
+        Map<String, String> valores = new LinkedHashMap<>();
+        valores.put("precio", solicitud.getOperacionPrecioVenta());
+        return valores;
     }
 
     private List<ExpedienteInteresado> relaciones(Long expedienteId) {

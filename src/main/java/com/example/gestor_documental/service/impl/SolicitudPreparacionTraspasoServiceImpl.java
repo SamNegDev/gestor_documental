@@ -736,6 +736,10 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
     }
 
     private String mejorPrecio(PreparacionContext context) {
+        String precioSolicitud = texto(context.solicitud().getOperacionPrecioVenta());
+        if (precioSolicitud != null) {
+            return precioSolicitud;
+        }
         return context.lecturasRoles().values().stream()
                 .map(DocumentoRolesLectura::getValorDeclarado)
                 .map(this::texto)

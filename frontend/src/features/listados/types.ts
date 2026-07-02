@@ -91,6 +91,7 @@ export interface SolicitudDetail {
   fechaCreacion?: string | null;
   fechaUltimaModificacion?: string | null;
   observaciones?: string | null;
+  operacionPrecioVenta?: string | null;
   situacionDocumental?: string | null;
   expedienteId?: number | null;
   cliente?: ClienteResumen | null;
@@ -213,6 +214,7 @@ export interface SolicitudUpsertInput {
   vehiculoMarca?: string | null;
   vehiculoModelo?: string | null;
   vehiculoBastidor?: string | null;
+  operacionPrecioVenta?: string | null;
   observaciones?: string | null;
   interesado1Rol?: string | null;
   interesado1Nombre?: string | null;

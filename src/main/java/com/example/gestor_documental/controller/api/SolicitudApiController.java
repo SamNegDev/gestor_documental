@@ -434,6 +434,7 @@ public class SolicitudApiController {
         solicitud.setVehiculoMarca(TextNormalizer.upperOrNull(request.getVehiculoMarca()));
         solicitud.setVehiculoModelo(TextNormalizer.upperOrNull(request.getVehiculoModelo()));
         solicitud.setVehiculoBastidor(TextNormalizer.upperOrNull(request.getVehiculoBastidor()));
+        solicitud.setOperacionPrecioVenta(TextNormalizer.upperOrNull(request.getOperacionPrecioVenta()));
         solicitud.setObservaciones(TextNormalizer.upperOrNull(request.getObservaciones()));
         solicitud.setInteresado1Rol(request.getInteresado1Rol());
         solicitud.setInteresado1Nombre(TextNormalizer.upperOrNull(request.getInteresado1Nombre()));
@@ -604,6 +605,7 @@ public class SolicitudApiController {
                 .fechaCreacion(formatDate(solicitud.getFechaCreacion()))
                 .fechaUltimaModificacion(formatDate(solicitud.getFechaUltimaModificacion()))
                 .observaciones(solicitud.getObservaciones())
+                .operacionPrecioVenta(solicitud.getOperacionPrecioVenta())
                 .situacionDocumental(situacionDocumental(solicitud, documentos, interesados))
                 .expedienteId(solicitud.getExpediente() != null ? solicitud.getExpediente().getId() : null)
                 .vehiculo(new SolicitudVehiculoResponse(

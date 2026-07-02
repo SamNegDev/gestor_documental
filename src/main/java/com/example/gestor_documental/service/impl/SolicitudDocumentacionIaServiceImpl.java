@@ -221,10 +221,10 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                         solicitud,
                         usuario,
                         "IA DOCUMENTACION",
-                        "Se actualizaron datos de vehiculo desde factura/contrato.");
-                detalles.add("Datos de vehiculo actualizados en la solicitud.");
+                        "Se actualizaron datos de vehiculo u operacion desde factura/contrato.");
+                detalles.add("Datos de vehiculo u operacion actualizados en la solicitud.");
                 return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, true, false, false,
-                        "Datos de vehiculo actualizados desde la documentacion.", detalles);
+                        "Datos de vehiculo u operacion actualizados desde la documentacion.", detalles);
             }
             return respuesta(solicitudId, documentosIdentidad.size(), documentosRoles.size(), contadores, false, true, false,
                     "Sin cambios: la documentacion ya estaba procesada correctamente.", detalles);
@@ -1082,16 +1082,21 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
 
         String bastidorLeido = normalizarIdentificador(lecturaRoles.getBastidor());
         String bastidorSolicitud = normalizarIdentificador(solicitud.getVehiculoBastidor());
-        if (bastidorLeido == null || bastidorLeido.length() < 6) {
-            return actualizado;
-        }
-        if (bastidorSolicitud == null) {
+        if (bastidorLeido != null && bastidorLeido.length() >= 6 && bastidorSolicitud == null) {
             solicitud.setVehiculoBastidor(bastidorLeido);
             detalles.add("Bastidor detectado y guardado en la solicitud: " + bastidorLeido + ".");
-            return true;
-        }
-        if (!bastidorSolicitud.equals(bastidorLeido)) {
+            actualizado = true;
+        } else if (bastidorLeido != null && bastidorLeido.length() >= 6 && !bastidorSolicitud.equals(bastidorLeido)) {
             detalles.add("El bastidor de factura/contrato (" + bastidorLeido + ") no coincide con el guardado (" + bastidorSolicitud + ").");
+        }
+        String precioLeido = TextNormalizer.upperOrNull(lecturaRoles.getValorDeclarado());
+        String precioSolicitud = TextNormalizer.upperOrNull(solicitud.getOperacionPrecioVenta());
+        if (precioLeido != null && precioSolicitud == null) {
+            solicitud.setOperacionPrecioVenta(precioLeido);
+            detalles.add("Precio de venta detectado y guardado en la solicitud: " + precioLeido + ".");
+            actualizado = true;
+        } else if (precioLeido != null && !precioSolicitud.equals(precioLeido)) {
+            detalles.add("El precio de factura/contrato (" + precioLeido + ") no coincide con el guardado (" + precioSolicitud + ").");
         }
         return actualizado;
     }

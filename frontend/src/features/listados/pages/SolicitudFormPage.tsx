@@ -22,6 +22,7 @@ function emptyForm(): SolicitudUpsertInput {
     vehiculoMarca: "",
     vehiculoModelo: "",
     vehiculoBastidor: "",
+    operacionPrecioVenta: "",
     observaciones: "",
     interesado1Rol: "",
     interesado1Nombre: "",
@@ -69,6 +70,7 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     vehiculoMarca: uppercaseInput(solicitud.vehiculo?.marca || ""),
     vehiculoModelo: uppercaseInput(solicitud.vehiculo?.modelo || ""),
     vehiculoBastidor: uppercaseInput(solicitud.vehiculo?.bastidor || ""),
+    operacionPrecioVenta: uppercaseInput(solicitud.operacionPrecioVenta || ""),
     observaciones: uppercaseInput(solicitud.observaciones || ""),
     interesado1Rol: interesado1?.rol || "",
     interesado1Nombre: uppercaseInput(interesado1?.nombre || ""),
@@ -114,6 +116,7 @@ function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
     vehiculoMarca: cleanUpperText(form.vehiculoMarca),
     vehiculoModelo: cleanUpperText(form.vehiculoModelo),
     vehiculoBastidor: cleanUpperText(form.vehiculoBastidor),
+    operacionPrecioVenta: cleanUpperText(form.operacionPrecioVenta),
     observaciones: cleanUpperText(form.observaciones),
     interesado1Rol: cleanUpperText(form.interesado1Rol),
     interesado1Nombre: cleanUpperText(form.interesado1Nombre),
@@ -317,6 +320,10 @@ export function SolicitudFormPage() {
             <label>
               Bastidor
               <input value={form.vehiculoBastidor || ""} onChange={(event) => setForm({ ...form, vehiculoBastidor: uppercaseInput(event.target.value) })} />
+            </label>
+            <label>
+              Precio de venta
+              <input inputMode="decimal" value={form.operacionPrecioVenta || ""} onChange={(event) => setForm({ ...form, operacionPrecioVenta: uppercaseInput(event.target.value) })} />
             </label>
             <label className="edit-form-grid__wide">
               Observaciones

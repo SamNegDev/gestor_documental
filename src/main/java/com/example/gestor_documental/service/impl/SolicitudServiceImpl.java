@@ -609,6 +609,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         String vehiculoMarcaAnterior = solicitudBase.getVehiculoMarca();
         String vehiculoModeloAnterior = solicitudBase.getVehiculoModelo();
         String vehiculoBastidorAnterior = solicitudBase.getVehiculoBastidor();
+        String operacionPrecioVentaAnterior = solicitudBase.getOperacionPrecioVenta();
         Long tipoTramiteAnterior = solicitudBase.getTipoTramite() != null ? solicitudBase.getTipoTramite().getId() : null;
 
         solicitudBase.setTipoTramite(tipoTramite);
@@ -616,6 +617,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitudBase.setVehiculoMarca(TextNormalizer.upperOrNull(solicitudActualizada.getVehiculoMarca()));
         solicitudBase.setVehiculoModelo(TextNormalizer.upperOrNull(solicitudActualizada.getVehiculoModelo()));
         solicitudBase.setVehiculoBastidor(normalizarCodigoVehiculo(solicitudActualizada.getVehiculoBastidor()));
+        solicitudBase.setOperacionPrecioVenta(TextNormalizer.upperOrNull(solicitudActualizada.getOperacionPrecioVenta()));
 
         solicitudBase.setInteresado1Rol(solicitudActualizada.getInteresado1Rol());
         solicitudBase.setInteresado1Nombre(NombrePersonaNormalizer.normalizar(solicitudActualizada.getInteresado1Nombre()));
@@ -682,6 +684,9 @@ public class SolicitudServiceImpl implements SolicitudService {
                 || !java.util.Objects.equals(vehiculoModeloAnterior, solicitudBase.getVehiculoModelo())
                 || !java.util.Objects.equals(vehiculoBastidorAnterior, solicitudBase.getVehiculoBastidor())) {
             cambios.add("Vehiculo");
+        }
+        if (!java.util.Objects.equals(operacionPrecioVentaAnterior, solicitudBase.getOperacionPrecioVenta())) {
+            cambios.add("Precio de venta");
         }
 
         Solicitud solicitudGuardada = solicitudRepository.save(solicitudBase);
@@ -932,6 +937,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setVehiculoMarca(TextNormalizer.upperOrNull(solicitud.getVehiculoMarca()));
         solicitud.setVehiculoModelo(TextNormalizer.upperOrNull(solicitud.getVehiculoModelo()));
         solicitud.setVehiculoBastidor(normalizarCodigoVehiculo(solicitud.getVehiculoBastidor()));
+        solicitud.setOperacionPrecioVenta(TextNormalizer.upperOrNull(solicitud.getOperacionPrecioVenta()));
         solicitud.setObservaciones(TextNormalizer.upperOrNull(solicitud.getObservaciones()));
         solicitud.setInteresado1Nombre(NombrePersonaNormalizer.normalizar(solicitud.getInteresado1Nombre()));
         solicitud.setInteresado1Dni(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()));
