@@ -26,6 +26,7 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 
 ### Plantillas documentales
 
+- Completar la interfaz guiada de preparacion de traspaso en solicitud usando el estado backend del asistente, con acciones directas para corregir datos y generar documentos.
 - Incorporar nuevos modelos oficiales cuando sean necesarios.
 - Completar automaticamente marca, modelo y bastidor desde el registro ampliado de vehiculos, e incorporar precio cuando quede modelado como dato estructurado.
 

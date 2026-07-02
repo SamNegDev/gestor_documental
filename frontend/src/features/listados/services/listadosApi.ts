@@ -1,6 +1,6 @@
 import { apiDelete, apiGet, apiPostForm, apiPostJson, apiPutJson } from "../../../shared/api/http";
 import type { CreacionConProcesamiento } from "../../expedientes/types/expedienteDetail.types";
-import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudDocumentacionIaResponse, SolicitudIdentidadDetectadaInput, SolicitudInteresadoCoincidencia, SolicitudListItem, SolicitudUpsertInput } from "../types";
+import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudDocumentacionIaResponse, SolicitudIdentidadDetectadaInput, SolicitudInteresadoCoincidencia, SolicitudListItem, SolicitudPreparacionTraspaso, SolicitudUpsertInput } from "../types";
 
 function buildQuery(filters: ListFilters) {
   const params = new URLSearchParams();
@@ -49,6 +49,10 @@ export function getSolicitudListCatalogs() {
 
 export function getSolicitudDetail(id: string | number) {
   return apiGet<SolicitudDetail>(`/api/solicitudes/${id}`);
+}
+
+export function getSolicitudPreparacionTraspaso(id: string | number) {
+  return apiGet<SolicitudPreparacionTraspaso>(`/api/solicitudes/${id}/preparacion-traspaso`);
 }
 
 export function createSolicitud(input: SolicitudUpsertInput) {

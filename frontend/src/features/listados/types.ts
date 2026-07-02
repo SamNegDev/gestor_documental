@@ -113,6 +113,7 @@ export interface LecturaIaSolicitudCliente {
   usosMaximos: number;
   usosRestantes: number;
   documentosIdentidad: number;
+  documentosVehiculo?: number;
   documentosRoles: number;
   mensaje?: string | null;
 }
@@ -153,6 +154,49 @@ export interface SolicitudDocumentacionIaResponse {
   requiereRevision: boolean;
   mensaje?: string | null;
   detalles: string[];
+}
+
+export interface SolicitudPreparacionAccion {
+  tipo?: string | null;
+  titulo: string;
+  detalle?: string | null;
+  bloque?: string | null;
+}
+
+export interface SolicitudPreparacionItem {
+  codigo: string;
+  etiqueta: string;
+  estado: "OK" | "AVISO" | "PENDIENTE" | "BLOQUEANTE" | string;
+  detalle?: string | null;
+  accionTipo?: string | null;
+  accionLabel?: string | null;
+}
+
+export interface SolicitudPreparacionBloque {
+  codigo: string;
+  titulo: string;
+  estado: "OK" | "AVISO" | "PENDIENTE" | "BLOQUEANTE" | string;
+  completados: number;
+  total: number;
+  items: SolicitudPreparacionItem[];
+}
+
+export interface SolicitudPreparacionDocumento {
+  codigo: string;
+  nombre: string;
+  estado: "LISTO" | "FALTAN_DATOS" | "YA_APORTADO" | string;
+  camposCompletos: number;
+  camposTotales: number;
+  faltantes: string[];
+}
+
+export interface SolicitudPreparacionTraspaso {
+  solicitudId: number;
+  estado: "LISTA" | "INCOMPLETA" | "BLOQUEADA" | string;
+  progreso: number;
+  siguienteAccion: SolicitudPreparacionAccion;
+  bloques: SolicitudPreparacionBloque[];
+  documentosGenerables: SolicitudPreparacionDocumento[];
 }
 
 export interface SolicitudUpsertInput {

@@ -29,10 +29,19 @@ import {
   enviarMensajeSolicitud,
   getSolicitudInteresadoCoincidencias,
   getSolicitudDetail,
+  getSolicitudPreparacionTraspaso,
   procesarSolicitudDocumentacionIa,
   procesarSolicitudDocumentacionIaCliente,
 } from "../services/listadosApi";
-import type { LecturaIaSolicitudCliente, SolicitudDetail, SolicitudDocumentacionIaResponse, SolicitudIdentidadDetectadaInput } from "../types";
+import type {
+  LecturaIaSolicitudCliente,
+  SolicitudDetail,
+  SolicitudDocumentacionIaResponse,
+  SolicitudIdentidadDetectadaInput,
+  SolicitudPreparacionBloque,
+  SolicitudPreparacionDocumento,
+  SolicitudPreparacionTraspaso,
+} from "../types";
 const COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX = "gestor.solicitudCompleta.job.";
 const COMPLETE_DOCUMENT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 const SOLICITUD_ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
@@ -58,6 +67,12 @@ export function SolicitudDetailPage() {
   const solicitudQuery = useQuery({
     queryKey: ["solicitudes", "detalle", id],
     queryFn: () => getSolicitudDetail(id!),
+    enabled: Boolean(id),
+  });
+
+  const preparacionQuery = useQuery({
+    queryKey: ["solicitudes", "preparacion-traspaso", id],
+    queryFn: () => getSolicitudPreparacionTraspaso(id!),
     enabled: Boolean(id),
   });
 
@@ -91,6 +106,7 @@ export function SolicitudDetailPage() {
     onSuccess: () => {
       setMensaje("");
       queryClient.invalidateQueries({ queryKey: ["solicitudes", "detalle", id] });
+      queryClient.invalidateQueries({ queryKey: ["solicitudes", "preparacion-traspaso", id] });
     },
   });
 
@@ -110,6 +126,7 @@ export function SolicitudDetailPage() {
       queryClient.setQueryData(["solicitudes", "detalle", id], actualizada);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
+        queryClient.invalidateQueries({ queryKey: ["solicitudes", "preparacion-traspaso", id] }),
         queryClient.invalidateQueries({ queryKey: ["tareas"] }),
         queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
       ]);
@@ -120,6 +137,7 @@ export function SolicitudDetailPage() {
     const result = await solicitudQuery.refetch();
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
+      queryClient.invalidateQueries({ queryKey: ["solicitudes", "preparacion-traspaso", id] }),
       queryClient.invalidateQueries({ queryKey: ["tareas"] }),
       queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
     ]);
@@ -413,8 +431,16 @@ export function SolicitudDetailPage() {
       .map((interesado) => normalizeIdentityIdentifier(interesado.dni))
       .filter((value): value is string => Boolean(value)),
   );
-  const preparationItems = buildSolicitudPreparationItems(solicitud);
   const hasSolicitudDocuments = solicitud.documentos.some((documento) => documento.id);
+  const editSolicitudPath = isAdmin ? `/solicitudes/${solicitud.id}/editar` : `/cliente/solicitudes/${solicitud.id}/editar`;
+  const preparationTitle = solicitud.tipoTramite === "TRASPASO" ? "Preparacion del traspaso" : "Preparacion de la solicitud";
+  const preparationIaPending = isAdmin ? procesarDocumentacionMutation.isPending : procesarDocumentacionClienteMutation.isPending;
+  const preparationIaDisabled = isAdmin
+    ? procesarDocumentacionMutation.isPending || !hasSolicitudDocuments
+    : procesarDocumentacionClienteMutation.isPending || !solicitud.lecturaIaCliente?.puedeSolicitar;
+  const preparationIaLabel = isAdmin
+    ? (procesarDocumentacionMutation.isPending ? "Leyendo IA" : "Lectura IA")
+    : clienteIaButtonText(solicitud.lecturaIaCliente, procesarDocumentacionClienteMutation.isPending);
 
   return (
     <section className="request-page">
@@ -485,16 +511,29 @@ export function SolicitudDetailPage() {
 
       {!isClosed ? (
         <>
-          <CompleteExpedienteUploadPanel
-            onUploadCompleteExpediente={handleUploadCompleteSolicitud}
-            processing={completeSolicitudProcessing}
-            processingJob={completeSolicitudJob}
-            minimized={completeSolicitudMinimized}
-            onToggleMinimized={() => setCompleteSolicitudMinimized((current) => !current)}
-            title="Aportar documentacion completa"
-            description="Sube el PDF completo de la solicitud y el sistema intentara separar automaticamente los documentos detectados."
+          <div id="solicitud-documentacion-completa">
+            <CompleteExpedienteUploadPanel
+              onUploadCompleteExpediente={handleUploadCompleteSolicitud}
+              processing={completeSolicitudProcessing}
+              processingJob={completeSolicitudJob}
+              minimized={completeSolicitudMinimized}
+              onToggleMinimized={() => setCompleteSolicitudMinimized((current) => !current)}
+              title="Aportar documentacion completa"
+              description="Sube el PDF completo de la solicitud y el sistema intentara separar automaticamente los documentos detectados."
+            />
+          </div>
+          <SolicitudPreparationAssistant
+            editPath={editSolicitudPath}
+            error={preparacionQuery.isError}
+            iaDisabled={preparationIaDisabled}
+            iaLabel={preparationIaLabel}
+            iaPending={preparationIaPending}
+            loading={preparacionQuery.isLoading}
+            onReadWithIa={isAdmin ? () => handleProcessDocumentacionIa(false) : () => void handleProcessClienteIa()}
+            onOpenTemplates={() => setTemplateDialogOpen(true)}
+            preparation={preparacionQuery.data}
+            title={preparationTitle}
           />
-          <SolicitudPreparationPanel items={preparationItems} />
         </>
       ) : null}
 
@@ -543,7 +582,7 @@ export function SolicitudDetailPage() {
       </div>
 
       <div className="request-grid request-grid--wide">
-        <section className="panel">
+        <section className="panel" id="solicitud-documentos">
           <div className="panel-heading">
             <h2>Documentos</h2>
             <div className="button-group">
@@ -841,40 +880,259 @@ function normalizeIdentityIdentifier(value?: string | null) {
   return normalized || null;
 }
 
-type SolicitudPreparationItem = {
-  key: string;
-  label: string;
-  detail: string;
-  missing?: string | null;
-  ready: boolean;
-};
+function SolicitudPreparationAssistant({
+  preparation,
+  loading,
+  error,
+  title,
+  editPath,
+  iaDisabled,
+  iaLabel,
+  iaPending,
+  onReadWithIa,
+  onOpenTemplates,
+}: {
+  preparation?: SolicitudPreparacionTraspaso;
+  loading: boolean;
+  error: boolean;
+  title: string;
+  editPath: string;
+  iaDisabled: boolean;
+  iaLabel: string;
+  iaPending: boolean;
+  onReadWithIa: () => void;
+  onOpenTemplates: () => void;
+}) {
+  if (loading) {
+    return (
+      <section className="request-assistant request-assistant--loading" aria-label={title}>
+        <div className="request-assistant__top">
+          <div className="request-assistant__title">
+            <span className="request-assistant__icon is-info">
+              <Loader2 size={18} />
+            </span>
+            <div>
+              <p className="eyebrow">{title}</p>
+              <h3>Calculando estado</h3>
+            </div>
+          </div>
+        </div>
+        <div className="request-assistant__bar">
+          <span style={{ width: "34%" }} />
+        </div>
+      </section>
+    );
+  }
 
-function SolicitudPreparationPanel({ items }: { items: SolicitudPreparationItem[] }) {
-  const pendingItems = items.filter((item) => !item.ready);
-  const pending = pendingItems.length;
+  if (error || !preparation) {
+    return (
+      <section className="request-assistant request-assistant--warning" aria-label={title}>
+        <div className="request-assistant__top">
+          <div className="request-assistant__title">
+            <span className="request-assistant__icon is-warning">
+              <AlertTriangle size={18} />
+            </span>
+            <div>
+              <p className="eyebrow">{title}</p>
+              <h3>No se pudo calcular la preparacion</h3>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const progress = clampPercent(preparation.progreso);
+  const tone = preparationTone(preparation.estado);
+  const action = preparation.siguienteAccion;
+
   return (
-    <section className="request-document-guide request-preparation-panel" aria-label="Preparacion documental de la solicitud">
-      <div className="request-document-guide__heading">
-        {pending > 0 ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
-        <div>
-          <strong>Preparacion antes de convertir</strong>
-          <span>{pending > 0 ? `Falta completar: ${formatReadableList(pendingItems.map((item) => item.label))}.` : "Interesados, vehiculo y documentos base listos para convertir."}</span>
+    <section className={`request-assistant request-assistant--${tone}`} aria-label={title}>
+      <div className="request-assistant__top">
+        <div className="request-assistant__title">
+          <span className={`request-assistant__icon is-${tone}`}>{preparationIcon(preparation.estado)}</span>
+          <div>
+            <p className="eyebrow">{title}</p>
+            <h3>{preparationHeadline(preparation)}</h3>
+          </div>
+        </div>
+        <div className="request-assistant__summary">
+          <strong>{progress}%</strong>
+          <span>{preparationLabel(preparation.estado)}</span>
         </div>
       </div>
-      <ul className="request-preparation-list">
-        {items.map((item) => (
-          <li className={item.ready ? "is-ready" : "is-pending"} key={item.key}>
-            {item.ready ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-            <span>
-              <strong>{item.label}</strong>
-              <small>{item.detail}</small>
-              {!item.ready && item.missing ? <em>{item.missing}</em> : null}
-            </span>
-          </li>
+      <div className="request-assistant__bar" aria-hidden="true">
+        <span style={{ width: `${progress}%` }} />
+      </div>
+      {action ? (
+        <div className="request-assistant__action">
+          <div>
+            <strong>{action.titulo}</strong>
+            {action.detalle ? <span>{action.detalle}</span> : null}
+          </div>
+          <SolicitudPreparationAction
+            iaDisabled={iaDisabled}
+            iaLabel={iaLabel}
+            iaPending={iaPending}
+            onReadWithIa={onReadWithIa}
+            tipo={action.tipo}
+            editPath={editPath}
+            onOpenTemplates={onOpenTemplates}
+          />
+        </div>
+      ) : null}
+      <div className="request-assistant__blocks">
+        {preparation.bloques.map((bloque) => (
+          <SolicitudPreparationBlock bloque={bloque} key={bloque.codigo} />
         ))}
-      </ul>
+      </div>
+      {preparation.documentosGenerables.length > 0 ? (
+        <div className="request-assistant__documents">
+          <div className="request-assistant__section-title">
+            <FileSignature size={16} />
+            <strong>Documentos</strong>
+          </div>
+          <ul>
+            {preparation.documentosGenerables.map((documento) => (
+              <SolicitudPreparationDocument documento={documento} key={documento.codigo} />
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function SolicitudPreparationBlock({ bloque }: { bloque: SolicitudPreparacionBloque }) {
+  const tone = preparationTone(bloque.estado);
+  const pendingItem = bloque.items.find((item) => item.estado !== "OK") ?? bloque.items[0];
+  const progress = bloque.total > 0 ? clampPercent((bloque.completados / bloque.total) * 100) : 0;
+  return (
+    <div className={`request-assistant__block is-${tone}`}>
+      <div className="request-assistant__block-head">
+        <span>{preparationIcon(bloque.estado)}</span>
+        <div>
+          <strong>{bloque.titulo}</strong>
+          <small>{pendingItem?.detalle || (bloque.estado === "OK" ? "Completo" : "Pendiente de revisar")}</small>
+          {pendingItem?.accionLabel ? <em>{pendingItem.accionLabel}</em> : null}
+        </div>
+        <b>{bloque.completados}/{bloque.total}</b>
+      </div>
+      <div className="request-assistant__block-progress" aria-hidden="true">
+        <span style={{ width: `${progress}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function SolicitudPreparationDocument({ documento }: { documento: SolicitudPreparacionDocumento }) {
+  const tone = documentTone(documento.estado);
+  return (
+    <li className={`is-${tone}`}>
+      <span>
+        <strong>{documento.nombre}</strong>
+        {documento.faltantes.length > 0 ? <small>Falta: {formatReadableList(documento.faltantes)}.</small> : null}
+      </span>
+      <em>{documentLabel(documento.estado, documento.camposCompletos, documento.camposTotales)}</em>
+    </li>
+  );
+}
+
+function SolicitudPreparationAction({
+  tipo,
+  editPath,
+  iaDisabled,
+  iaLabel,
+  iaPending,
+  onReadWithIa,
+  onOpenTemplates,
+}: {
+  tipo?: string | null;
+  editPath: string;
+  iaDisabled: boolean;
+  iaLabel: string;
+  iaPending: boolean;
+  onReadWithIa: () => void;
+  onOpenTemplates: () => void;
+}) {
+  if (!tipo || tipo === "NINGUNA") return null;
+  if (tipo === "GENERAR_DOCUMENTOS" || tipo === "COMPLETAR_PLANTILLA") {
+    return (
+      <button className="primary-button primary-button--compact" onClick={onOpenTemplates} type="button">
+        <FileSignature size={16} />
+        Generar docs
+      </button>
+    );
+  }
+  if (tipo === "SUBIR_DOCUMENTO") {
+    return (
+      <a className="soft-button soft-button--compact" href="#solicitud-documentacion-completa">
+        <FileText size={16} />
+        Aportar docs
+      </a>
+    );
+  }
+  if (tipo === "REVISAR_IA") {
+    return (
+      <button className="primary-button primary-button--compact" disabled={iaDisabled} onClick={onReadWithIa} type="button">
+        {iaPending ? <Loader2 size={16} /> : <Sparkles size={16} />}
+        {iaLabel}
+      </button>
+    );
+  }
+  if (tipo.startsWith("COMPLETAR") || tipo.startsWith("REVISAR")) {
+    return (
+      <Link className="soft-button soft-button--compact" to={editPath}>
+        <Pencil size={16} />
+        Editar datos
+      </Link>
+    );
+  }
+  return null;
+}
+
+function clampPercent(value?: number | null) {
+  return Math.max(0, Math.min(100, Math.round(value ?? 0)));
+}
+
+function preparationTone(estado?: string | null) {
+  if (estado === "LISTA" || estado === "OK") return "success";
+  if (estado === "BLOQUEADA" || estado === "BLOQUEANTE") return "danger";
+  if (estado === "AVISO") return "warning";
+  return "info";
+}
+
+function preparationIcon(estado?: string | null) {
+  const tone = preparationTone(estado);
+  if (tone === "success") return <CheckCircle2 size={16} />;
+  if (tone === "danger" || tone === "warning") return <AlertTriangle size={16} />;
+  return <Info size={16} />;
+}
+
+function preparationLabel(estado?: string | null) {
+  if (estado === "LISTA") return "Lista";
+  if (estado === "BLOQUEADA") return "Bloqueada";
+  if (estado === "INCOMPLETA") return "Incompleta";
+  return formatEnum(estado);
+}
+
+function preparationHeadline(preparation: SolicitudPreparacionTraspaso) {
+  if (preparation.estado === "LISTA") return "Lista para generar documentos";
+  if (preparation.estado === "BLOQUEADA") return "Faltan datos obligatorios";
+  return preparation.siguienteAccion?.titulo || "Preparacion en curso";
+}
+
+function documentTone(estado?: string | null) {
+  if (estado === "YA_APORTADO" || estado === "LISTO") return "success";
+  if (estado === "FALTAN_DATOS") return "warning";
+  return "info";
+}
+
+function documentLabel(estado?: string | null, completos?: number, total?: number) {
+  if (estado === "YA_APORTADO") return "Aportado";
+  if (estado === "LISTO") return "Listo";
+  if (estado === "FALTAN_DATOS") return `${completos}/${total}`;
+  return formatEnum(estado);
 }
 
 function SolicitudIaErrorPanel({ message, onDismiss }: { message: string; onDismiss: () => void }) {
@@ -934,15 +1192,7 @@ function SolicitudClienteIaPanel({
   onRequest: () => void;
 }) {
   const disabled = loading || !lecturaIa?.puedeSolicitar;
-  const buttonText = loading
-    ? "Solicitando"
-    : !lecturaIa
-      ? "No disponible"
-      : lecturaIa.usosRestantes <= 0
-        ? "Limite alcanzado"
-        : !lecturaIa.documentacionSuficiente
-          ? "Documentacion pendiente"
-          : "Solicitar lectura IA";
+  const buttonText = clienteIaButtonText(lecturaIa, loading);
   return (
     <section className="client-ai-panel" aria-label="Lectura IA de la solicitud">
       <div className="exp-panel__heading">
@@ -962,7 +1212,7 @@ function SolicitudClienteIaPanel({
           <strong>{lecturaIa?.mensaje || "Lectura IA no disponible."}</strong>
           <small>
             Usos consumidos: {lecturaIa?.usosConsumidos ?? 0} de {lecturaIa?.usosMaximos ?? 3}
-            {lecturaIa ? ` - Documentos: ${lecturaIa.documentosIdentidad} identidad / ${lecturaIa.documentosRoles} contrato o factura` : ""}
+            {lecturaIa ? ` - Documentos: ${lecturaIa.documentosIdentidad} identidad / ${lecturaIa.documentosVehiculo ?? 0} vehiculo` : ""}
           </small>
           {lecturaIa && !lecturaIa.documentacionSuficiente && lecturaIa.bloqueosDocumentales.length > 0 ? (
             <ul className="client-ai-blockers">
@@ -979,6 +1229,15 @@ function SolicitudClienteIaPanel({
       </div>
     </section>
   );
+}
+
+function clienteIaButtonText(lecturaIa?: LecturaIaSolicitudCliente | null, loading = false) {
+  if (loading) return "Solicitando";
+  if (!lecturaIa) return "No disponible";
+  if (!lecturaIa.apiKeyConfigurada) return "IA no configurada";
+  if (lecturaIa.usosRestantes <= 0) return "Limite alcanzado";
+  if (!lecturaIa.documentacionSuficiente) return "Documentacion pendiente";
+  return "Solicitar lectura IA";
 }
 
 function AdminActions({
@@ -1177,220 +1436,6 @@ function hasInteresadoData(interesado: { nombre?: string | null; rol?: string | 
   return [interesado.nombre, interesado.rol, interesado.dni, interesado.telefono, interesado.direccion].some(
     (value) => value && value.trim() !== "",
   );
-}
-
-function buildSolicitudPreparationItems(solicitud: SolicitudDetail): SolicitudPreparationItem[] {
-  const uploadedTypes = new Set(solicitud.documentos.map((documento) => documento.tipo));
-  const expectedIdentityCount = expectedIdentities(solicitud.tipoTramite);
-  const interesados = solicitud.interesados.filter(hasInteresadoData);
-  const expectedRoleKeys = expectedRoles(solicitud.tipoTramite);
-  const expectedRoleLabels = expectedRoleKeys.map(roleLabel);
-  const missingRoleLabels = expectedRoleKeys
-    .filter((rol) => !interesados.some((item) => item.rol === rol && item.nombre && item.dni))
-    .map(roleLabel);
-  const incompleteLabels = interesados
-    .filter((item) => !item.nombre || !item.dni || !item.rol)
-    .map(interesadoLabel);
-  const missingIdentities = missingIdentityTargets(expectedRoleKeys, interesados);
-  const identityCoveredCount = Math.max(0, expectedIdentityCount - missingIdentities.length);
-  const representativesMissing = interesados.filter((item) => item.requiereRepresentanteLegal && !item.representanteLegalAportado);
-  const representativesCovered = interesados.filter((item) => item.requiereRepresentanteLegal && item.representanteLegalAportado);
-  const identityReady = missingIdentities.length === 0 && representativesMissing.length === 0;
-  const roleDocsCount = solicitud.documentos.filter((documento) => documento.tipo === "CONTRATO_COMPRAVENTA" || documento.tipo === "FACTURA").length;
-  const roleDocsReady = solicitud.tipoTramite === "BATECOM"
-    ? roleDocsCount >= 2
-    : roleDocsCount >= 1;
-  const mandateReady = uploadedTypes.has("MANDATO") || uploadedTypes.has("MANDATO_REPRESENTACION");
-  const vehicleMissingDocs = missingVehicleDocs(uploadedTypes);
-  const vehicleReady = vehicleMissingDocs.length === 0;
-  const interesadosReady = missingRoleLabels.length === 0 && incompleteLabels.length === 0;
-  return [
-    {
-      key: "interesados",
-      label: "Interesados y roles",
-      detail: interesadosReady
-        ? `${formatReadableList(expectedRoleLabels)} identificados con nombre, DNI/CIF y rol.`
-        : `${interesados.length}/${expectedIdentityCount} bloque(s) informados.`,
-      missing: missingRoleLabels.length > 0
-        ? `Falta bloque de ${formatReadableList(missingRoleLabels)}.`
-        : incompleteLabels.length > 0
-          ? `Completa nombre, DNI/CIF y rol de ${formatReadableList(incompleteLabels)}.`
-          : null,
-      ready: interesadosReady,
-    },
-    {
-      key: "identidades",
-      label: representativesMissing.length > 0 || representativesCovered.length > 0 ? "DNI/CIF y administrador" : "DNI/CIF",
-      detail: identityReady
-        ? identityReadyDetail(identityCoveredCount, expectedIdentityCount, representativesCovered)
-        : `${identityCoveredCount}/${expectedIdentityCount} identidad(es) principales cubiertas.`,
-      missing: identityMissingDetail(missingIdentities, representativesMissing),
-      ready: identityReady,
-    },
-    {
-      key: "contrato",
-      label: solicitud.tipoTramite === "BATECOM" ? "Contratos BATE/COM" : "Factura o contrato",
-      detail: roleDocsReady
-        ? solicitud.tipoTramite === "BATECOM"
-          ? "Dos operaciones disponibles para detectar la compraventa comun."
-          : "Disponible para leer comprador y vendedor."
-        : solicitud.tipoTramite === "BATECOM"
-          ? `${roleDocsCount}/2 contrato(s) o factura(s) disponibles.`
-          : "Necesario para fijar roles con seguridad.",
-      missing: roleDocsReady || solicitud.tipoTramite === "CAMBIO_DOMICILIO"
-        ? null
-        : solicitud.tipoTramite === "BATECOM"
-          ? "Faltan contratos/facturas de entrega a compraventa y venta final."
-          : "Falta factura o contrato para confirmar comprador y vendedor.",
-      ready: roleDocsReady || solicitud.tipoTramite === "CAMBIO_DOMICILIO",
-    },
-    {
-      key: "mandato",
-      label: "Mandato",
-      detail: mandateReady ? "Autorizacion aportada." : "Falta mandato o representacion.",
-      missing: mandateReady ? null : "Sube mandato o mandato de representacion.",
-      ready: mandateReady,
-    },
-    {
-      key: "vehiculo",
-      label: "Vehiculo",
-      detail: vehicleReady ? vehicleReadyDetail(uploadedTypes) : vehiclePendingDetail(uploadedTypes, vehicleMissingDocs),
-      missing: vehicleReady ? null : vehicleMissingDetail(vehicleMissingDocs),
-      ready: vehicleReady,
-    },
-  ];
-}
-
-function expectedIdentities(tipoTramite?: string | null) {
-  if (tipoTramite === "BATECOM") return 3;
-  if (tipoTramite === "TRASPASO" || tipoTramite === "NOTIFICACION_VENTA") return 2;
-  return 1;
-}
-
-function expectedRoles(tipoTramite?: string | null) {
-  if (tipoTramite === "BATECOM") return ["VENDEDOR", "COMPRAVENTA", "COMPRADOR"];
-  if (tipoTramite === "TRASPASO" || tipoTramite === "NOTIFICACION_VENTA") return ["VENDEDOR", "COMPRADOR"];
-  return ["TITULAR"];
-}
-
-function roleLabel(rol?: string | null) {
-  const labels: Record<string, string> = {
-    VENDEDOR: "vendedor",
-    COMPRADOR: "comprador",
-    COMPRAVENTA: "compraventa",
-    TITULAR: "titular",
-  };
-  return rol ? labels[rol] || formatEnum(rol).toLowerCase() : "interesado";
-}
-
-function interesadoLabel(interesado: { rol?: string | null; nombre?: string | null }) {
-  return roleLabel(interesado.rol) || interesado.nombre || "interesado";
-}
-
-type IdentityTarget = {
-  documentLabel: string;
-  ownerLabel: string;
-};
-
-function missingIdentityTargets(
-  expectedRolesList: string[],
-  interesados: Array<{
-    rol?: string | null;
-    nombre?: string | null;
-    dni?: string | null;
-    personaJuridica?: boolean;
-    documentoIdentidadAportado?: boolean;
-  }>,
-): IdentityTarget[] {
-  return expectedRolesList
-    .map((rol) => {
-      const interesado = interesados.find((item) => item.rol === rol);
-      if (!interesado) {
-        return { documentLabel: "DNI/CIF", ownerLabel: roleLabel(rol) };
-      }
-      if (interesado.documentoIdentidadAportado) {
-        return null;
-      }
-      return {
-        documentLabel: interesado.personaJuridica ? "CIF" : "DNI/NIE",
-        ownerLabel: identityOwnerLabel(interesado),
-      };
-    })
-    .filter(Boolean) as IdentityTarget[];
-}
-
-function identityOwnerLabel(interesado: { rol?: string | null; nombre?: string | null; dni?: string | null }) {
-  const rol = roleLabel(interesado.rol);
-  const nombre = interesado.nombre?.trim();
-  const dni = interesado.dni?.trim();
-  if (nombre && dni) return `${rol} ${nombre} (${dni})`;
-  if (nombre) return `${rol} ${nombre}`;
-  if (dni) return `${rol} ${dni}`;
-  return rol;
-}
-
-function identityReadyDetail(
-  identityCoveredCount: number,
-  expectedIdentityCount: number,
-  representativesCovered: Array<{ representanteLegalNombre?: string | null }>,
-) {
-  if (representativesCovered.length > 0) {
-    const names = representativesCovered.map((item) => item.representanteLegalNombre).filter(Boolean) as string[];
-    return names.length > 0
-      ? `Identidades cubiertas y administrador detectado: ${formatReadableList(names)}.`
-      : "Identidades y administrador cubiertos.";
-  }
-  return `${identityCoveredCount}/${expectedIdentityCount} identidad(es) cubiertas.`;
-}
-
-function identityMissingDetail(
-  missingIdentities: IdentityTarget[],
-  representativesMissing: Array<{
-    nombre?: string | null;
-    rol?: string | null;
-    representanteLegalNombre?: string | null;
-    representanteLegalDni?: string | null;
-  }>,
-) {
-  const parts: string[] = [];
-  missingIdentities.forEach((item) => parts.push(`Falta ${item.documentLabel} de ${item.ownerLabel}.`));
-  representativesMissing.forEach((item) => {
-    const representante = item.representanteLegalNombre
-      ? `${item.representanteLegalNombre}${item.representanteLegalDni ? ` (${item.representanteLegalDni})` : ""}`
-      : `la empresa ${item.nombre || roleLabel(item.rol)}`;
-    parts.push(`Falta DNI del administrador ${representante}.`);
-  });
-  return parts.length > 0 ? parts.join(" ") : null;
-}
-
-function missingVehicleDocs(uploadedTypes: Set<string | null | undefined>) {
-  if (uploadedTypes.has("INFORME_DGT")) return [];
-  return [
-    !uploadedTypes.has("PERMISO_CIRCULACION") ? "permiso de circulacion" : null,
-    !uploadedTypes.has("FICHA_TECNICA") ? "ficha tecnica" : null,
-  ].filter(Boolean) as string[];
-}
-
-function vehicleReadyDetail(uploadedTypes: Set<string | null | undefined>) {
-  if (uploadedTypes.has("INFORME_DGT")) return "Informe DGT disponible para permiso y ficha.";
-  return "Permiso de circulacion y ficha tecnica disponibles.";
-}
-
-function vehiclePendingDetail(uploadedTypes: Set<string | null | undefined>, missingDocs: string[]) {
-  const availableDocs = [
-    uploadedTypes.has("PERMISO_CIRCULACION") ? "permiso de circulacion" : null,
-    uploadedTypes.has("FICHA_TECNICA") ? "ficha tecnica" : null,
-  ].filter(Boolean) as string[];
-  if (availableDocs.length === 0) return "Sin documentacion tecnica del vehiculo.";
-  return `${formatReadableList(availableDocs)} disponible; falta ${formatReadableList(missingDocs)}.`;
-}
-
-function vehicleMissingDetail(missingDocs: string[]) {
-  if (missingDocs.length === 0) return null;
-  const missing = formatReadableList(missingDocs);
-  return missingDocs.length > 1
-    ? `Faltan ${missing}, o sube Informe DGT.`
-    : `Falta ${missing}. Tambien puede cubrirse con Informe DGT.`;
 }
 
 function formatReadableList(values: string[]) {

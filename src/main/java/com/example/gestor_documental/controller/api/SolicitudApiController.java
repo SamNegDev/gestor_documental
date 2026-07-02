@@ -22,6 +22,7 @@ import com.example.gestor_documental.dto.expediente.SolicitudDocumentacionIaResp
 import com.example.gestor_documental.dto.expediente.SolicitudIdentidadDetectadaRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudListItemResponse;
+import com.example.gestor_documental.dto.expediente.SolicitudPreparacionTraspasoResponse;
 import com.example.gestor_documental.dto.expediente.TipoTramiteResumenResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
 import com.example.gestor_documental.enums.EstadoSolicitud;
@@ -49,6 +50,7 @@ import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.IncidenciaService;
 import com.example.gestor_documental.service.MensajeService;
 import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
+import com.example.gestor_documental.service.SolicitudPreparacionTraspasoService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.impl.CorreoEntranteSolicitudService;
@@ -99,6 +101,7 @@ public class SolicitudApiController {
     private final CurrentUserService currentUserService;
     private final CorreoEntranteSolicitudService correoEntranteSolicitudService;
     private final SolicitudDocumentacionIaService solicitudDocumentacionIaService;
+    private final SolicitudPreparacionTraspasoService solicitudPreparacionTraspasoService;
     private final DocumentoIdentidadLecturaRepository documentoIdentidadLecturaRepository;
     private final DocumentoRolesLecturaRepository documentoRolesLecturaRepository;
     private final ClienteInteresadoRepository clienteInteresadoRepository;
@@ -174,6 +177,15 @@ public class SolicitudApiController {
         }
 
         return mapSolicitudDetail(solicitud, usuarioLogueado);
+    }
+
+    @GetMapping("/{id}/preparacion-traspaso")
+    public SolicitudPreparacionTraspasoResponse obtenerPreparacionTraspaso(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = usuario(authentication);
+        return solicitudPreparacionTraspasoService.obtenerPreparacion(id, usuarioLogueado);
     }
 
     @PostMapping("/{id}/convertir")

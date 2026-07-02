@@ -324,6 +324,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 MAX_USOS_CLIENTE_SOLICITUD,
                 usosRestantes,
                 documentacion.documentosIdentidad(),
+                documentacion.documentosVehiculo(),
                 documentacion.documentosRoles(),
                 mensaje
         );
@@ -339,18 +340,25 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         int documentosRoles = (int) documentos.stream()
                 .filter(documento -> esDocumentoRoles(documento.getTipoDocumento()))
                 .count();
+        boolean permisoCirculacion = documentos.stream()
+                .anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.PERMISO_CIRCULACION);
+        boolean fichaTecnica = documentos.stream()
+                .anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.FICHA_TECNICA);
+        boolean informeDgt = documentos.stream()
+                .anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.INFORME_DGT);
+        int documentosVehiculo = (int) documentos.stream()
+                .filter(documento -> documento.getTipoDocumento() == TipoDocumento.PERMISO_CIRCULACION
+                        || documento.getTipoDocumento() == TipoDocumento.FICHA_TECNICA
+                        || documento.getTipoDocumento() == TipoDocumento.INFORME_DGT)
+                .count();
         List<String> bloqueos = new ArrayList<>();
         if (documentosIdentidad == 0) {
-            bloqueos.add("Falta DNI/CIF para validar la identidad.");
+            bloqueos.add("Falta DNI/NIE/CIF para validar la identidad.");
         }
-        if (esBatecom(solicitud)) {
-            if (documentosRoles < 2) {
-                bloqueos.add("Faltan dos contratos/facturas para detectar las operaciones BATECOM.");
-            }
-        } else if (documentosRoles == 0) {
-            bloqueos.add("Falta factura o contrato para determinar comprador y vendedor.");
+        if (!informeDgt && !(permisoCirculacion && fichaTecnica)) {
+            bloqueos.add("Falta permiso de circulacion y ficha tecnica, o Informe DGT.");
         }
-        return new DocumentacionSolicitudCliente(documentosIdentidad, documentosRoles, bloqueos);
+        return new DocumentacionSolicitudCliente(documentosIdentidad, documentosVehiculo, documentosRoles, bloqueos);
     }
 
     private String mensajeLecturaClienteSolicitud(
@@ -1202,7 +1210,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private record NombreCandidato(String valor, int prioridad) {
     }
 
-    private record DocumentacionSolicitudCliente(int documentosIdentidad, int documentosRoles, List<String> bloqueos) {
+    private record DocumentacionSolicitudCliente(int documentosIdentidad, int documentosVehiculo, int documentosRoles, List<String> bloqueos) {
         private boolean suficiente() {
             return bloqueos.isEmpty();
         }

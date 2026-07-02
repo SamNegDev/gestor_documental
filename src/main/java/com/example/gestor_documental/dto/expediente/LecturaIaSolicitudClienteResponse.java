@@ -12,6 +12,7 @@ public record LecturaIaSolicitudClienteResponse(
         int usosMaximos,
         int usosRestantes,
         int documentosIdentidad,
+        int documentosVehiculo,
         int documentosRoles,
         String mensaje
 ) {
