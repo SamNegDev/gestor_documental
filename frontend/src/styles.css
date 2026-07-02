@@ -3817,6 +3817,10 @@ input.records-table-filter {
   gap: 10px;
 }
 
+.registry-tabs {
+  width: fit-content;
+}
+
 .registry-period-filter {
   display: flex;
   min-height: 42px;

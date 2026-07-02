@@ -16,14 +16,15 @@ export function InteresadosRegistroPage() {
   const [periodo, setPeriodo] = useState("ULTIMA_SEMANA");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
+  const [vista, setVista] = useState<"HABITUALES" | "RECIENTES">("HABITUALES");
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<InteresadoRegistroUpdateInput>({ tipoPersona: "PARTICULAR" });
   const { user } = useOutletContext<AppOutletContext>();
   const queryClient = useQueryClient();
   const deferredSearch = useDeferredValue(search);
   const query = useQuery({
-    queryKey: ["registro", "interesados", deferredSearch, periodo, fechaDesde, fechaHasta],
-    queryFn: () => getInteresadosRegistro(deferredSearch, periodo, fechaDesde, fechaHasta),
+    queryKey: ["registro", "interesados", vista, deferredSearch, periodo, fechaDesde, fechaHasta],
+    queryFn: () => getInteresadosRegistro(deferredSearch, periodo, fechaDesde, fechaHasta, vista),
   });
   const mutation = useMutation({
     mutationFn: (input: InteresadoRegistroUpdateInput) => createInteresadoHabitual(input),
@@ -35,6 +36,7 @@ export function InteresadosRegistroPage() {
   });
   const interesados = query.data ?? [];
   const canCreateHabitual = user?.rol === "CLIENTE";
+  const showingHabituales = vista === "HABITUALES";
   const updateField = (field: keyof InteresadoRegistroUpdateInput, value: string) => setForm((current) => ({ ...current, [field]: uppercaseInput(value) }));
   const updateAddress = (value: AddressValue) => setForm((current) => ({ ...current, ...value, direccion: "" }));
 
@@ -43,8 +45,8 @@ export function InteresadosRegistroPage() {
       <header className="records-header">
         <div>
           <p className="eyebrow">Cartera reutilizable</p>
-          <h2>Clientes habituales</h2>
-          <p>Personas y empresas guardadas para reutilizar datos y documentacion.</p>
+          <h2>{showingHabituales ? "Clientes habituales" : "Interesados recientes"}</h2>
+          <p>{showingHabituales ? "Personas y empresas guardadas para reutilizar datos y documentacion." : "Personas que han participado en tramites, sin quedar guardadas como habituales."}</p>
         </div>
         <div className="records-header__actions">
           {canCreateHabitual ? (
@@ -56,6 +58,14 @@ export function InteresadosRegistroPage() {
           <span className="records-count">{interesados.length} registros</span>
         </div>
       </header>
+      <div className="task-tabs registry-tabs" role="tablist" aria-label="Tipo de interesados">
+        <button className={vista === "HABITUALES" ? "is-active" : ""} type="button" onClick={() => setVista("HABITUALES")}>
+          Clientes habituales
+        </button>
+        <button className={vista === "RECIENTES" ? "is-active" : ""} type="button" onClick={() => setVista("RECIENTES")}>
+          Interesados recientes
+        </button>
+      </div>
       <RegistroFilters
         search={search}
         periodo={periodo}
@@ -69,10 +79,10 @@ export function InteresadosRegistroPage() {
       />
       <section className="records-panel records-panel--ledger">
         {query.isLoading ? <div className="records-skeleton"><span /><span /><span /></div> : null}
-        {query.error ? <div className="records-empty records-empty--danger">No se pudieron cargar los clientes habituales.</div> : null}
+        {query.error ? <div className="records-empty records-empty--danger">No se pudieron cargar los interesados.</div> : null}
         {!query.isLoading && !query.error ? (
           <div className="registry-list">
-            {interesados.length === 0 ? <div className="records-empty">No hay clientes habituales que coincidan con la busqueda.</div> : null}
+            {interesados.length === 0 ? <div className="records-empty">{showingHabituales ? "No hay clientes habituales que coincidan con la busqueda." : "No hay interesados recientes que coincidan con la busqueda."}</div> : null}
             {interesados.map((item) => (
               <Link className="registry-row" key={item.id} to={`/interesados/${item.id}`}>
                 <span className="registry-row__icon"><UserRound size={19} /></span>

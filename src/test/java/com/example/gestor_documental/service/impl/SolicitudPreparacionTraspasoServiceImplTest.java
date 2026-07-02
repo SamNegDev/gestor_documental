@@ -200,7 +200,7 @@ class SolicitudPreparacionTraspasoServiceImplTest {
         when(documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(eq(3L), any()))
                 .thenReturn(List.of(cifCliente));
         when(identidadLecturaRepository.findByDocumentoIdIn(List.of(56L))).thenReturn(List.of());
-        when(clienteInteresadoRepository.findByClienteIdOrderByInteresadoNombreAsc(3L)).thenReturn(List.of());
+        when(clienteInteresadoRepository.findByClienteIdAndHabitualTrueOrderByInteresadoNombreAsc(3L)).thenReturn(List.of());
 
         SolicitudPreparacionTraspasoResponse response = service.obtenerPreparacion(14L, usuario);
 

@@ -206,7 +206,7 @@ public class ExpedienteApiController {
                     query,
                     PageRequest.of(0, 8)
             ));
-            clienteInteresadoRepository.findByClienteIdOrderByInteresadoNombreAsc(usuarioLogueado.getCliente().getId()).stream()
+            clienteInteresadoRepository.findByClienteIdAndHabitualTrueOrderByInteresadoNombreAsc(usuarioLogueado.getCliente().getId()).stream()
                     .map(com.example.gestor_documental.model.ClienteInteresado::getInteresado)
                     .filter(interesado -> contiene(interesado.getDni(), query) || contiene(interesado.getNombre(), query))
                     .forEach(interesado -> {

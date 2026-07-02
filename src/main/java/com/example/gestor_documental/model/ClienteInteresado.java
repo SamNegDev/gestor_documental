@@ -44,6 +44,8 @@ public class ClienteInteresado {
 
     private Boolean representanteLegal = false;
 
+    private Boolean habitual = false;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime fechaAlta;

@@ -803,7 +803,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         }
 
         ClienteInteresado relacion = clienteInteresadoRepository
-                .findByClienteIdAndInteresadoId(solicitud.getCliente().getId(), request.getInteresadoId())
+                .findByClienteIdAndInteresadoIdAndHabitualTrue(solicitud.getCliente().getId(), request.getInteresadoId())
                 .orElseThrow(() -> new AccesoDenegadoException("El interesado no pertenece a la cartera habitual del cliente"));
         Interesado interesado = relacion.getInteresado();
         if (interesado == null) {

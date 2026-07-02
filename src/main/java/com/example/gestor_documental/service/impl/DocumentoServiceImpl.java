@@ -376,7 +376,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             return null;
         }
         validarPermisoCliente(clienteId, usuario, "subir documentacion de este interesado");
-        if (!clienteInteresadoRepository.existsByClienteIdAndInteresadoId(clienteId, interesadoId)) {
+        if (!clienteInteresadoRepository.existsByClienteIdAndInteresadoIdAndHabitualTrue(clienteId, interesadoId)) {
             throw new AccesoDenegadoException("El interesado no pertenece a la cartera habitual del cliente");
         }
 

@@ -273,7 +273,7 @@ public class SolicitudApiController {
             texto = "%" + texto.replaceAll("\\s+", "%") + "%";
         }
         Long clienteId = solicitud.getCliente().getId();
-        return clienteInteresadoRepository.buscarPorClienteYTexto(clienteId, texto, PageRequest.of(0, 30)).stream()
+        return clienteInteresadoRepository.buscarHabitualesPorClienteYTexto(clienteId, texto, PageRequest.of(0, 30)).stream()
                 .map(relacion -> mapInteresadoHabitual(clienteId, relacion.getInteresado()))
                 .toList();
     }
@@ -848,7 +848,7 @@ public class SolicitudApiController {
         if (identificador.isBlank()) {
             return false;
         }
-        return clienteInteresadoRepository.existsByClienteIdAndInteresadoIdentificador(
+        return clienteInteresadoRepository.existsHabitualByClienteIdAndInteresadoIdentificador(
                 solicitud.getCliente().getId(),
                 identificador
         );

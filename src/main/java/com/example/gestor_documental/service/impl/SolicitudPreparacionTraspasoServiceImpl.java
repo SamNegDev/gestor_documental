@@ -96,7 +96,7 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                         .collect(Collectors.toMap(lectura -> lectura.getDocumento().getId(), lectura -> lectura, (first, second) -> first));
         List<ClienteInteresado> relacionesCliente = clienteId == null
                 ? List.of()
-                : clienteInteresadoRepository.findByClienteIdOrderByInteresadoNombreAsc(clienteId);
+                : clienteInteresadoRepository.findByClienteIdAndHabitualTrueOrderByInteresadoNombreAsc(clienteId);
 
         PreparacionContext context = new PreparacionContext(
                 solicitud,

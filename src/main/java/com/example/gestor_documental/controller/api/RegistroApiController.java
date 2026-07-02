@@ -74,29 +74,39 @@ public class RegistroApiController {
     public List<InteresadoRegistroResponse> listarInteresados(
             @RequestParam(required = false) String q,
             @RequestParam(required = false, defaultValue = "ULTIMA_SEMANA") String periodo,
+            @RequestParam(required = false, defaultValue = "HABITUALES") String vista,
             @RequestParam(required = false) LocalDate fechaDesde,
             @RequestParam(required = false) LocalDate fechaHasta,
             Authentication authentication
     ) {
         Usuario usuario = usuario(authentication);
         String query = normalizar(q);
+        String vistaNormalizada = vista != null ? vista.toUpperCase(Locale.ROOT) : "HABITUALES";
+        boolean soloHabituales = "HABITUALES".equals(vistaNormalizada);
+        boolean incluirHabituales = soloHabituales || "TODOS".equals(vistaNormalizada);
         DateRange range = dateRange(periodo, fechaDesde, fechaHasta);
         Long clienteId = clienteIdVisible(usuario);
         if (usuario.getRolUsuario() != RolUsuario.ADMIN && clienteId == null) return List.of();
 
-        List<ExpedienteInteresado> relaciones = relacionRepository.findRegistro(clienteId, range.desde(), range.hasta());
+        List<ExpedienteInteresado> relaciones = soloHabituales
+                ? relacionRepository.findRegistro(clienteId, null, null)
+                : relacionRepository.findRegistro(clienteId, range.desde(), range.hasta());
         Map<Long, List<ExpedienteInteresado>> relacionesPorInteresado = relaciones.stream()
                 .collect(java.util.stream.Collectors.groupingBy(relacion -> relacion.getInteresado().getId()));
-        List<Interesado> interesadosBase = usuario.getRolUsuario() == RolUsuario.ADMIN && "TODO".equals(periodo)
-                ? interesadoRepository.findAll()
-                : relacionesPorInteresado.values().stream().map(items -> items.get(0).getInteresado()).toList();
-        Map<Long, ClienteInteresado> habituales = clienteId != null
-                ? clienteInteresadoRepository.findByClienteIdOrderByInteresadoNombreAsc(clienteId).stream()
-                .collect(java.util.stream.Collectors.toMap(relacion -> relacion.getInteresado().getId(), relacion -> relacion))
-                : Map.of();
+        Map<Long, ClienteInteresado> habituales = relacionesHabitualesVisibles(usuario, clienteId);
+        List<Interesado> interesadosBase;
+        if (soloHabituales) {
+            interesadosBase = habituales.values().stream().map(ClienteInteresado::getInteresado).toList();
+        } else if (usuario.getRolUsuario() == RolUsuario.ADMIN && "TODO".equals(periodo)) {
+            interesadosBase = interesadoRepository.findAll();
+        } else {
+            interesadosBase = relacionesPorInteresado.values().stream().map(items -> items.get(0).getInteresado()).toList();
+        }
         Map<Long, Interesado> interesadosPorId = new LinkedHashMap<>();
         interesadosBase.forEach(interesado -> interesadosPorId.put(interesado.getId(), interesado));
-        habituales.values().forEach(relacion -> interesadosPorId.put(relacion.getInteresado().getId(), relacion.getInteresado()));
+        if (incluirHabituales) {
+            habituales.values().forEach(relacion -> interesadosPorId.put(relacion.getInteresado().getId(), relacion.getInteresado()));
+        }
 
         return interesadosPorId.values().stream()
                 .filter(interesado -> query == null
@@ -116,7 +126,9 @@ public class RegistroApiController {
         Long clienteId = clienteIdVisible(usuario);
         ClienteInteresado habitual = clienteId != null
                 ? clienteInteresadoRepository.findByClienteIdAndInteresadoId(clienteId, id).orElse(null)
-                : null;
+                : clienteInteresadoRepository.findByHabitualTrueOrderByInteresadoNombreAsc().stream()
+                .filter(relacion -> relacion.getInteresado() != null && id.equals(relacion.getInteresado().getId()))
+                .findFirst().orElse(null);
         if (usuario.getRolUsuario() != RolUsuario.ADMIN && relaciones.isEmpty() && habitual == null) {
             throw new AccesoDenegadoException("No tienes permiso para consultar este interesado");
         }
@@ -150,14 +162,37 @@ public class RegistroApiController {
             nuevo.setTipoPersona(request.tipoPersona());
             return interesadoService.guardar(nuevo);
         });
-        if (!clienteInteresadoRepository.existsByClienteIdAndInteresadoId(clienteId, interesado.getId())) {
-            ClienteInteresado relacion = new ClienteInteresado();
-            relacion.setCliente(clienteService.buscarPorId(clienteId).orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado")));
-            relacion.setInteresado(interesado);
-            clienteInteresadoRepository.save(relacion);
-        }
-        ClienteInteresado habitual = clienteInteresadoRepository.findByClienteIdAndInteresadoId(clienteId, interesado.getId()).orElse(null);
+        ClienteInteresado habitual = clienteInteresadoRepository.findByClienteIdAndInteresadoId(clienteId, interesado.getId())
+                .orElseGet(() -> {
+                    ClienteInteresado relacion = new ClienteInteresado();
+                    relacion.setCliente(clienteService.buscarPorId(clienteId).orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado")));
+                    relacion.setInteresado(interesado);
+                    return relacion;
+                });
+        habitual.setHabitual(true);
+        clienteInteresadoRepository.save(habitual);
         return mapInteresado(interesado, tramitesInteresado(interesado.getId(), usuario), habitual, clienteId);
+    }
+
+    @PostMapping("/interesados/{id}/habitual")
+    public InteresadoRegistroResponse marcarInteresadoHabitual(@PathVariable Long id, Authentication authentication) {
+        Usuario usuario = usuario(authentication);
+        Long clienteId = clienteIdVisible(usuario);
+        if (clienteId == null) {
+            throw new AccesoDenegadoException("Solo un usuario cliente puede marcar clientes habituales");
+        }
+        Interesado interesado = interesadoRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Interesado no encontrado"));
+        ClienteInteresado habitual = clienteInteresadoRepository.findByClienteIdAndInteresadoId(clienteId, id)
+                .orElseGet(() -> {
+                    ClienteInteresado relacion = new ClienteInteresado();
+                    relacion.setCliente(clienteService.buscarPorId(clienteId).orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado")));
+                    relacion.setInteresado(interesado);
+                    return relacion;
+                });
+        habitual.setHabitual(true);
+        clienteInteresadoRepository.save(habitual);
+        return mapInteresado(interesado, tramitesInteresado(id, usuario), habitual, clienteId);
     }
 
     @PostMapping(value = "/interesados/{id}/documentos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -167,7 +202,7 @@ public class RegistroApiController {
                                                                        Authentication authentication) {
         Usuario usuario = usuario(authentication);
         Long clienteId = clienteIdVisible(usuario);
-        if (clienteId == null || !clienteInteresadoRepository.existsByClienteIdAndInteresadoId(clienteId, id)) {
+        if (clienteId == null || !clienteInteresadoRepository.existsByClienteIdAndInteresadoIdAndHabitualTrue(clienteId, id)) {
             throw new AccesoDenegadoException("El interesado no pertenece a tu cartera habitual");
         }
         validarPdf(archivo);
@@ -248,12 +283,30 @@ public class RegistroApiController {
                 .municipio(interesado.getMunicipio())
                 .provincia(interesado.getProvincia())
                 .tipoPersona(interesado.getTipoPersona() != null ? interesado.getTipoPersona().name() : null)
-                .habitual(habitual != null)
+                .habitual(habitual != null && Boolean.TRUE.equals(habitual.getHabitual()))
                 .representanteLegal(habitual != null && Boolean.TRUE.equals(habitual.getRepresentanteLegal()))
                 .totalTramites(tramites.size())
                 .ultimaActividad(tramites.isEmpty() ? null : tramites.get(0).getFechaUltimaModificacion())
-                .documentos(clienteId != null ? documentoService.listarPorInteresadoHabitual(clienteId, interesado.getId()).stream().map(this::mapDocumento).toList() : List.of())
+                .documentos(clienteId != null && habitual != null && Boolean.TRUE.equals(habitual.getHabitual())
+                        ? documentoService.listarPorInteresadoHabitual(clienteId, interesado.getId()).stream().map(this::mapDocumento).toList()
+                        : List.of())
                 .tramites(tramites).build();
+    }
+
+    private Map<Long, ClienteInteresado> relacionesHabitualesVisibles(Usuario usuario, Long clienteId) {
+        List<ClienteInteresado> relaciones = clienteId != null
+                ? clienteInteresadoRepository.findByClienteIdAndHabitualTrueOrderByInteresadoNombreAsc(clienteId)
+                : usuario.getRolUsuario() == RolUsuario.ADMIN
+                ? clienteInteresadoRepository.findByHabitualTrueOrderByInteresadoNombreAsc()
+                : List.of();
+        return relaciones.stream()
+                .filter(relacion -> relacion.getInteresado() != null && relacion.getInteresado().getId() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        relacion -> relacion.getInteresado().getId(),
+                        relacion -> relacion,
+                        (first, second) -> first,
+                        LinkedHashMap::new
+                ));
     }
 
     private DocumentoExpedienteResponse mapDocumento(Documento documento) {
