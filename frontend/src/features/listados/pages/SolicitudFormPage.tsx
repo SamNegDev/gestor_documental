@@ -476,7 +476,7 @@ function InteresadoFields({
   const updateAddress = (value: AddressValue) => {
     onChange({
       ...form,
-      [field("Direccion")]: "",
+      [field("Direccion")]: value.direccion,
       [field("TipoVia")]: value.tipoVia,
       [field("NombreVia")]: value.nombreVia,
       [field("NumeroVia")]: value.numeroVia,
