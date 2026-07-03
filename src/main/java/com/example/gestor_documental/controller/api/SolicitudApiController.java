@@ -946,15 +946,31 @@ public class SolicitudApiController {
         if (solicitud.getCliente() == null || solicitud.getCliente().getId() == null) {
             return DocumentoSoporte.noAportado();
         }
+        Long clienteId = solicitud.getCliente().getId();
+        TipoDocumento tipoEsperado = personaJuridica ? TipoDocumento.CIF : TipoDocumento.DNI;
+        if (soporteIdentidadHabitual(clienteId, identificador, tipoEsperado)) {
+            return new DocumentoSoporte(true, "FICHA_CLIENTE");
+        }
         String nifCliente = normalizarIdentificador(solicitud.getCliente().getNif());
         if (!identificador.equals(nifCliente)) {
             return DocumentoSoporte.noAportado();
         }
-        TipoDocumento tipoEsperado = personaJuridica ? TipoDocumento.CIF : TipoDocumento.DNI;
-        boolean existeEnFichaCliente = documentoService.listarPorCliente(solicitud.getCliente().getId()).stream()
+        boolean existeEnFichaCliente = documentoService.listarPorCliente(clienteId).stream()
                 .anyMatch(documento -> documento.getTipoDocumento() == tipoEsperado
                         && (personaJuridica || documentoLecturaCoincide(documento, identificador)));
         return existeEnFichaCliente ? new DocumentoSoporte(true, "FICHA_CLIENTE") : DocumentoSoporte.noAportado();
+    }
+
+    private boolean soporteIdentidadHabitual(Long clienteId, String identificador, TipoDocumento tipoEsperado) {
+        if (clienteId == null || identificador == null || identificador.isBlank()) {
+            return false;
+        }
+        return clienteInteresadoRepository.findByClienteIdAndHabitualTrueOrderByInteresadoNombreAsc(clienteId).stream()
+                .map(ClienteInteresado::getInteresado)
+                .filter(interesado -> interesado != null && interesado.getId() != null)
+                .filter(interesado -> identificador.equals(normalizarIdentificador(interesado.getDni())))
+                .anyMatch(interesado -> documentoService.listarPorInteresadoHabitual(clienteId, interesado.getId()).stream()
+                        .anyMatch(documento -> documento.getTipoDocumento() == tipoEsperado));
     }
 
     private RepresentanteSoporte soporteRepresentanteLegal(Solicitud solicitud, String dniEmpresa) {
