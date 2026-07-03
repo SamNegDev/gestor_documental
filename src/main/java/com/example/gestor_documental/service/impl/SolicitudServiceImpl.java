@@ -986,7 +986,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         lectura.setMensaje(interesadoVinculado != null
                 ? "Identidad corregida, validada y asignada manualmente."
                 : "Identidad corregida y validada manualmente.");
-        lectura.setResultadoJson(resultadoIdentidadManual(request, identificador, tipoDetectado));
+        lectura.setResultadoJson(resultadoIdentidadManual(lectura.getResultadoJson(), request, identificador, tipoDetectado));
         documentoIdentidadLecturaRepository.save(lectura);
         boolean documentoActualizado = false;
         if (documento.getTipoDocumento() != tipoDetectado) {
@@ -1018,9 +1018,52 @@ public class SolicitudServiceImpl implements SolicitudService {
         return esCif(identificador) ? TipoDocumento.CIF : fallback != null ? fallback : TipoDocumento.DNI;
     }
 
-    private String resultadoIdentidadManual(SolicitudIdentidadDetectadaRequest request, String identificador, TipoDocumento tipoDetectado) {
-        ObjectNode root = objectMapper.createObjectNode();
-        ArrayNode identidades = objectMapper.createArrayNode();
+    private String resultadoIdentidadManual(String resultadoActualJson, SolicitudIdentidadDetectadaRequest request, String identificador, TipoDocumento tipoDetectado) {
+        ObjectNode root = resultadoIdentidadActual(resultadoActualJson);
+        ArrayNode identidadesActualizadas = objectMapper.createArrayNode();
+        ObjectNode identidad = identidadManual(request, identificador, tipoDetectado);
+        JsonNode identidadesActuales = root.path("identidades");
+        boolean reemplazada = false;
+        if (identidadesActuales.isArray()) {
+            for (JsonNode item : identidadesActuales) {
+                if (!reemplazada && identidadManualCoincide(item, request.getIdentificadorOriginal(), identificador)) {
+                    identidadesActualizadas.add(identidad);
+                    reemplazada = true;
+                } else {
+                    identidadesActualizadas.add(item.deepCopy());
+                }
+            }
+        } else if (root.has("identificador")) {
+            if (identidadManualCoincide(root, request.getIdentificadorOriginal(), identificador)) {
+                identidadesActualizadas.add(identidad);
+                reemplazada = true;
+            } else {
+                identidadesActualizadas.add(root.deepCopy());
+            }
+        }
+        if (!reemplazada) {
+            identidadesActualizadas.add(identidad);
+        }
+        root.set("identidades", identidadesActualizadas);
+        root.put("observaciones", "Lectura corregida manualmente desde revision de solicitud.");
+        return root.toString();
+    }
+
+    private ObjectNode resultadoIdentidadActual(String resultadoActualJson) {
+        if (resultadoActualJson == null || resultadoActualJson.isBlank()) {
+            return objectMapper.createObjectNode();
+        }
+        try {
+            JsonNode root = objectMapper.readTree(resultadoActualJson);
+            if (root instanceof ObjectNode objectNode) {
+                return objectNode.deepCopy();
+            }
+        } catch (Exception ignored) {
+        }
+        return objectMapper.createObjectNode();
+    }
+
+    private ObjectNode identidadManual(SolicitudIdentidadDetectadaRequest request, String identificador, TipoDocumento tipoDetectado) {
         ObjectNode identidad = objectMapper.createObjectNode();
         identidad.put("tipoDocumento", tipoDetectado == TipoDocumento.CIF ? "CIF" : tipoNieDni(identificador));
         identidad.put("identificador", identificador);
@@ -1034,10 +1077,26 @@ public class SolicitudServiceImpl implements SolicitudService {
         identidad.put("confianzaGlobal", CONFIANZA_IDENTIDAD_VALIDADA_MANUALMENTE);
         identidad.put("requiereRevision", false);
         identidad.put("observaciones", "Identidad corregida y validada manualmente.");
-        identidades.add(identidad);
-        root.set("identidades", identidades);
-        root.put("observaciones", "Lectura corregida manualmente desde revision de solicitud.");
-        return root.toString();
+        return identidad;
+    }
+
+    private boolean identidadManualCoincide(JsonNode item, String identificadorOriginal, String identificadorValidado) {
+        String itemId = normalizarIdentificadorDocumento(textoJson(item, "identificador"));
+        String original = normalizarIdentificadorDocumento(identificadorOriginal);
+        String validado = normalizarIdentificadorDocumento(identificadorValidado);
+        return itemId != null && ((original != null && itemId.equals(original)) || (validado != null && itemId.equals(validado)));
+    }
+
+    private String textoJson(JsonNode node, String field) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        JsonNode value = node.path(field);
+        if (value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+        String text = value.asText("").trim();
+        return text.isBlank() ? null : text;
     }
 
     private JsonNode nullNode() {

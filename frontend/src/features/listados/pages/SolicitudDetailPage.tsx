@@ -778,7 +778,7 @@ export function SolicitudDetailPage() {
                   <SolicitudDocumentReading
                     documento={documento}
                     canAddIdentity={!isClosed}
-                    canRereadIdentity={isAdmin && !isClosed}
+                    canRereadIdentity={!isClosed}
                     existingIdentities={existingSolicitudIdentities}
                     addingIdentity={anadirIdentidadDetectadaMutation.isPending}
                     rereadingIdentity={releerIdentidadMutation.isPending}
