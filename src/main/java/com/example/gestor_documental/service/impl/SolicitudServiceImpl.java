@@ -9,6 +9,7 @@ import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
@@ -775,19 +776,37 @@ public class SolicitudServiceImpl implements SolicitudService {
         if (!identificadorDocumentoValido(identificador)) {
             throw new OperacionInvalidaException("El DNI/NIE/CIF indicado no es valido. Corrigelo antes de anadirlo.");
         }
-        if (dniYaPresente(solicitud, identificador)) {
-            throw new OperacionInvalidaException("Ese DNI/CIF ya esta incluido en la solicitud");
+        String nombre = nombreInteresadoDetectado(request, identificador);
+        int slotExistente = slotPorDni(solicitud, identificador);
+        if (slotExistente != 0) {
+            validarRolInteresadoExistente(solicitud, slotExistente, request.getRol());
+            completarInteresadoExistente(solicitud, slotExistente, request.getRol(), nombre, request.getDireccionTexto());
+            Interesado interesadoVinculado = resolverInteresadoVinculadoManual(solicitud, request, identificador, slotExistente, nombre);
+            validarLecturaIdentidadManual(solicitud, request, identificador, interesadoVinculado);
+            validarInteresadosSolicitud(solicitud);
+            normalizarSolicitud(solicitud);
+            solicitud.setFechaUltimaModificacion(LocalDateTime.now());
+            solicitud.setModificadoPor(usuarioLogueado);
+            Solicitud guardada = solicitudRepository.save(solicitud);
+            historialCambioService.registrarCambioSolicitud(
+                    guardada,
+                    usuarioLogueado,
+                    "IDENTIDAD ASIGNADA",
+                    "Se asigno el documento de identidad a " + nombreSlot(guardada, slotExistente) + " (" + identificador + ")."
+            );
+            return guardada;
         }
 
-        String nombre = nombreInteresadoDetectado(request, identificador);
         int slot = primerHuecoInteresado(solicitud);
         if (slot == 0) {
             throw new OperacionInvalidaException("La solicitud ya tiene los tres interesados ocupados");
         }
 
-        validarLecturaIdentidadManual(solicitud, request, identificador);
         aplicarInteresadoDetectado(solicitud, slot, request.getRol(), nombre, identificador, request.getDireccionTexto());
+        Interesado interesadoVinculado = resolverInteresadoVinculadoManual(solicitud, request, identificador, slot, nombre);
+        validarLecturaIdentidadManual(solicitud, request, identificador, interesadoVinculado);
         validarInteresadosSolicitud(solicitud);
+        normalizarSolicitud(solicitud);
         solicitud.setFechaUltimaModificacion(LocalDateTime.now());
         solicitud.setModificadoPor(usuarioLogueado);
         Solicitud guardada = solicitudRepository.save(solicitud);
@@ -856,7 +875,12 @@ public class SolicitudServiceImpl implements SolicitudService {
         return guardada;
     }
 
-    private void validarLecturaIdentidadManual(Solicitud solicitud, SolicitudIdentidadDetectadaRequest request, String identificador) {
+    private void validarLecturaIdentidadManual(
+            Solicitud solicitud,
+            SolicitudIdentidadDetectadaRequest request,
+            String identificador,
+            Interesado interesadoVinculado
+    ) {
         if (request.getDocumentoId() == null) {
             return;
         }
@@ -885,13 +909,28 @@ public class SolicitudServiceImpl implements SolicitudService {
         lectura.setConfianzaGlobal(CONFIANZA_IDENTIDAD_VALIDADA_MANUALMENTE);
         lectura.setRequiereRevision(false);
         lectura.setVinculadoAutomaticamente(false);
-        lectura.setInteresadoVinculado(null);
+        lectura.setInteresadoVinculado(interesadoVinculado);
         lectura.setFechaLectura(LocalDateTime.now());
-        lectura.setMensaje("Identidad corregida y validada manualmente.");
+        lectura.setMensaje(interesadoVinculado != null
+                ? "Identidad corregida, validada y asignada manualmente."
+                : "Identidad corregida y validada manualmente.");
         lectura.setResultadoJson(resultadoIdentidadManual(request, identificador, tipoDetectado));
         documentoIdentidadLecturaRepository.save(lectura);
+        boolean documentoActualizado = false;
         if (documento.getTipoDocumento() != tipoDetectado) {
             documento.setTipoDocumento(tipoDetectado);
+            documentoActualizado = true;
+        }
+        if (interesadoVinculado != null && (documento.getInteresado() == null
+                || !interesadoVinculado.getId().equals(documento.getInteresado().getId()))) {
+            documento.setInteresado(interesadoVinculado);
+            documentoActualizado = true;
+        }
+        if (documento.getCliente() == null && solicitud.getCliente() != null) {
+            documento.setCliente(solicitud.getCliente());
+            documentoActualizado = true;
+        }
+        if (documentoActualizado) {
             documentoRepository.save(documento);
         }
     }
@@ -980,6 +1019,72 @@ public class SolicitudServiceImpl implements SolicitudService {
         return trimmed.length() <= max ? trimmed : trimmed.substring(0, max);
     }
 
+    private void validarRolInteresadoExistente(Solicitud solicitud, int slot, RolInteresado rolSolicitado) {
+        RolInteresado rolActual = rolSlot(solicitud, slot);
+        if (rolActual != null && rolSolicitado != null && rolActual != rolSolicitado) {
+            throw new OperacionInvalidaException("Ese DNI/CIF ya esta incluido con otro rol en la solicitud");
+        }
+    }
+
+    private void completarInteresadoExistente(
+            Solicitud solicitud,
+            int slot,
+            RolInteresado rol,
+            String nombre,
+            String direccion
+    ) {
+        if (rolSlot(solicitud, slot) == null) {
+            setRolSlot(solicitud, slot, rol);
+        }
+        if (TextNormalizer.upperOrNull(nombreSlot(solicitud, slot)) == null) {
+            setNombreSlot(solicitud, slot, nombre);
+        }
+        if (TextNormalizer.upperOrNull(direccionSlot(solicitud, slot)) == null) {
+            setDireccionSlot(solicitud, slot, TextNormalizer.upperOrNull(direccion));
+        }
+    }
+
+    private Interesado resolverInteresadoVinculadoManual(
+            Solicitud solicitud,
+            SolicitudIdentidadDetectadaRequest request,
+            String identificador,
+            int slot,
+            String nombreFallback
+    ) {
+        String nombre = NombrePersonaNormalizer.normalizar(primerTexto(nombreSlot(solicitud, slot), nombreFallback, identificador));
+        String direccion = TextNormalizer.upperOrNull(primerTexto(direccionSlot(solicitud, slot), request.getDireccionTexto()));
+        Optional<Interesado> existente = interesadoService.buscarInteresadoPorDNI(identificador);
+        if (existente.isPresent()) {
+            Interesado interesado = existente.get();
+            boolean cambiado = false;
+            if (TextNormalizer.upperOrNull(interesado.getNombre()) == null && nombre != null) {
+                interesado.setNombre(nombre);
+                cambiado = true;
+            }
+            if (TextNormalizer.upperOrNull(interesado.getDireccion()) == null && direccion != null) {
+                interesado.setDireccion(direccion);
+                cambiado = true;
+            }
+            return cambiado ? interesadoService.guardar(interesado) : interesado;
+        }
+
+        Interesado nuevo = new Interesado();
+        nuevo.setDni(identificador);
+        nuevo.setNombre(nombre != null ? nombre : identificador);
+        nuevo.setDireccion(direccion);
+        nuevo.setTipoPersona(esCif(identificador) ? TipoPersona.EMPRESA : TipoPersona.PARTICULAR);
+        return interesadoService.guardar(nuevo);
+    }
+
+    private String primerTexto(String... values) {
+        for (String value : values) {
+            if (value != null && !value.trim().isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
     private int slotParaInteresadoHabitual(Solicitud solicitud, RolInteresado rol, Interesado interesado, String identificador) {
         int slotMismoDni = slotPorDni(solicitud, identificador);
         if (slotMismoDni != 0) {
@@ -1008,17 +1113,17 @@ public class SolicitudServiceImpl implements SolicitudService {
     }
 
     private int slotPorDni(Solicitud solicitud, String identificador) {
-        String normalizado = TextNormalizer.upperOrNull(identificador);
+        String normalizado = normalizarIdentificadorDocumento(identificador);
         if (normalizado == null) {
             return 0;
         }
-        if (normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()))) {
+        if (normalizado.equals(normalizarIdentificadorDocumento(solicitud.getInteresado1Dni()))) {
             return 1;
         }
-        if (normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado2Dni()))) {
+        if (normalizado.equals(normalizarIdentificadorDocumento(solicitud.getInteresado2Dni()))) {
             return 2;
         }
-        if (normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado3Dni()))) {
+        if (normalizado.equals(normalizarIdentificadorDocumento(solicitud.getInteresado3Dni()))) {
             return 3;
         }
         return 0;
@@ -1062,6 +1167,45 @@ public class SolicitudServiceImpl implements SolicitudService {
             case 3 -> solicitud.getInteresado3Nombre();
             default -> null;
         };
+    }
+
+    private String direccionSlot(Solicitud solicitud, int slot) {
+        return switch (slot) {
+            case 1 -> solicitud.getInteresado1Direccion();
+            case 2 -> solicitud.getInteresado2Direccion();
+            case 3 -> solicitud.getInteresado3Direccion();
+            default -> null;
+        };
+    }
+
+    private void setRolSlot(Solicitud solicitud, int slot, RolInteresado rol) {
+        if (slot == 1) {
+            solicitud.setInteresado1Rol(rol);
+        } else if (slot == 2) {
+            solicitud.setInteresado2Rol(rol);
+        } else if (slot == 3) {
+            solicitud.setInteresado3Rol(rol);
+        }
+    }
+
+    private void setNombreSlot(Solicitud solicitud, int slot, String nombre) {
+        if (slot == 1) {
+            solicitud.setInteresado1Nombre(nombre);
+        } else if (slot == 2) {
+            solicitud.setInteresado2Nombre(nombre);
+        } else if (slot == 3) {
+            solicitud.setInteresado3Nombre(nombre);
+        }
+    }
+
+    private void setDireccionSlot(Solicitud solicitud, int slot, String direccion) {
+        if (slot == 1) {
+            solicitud.setInteresado1Direccion(direccion);
+        } else if (slot == 2) {
+            solicitud.setInteresado2Direccion(direccion);
+        } else if (slot == 3) {
+            solicitud.setInteresado3Direccion(direccion);
+        }
     }
 
     private void aplicarInteresadoHabitual(
@@ -1113,15 +1257,6 @@ public class SolicitudServiceImpl implements SolicitudService {
             solicitud.setInteresado3Municipio(interesado.getMunicipio());
             solicitud.setInteresado3Provincia(interesado.getProvincia());
         }
-    }
-
-    private boolean dniYaPresente(Solicitud solicitud, String identificador) {
-        String normalizado = TextNormalizer.upperOrNull(identificador);
-        return normalizado != null && (
-                normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()))
-                        || normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado2Dni()))
-                        || normalizado.equals(TextNormalizer.upperOrNull(solicitud.getInteresado3Dni()))
-        );
     }
 
     private int primerHuecoInteresado(Solicitud solicitud) {

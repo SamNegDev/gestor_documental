@@ -510,11 +510,15 @@ export function SolicitudDetailPage() {
   const solicitud = solicitudQuery.data;
   const isClosed = solicitud.estado === "CONVERTIDA" || solicitud.estado === "RECHAZADO";
   const interesadosVisibles = solicitud.interesados.filter(hasInteresadoData);
-  const existingIdentityIdentifiers = new Set(
-    solicitud.interesados
-      .map((interesado) => normalizeIdentityIdentifier(interesado.dni))
-      .filter((value): value is string => Boolean(value)),
-  );
+  const existingSolicitudIdentities = solicitud.interesados
+    .reduce<SolicitudExistingIdentity[]>((result, interesado) => {
+      const identificador = normalizeIdentityIdentifier(interesado.dni);
+      if (identificador) {
+        result.push({ identificador, rol: interesado.rol, nombre: interesado.nombre });
+      }
+      return result;
+    }, []);
+  const existingIdentityIdentifiers = new Set(existingSolicitudIdentities.map((identity) => identity.identificador));
   const hasSolicitudDocuments = solicitud.documentos.some((documento) => documento.id);
   const editSolicitudPath = isAdmin ? `/solicitudes/${solicitud.id}/editar` : `/cliente/solicitudes/${solicitud.id}/editar`;
   const preparationTitle = solicitud.tipoTramite === "TRASPASO" ? "Preparacion del traspaso" : "Preparacion de la solicitud";
@@ -746,7 +750,7 @@ export function SolicitudDetailPage() {
                   <SolicitudDocumentReading
                     documento={documento}
                     canAddIdentity={!isClosed}
-                    existingIdentifiers={existingIdentityIdentifiers}
+                    existingIdentities={existingSolicitudIdentities}
                     addingIdentity={anadirIdentidadDetectadaMutation.isPending}
                     onAddIdentity={handleAddDetectedIdentity}
                   />
@@ -948,16 +952,22 @@ function SolicitudHabitualesPanel({
   );
 }
 
+type SolicitudExistingIdentity = {
+  identificador: string;
+  rol?: string | null;
+  nombre?: string | null;
+};
+
 function SolicitudDocumentReading({
   documento,
   canAddIdentity = false,
-  existingIdentifiers,
+  existingIdentities,
   addingIdentity,
   onAddIdentity,
 }: {
   documento: DocumentoExpediente;
   canAddIdentity?: boolean;
-  existingIdentifiers: Set<string>;
+  existingIdentities: SolicitudExistingIdentity[];
   addingIdentity: boolean;
   onAddIdentity: (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string) => void;
 }) {
@@ -982,8 +992,12 @@ function SolicitudDocumentReading({
             const normalizedId = normalizeIdentityIdentifier(item.identificador);
             const identifierValue = identifiers[key] ?? normalizedId ?? "";
             const normalizedEditedId = normalizeIdentityIdentifier(identifierValue);
-            const alreadyAdded = Boolean(normalizedEditedId && existingIdentifiers.has(normalizedEditedId));
-            const selectedRole = selectedRoles[key] || "";
+            const matchedExisting = normalizedEditedId
+              ? existingIdentities.find((existing) => existing.identificador === normalizedEditedId)
+              : null;
+            const selectedRole = matchedExisting?.rol || selectedRoles[key] || "";
+            const roleLocked = Boolean(matchedExisting?.rol);
+            const submitLabel = matchedExisting ? "Asignar" : "Anadir";
             return (
               <div className="solicitud-reading-identity" key={key}>
                 <div>
@@ -991,20 +1005,23 @@ function SolicitudDocumentReading({
                   {item.fechaNacimiento ? <small>Nacimiento: {item.fechaNacimiento}</small> : null}
                   {item.direccionTexto ? <small>{item.direccionTexto}</small> : null}
                   {item.observaciones ? <small>{item.observaciones}</small> : null}
+                  {matchedExisting ? (
+                    <small>Coincide con interesado: {[matchedExisting.nombre, matchedExisting.rol ? formatEnum(matchedExisting.rol) : null].filter(Boolean).join(" - ")}</small>
+                  ) : null}
                 </div>
                 {canAddIdentity ? (
                   <div className="solicitud-reading-identity__actions">
                     <input
                       aria-label="DNI/NIE/CIF revisado"
                       className="solicitud-reading-identity__identifier"
-                      disabled={addingIdentity || alreadyAdded}
+                      disabled={addingIdentity}
                       onChange={(event) => setIdentifiers((current) => ({ ...current, [key]: uppercaseInput(event.target.value) }))}
                       placeholder="DNI/NIE/CIF"
                       value={identifierValue}
                     />
                     <select
                       aria-label="Rol del interesado"
-                      disabled={addingIdentity || alreadyAdded}
+                      disabled={addingIdentity || roleLocked}
                       onChange={(event) => setSelectedRoles((current) => ({ ...current, [key]: event.target.value }))}
                       value={selectedRole}
                     >
@@ -1015,12 +1032,12 @@ function SolicitudDocumentReading({
                     </select>
                     <button
                       className="soft-button soft-button--compact"
-                      disabled={addingIdentity || alreadyAdded || !selectedRole || !normalizedEditedId}
+                      disabled={addingIdentity || !selectedRole || !normalizedEditedId}
                       onClick={() => onAddIdentity(documento, item, selectedRole, identifierValue)}
                       type="button"
                     >
                       {addingIdentity ? <Loader2 size={14} /> : <UserPlus size={14} />}
-                      {alreadyAdded ? "Incluido" : "Anadir"}
+                      {submitLabel}
                     </button>
                   </div>
                 ) : null}
