@@ -2795,6 +2795,19 @@ select {
   font-weight: 750;
 }
 
+.solicitud-reading__header-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.solicitud-reading__header-actions .soft-button {
+  min-height: 28px;
+  padding-inline: 9px;
+}
+
 .solicitud-reading em {
   color: var(--muted);
   font-size: 0.74rem;
@@ -2937,6 +2950,10 @@ select {
     align-items: flex-start;
     flex-direction: column;
     gap: 5px;
+  }
+
+  .solicitud-reading__header-actions {
+    justify-content: flex-start;
   }
 
   .solicitud-reading-identity__summary code {

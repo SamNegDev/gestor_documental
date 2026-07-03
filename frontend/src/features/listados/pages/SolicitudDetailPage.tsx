@@ -16,6 +16,7 @@ import {
   extractDocumentPages,
   getCompleteExpedienteProcessing,
   mergeDocuments,
+  readDocumentIdentity,
   startCompleteSolicitudProcessing,
   updateDocument,
 } from "../../expedientes/services/documentosApi";
@@ -154,6 +155,18 @@ export function SolicitudDetailPage() {
       queryClient.setQueryData(["solicitudes", "detalle", id], actualizada);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
+        queryClient.invalidateQueries({ queryKey: ["solicitudes", "preparacion-traspaso", id] }),
+        queryClient.invalidateQueries({ queryKey: ["tareas"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
+    },
+  });
+
+  const releerIdentidadMutation = useMutation({
+    mutationFn: (documentoId: number) => readDocumentIdentity(documentoId, true),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["solicitudes", "detalle", id] }),
         queryClient.invalidateQueries({ queryKey: ["solicitudes", "preparacion-traspaso", id] }),
         queryClient.invalidateQueries({ queryKey: ["tareas"] }),
         queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
@@ -482,6 +495,21 @@ export function SolicitudDetailPage() {
     }
   };
 
+  const handleRereadIdentity = async (documento: DocumentoExpediente) => {
+    const confirmed = await confirm({
+      title: "Releer identidad",
+      description: "Se sustituira la lectura de identidad guardada para este PDF. Si contiene dos DNI/CIF, la nueva lectura deberia mostrar ambas opciones para asignarlas.",
+      confirmLabel: "Releer",
+      cancelLabel: "Cancelar",
+    });
+    if (!confirmed) return;
+    try {
+      await releerIdentidadMutation.mutateAsync(documento.id);
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo releer la identidad." : "No se pudo releer la identidad.");
+    }
+  };
+
   const handleAssignHabitual = async (habitual: SolicitudInteresadoHabitual, rol: string) => {
     const solicitudActual = solicitudQuery.data;
     if (!solicitudActual) return;
@@ -750,9 +778,12 @@ export function SolicitudDetailPage() {
                   <SolicitudDocumentReading
                     documento={documento}
                     canAddIdentity={!isClosed}
+                    canRereadIdentity={isAdmin && !isClosed}
                     existingIdentities={existingSolicitudIdentities}
                     addingIdentity={anadirIdentidadDetectadaMutation.isPending}
+                    rereadingIdentity={releerIdentidadMutation.isPending}
                     onAddIdentity={handleAddDetectedIdentity}
+                    onRereadIdentity={handleRereadIdentity}
                   />
                 </div>
                 <small>{documento.fechaSubida || "Sin fecha"}</small>
@@ -961,15 +992,21 @@ type SolicitudExistingIdentity = {
 function SolicitudDocumentReading({
   documento,
   canAddIdentity = false,
+  canRereadIdentity = false,
   existingIdentities,
   addingIdentity,
+  rereadingIdentity,
   onAddIdentity,
+  onRereadIdentity,
 }: {
   documento: DocumentoExpediente;
   canAddIdentity?: boolean;
+  canRereadIdentity?: boolean;
   existingIdentities: SolicitudExistingIdentity[];
   addingIdentity: boolean;
+  rereadingIdentity: boolean;
   onAddIdentity: (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string) => void;
+  onRereadIdentity: (documento: DocumentoExpediente) => void;
 }) {
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
   const [identifiers, setIdentifiers] = useState<Record<string, string>>({});
@@ -987,7 +1024,20 @@ function SolicitudDocumentReading({
       <div className={identidad.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
         <div className="solicitud-reading__header">
           <strong>{detectadas.length > 1 ? `${detectadas.length} DNI/CIF detectados` : "DNI/CIF detectado"}</strong>
-          <span>{confidenceLabel(identidad.confianzaGlobal)}</span>
+          <div className="solicitud-reading__header-actions">
+            <span>{confidenceLabel(identidad.confianzaGlobal)}</span>
+            {canRereadIdentity ? (
+              <button
+                className="soft-button soft-button--compact"
+                disabled={rereadingIdentity}
+                onClick={() => onRereadIdentity(documento)}
+                type="button"
+              >
+                {rereadingIdentity ? <Loader2 size={14} /> : <RefreshCw size={14} />}
+                Releer
+              </button>
+            ) : null}
+          </div>
         </div>
         <div className="solicitud-reading-identities">
           {detectadas.map((item, index) => {
