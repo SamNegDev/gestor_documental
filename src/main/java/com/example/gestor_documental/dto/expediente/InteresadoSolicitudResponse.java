@@ -19,6 +19,12 @@ public class InteresadoSolicitudResponse {
     private String direccion;
     private String tipoVia;
     private String nombreVia;
+    private String numeroVia;
+    private String bloque;
+    private String portal;
+    private String escalera;
+    private String piso;
+    private String puerta;
     private String codigoPostal;
     private String municipio;
     private String provincia;

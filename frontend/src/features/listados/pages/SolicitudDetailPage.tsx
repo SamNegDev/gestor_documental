@@ -1663,7 +1663,16 @@ function formatEnum(value?: string | null) {
 }
 
 function formatInteresadoAddress(interesado: InteresadoSolicitud) {
-  const via = [interesado.tipoVia, interesado.nombreVia]
+  const via = [
+    interesado.tipoVia,
+    interesado.nombreVia,
+    interesado.numeroVia,
+    withAddressLabel("BLOQ", interesado.bloque),
+    withAddressLabel("PORTAL", interesado.portal),
+    withAddressLabel("ESC", interesado.escalera),
+    withAddressLabel("PISO", interesado.piso),
+    withAddressLabel("PTA", interesado.puerta),
+  ]
     .map((value) => value?.trim())
     .filter(Boolean)
     .join(" ");
@@ -1674,7 +1683,16 @@ function formatInteresadoAddress(interesado: InteresadoSolicitud) {
 }
 
 function formatHabitualAddress(interesado: SolicitudInteresadoHabitual) {
-  const via = [interesado.tipoVia, interesado.nombreVia]
+  const via = [
+    interesado.tipoVia,
+    interesado.nombreVia,
+    interesado.numeroVia,
+    withAddressLabel("BLOQ", interesado.bloque),
+    withAddressLabel("PORTAL", interesado.portal),
+    withAddressLabel("ESC", interesado.escalera),
+    withAddressLabel("PISO", interesado.piso),
+    withAddressLabel("PTA", interesado.puerta),
+  ]
     .map((value) => value?.trim())
     .filter(Boolean)
     .join(" ");
@@ -1693,12 +1711,23 @@ function hasInteresadoData(interesado: InteresadoSolicitud) {
     interesado.direccion,
     interesado.tipoVia,
     interesado.nombreVia,
+    interesado.numeroVia,
+    interesado.bloque,
+    interesado.portal,
+    interesado.escalera,
+    interesado.piso,
+    interesado.puerta,
     interesado.codigoPostal,
     interesado.municipio,
     interesado.provincia,
   ].some(
     (value) => value && value.trim() !== "",
   );
+}
+
+function withAddressLabel(label: string, value?: string | null) {
+  const clean = value?.trim();
+  return clean ? `${label} ${clean}` : "";
 }
 
 function formatReadableList(values: string[]) {

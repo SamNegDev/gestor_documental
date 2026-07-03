@@ -34,6 +34,12 @@ public class InteresadoServiceImpl implements InteresadoService {
         nuevoInteresado.setTelefono(TextNormalizer.upperOrNull(nuevoInteresado.getTelefono()));
         nuevoInteresado.setTipoVia(TextNormalizer.upperOrNull(nuevoInteresado.getTipoVia()));
         nuevoInteresado.setNombreVia(TextNormalizer.upperOrNull(nuevoInteresado.getNombreVia()));
+        nuevoInteresado.setNumeroVia(TextNormalizer.upperOrNull(nuevoInteresado.getNumeroVia()));
+        nuevoInteresado.setBloque(TextNormalizer.upperOrNull(nuevoInteresado.getBloque()));
+        nuevoInteresado.setPortal(TextNormalizer.upperOrNull(nuevoInteresado.getPortal()));
+        nuevoInteresado.setEscalera(TextNormalizer.upperOrNull(nuevoInteresado.getEscalera()));
+        nuevoInteresado.setPiso(TextNormalizer.upperOrNull(nuevoInteresado.getPiso()));
+        nuevoInteresado.setPuerta(TextNormalizer.upperOrNull(nuevoInteresado.getPuerta()));
         nuevoInteresado.setCodigoPostal(TextNormalizer.upperOrNull(nuevoInteresado.getCodigoPostal()));
         nuevoInteresado.setMunicipio(TextNormalizer.upperOrNull(nuevoInteresado.getMunicipio()));
         nuevoInteresado.setProvincia(TextNormalizer.upperOrNull(nuevoInteresado.getProvincia()));
@@ -42,6 +48,12 @@ public class InteresadoServiceImpl implements InteresadoService {
             nuevoInteresado.setDireccion(DireccionFormatter.componer(
                     nuevoInteresado.getTipoVia(),
                     nuevoInteresado.getNombreVia(),
+                    nuevoInteresado.getNumeroVia(),
+                    nuevoInteresado.getBloque(),
+                    nuevoInteresado.getPortal(),
+                    nuevoInteresado.getEscalera(),
+                    nuevoInteresado.getPiso(),
+                    nuevoInteresado.getPuerta(),
                     nuevoInteresado.getCodigoPostal(),
                     nuevoInteresado.getMunicipio(),
                     nuevoInteresado.getProvincia()));
@@ -68,6 +80,12 @@ public class InteresadoServiceImpl implements InteresadoService {
         interesado.setTelefono(TextNormalizer.upperOrNull(request.telefono()));
         interesado.setTipoVia(TextNormalizer.upperOrNull(request.tipoVia()));
         interesado.setNombreVia(TextNormalizer.upperOrNull(request.nombreVia()));
+        interesado.setNumeroVia(TextNormalizer.upperOrNull(request.numeroVia()));
+        interesado.setBloque(TextNormalizer.upperOrNull(request.bloque()));
+        interesado.setPortal(TextNormalizer.upperOrNull(request.portal()));
+        interesado.setEscalera(TextNormalizer.upperOrNull(request.escalera()));
+        interesado.setPiso(TextNormalizer.upperOrNull(request.piso()));
+        interesado.setPuerta(TextNormalizer.upperOrNull(request.puerta()));
         interesado.setCodigoPostal(TextNormalizer.upperOrNull(request.codigoPostal()));
         interesado.setMunicipio(TextNormalizer.upperOrNull(request.municipio()));
         interesado.setProvincia(TextNormalizer.upperOrNull(request.provincia()));
@@ -76,6 +94,12 @@ public class InteresadoServiceImpl implements InteresadoService {
             interesado.setDireccion(DireccionFormatter.componer(
                     interesado.getTipoVia(),
                     interesado.getNombreVia(),
+                    interesado.getNumeroVia(),
+                    interesado.getBloque(),
+                    interesado.getPortal(),
+                    interesado.getEscalera(),
+                    interesado.getPiso(),
+                    interesado.getPuerta(),
                     interesado.getCodigoPostal(),
                     interesado.getMunicipio(),
                     interesado.getProvincia()));

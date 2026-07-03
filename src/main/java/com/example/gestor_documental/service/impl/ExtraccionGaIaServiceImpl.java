@@ -1143,6 +1143,12 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
         actualizado |= setIfBlank(interesado.getTelefono(), normalizarTexto(valor(persona, "telefono")), interesado::setTelefono);
         actualizado |= setIfBlank(interesado.getTipoVia(), normalizarTexto(valor(direccion, "siglas")), interesado::setTipoVia);
         actualizado |= setIfBlank(interesado.getNombreVia(), normalizarTexto(valor(direccion, "nombreVia")), interesado::setNombreVia);
+        actualizado |= setIfBlank(interesado.getNumeroVia(), normalizarTexto(valor(direccion, "numero")), interesado::setNumeroVia);
+        actualizado |= setIfBlank(interesado.getBloque(), normalizarTexto(valor(direccion, "bloque")), interesado::setBloque);
+        actualizado |= setIfBlank(interesado.getPortal(), normalizarTexto(valor(direccion, "portal")), interesado::setPortal);
+        actualizado |= setIfBlank(interesado.getEscalera(), normalizarTexto(valor(direccion, "escalera")), interesado::setEscalera);
+        actualizado |= setIfBlank(interesado.getPiso(), normalizarTexto(valor(direccion, "piso")), interesado::setPiso);
+        actualizado |= setIfBlank(interesado.getPuerta(), normalizarTexto(valor(direccion, "puerta")), interesado::setPuerta);
         actualizado |= setIfBlank(interesado.getCodigoPostal(), normalizarCodigoPostal(valor(direccion, "codigoPostal")), interesado::setCodigoPostal);
         actualizado |= setIfBlank(interesado.getMunicipio(), normalizarTexto(valor(direccion, "municipio")), interesado::setMunicipio);
         actualizado |= setIfBlank(interesado.getProvincia(), normalizarProvincia(valor(direccion, "provincia"), valor(direccion, "codigoPostal")), interesado::setProvincia);
@@ -1209,13 +1215,30 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
     }
 
     private String direccionInteresado(JsonNode direccion) {
-        return String.join(" ", java.util.stream.Stream.of(
+        String via = String.join(" ", java.util.stream.Stream.of(
                         normalizarTexto(valor(direccion, "siglas")),
                         normalizarTexto(valor(direccion, "nombreVia")),
-                        normalizarTexto(valor(direccion, "numero"))
+                        normalizarTexto(valor(direccion, "numero")),
+                        direccionConEtiqueta("BLOQ", valor(direccion, "bloque")),
+                        direccionConEtiqueta("PORTAL", valor(direccion, "portal")),
+                        direccionConEtiqueta("ESC", valor(direccion, "escalera")),
+                        direccionConEtiqueta("PISO", valor(direccion, "piso")),
+                        direccionConEtiqueta("PTA", valor(direccion, "puerta"))
                 )
                 .filter(value -> value != null && !value.isBlank())
                 .toList());
+        return String.join(", ", java.util.stream.Stream.of(
+                        via,
+                        normalizarCodigoPostal(valor(direccion, "codigoPostal")),
+                        normalizarTexto(valor(direccion, "municipio")),
+                        normalizarProvincia(valor(direccion, "provincia"), valor(direccion, "codigoPostal")))
+                .filter(value -> value != null && !value.isBlank())
+                .toList());
+    }
+
+    private String direccionConEtiqueta(String etiqueta, String valor) {
+        String normalizado = normalizarTexto(valor);
+        return normalizado != null && !normalizado.isBlank() ? etiqueta + " " + normalizado : null;
     }
 
     private TipoPersona inferirTipoPersona(String dni, String tipoPersona) {

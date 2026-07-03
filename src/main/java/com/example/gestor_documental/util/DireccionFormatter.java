@@ -9,8 +9,32 @@ public final class DireccionFormatter {
     }
 
     public static String componer(String tipoVia, String nombreVia, String codigoPostal, String municipio, String provincia) {
+        return componer(tipoVia, nombreVia, null, null, null, null, null, null, codigoPostal, municipio, provincia);
+    }
+
+    public static String componer(
+            String tipoVia,
+            String nombreVia,
+            String numeroVia,
+            String bloque,
+            String portal,
+            String escalera,
+            String piso,
+            String puerta,
+            String codigoPostal,
+            String municipio,
+            String provincia
+    ) {
         List<String> partes = new ArrayList<>();
-        String via = unir(TextNormalizer.upperOrNull(tipoVia), TextNormalizer.upperOrNull(nombreVia));
+        String via = unir(
+                TextNormalizer.upperOrNull(tipoVia),
+                TextNormalizer.upperOrNull(nombreVia),
+                TextNormalizer.upperOrNull(numeroVia),
+                conEtiqueta("BLOQ", bloque),
+                conEtiqueta("PORTAL", portal),
+                conEtiqueta("ESC", escalera),
+                conEtiqueta("PISO", piso),
+                conEtiqueta("PTA", puerta));
         if (via != null) {
             partes.add(via);
         }
@@ -29,9 +53,19 @@ public final class DireccionFormatter {
         return partes.isEmpty() ? null : String.join(", ", partes);
     }
 
-    private static String unir(String primero, String segundo) {
-        if (primero == null) return segundo;
-        if (segundo == null) return primero;
-        return primero + " " + segundo;
+    private static String conEtiqueta(String etiqueta, String valor) {
+        String valorNormalizado = TextNormalizer.upperOrNull(valor);
+        return valorNormalizado != null ? etiqueta + " " + valorNormalizado : null;
+    }
+
+    private static String unir(String... valores) {
+        List<String> partes = new ArrayList<>();
+        for (String valor : valores) {
+            String normalizado = TextNormalizer.upperOrNull(valor);
+            if (normalizado != null) {
+                partes.add(normalizado);
+            }
+        }
+        return partes.isEmpty() ? null : String.join(" ", partes);
     }
 }

@@ -17,7 +17,7 @@ const BATECOM_LABELS = ["Vendedor inicial", "Compraventa", "Comprador final"];
 type InteresadoForm = ExpedienteEditInput["interesados"][number];
 
 function emptyInteresado(): InteresadoForm {
-  return { nombre: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
+  return { nombre: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
 }
 
 function ensureBatecomInteresados(interesados: InteresadoForm[]) {
@@ -35,6 +35,12 @@ function hasInteresadoData(interesado: InteresadoForm) {
       || interesado.direccion?.trim()
       || interesado.tipoVia?.trim()
       || interesado.nombreVia?.trim()
+      || interesado.numeroVia?.trim()
+      || interesado.bloque?.trim()
+      || interesado.portal?.trim()
+      || interesado.escalera?.trim()
+      || interesado.piso?.trim()
+      || interesado.puerta?.trim()
       || interesado.codigoPostal?.trim()
       || interesado.municipio?.trim()
       || interesado.provincia?.trim(),
@@ -69,6 +75,12 @@ function buildPayload(form: ExpedienteEditInput): ExpedienteEditInput {
       direccion: cleanText(interesado.direccion),
       tipoVia: cleanText(interesado.tipoVia),
       nombreVia: cleanText(interesado.nombreVia),
+      numeroVia: cleanText(interesado.numeroVia),
+      bloque: cleanText(interesado.bloque),
+      portal: cleanText(interesado.portal),
+      escalera: cleanText(interesado.escalera),
+      piso: cleanText(interesado.piso),
+      puerta: cleanText(interesado.puerta),
       codigoPostal: cleanText(interesado.codigoPostal),
       municipio: cleanText(interesado.municipio),
       provincia: cleanText(interesado.provincia),
@@ -165,6 +177,12 @@ export function ExpedienteCreatePage() {
         direccion: uppercaseInput(interesado.direccion || ""),
         tipoVia: uppercaseInput(interesado.tipoVia || ""),
         nombreVia: uppercaseInput(interesado.nombreVia || ""),
+        numeroVia: uppercaseInput(interesado.numeroVia || ""),
+        bloque: uppercaseInput(interesado.bloque || ""),
+        portal: uppercaseInput(interesado.portal || ""),
+        escalera: uppercaseInput(interesado.escalera || ""),
+        piso: uppercaseInput(interesado.piso || ""),
+        puerta: uppercaseInput(interesado.puerta || ""),
         codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
         municipio: uppercaseInput(interesado.municipio || ""),
         provincia: uppercaseInput(interesado.provincia || ""),

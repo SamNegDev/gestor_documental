@@ -4394,6 +4394,47 @@ input.records-table-filter {
   grid-column: 1 / -1;
 }
 
+.address-fields {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.address-fields .address-field {
+  min-width: 0;
+}
+
+.address-field--type {
+  grid-column: span 2;
+}
+
+.address-field--street {
+  grid-column: span 4;
+}
+
+.address-field--xs {
+  grid-column: span 1;
+}
+
+.address-field--postal {
+  grid-column: span 2;
+}
+
+.address-field--province,
+.address-field--municipality {
+  grid-column: span 5;
+}
+
+.address-field--legacy {
+  grid-column: 1 / -1;
+}
+
+.address-field--xs input {
+  text-align: center;
+}
+
 .vehicle-edit-form__actions {
   grid-column: 1 / -1;
   display: flex;
@@ -4802,6 +4843,22 @@ input.records-table-filter {
   .registry-profile__facts--vehicle,
   .vehicle-edit-form {
     grid-template-columns: 1fr;
+  }
+
+  .address-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .address-field--type,
+  .address-field--street,
+  .address-field--postal,
+  .address-field--province,
+  .address-field--municipality {
+    grid-column: 1 / -1;
+  }
+
+  .address-field--xs {
+    grid-column: span 1;
   }
 
   .registry-profile__actions .primary-button,

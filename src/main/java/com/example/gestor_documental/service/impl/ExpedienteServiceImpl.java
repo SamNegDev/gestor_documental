@@ -156,13 +156,21 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                     nuevoInteresado.setTelefono(TextNormalizer.upperOrNull(dto.getTelefono()));
                     nuevoInteresado.setTipoVia(TextNormalizer.upperOrNull(dto.getTipoVia()));
                     nuevoInteresado.setNombreVia(TextNormalizer.upperOrNull(dto.getNombreVia()));
+                    nuevoInteresado.setNumeroVia(TextNormalizer.upperOrNull(dto.getNumeroVia()));
+                    nuevoInteresado.setBloque(TextNormalizer.upperOrNull(dto.getBloque()));
+                    nuevoInteresado.setPortal(TextNormalizer.upperOrNull(dto.getPortal()));
+                    nuevoInteresado.setEscalera(TextNormalizer.upperOrNull(dto.getEscalera()));
+                    nuevoInteresado.setPiso(TextNormalizer.upperOrNull(dto.getPiso()));
+                    nuevoInteresado.setPuerta(TextNormalizer.upperOrNull(dto.getPuerta()));
                     nuevoInteresado.setCodigoPostal(TextNormalizer.upperOrNull(dto.getCodigoPostal()));
                     nuevoInteresado.setMunicipio(TextNormalizer.upperOrNull(dto.getMunicipio()));
                     nuevoInteresado.setProvincia(TextNormalizer.upperOrNull(dto.getProvincia()));
                     String direccion = TextNormalizer.upperOrNull(dto.getDireccion());
                     nuevoInteresado.setDireccion(direccion != null
                             ? direccion
-                            : DireccionFormatter.componer(dto.getTipoVia(), dto.getNombreVia(), dto.getCodigoPostal(), dto.getMunicipio(), dto.getProvincia()));
+                            : DireccionFormatter.componer(dto.getTipoVia(), dto.getNombreVia(), dto.getNumeroVia(), dto.getBloque(),
+                                    dto.getPortal(), dto.getEscalera(), dto.getPiso(), dto.getPuerta(),
+                                    dto.getCodigoPostal(), dto.getMunicipio(), dto.getProvincia()));
                     return interesadoService.guardar(nuevoInteresado);
                 });
 
@@ -387,6 +395,12 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                         && (dto.getDireccion() == null || dto.getDireccion().isBlank())
                         && (dto.getTipoVia() == null || dto.getTipoVia().isBlank())
                         && (dto.getNombreVia() == null || dto.getNombreVia().isBlank())
+                        && (dto.getNumeroVia() == null || dto.getNumeroVia().isBlank())
+                        && (dto.getBloque() == null || dto.getBloque().isBlank())
+                        && (dto.getPortal() == null || dto.getPortal().isBlank())
+                        && (dto.getEscalera() == null || dto.getEscalera().isBlank())
+                        && (dto.getPiso() == null || dto.getPiso().isBlank())
+                        && (dto.getPuerta() == null || dto.getPuerta().isBlank())
                         && (dto.getCodigoPostal() == null || dto.getCodigoPostal().isBlank())
                         && (dto.getMunicipio() == null || dto.getMunicipio().isBlank())
                         && (dto.getProvincia() == null || dto.getProvincia().isBlank()));

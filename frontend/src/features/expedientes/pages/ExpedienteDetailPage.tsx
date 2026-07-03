@@ -92,7 +92,7 @@ const COMPLETE_DOCUMENT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 type InteresadoCorrection = ExpedienteEditInput["interesados"][number];
 
 function emptyInteresadoCorrection(): InteresadoCorrection {
-  return { nombre: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
+  return { nombre: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
 }
 
 function hasInteresadoCorrectionData(interesado: InteresadoCorrection) {
@@ -103,6 +103,12 @@ function hasInteresadoCorrectionData(interesado: InteresadoCorrection) {
       || interesado.direccion?.trim()
       || interesado.tipoVia?.trim()
       || interesado.nombreVia?.trim()
+      || interesado.numeroVia?.trim()
+      || interesado.bloque?.trim()
+      || interesado.portal?.trim()
+      || interesado.escalera?.trim()
+      || interesado.piso?.trim()
+      || interesado.puerta?.trim()
       || interesado.codigoPostal?.trim()
       || interesado.municipio?.trim()
       || interesado.provincia?.trim()
@@ -529,6 +535,12 @@ function InterestedPartiesCorrectionDialog({
             direccion: uppercaseInput(interesado.direccion || ""),
             tipoVia: uppercaseInput(interesado.tipoVia || ""),
             nombreVia: uppercaseInput(interesado.nombreVia || ""),
+            numeroVia: uppercaseInput(interesado.numeroVia || ""),
+            bloque: uppercaseInput(interesado.bloque || ""),
+            portal: uppercaseInput(interesado.portal || ""),
+            escalera: uppercaseInput(interesado.escalera || ""),
+            piso: uppercaseInput(interesado.piso || ""),
+            puerta: uppercaseInput(interesado.puerta || ""),
             codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
             municipio: uppercaseInput(interesado.municipio || ""),
             provincia: uppercaseInput(interesado.provincia || ""),
@@ -551,6 +563,12 @@ function InterestedPartiesCorrectionDialog({
       direccion: uppercaseInput(interesado.direccion || ""),
       tipoVia: uppercaseInput(interesado.tipoVia || ""),
       nombreVia: uppercaseInput(interesado.nombreVia || ""),
+      numeroVia: uppercaseInput(interesado.numeroVia || ""),
+      bloque: uppercaseInput(interesado.bloque || ""),
+      portal: uppercaseInput(interesado.portal || ""),
+      escalera: uppercaseInput(interesado.escalera || ""),
+      piso: uppercaseInput(interesado.piso || ""),
+      puerta: uppercaseInput(interesado.puerta || ""),
       codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
       municipio: uppercaseInput(interesado.municipio || ""),
       provincia: uppercaseInput(interesado.provincia || ""),

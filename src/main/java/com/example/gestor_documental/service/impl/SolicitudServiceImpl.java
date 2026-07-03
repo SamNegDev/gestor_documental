@@ -353,6 +353,12 @@ public class SolicitudServiceImpl implements SolicitudService {
          interesado1dto.setTelefono(solicitud.getInteresado1Telefono());
          interesado1dto.setTipoVia(solicitud.getInteresado1TipoVia());
          interesado1dto.setNombreVia(solicitud.getInteresado1NombreVia());
+         interesado1dto.setNumeroVia(solicitud.getInteresado1NumeroVia());
+         interesado1dto.setBloque(solicitud.getInteresado1Bloque());
+         interesado1dto.setPortal(solicitud.getInteresado1Portal());
+         interesado1dto.setEscalera(solicitud.getInteresado1Escalera());
+         interesado1dto.setPiso(solicitud.getInteresado1Piso());
+         interesado1dto.setPuerta(solicitud.getInteresado1Puerta());
          interesado1dto.setCodigoPostal(solicitud.getInteresado1CodigoPostal());
          interesado1dto.setMunicipio(solicitud.getInteresado1Municipio());
          interesado1dto.setProvincia(solicitud.getInteresado1Provincia());
@@ -365,6 +371,12 @@ public class SolicitudServiceImpl implements SolicitudService {
          interesado2dto.setTelefono(solicitud.getInteresado2Telefono());
          interesado2dto.setTipoVia(solicitud.getInteresado2TipoVia());
          interesado2dto.setNombreVia(solicitud.getInteresado2NombreVia());
+         interesado2dto.setNumeroVia(solicitud.getInteresado2NumeroVia());
+         interesado2dto.setBloque(solicitud.getInteresado2Bloque());
+         interesado2dto.setPortal(solicitud.getInteresado2Portal());
+         interesado2dto.setEscalera(solicitud.getInteresado2Escalera());
+         interesado2dto.setPiso(solicitud.getInteresado2Piso());
+         interesado2dto.setPuerta(solicitud.getInteresado2Puerta());
          interesado2dto.setCodigoPostal(solicitud.getInteresado2CodigoPostal());
          interesado2dto.setMunicipio(solicitud.getInteresado2Municipio());
          interesado2dto.setProvincia(solicitud.getInteresado2Provincia());
@@ -377,6 +389,12 @@ public class SolicitudServiceImpl implements SolicitudService {
          interesado3dto.setTelefono(solicitud.getInteresado3Telefono());
          interesado3dto.setTipoVia(solicitud.getInteresado3TipoVia());
          interesado3dto.setNombreVia(solicitud.getInteresado3NombreVia());
+         interesado3dto.setNumeroVia(solicitud.getInteresado3NumeroVia());
+         interesado3dto.setBloque(solicitud.getInteresado3Bloque());
+         interesado3dto.setPortal(solicitud.getInteresado3Portal());
+         interesado3dto.setEscalera(solicitud.getInteresado3Escalera());
+         interesado3dto.setPiso(solicitud.getInteresado3Piso());
+         interesado3dto.setPuerta(solicitud.getInteresado3Puerta());
          interesado3dto.setCodigoPostal(solicitud.getInteresado3CodigoPostal());
          interesado3dto.setMunicipio(solicitud.getInteresado3Municipio());
          interesado3dto.setProvincia(solicitud.getInteresado3Provincia());
@@ -429,6 +447,12 @@ public class SolicitudServiceImpl implements SolicitudService {
                                         solicitud.getInteresado1Direccion(),
                                         solicitud.getInteresado1TipoVia(),
                                         solicitud.getInteresado1NombreVia(),
+                                        solicitud.getInteresado1NumeroVia(),
+                                        solicitud.getInteresado1Bloque(),
+                                        solicitud.getInteresado1Portal(),
+                                        solicitud.getInteresado1Escalera(),
+                                        solicitud.getInteresado1Piso(),
+                                        solicitud.getInteresado1Puerta(),
                                         solicitud.getInteresado1CodigoPostal(),
                                         solicitud.getInteresado1Municipio(),
                                         solicitud.getInteresado1Provincia())
@@ -442,6 +466,12 @@ public class SolicitudServiceImpl implements SolicitudService {
                                         solicitud.getInteresado2Direccion(),
                                         solicitud.getInteresado2TipoVia(),
                                         solicitud.getInteresado2NombreVia(),
+                                        solicitud.getInteresado2NumeroVia(),
+                                        solicitud.getInteresado2Bloque(),
+                                        solicitud.getInteresado2Portal(),
+                                        solicitud.getInteresado2Escalera(),
+                                        solicitud.getInteresado2Piso(),
+                                        solicitud.getInteresado2Puerta(),
                                         solicitud.getInteresado2CodigoPostal(),
                                         solicitud.getInteresado2Municipio(),
                                         solicitud.getInteresado2Provincia())
@@ -455,6 +485,12 @@ public class SolicitudServiceImpl implements SolicitudService {
                                         solicitud.getInteresado3Direccion(),
                                         solicitud.getInteresado3TipoVia(),
                                         solicitud.getInteresado3NombreVia(),
+                                        solicitud.getInteresado3NumeroVia(),
+                                        solicitud.getInteresado3Bloque(),
+                                        solicitud.getInteresado3Portal(),
+                                        solicitud.getInteresado3Escalera(),
+                                        solicitud.getInteresado3Piso(),
+                                        solicitud.getInteresado3Puerta(),
                                         solicitud.getInteresado3CodigoPostal(),
                                         solicitud.getInteresado3Municipio(),
                                         solicitud.getInteresado3Provincia())
@@ -641,6 +677,12 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitudBase.setInteresado1Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Telefono()));
         solicitudBase.setInteresado1TipoVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1TipoVia()));
         solicitudBase.setInteresado1NombreVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1NombreVia()));
+        solicitudBase.setInteresado1NumeroVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1NumeroVia()));
+        solicitudBase.setInteresado1Bloque(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Bloque()));
+        solicitudBase.setInteresado1Portal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Portal()));
+        solicitudBase.setInteresado1Escalera(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Escalera()));
+        solicitudBase.setInteresado1Piso(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Piso()));
+        solicitudBase.setInteresado1Puerta(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Puerta()));
         solicitudBase.setInteresado1CodigoPostal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1CodigoPostal()));
         solicitudBase.setInteresado1Municipio(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Municipio()));
         solicitudBase.setInteresado1Provincia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Provincia()));
@@ -648,6 +690,12 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitudActualizada.getInteresado1Direccion(),
                 solicitudActualizada.getInteresado1TipoVia(),
                 solicitudActualizada.getInteresado1NombreVia(),
+                solicitudActualizada.getInteresado1NumeroVia(),
+                solicitudActualizada.getInteresado1Bloque(),
+                solicitudActualizada.getInteresado1Portal(),
+                solicitudActualizada.getInteresado1Escalera(),
+                solicitudActualizada.getInteresado1Piso(),
+                solicitudActualizada.getInteresado1Puerta(),
                 solicitudActualizada.getInteresado1CodigoPostal(),
                 solicitudActualizada.getInteresado1Municipio(),
                 solicitudActualizada.getInteresado1Provincia()));
@@ -658,6 +706,12 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitudBase.setInteresado2Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Telefono()));
         solicitudBase.setInteresado2TipoVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2TipoVia()));
         solicitudBase.setInteresado2NombreVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2NombreVia()));
+        solicitudBase.setInteresado2NumeroVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2NumeroVia()));
+        solicitudBase.setInteresado2Bloque(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Bloque()));
+        solicitudBase.setInteresado2Portal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Portal()));
+        solicitudBase.setInteresado2Escalera(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Escalera()));
+        solicitudBase.setInteresado2Piso(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Piso()));
+        solicitudBase.setInteresado2Puerta(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Puerta()));
         solicitudBase.setInteresado2CodigoPostal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2CodigoPostal()));
         solicitudBase.setInteresado2Municipio(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Municipio()));
         solicitudBase.setInteresado2Provincia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Provincia()));
@@ -665,6 +719,12 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitudActualizada.getInteresado2Direccion(),
                 solicitudActualizada.getInteresado2TipoVia(),
                 solicitudActualizada.getInteresado2NombreVia(),
+                solicitudActualizada.getInteresado2NumeroVia(),
+                solicitudActualizada.getInteresado2Bloque(),
+                solicitudActualizada.getInteresado2Portal(),
+                solicitudActualizada.getInteresado2Escalera(),
+                solicitudActualizada.getInteresado2Piso(),
+                solicitudActualizada.getInteresado2Puerta(),
                 solicitudActualizada.getInteresado2CodigoPostal(),
                 solicitudActualizada.getInteresado2Municipio(),
                 solicitudActualizada.getInteresado2Provincia()));
@@ -675,6 +735,12 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitudBase.setInteresado3Telefono(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Telefono()));
         solicitudBase.setInteresado3TipoVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3TipoVia()));
         solicitudBase.setInteresado3NombreVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3NombreVia()));
+        solicitudBase.setInteresado3NumeroVia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3NumeroVia()));
+        solicitudBase.setInteresado3Bloque(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Bloque()));
+        solicitudBase.setInteresado3Portal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Portal()));
+        solicitudBase.setInteresado3Escalera(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Escalera()));
+        solicitudBase.setInteresado3Piso(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Piso()));
+        solicitudBase.setInteresado3Puerta(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Puerta()));
         solicitudBase.setInteresado3CodigoPostal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3CodigoPostal()));
         solicitudBase.setInteresado3Municipio(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Municipio()));
         solicitudBase.setInteresado3Provincia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Provincia()));
@@ -682,6 +748,12 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitudActualizada.getInteresado3Direccion(),
                 solicitudActualizada.getInteresado3TipoVia(),
                 solicitudActualizada.getInteresado3NombreVia(),
+                solicitudActualizada.getInteresado3NumeroVia(),
+                solicitudActualizada.getInteresado3Bloque(),
+                solicitudActualizada.getInteresado3Portal(),
+                solicitudActualizada.getInteresado3Escalera(),
+                solicitudActualizada.getInteresado3Piso(),
+                solicitudActualizada.getInteresado3Puerta(),
                 solicitudActualizada.getInteresado3CodigoPostal(),
                 solicitudActualizada.getInteresado3Municipio(),
                 solicitudActualizada.getInteresado3Provincia()));
@@ -1220,6 +1292,12 @@ public class SolicitudServiceImpl implements SolicitudService {
                 interesado.getDireccion(),
                 interesado.getTipoVia(),
                 interesado.getNombreVia(),
+                interesado.getNumeroVia(),
+                interesado.getBloque(),
+                interesado.getPortal(),
+                interesado.getEscalera(),
+                interesado.getPiso(),
+                interesado.getPuerta(),
                 interesado.getCodigoPostal(),
                 interesado.getMunicipio(),
                 interesado.getProvincia());
@@ -1231,6 +1309,12 @@ public class SolicitudServiceImpl implements SolicitudService {
             solicitud.setInteresado1Direccion(direccion);
             solicitud.setInteresado1TipoVia(interesado.getTipoVia());
             solicitud.setInteresado1NombreVia(interesado.getNombreVia());
+            solicitud.setInteresado1NumeroVia(interesado.getNumeroVia());
+            solicitud.setInteresado1Bloque(interesado.getBloque());
+            solicitud.setInteresado1Portal(interesado.getPortal());
+            solicitud.setInteresado1Escalera(interesado.getEscalera());
+            solicitud.setInteresado1Piso(interesado.getPiso());
+            solicitud.setInteresado1Puerta(interesado.getPuerta());
             solicitud.setInteresado1CodigoPostal(interesado.getCodigoPostal());
             solicitud.setInteresado1Municipio(interesado.getMunicipio());
             solicitud.setInteresado1Provincia(interesado.getProvincia());
@@ -1242,6 +1326,12 @@ public class SolicitudServiceImpl implements SolicitudService {
             solicitud.setInteresado2Direccion(direccion);
             solicitud.setInteresado2TipoVia(interesado.getTipoVia());
             solicitud.setInteresado2NombreVia(interesado.getNombreVia());
+            solicitud.setInteresado2NumeroVia(interesado.getNumeroVia());
+            solicitud.setInteresado2Bloque(interesado.getBloque());
+            solicitud.setInteresado2Portal(interesado.getPortal());
+            solicitud.setInteresado2Escalera(interesado.getEscalera());
+            solicitud.setInteresado2Piso(interesado.getPiso());
+            solicitud.setInteresado2Puerta(interesado.getPuerta());
             solicitud.setInteresado2CodigoPostal(interesado.getCodigoPostal());
             solicitud.setInteresado2Municipio(interesado.getMunicipio());
             solicitud.setInteresado2Provincia(interesado.getProvincia());
@@ -1253,6 +1343,12 @@ public class SolicitudServiceImpl implements SolicitudService {
             solicitud.setInteresado3Direccion(direccion);
             solicitud.setInteresado3TipoVia(interesado.getTipoVia());
             solicitud.setInteresado3NombreVia(interesado.getNombreVia());
+            solicitud.setInteresado3NumeroVia(interesado.getNumeroVia());
+            solicitud.setInteresado3Bloque(interesado.getBloque());
+            solicitud.setInteresado3Portal(interesado.getPortal());
+            solicitud.setInteresado3Escalera(interesado.getEscalera());
+            solicitud.setInteresado3Piso(interesado.getPiso());
+            solicitud.setInteresado3Puerta(interesado.getPuerta());
             solicitud.setInteresado3CodigoPostal(interesado.getCodigoPostal());
             solicitud.setInteresado3Municipio(interesado.getMunicipio());
             solicitud.setInteresado3Provincia(interesado.getProvincia());
@@ -1326,6 +1422,12 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado1Direccion(null);
         solicitud.setInteresado1TipoVia(null);
         solicitud.setInteresado1NombreVia(null);
+        solicitud.setInteresado1NumeroVia(null);
+        solicitud.setInteresado1Bloque(null);
+        solicitud.setInteresado1Portal(null);
+        solicitud.setInteresado1Escalera(null);
+        solicitud.setInteresado1Piso(null);
+        solicitud.setInteresado1Puerta(null);
         solicitud.setInteresado1CodigoPostal(null);
         solicitud.setInteresado1Municipio(null);
         solicitud.setInteresado1Provincia(null);
@@ -1339,6 +1441,12 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado2Direccion(null);
         solicitud.setInteresado2TipoVia(null);
         solicitud.setInteresado2NombreVia(null);
+        solicitud.setInteresado2NumeroVia(null);
+        solicitud.setInteresado2Bloque(null);
+        solicitud.setInteresado2Portal(null);
+        solicitud.setInteresado2Escalera(null);
+        solicitud.setInteresado2Piso(null);
+        solicitud.setInteresado2Puerta(null);
         solicitud.setInteresado2CodigoPostal(null);
         solicitud.setInteresado2Municipio(null);
         solicitud.setInteresado2Provincia(null);
@@ -1352,6 +1460,12 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado3Direccion(null);
         solicitud.setInteresado3TipoVia(null);
         solicitud.setInteresado3NombreVia(null);
+        solicitud.setInteresado3NumeroVia(null);
+        solicitud.setInteresado3Bloque(null);
+        solicitud.setInteresado3Portal(null);
+        solicitud.setInteresado3Escalera(null);
+        solicitud.setInteresado3Piso(null);
+        solicitud.setInteresado3Puerta(null);
         solicitud.setInteresado3CodigoPostal(null);
         solicitud.setInteresado3Municipio(null);
         solicitud.setInteresado3Provincia(null);
@@ -1415,6 +1529,12 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado1Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado1Telefono()));
         solicitud.setInteresado1TipoVia(TextNormalizer.upperOrNull(solicitud.getInteresado1TipoVia()));
         solicitud.setInteresado1NombreVia(TextNormalizer.upperOrNull(solicitud.getInteresado1NombreVia()));
+        solicitud.setInteresado1NumeroVia(TextNormalizer.upperOrNull(solicitud.getInteresado1NumeroVia()));
+        solicitud.setInteresado1Bloque(TextNormalizer.upperOrNull(solicitud.getInteresado1Bloque()));
+        solicitud.setInteresado1Portal(TextNormalizer.upperOrNull(solicitud.getInteresado1Portal()));
+        solicitud.setInteresado1Escalera(TextNormalizer.upperOrNull(solicitud.getInteresado1Escalera()));
+        solicitud.setInteresado1Piso(TextNormalizer.upperOrNull(solicitud.getInteresado1Piso()));
+        solicitud.setInteresado1Puerta(TextNormalizer.upperOrNull(solicitud.getInteresado1Puerta()));
         solicitud.setInteresado1CodigoPostal(TextNormalizer.upperOrNull(solicitud.getInteresado1CodigoPostal()));
         solicitud.setInteresado1Municipio(TextNormalizer.upperOrNull(solicitud.getInteresado1Municipio()));
         solicitud.setInteresado1Provincia(TextNormalizer.upperOrNull(solicitud.getInteresado1Provincia()));
@@ -1422,6 +1542,12 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitud.getInteresado1Direccion(),
                 solicitud.getInteresado1TipoVia(),
                 solicitud.getInteresado1NombreVia(),
+                solicitud.getInteresado1NumeroVia(),
+                solicitud.getInteresado1Bloque(),
+                solicitud.getInteresado1Portal(),
+                solicitud.getInteresado1Escalera(),
+                solicitud.getInteresado1Piso(),
+                solicitud.getInteresado1Puerta(),
                 solicitud.getInteresado1CodigoPostal(),
                 solicitud.getInteresado1Municipio(),
                 solicitud.getInteresado1Provincia()));
@@ -1430,6 +1556,12 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado2Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado2Telefono()));
         solicitud.setInteresado2TipoVia(TextNormalizer.upperOrNull(solicitud.getInteresado2TipoVia()));
         solicitud.setInteresado2NombreVia(TextNormalizer.upperOrNull(solicitud.getInteresado2NombreVia()));
+        solicitud.setInteresado2NumeroVia(TextNormalizer.upperOrNull(solicitud.getInteresado2NumeroVia()));
+        solicitud.setInteresado2Bloque(TextNormalizer.upperOrNull(solicitud.getInteresado2Bloque()));
+        solicitud.setInteresado2Portal(TextNormalizer.upperOrNull(solicitud.getInteresado2Portal()));
+        solicitud.setInteresado2Escalera(TextNormalizer.upperOrNull(solicitud.getInteresado2Escalera()));
+        solicitud.setInteresado2Piso(TextNormalizer.upperOrNull(solicitud.getInteresado2Piso()));
+        solicitud.setInteresado2Puerta(TextNormalizer.upperOrNull(solicitud.getInteresado2Puerta()));
         solicitud.setInteresado2CodigoPostal(TextNormalizer.upperOrNull(solicitud.getInteresado2CodigoPostal()));
         solicitud.setInteresado2Municipio(TextNormalizer.upperOrNull(solicitud.getInteresado2Municipio()));
         solicitud.setInteresado2Provincia(TextNormalizer.upperOrNull(solicitud.getInteresado2Provincia()));
@@ -1437,6 +1569,12 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitud.getInteresado2Direccion(),
                 solicitud.getInteresado2TipoVia(),
                 solicitud.getInteresado2NombreVia(),
+                solicitud.getInteresado2NumeroVia(),
+                solicitud.getInteresado2Bloque(),
+                solicitud.getInteresado2Portal(),
+                solicitud.getInteresado2Escalera(),
+                solicitud.getInteresado2Piso(),
+                solicitud.getInteresado2Puerta(),
                 solicitud.getInteresado2CodigoPostal(),
                 solicitud.getInteresado2Municipio(),
                 solicitud.getInteresado2Provincia()));
@@ -1445,6 +1583,12 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado3Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado3Telefono()));
         solicitud.setInteresado3TipoVia(TextNormalizer.upperOrNull(solicitud.getInteresado3TipoVia()));
         solicitud.setInteresado3NombreVia(TextNormalizer.upperOrNull(solicitud.getInteresado3NombreVia()));
+        solicitud.setInteresado3NumeroVia(TextNormalizer.upperOrNull(solicitud.getInteresado3NumeroVia()));
+        solicitud.setInteresado3Bloque(TextNormalizer.upperOrNull(solicitud.getInteresado3Bloque()));
+        solicitud.setInteresado3Portal(TextNormalizer.upperOrNull(solicitud.getInteresado3Portal()));
+        solicitud.setInteresado3Escalera(TextNormalizer.upperOrNull(solicitud.getInteresado3Escalera()));
+        solicitud.setInteresado3Piso(TextNormalizer.upperOrNull(solicitud.getInteresado3Piso()));
+        solicitud.setInteresado3Puerta(TextNormalizer.upperOrNull(solicitud.getInteresado3Puerta()));
         solicitud.setInteresado3CodigoPostal(TextNormalizer.upperOrNull(solicitud.getInteresado3CodigoPostal()));
         solicitud.setInteresado3Municipio(TextNormalizer.upperOrNull(solicitud.getInteresado3Municipio()));
         solicitud.setInteresado3Provincia(TextNormalizer.upperOrNull(solicitud.getInteresado3Provincia()));
@@ -1452,17 +1596,40 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitud.getInteresado3Direccion(),
                 solicitud.getInteresado3TipoVia(),
                 solicitud.getInteresado3NombreVia(),
+                solicitud.getInteresado3NumeroVia(),
+                solicitud.getInteresado3Bloque(),
+                solicitud.getInteresado3Portal(),
+                solicitud.getInteresado3Escalera(),
+                solicitud.getInteresado3Piso(),
+                solicitud.getInteresado3Puerta(),
                 solicitud.getInteresado3CodigoPostal(),
                 solicitud.getInteresado3Municipio(),
                 solicitud.getInteresado3Provincia()));
     }
 
-    private String direccionSolicitud(String direccion, String tipoVia, String nombreVia, String codigoPostal, String municipio, String provincia) {
+    private String direccionSolicitud(
+            String direccion,
+            String tipoVia,
+            String nombreVia,
+            String numeroVia,
+            String bloque,
+            String portal,
+            String escalera,
+            String piso,
+            String puerta,
+            String codigoPostal,
+            String municipio,
+            String provincia
+    ) {
         String direccionNormalizada = TextNormalizer.upperOrNull(direccion);
-        if (direccionNormalizada != null) {
-            return direccionNormalizada;
+        String direccionCompuesta = DireccionFormatter.componer(tipoVia, nombreVia, numeroVia, bloque, portal, escalera, piso, puerta,
+                codigoPostal, municipio, provincia);
+        boolean tieneDatosDeVia = java.util.stream.Stream.of(tipoVia, nombreVia, numeroVia, bloque, portal, escalera, piso, puerta)
+                .anyMatch(valor -> TextNormalizer.upperOrNull(valor) != null);
+        if (tieneDatosDeVia && direccionCompuesta != null) {
+            return direccionCompuesta;
         }
-        return DireccionFormatter.componer(tipoVia, nombreVia, codigoPostal, municipio, provincia);
+        return direccionNormalizada != null ? direccionNormalizada : direccionCompuesta;
     }
 
     private void completarVehiculoDesdeSolicitud(Vehiculo vehiculo, Solicitud solicitud) {

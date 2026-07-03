@@ -37,6 +37,24 @@ public class Interesado {
     @Column(length = 120)
     private String nombreVia;
 
+    @Column(length = 20)
+    private String numeroVia;
+
+    @Column(length = 20)
+    private String bloque;
+
+    @Column(length = 20)
+    private String portal;
+
+    @Column(length = 20)
+    private String escalera;
+
+    @Column(length = 20)
+    private String piso;
+
+    @Column(length = 20)
+    private String puerta;
+
     @Column(length = 10)
     private String codigoPostal;
 

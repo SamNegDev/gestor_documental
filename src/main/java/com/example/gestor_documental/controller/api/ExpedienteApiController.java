@@ -232,6 +232,12 @@ public class ExpedienteApiController {
                         .direccion(interesado.getDireccion())
                         .tipoVia(interesado.getTipoVia())
                         .nombreVia(interesado.getNombreVia())
+                        .numeroVia(interesado.getNumeroVia())
+                        .bloque(interesado.getBloque())
+                        .portal(interesado.getPortal())
+                        .escalera(interesado.getEscalera())
+                        .piso(interesado.getPiso())
+                        .puerta(interesado.getPuerta())
                         .codigoPostal(interesado.getCodigoPostal())
                         .municipio(interesado.getMunicipio())
                         .provincia(interesado.getProvincia())
@@ -551,6 +557,12 @@ public class ExpedienteApiController {
         dto.setDireccion(TextNormalizer.upperOrNull(interesado.getDireccion()));
         dto.setTipoVia(TextNormalizer.upperOrNull(interesado.getTipoVia()));
         dto.setNombreVia(TextNormalizer.upperOrNull(interesado.getNombreVia()));
+        dto.setNumeroVia(TextNormalizer.upperOrNull(interesado.getNumeroVia()));
+        dto.setBloque(TextNormalizer.upperOrNull(interesado.getBloque()));
+        dto.setPortal(TextNormalizer.upperOrNull(interesado.getPortal()));
+        dto.setEscalera(TextNormalizer.upperOrNull(interesado.getEscalera()));
+        dto.setPiso(TextNormalizer.upperOrNull(interesado.getPiso()));
+        dto.setPuerta(TextNormalizer.upperOrNull(interesado.getPuerta()));
         dto.setCodigoPostal(TextNormalizer.upperOrNull(interesado.getCodigoPostal()));
         dto.setMunicipio(TextNormalizer.upperOrNull(interesado.getMunicipio()));
         dto.setProvincia(TextNormalizer.upperOrNull(interesado.getProvincia()));

@@ -18,6 +18,12 @@ export interface InteresadoRegistro {
   direccion?: string | null;
   tipoVia?: string | null;
   nombreVia?: string | null;
+  numeroVia?: string | null;
+  bloque?: string | null;
+  portal?: string | null;
+  escalera?: string | null;
+  piso?: string | null;
+  puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
   provincia?: string | null;
@@ -37,6 +43,12 @@ export interface InteresadoRegistroUpdateInput {
   direccion?: string | null;
   tipoVia?: string | null;
   nombreVia?: string | null;
+  numeroVia?: string | null;
+  bloque?: string | null;
+  portal?: string | null;
+  escalera?: string | null;
+  piso?: string | null;
+  puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
   provincia?: string | null;

@@ -483,6 +483,12 @@ public class SolicitudApiController {
         solicitud.setInteresado1Direccion(TextNormalizer.upperOrNull(request.getInteresado1Direccion()));
         solicitud.setInteresado1TipoVia(TextNormalizer.upperOrNull(request.getInteresado1TipoVia()));
         solicitud.setInteresado1NombreVia(TextNormalizer.upperOrNull(request.getInteresado1NombreVia()));
+        solicitud.setInteresado1NumeroVia(TextNormalizer.upperOrNull(request.getInteresado1NumeroVia()));
+        solicitud.setInteresado1Bloque(TextNormalizer.upperOrNull(request.getInteresado1Bloque()));
+        solicitud.setInteresado1Portal(TextNormalizer.upperOrNull(request.getInteresado1Portal()));
+        solicitud.setInteresado1Escalera(TextNormalizer.upperOrNull(request.getInteresado1Escalera()));
+        solicitud.setInteresado1Piso(TextNormalizer.upperOrNull(request.getInteresado1Piso()));
+        solicitud.setInteresado1Puerta(TextNormalizer.upperOrNull(request.getInteresado1Puerta()));
         solicitud.setInteresado1CodigoPostal(TextNormalizer.upperOrNull(request.getInteresado1CodigoPostal()));
         solicitud.setInteresado1Municipio(TextNormalizer.upperOrNull(request.getInteresado1Municipio()));
         solicitud.setInteresado1Provincia(TextNormalizer.upperOrNull(request.getInteresado1Provincia()));
@@ -493,6 +499,12 @@ public class SolicitudApiController {
         solicitud.setInteresado2Direccion(TextNormalizer.upperOrNull(request.getInteresado2Direccion()));
         solicitud.setInteresado2TipoVia(TextNormalizer.upperOrNull(request.getInteresado2TipoVia()));
         solicitud.setInteresado2NombreVia(TextNormalizer.upperOrNull(request.getInteresado2NombreVia()));
+        solicitud.setInteresado2NumeroVia(TextNormalizer.upperOrNull(request.getInteresado2NumeroVia()));
+        solicitud.setInteresado2Bloque(TextNormalizer.upperOrNull(request.getInteresado2Bloque()));
+        solicitud.setInteresado2Portal(TextNormalizer.upperOrNull(request.getInteresado2Portal()));
+        solicitud.setInteresado2Escalera(TextNormalizer.upperOrNull(request.getInteresado2Escalera()));
+        solicitud.setInteresado2Piso(TextNormalizer.upperOrNull(request.getInteresado2Piso()));
+        solicitud.setInteresado2Puerta(TextNormalizer.upperOrNull(request.getInteresado2Puerta()));
         solicitud.setInteresado2CodigoPostal(TextNormalizer.upperOrNull(request.getInteresado2CodigoPostal()));
         solicitud.setInteresado2Municipio(TextNormalizer.upperOrNull(request.getInteresado2Municipio()));
         solicitud.setInteresado2Provincia(TextNormalizer.upperOrNull(request.getInteresado2Provincia()));
@@ -503,6 +515,12 @@ public class SolicitudApiController {
         solicitud.setInteresado3Direccion(TextNormalizer.upperOrNull(request.getInteresado3Direccion()));
         solicitud.setInteresado3TipoVia(TextNormalizer.upperOrNull(request.getInteresado3TipoVia()));
         solicitud.setInteresado3NombreVia(TextNormalizer.upperOrNull(request.getInteresado3NombreVia()));
+        solicitud.setInteresado3NumeroVia(TextNormalizer.upperOrNull(request.getInteresado3NumeroVia()));
+        solicitud.setInteresado3Bloque(TextNormalizer.upperOrNull(request.getInteresado3Bloque()));
+        solicitud.setInteresado3Portal(TextNormalizer.upperOrNull(request.getInteresado3Portal()));
+        solicitud.setInteresado3Escalera(TextNormalizer.upperOrNull(request.getInteresado3Escalera()));
+        solicitud.setInteresado3Piso(TextNormalizer.upperOrNull(request.getInteresado3Piso()));
+        solicitud.setInteresado3Puerta(TextNormalizer.upperOrNull(request.getInteresado3Puerta()));
         solicitud.setInteresado3CodigoPostal(TextNormalizer.upperOrNull(request.getInteresado3CodigoPostal()));
         solicitud.setInteresado3Municipio(TextNormalizer.upperOrNull(request.getInteresado3Municipio()));
         solicitud.setInteresado3Provincia(TextNormalizer.upperOrNull(request.getInteresado3Provincia()));
@@ -691,6 +709,12 @@ public class SolicitudApiController {
                 .direccion(interesado.getDireccion())
                 .tipoVia(interesado.getTipoVia())
                 .nombreVia(interesado.getNombreVia())
+                .numeroVia(interesado.getNumeroVia())
+                .bloque(interesado.getBloque())
+                .portal(interesado.getPortal())
+                .escalera(interesado.getEscalera())
+                .piso(interesado.getPiso())
+                .puerta(interesado.getPuerta())
                 .codigoPostal(interesado.getCodigoPostal())
                 .municipio(interesado.getMunicipio())
                 .provincia(interesado.getProvincia())
@@ -709,6 +733,12 @@ public class SolicitudApiController {
                 solicitud.getInteresado1Direccion(),
                 solicitud.getInteresado1TipoVia(),
                 solicitud.getInteresado1NombreVia(),
+                solicitud.getInteresado1NumeroVia(),
+                solicitud.getInteresado1Bloque(),
+                solicitud.getInteresado1Portal(),
+                solicitud.getInteresado1Escalera(),
+                solicitud.getInteresado1Piso(),
+                solicitud.getInteresado1Puerta(),
                 solicitud.getInteresado1CodigoPostal(),
                 solicitud.getInteresado1Municipio(),
                 solicitud.getInteresado1Provincia(),
@@ -723,6 +753,12 @@ public class SolicitudApiController {
                     solicitud.getInteresado1Direccion(),
                     solicitud.getInteresado1TipoVia(),
                     solicitud.getInteresado1NombreVia(),
+                    solicitud.getInteresado1NumeroVia(),
+                    solicitud.getInteresado1Bloque(),
+                    solicitud.getInteresado1Portal(),
+                    solicitud.getInteresado1Escalera(),
+                    solicitud.getInteresado1Piso(),
+                    solicitud.getInteresado1Puerta(),
                     solicitud.getInteresado1CodigoPostal(),
                     solicitud.getInteresado1Municipio(),
                     solicitud.getInteresado1Provincia(),
@@ -735,6 +771,12 @@ public class SolicitudApiController {
                 solicitud.getInteresado2Direccion(),
                 solicitud.getInteresado2TipoVia(),
                 solicitud.getInteresado2NombreVia(),
+                solicitud.getInteresado2NumeroVia(),
+                solicitud.getInteresado2Bloque(),
+                solicitud.getInteresado2Portal(),
+                solicitud.getInteresado2Escalera(),
+                solicitud.getInteresado2Piso(),
+                solicitud.getInteresado2Puerta(),
                 solicitud.getInteresado2CodigoPostal(),
                 solicitud.getInteresado2Municipio(),
                 solicitud.getInteresado2Provincia(),
@@ -749,6 +791,12 @@ public class SolicitudApiController {
                     solicitud.getInteresado2Direccion(),
                     solicitud.getInteresado2TipoVia(),
                     solicitud.getInteresado2NombreVia(),
+                    solicitud.getInteresado2NumeroVia(),
+                    solicitud.getInteresado2Bloque(),
+                    solicitud.getInteresado2Portal(),
+                    solicitud.getInteresado2Escalera(),
+                    solicitud.getInteresado2Piso(),
+                    solicitud.getInteresado2Puerta(),
                     solicitud.getInteresado2CodigoPostal(),
                     solicitud.getInteresado2Municipio(),
                     solicitud.getInteresado2Provincia(),
@@ -761,6 +809,12 @@ public class SolicitudApiController {
                 solicitud.getInteresado3Direccion(),
                 solicitud.getInteresado3TipoVia(),
                 solicitud.getInteresado3NombreVia(),
+                solicitud.getInteresado3NumeroVia(),
+                solicitud.getInteresado3Bloque(),
+                solicitud.getInteresado3Portal(),
+                solicitud.getInteresado3Escalera(),
+                solicitud.getInteresado3Piso(),
+                solicitud.getInteresado3Puerta(),
                 solicitud.getInteresado3CodigoPostal(),
                 solicitud.getInteresado3Municipio(),
                 solicitud.getInteresado3Provincia(),
@@ -775,6 +829,12 @@ public class SolicitudApiController {
                     solicitud.getInteresado3Direccion(),
                     solicitud.getInteresado3TipoVia(),
                     solicitud.getInteresado3NombreVia(),
+                    solicitud.getInteresado3NumeroVia(),
+                    solicitud.getInteresado3Bloque(),
+                    solicitud.getInteresado3Portal(),
+                    solicitud.getInteresado3Escalera(),
+                    solicitud.getInteresado3Piso(),
+                    solicitud.getInteresado3Puerta(),
                     solicitud.getInteresado3CodigoPostal(),
                     solicitud.getInteresado3Municipio(),
                     solicitud.getInteresado3Provincia(),
@@ -807,6 +867,12 @@ public class SolicitudApiController {
             String direccion,
             String tipoVia,
             String nombreVia,
+            String numeroVia,
+            String bloque,
+            String portal,
+            String escalera,
+            String piso,
+            String puerta,
             String codigoPostal,
             String municipio,
             String provincia,
@@ -826,6 +892,12 @@ public class SolicitudApiController {
                 .direccion(direccion)
                 .tipoVia(tipoVia)
                 .nombreVia(nombreVia)
+                .numeroVia(numeroVia)
+                .bloque(bloque)
+                .portal(portal)
+                .escalera(escalera)
+                .piso(piso)
+                .puerta(puerta)
                 .codigoPostal(codigoPostal)
                 .municipio(municipio)
                 .provincia(provincia)

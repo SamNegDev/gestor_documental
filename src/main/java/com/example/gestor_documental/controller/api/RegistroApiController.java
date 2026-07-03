@@ -156,6 +156,12 @@ public class RegistroApiController {
             nuevo.setDireccion(request.direccion());
             nuevo.setTipoVia(request.tipoVia());
             nuevo.setNombreVia(request.nombreVia());
+            nuevo.setNumeroVia(request.numeroVia());
+            nuevo.setBloque(request.bloque());
+            nuevo.setPortal(request.portal());
+            nuevo.setEscalera(request.escalera());
+            nuevo.setPiso(request.piso());
+            nuevo.setPuerta(request.puerta());
             nuevo.setCodigoPostal(request.codigoPostal());
             nuevo.setMunicipio(request.municipio());
             nuevo.setProvincia(request.provincia());
@@ -279,6 +285,12 @@ public class RegistroApiController {
                 .telefono(interesado.getTelefono()).direccion(interesado.getDireccion())
                 .tipoVia(interesado.getTipoVia())
                 .nombreVia(interesado.getNombreVia())
+                .numeroVia(interesado.getNumeroVia())
+                .bloque(interesado.getBloque())
+                .portal(interesado.getPortal())
+                .escalera(interesado.getEscalera())
+                .piso(interesado.getPiso())
+                .puerta(interesado.getPuerta())
                 .codigoPostal(interesado.getCodigoPostal())
                 .municipio(interesado.getMunicipio())
                 .provincia(interesado.getProvincia())

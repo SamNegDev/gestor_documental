@@ -2,8 +2,15 @@ import { municipiosParaProvincia, PROVINCIAS, TIPOS_VIA } from "../utils/address
 import { uppercaseInput } from "../utils/text";
 
 export type AddressValue = {
+  direccion?: string | null;
   tipoVia?: string | null;
   nombreVia?: string | null;
+  numeroVia?: string | null;
+  bloque?: string | null;
+  portal?: string | null;
+  escalera?: string | null;
+  piso?: string | null;
+  puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
   provincia?: string | null;
@@ -33,32 +40,76 @@ export function AddressFields({ idPrefix, value, onChange, wideClassName }: Prop
     const municipio = siguientesMunicipios.includes(municipioActual) ? municipioActual : "";
     onChange({ ...value, provincia, municipio });
   };
+  const hasStructuredAddress = [
+    value.tipoVia,
+    value.nombreVia,
+    value.numeroVia,
+    value.bloque,
+    value.portal,
+    value.escalera,
+    value.piso,
+    value.puerta,
+    value.codigoPostal,
+    value.provincia,
+    value.municipio,
+  ].some((part) => Boolean(part && String(part).trim()));
+  const legacyAddress = hasStructuredAddress ? "" : (value.direccion || "").trim();
 
   return (
-    <>
-      <label>
-        Tipo de via
+    <div className={`address-fields ${wideClassName || ""}`}>
+      {legacyAddress ? (
+        <label className="address-field address-field--legacy">
+          Direccion actual
+          <input type="text" value={legacyAddress} readOnly />
+        </label>
+      ) : null}
+      <label className="address-field address-field--type">
+        Tipo
         <input list={`${idPrefix}-tipos-via`} value={value.tipoVia || ""} onChange={(event) => update("tipoVia", event.target.value)} />
         <datalist id={`${idPrefix}-tipos-via`}>
           {TIPOS_VIA.map((tipo) => <option key={tipo} value={tipo} />)}
         </datalist>
       </label>
-      <label className={wideClassName}>
-        Nombre de la via
+      <label className="address-field address-field--street">
+        Via
         <input value={value.nombreVia || ""} onChange={(event) => update("nombreVia", event.target.value)} />
       </label>
-      <label>
-        Codigo postal
-        <input inputMode="numeric" value={value.codigoPostal || ""} onChange={(event) => update("codigoPostal", event.target.value)} />
+      <label className="address-field address-field--xs">
+        Num.
+        <input maxLength={20} value={value.numeroVia || ""} onChange={(event) => update("numeroVia", event.target.value)} />
       </label>
-      <label>
+      <label className="address-field address-field--xs">
+        Bloq.
+        <input maxLength={20} value={value.bloque || ""} onChange={(event) => update("bloque", event.target.value)} />
+      </label>
+      <label className="address-field address-field--xs">
+        Portal
+        <input maxLength={20} value={value.portal || ""} onChange={(event) => update("portal", event.target.value)} />
+      </label>
+      <label className="address-field address-field--xs">
+        Esc.
+        <input maxLength={20} value={value.escalera || ""} onChange={(event) => update("escalera", event.target.value)} />
+      </label>
+      <label className="address-field address-field--xs">
+        Piso
+        <input maxLength={20} value={value.piso || ""} onChange={(event) => update("piso", event.target.value)} />
+      </label>
+      <label className="address-field address-field--xs">
+        Pta.
+        <input maxLength={20} value={value.puerta || ""} onChange={(event) => update("puerta", event.target.value)} />
+      </label>
+      <label className="address-field address-field--postal">
+        C.P.
+        <input inputMode="numeric" maxLength={10} value={value.codigoPostal || ""} onChange={(event) => update("codigoPostal", event.target.value)} />
+      </label>
+      <label className="address-field address-field--province">
         Provincia
         <select value={provinciaActual} onChange={(event) => updateProvincia(event.target.value)}>
           <option value="">Selecciona provincia</option>
           {PROVINCIAS.map((provincia) => <option key={provincia} value={provincia}>{provincia}</option>)}
         </select>
       </label>
-      <label>
+      <label className="address-field address-field--municipality">
         Municipio
         {municipios.length ? (
           <select value={municipioActual} onChange={(event) => update("municipio", event.target.value)}>
@@ -73,6 +124,6 @@ export function AddressFields({ idPrefix, value, onChange, wideClassName }: Prop
           />
         )}
       </label>
-    </>
+    </div>
   );
 }

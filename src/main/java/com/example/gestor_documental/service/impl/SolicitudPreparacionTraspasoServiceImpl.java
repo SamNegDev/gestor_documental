@@ -558,14 +558,20 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
         agregarInteresado(interesados, 1, solicitud.getInteresado1Rol(), solicitud.getInteresado1Nombre(),
                 solicitud.getInteresado1Dni(), solicitud.getInteresado1Telefono(), solicitud.getInteresado1Direccion(),
                 solicitud.getInteresado1TipoVia(), solicitud.getInteresado1NombreVia(), solicitud.getInteresado1CodigoPostal(),
+                solicitud.getInteresado1NumeroVia(), solicitud.getInteresado1Bloque(), solicitud.getInteresado1Portal(),
+                solicitud.getInteresado1Escalera(), solicitud.getInteresado1Piso(), solicitud.getInteresado1Puerta(),
                 solicitud.getInteresado1Municipio(), solicitud.getInteresado1Provincia());
         agregarInteresado(interesados, 2, solicitud.getInteresado2Rol(), solicitud.getInteresado2Nombre(),
                 solicitud.getInteresado2Dni(), solicitud.getInteresado2Telefono(), solicitud.getInteresado2Direccion(),
                 solicitud.getInteresado2TipoVia(), solicitud.getInteresado2NombreVia(), solicitud.getInteresado2CodigoPostal(),
+                solicitud.getInteresado2NumeroVia(), solicitud.getInteresado2Bloque(), solicitud.getInteresado2Portal(),
+                solicitud.getInteresado2Escalera(), solicitud.getInteresado2Piso(), solicitud.getInteresado2Puerta(),
                 solicitud.getInteresado2Municipio(), solicitud.getInteresado2Provincia());
         agregarInteresado(interesados, 3, solicitud.getInteresado3Rol(), solicitud.getInteresado3Nombre(),
                 solicitud.getInteresado3Dni(), solicitud.getInteresado3Telefono(), solicitud.getInteresado3Direccion(),
                 solicitud.getInteresado3TipoVia(), solicitud.getInteresado3NombreVia(), solicitud.getInteresado3CodigoPostal(),
+                solicitud.getInteresado3NumeroVia(), solicitud.getInteresado3Bloque(), solicitud.getInteresado3Portal(),
+                solicitud.getInteresado3Escalera(), solicitud.getInteresado3Piso(), solicitud.getInteresado3Puerta(),
                 solicitud.getInteresado3Municipio(), solicitud.getInteresado3Provincia());
         return interesados;
     }
@@ -581,14 +587,23 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
             String tipoVia,
             String nombreVia,
             String codigoPostal,
+            String numeroVia,
+            String bloque,
+            String portal,
+            String escalera,
+            String piso,
+            String puerta,
             String municipio,
             String provincia
     ) {
         if (rol == null && texto(nombre) == null && texto(dni) == null && texto(telefono) == null && texto(direccion) == null
-                && texto(nombreVia) == null && texto(codigoPostal) == null && texto(municipio) == null && texto(provincia) == null) {
+                && texto(nombreVia) == null && texto(numeroVia) == null && texto(bloque) == null && texto(portal) == null
+                && texto(escalera) == null && texto(piso) == null && texto(puerta) == null
+                && texto(codigoPostal) == null && texto(municipio) == null && texto(provincia) == null) {
             return;
         }
-        interesados.add(new InteresadoSlot(slot, rol, nombre, dni, telefono, direccion, tipoVia, nombreVia, codigoPostal, municipio, provincia));
+        interesados.add(new InteresadoSlot(slot, rol, nombre, dni, telefono, direccion, tipoVia, nombreVia,
+                numeroVia, bloque, portal, escalera, piso, puerta, codigoPostal, municipio, provincia));
     }
 
     private Map<RolInteresado, InteresadoSlot> interesadosPorRol(List<InteresadoSlot> interesados) {
@@ -764,6 +779,12 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
     private boolean direccionNoVacia(InteresadoSlot interesado) {
         return texto(interesado.direccion()) != null
                 || texto(interesado.nombreVia()) != null
+                || texto(interesado.numeroVia()) != null
+                || texto(interesado.bloque()) != null
+                || texto(interesado.portal()) != null
+                || texto(interesado.escalera()) != null
+                || texto(interesado.piso()) != null
+                || texto(interesado.puerta()) != null
                 || texto(interesado.municipio()) != null
                 || texto(interesado.codigoPostal()) != null;
     }
@@ -781,8 +802,14 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
 
     private boolean direccionSuficiente(InteresadoSlot interesado) {
         boolean viaEstructurada = texto(interesado.nombreVia()) != null;
+        boolean detalleVia = texto(interesado.numeroVia()) != null
+                || texto(interesado.bloque()) != null
+                || texto(interesado.portal()) != null
+                || texto(interesado.escalera()) != null
+                || texto(interesado.piso()) != null
+                || texto(interesado.puerta()) != null;
         boolean localidad = texto(interesado.codigoPostal()) != null || texto(interesado.municipio()) != null || texto(interesado.provincia()) != null;
-        if (viaEstructurada && localidad) {
+        if (viaEstructurada && localidad && (detalleVia || texto(interesado.codigoPostal()) != null)) {
             return true;
         }
         String direccion = normalizarTexto(interesado.direccion());
@@ -819,6 +846,24 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
         }
         if (texto(interesado.nombreVia()) != null) {
             partesVia.add(texto(interesado.nombreVia()));
+        }
+        if (texto(interesado.numeroVia()) != null) {
+            partesVia.add(texto(interesado.numeroVia()));
+        }
+        if (texto(interesado.bloque()) != null) {
+            partesVia.add("BLOQ " + texto(interesado.bloque()));
+        }
+        if (texto(interesado.portal()) != null) {
+            partesVia.add("PORTAL " + texto(interesado.portal()));
+        }
+        if (texto(interesado.escalera()) != null) {
+            partesVia.add("ESC " + texto(interesado.escalera()));
+        }
+        if (texto(interesado.piso()) != null) {
+            partesVia.add("PISO " + texto(interesado.piso()));
+        }
+        if (texto(interesado.puerta()) != null) {
+            partesVia.add("PTA " + texto(interesado.puerta()));
         }
         String via = String.join(" ", partesVia);
         List<String> partes = new ArrayList<>();
@@ -929,6 +974,12 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
             String direccion,
             String tipoVia,
             String nombreVia,
+            String numeroVia,
+            String bloque,
+            String portal,
+            String escalera,
+            String piso,
+            String puerta,
             String codigoPostal,
             String municipio,
             String provincia

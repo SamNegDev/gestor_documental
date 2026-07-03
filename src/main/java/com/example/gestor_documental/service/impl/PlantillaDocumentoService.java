@@ -463,16 +463,22 @@ public class PlantillaDocumentoService {
                 solicitud.getInteresado1Nombre(), solicitud.getInteresado1Dni(), solicitud.getInteresado1Telefono(),
                 solicitud.getInteresado1Direccion(), solicitud.getInteresado1TipoVia(),
                 solicitud.getInteresado1NombreVia(), solicitud.getInteresado1CodigoPostal(),
+                solicitud.getInteresado1NumeroVia(), solicitud.getInteresado1Bloque(), solicitud.getInteresado1Portal(),
+                solicitud.getInteresado1Escalera(), solicitud.getInteresado1Piso(), solicitud.getInteresado1Puerta(),
                 solicitud.getInteresado1Municipio(), solicitud.getInteresado1Provincia());
         agregarInteresadoSolicitud(relaciones, contexto, 2L, solicitud.getInteresado2Rol(),
                 solicitud.getInteresado2Nombre(), solicitud.getInteresado2Dni(), solicitud.getInteresado2Telefono(),
                 solicitud.getInteresado2Direccion(), solicitud.getInteresado2TipoVia(),
                 solicitud.getInteresado2NombreVia(), solicitud.getInteresado2CodigoPostal(),
+                solicitud.getInteresado2NumeroVia(), solicitud.getInteresado2Bloque(), solicitud.getInteresado2Portal(),
+                solicitud.getInteresado2Escalera(), solicitud.getInteresado2Piso(), solicitud.getInteresado2Puerta(),
                 solicitud.getInteresado2Municipio(), solicitud.getInteresado2Provincia());
         agregarInteresadoSolicitud(relaciones, contexto, 3L, solicitud.getInteresado3Rol(),
                 solicitud.getInteresado3Nombre(), solicitud.getInteresado3Dni(), solicitud.getInteresado3Telefono(),
                 solicitud.getInteresado3Direccion(), solicitud.getInteresado3TipoVia(),
                 solicitud.getInteresado3NombreVia(), solicitud.getInteresado3CodigoPostal(),
+                solicitud.getInteresado3NumeroVia(), solicitud.getInteresado3Bloque(), solicitud.getInteresado3Portal(),
+                solicitud.getInteresado3Escalera(), solicitud.getInteresado3Piso(), solicitud.getInteresado3Puerta(),
                 solicitud.getInteresado3Municipio(), solicitud.getInteresado3Provincia());
         return relaciones.stream()
                 .sorted(Comparator.comparingInt(item -> ordenRol(item.getRol())))
@@ -481,9 +487,11 @@ public class PlantillaDocumentoService {
 
     private void agregarInteresadoSolicitud(List<ExpedienteInteresado> relaciones, Expediente contexto, Long id,
             RolInteresado rol, String nombre, String dni, String telefono, String direccion, String tipoVia,
-            String nombreVia, String codigoPostal, String municipio, String provincia) {
+            String nombreVia, String codigoPostal, String numeroVia, String bloque, String portal, String escalera,
+            String piso, String puerta, String municipio, String provincia) {
         if (vacio(nombre) && vacio(dni) && rol == null && vacio(telefono) && vacio(direccion)
-                && vacio(nombreVia) && vacio(codigoPostal) && vacio(municipio) && vacio(provincia)) {
+                && vacio(nombreVia) && vacio(numeroVia) && vacio(bloque) && vacio(portal) && vacio(escalera)
+                && vacio(piso) && vacio(puerta) && vacio(codigoPostal) && vacio(municipio) && vacio(provincia)) {
             return;
         }
         Interesado interesado = new Interesado();
@@ -494,6 +502,12 @@ public class PlantillaDocumentoService {
         interesado.setDireccion(limpiar(direccion));
         interesado.setTipoVia(limpiar(tipoVia));
         interesado.setNombreVia(limpiar(nombreVia));
+        interesado.setNumeroVia(limpiar(numeroVia));
+        interesado.setBloque(limpiar(bloque));
+        interesado.setPortal(limpiar(portal));
+        interesado.setEscalera(limpiar(escalera));
+        interesado.setPiso(limpiar(piso));
+        interesado.setPuerta(limpiar(puerta));
         interesado.setCodigoPostal(limpiar(codigoPostal));
         interesado.setMunicipio(limpiar(municipio));
         interesado.setProvincia(limpiar(provincia));
@@ -551,10 +565,21 @@ public class PlantillaDocumentoService {
     private String nombreVia(Interesado interesado) {
         String tipoVia = limpiar(interesado.getTipoVia());
         String nombreVia = limpiar(interesado.getNombreVia());
-        String compuesta = java.util.stream.Stream.of(tipoVia, nombreVia)
+        String numeroVia = limpiar(interesado.getNumeroVia());
+        String bloque = conEtiqueta("BLOQ", interesado.getBloque());
+        String portal = conEtiqueta("PORTAL", interesado.getPortal());
+        String escalera = conEtiqueta("ESC", interesado.getEscalera());
+        String piso = conEtiqueta("PISO", interesado.getPiso());
+        String puerta = conEtiqueta("PTA", interesado.getPuerta());
+        String compuesta = java.util.stream.Stream.of(tipoVia, nombreVia, numeroVia, bloque, portal, escalera, piso, puerta)
                 .filter(parte -> !vacio(parte))
                 .collect(java.util.stream.Collectors.joining(" "));
         return !vacio(compuesta) ? compuesta : limpiar(interesado.getDireccion());
+    }
+
+    private String conEtiqueta(String etiqueta, String valor) {
+        String limpio = limpiar(valor);
+        return !vacio(limpio) ? etiqueta + " " + limpio : null;
     }
 
     private PlantillaDocumentoItemResponse mapPlantilla(TipoPlantilla plantilla) {
