@@ -15,10 +15,12 @@ import java.util.Optional;
 
 public interface DocumentoRepository extends JpaRepository<Documento, Long> {
 
+    @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
     List<Documento> findByExpedienteId(Long expedienteId);
 
     List<Documento> findByIncidenciaId(Long incidenciaId);
 
+    @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
     List<Documento> findBySolicitudId(Long solicitudId);
 
     @EntityGraph(attributePaths = {"expediente", "solicitud", "subidoPor"})

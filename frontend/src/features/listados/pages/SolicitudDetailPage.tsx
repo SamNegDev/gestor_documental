@@ -985,7 +985,10 @@ function SolicitudDocumentReading({
     );
     return (
       <div className={identidad.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
-        <strong>{detectadas.length > 1 ? `${detectadas.length} DNI/CIF detectados` : "DNI/CIF detectado"}</strong>
+        <div className="solicitud-reading__header">
+          <strong>{detectadas.length > 1 ? `${detectadas.length} DNI/CIF detectados` : "DNI/CIF detectado"}</strong>
+          <span>{confidenceLabel(identidad.confianzaGlobal)}</span>
+        </div>
         <div className="solicitud-reading-identities">
           {detectadas.map((item, index) => {
             const key = identityKey(item, index);
@@ -1000,13 +1003,24 @@ function SolicitudDocumentReading({
             const submitLabel = matchedExisting ? "Asignar" : "Anadir";
             return (
               <div className="solicitud-reading-identity" key={key}>
-                <div>
-                  <span>{identityTitle(item)}</span>
-                  {item.fechaNacimiento ? <small>Nacimiento: {item.fechaNacimiento}</small> : null}
-                  {item.direccionTexto ? <small>{item.direccionTexto}</small> : null}
-                  {item.observaciones ? <small>{item.observaciones}</small> : null}
+                <div className="solicitud-reading-identity__main">
+                  <div className="solicitud-reading-identity__summary">
+                    <div>
+                      <span>{item.tipoDocumentoDetectado || "Identidad"}</span>
+                      <strong>{identityDisplayName(item) || "Nombre no detectado"}</strong>
+                    </div>
+                    <code>{normalizedId || "Sin DNI/CIF"}</code>
+                  </div>
+                  <div className="solicitud-reading-identity__meta">
+                    {item.fechaNacimiento ? <span>Nac. {item.fechaNacimiento}</span> : null}
+                    {item.fechaCaducidad ? <span>Cad. {item.fechaCaducidad}</span> : null}
+                    {item.direccionTexto ? <span>{item.direccionTexto}</span> : null}
+                  </div>
                   {matchedExisting ? (
-                    <small>Coincide con interesado: {[matchedExisting.nombre, matchedExisting.rol ? formatEnum(matchedExisting.rol) : null].filter(Boolean).join(" - ")}</small>
+                    <p className="solicitud-reading-identity__match">Coincide con interesado: {[matchedExisting.nombre, matchedExisting.rol ? formatEnum(matchedExisting.rol) : null].filter(Boolean).join(" - ")}</p>
+                  ) : null}
+                  {item.observaciones ? (
+                    <p className="solicitud-reading-identity__note">{item.observaciones}</p>
                   ) : null}
                 </div>
                 {canAddIdentity ? (
@@ -1045,7 +1059,7 @@ function SolicitudDocumentReading({
             );
           })}
         </div>
-        <em>{confidenceLabel(identidad.confianzaGlobal)} / {identidad.mensaje || (identidad.requiereRevision ? "Revisar lectura" : "Lectura valida")}</em>
+        <em>{identidad.mensaje || (identidad.requiereRevision ? "Revisar lectura" : "Lectura valida")}</em>
       </div>
     );
   }
@@ -1147,10 +1161,6 @@ function mergeIdentityOption(first: DocumentoIdentidadDetectada, second: Documen
 
 function identityKey(item: DocumentoIdentidadDetectada, index: number) {
   return normalizeIdentityIdentifier(item.identificador) || `${normalizeIdentityName(item) || "identidad"}-${index}`;
-}
-
-function identityTitle(item: DocumentoIdentidadDetectada) {
-  return [normalizeIdentityIdentifier(item.identificador), identityDisplayName(item)].filter(Boolean).join(" - ") || "Sin identificacion clara";
 }
 
 function identityDisplayName(item: DocumentoIdentidadDetectada) {
