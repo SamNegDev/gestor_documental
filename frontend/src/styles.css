@@ -6702,11 +6702,13 @@ input.records-table-filter {
 .request-assistant__blocks {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  align-items: start;
   gap: 8px;
 }
 
 .request-assistant__block {
   display: grid;
+  align-self: start;
   gap: 9px;
   min-width: 0;
   padding: 11px;
@@ -6777,8 +6779,8 @@ input.records-table-filter {
 
 .request-assistant__missing-list li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
   gap: 8px;
   padding: 8px;
   border: 1px solid color-mix(in oklch, var(--line) 75%, transparent);
@@ -6786,8 +6788,19 @@ input.records-table-filter {
   background: color-mix(in oklch, var(--panel) 82%, var(--panel-soft));
 }
 
+.request-assistant__missing-list li > span {
+  min-width: 0;
+}
+
+.request-assistant__missing-list small {
+  overflow-wrap: anywhere;
+}
+
 .request-assistant__missing-list .soft-button--tiny {
-  white-space: nowrap;
+  justify-self: start;
+  max-width: 100%;
+  text-align: left;
+  white-space: normal;
 }
 
 .request-assistant__documents {
