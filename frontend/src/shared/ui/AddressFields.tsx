@@ -18,8 +18,20 @@ type Props = {
 
 export function AddressFields({ idPrefix, value, onChange, wideClassName }: Props) {
   const municipios = municipiosParaProvincia(value.provincia);
+  const provinciaActual = uppercaseInput(value.provincia || "");
+  const municipioActual = uppercaseInput(value.municipio || "");
+  const municipioCatalogado = municipioActual ? municipios.includes(municipioActual) : true;
+  const municipiosVisibles = municipioActual && municipios.length && !municipioCatalogado
+    ? [municipioActual, ...municipios]
+    : municipios;
   const update = (field: keyof AddressValue, rawValue: string) => {
     onChange({ ...value, [field]: uppercaseInput(rawValue) });
+  };
+  const updateProvincia = (rawValue: string) => {
+    const provincia = uppercaseInput(rawValue);
+    const siguientesMunicipios = municipiosParaProvincia(provincia);
+    const municipio = siguientesMunicipios.includes(municipioActual) ? municipioActual : "";
+    onChange({ ...value, provincia, municipio });
   };
 
   return (
@@ -41,23 +53,25 @@ export function AddressFields({ idPrefix, value, onChange, wideClassName }: Prop
       </label>
       <label>
         Provincia
-        <input list={`${idPrefix}-provincias`} value={value.provincia || ""} onChange={(event) => update("provincia", event.target.value)} />
-        <datalist id={`${idPrefix}-provincias`}>
-          {PROVINCIAS.map((provincia) => <option key={provincia} value={provincia} />)}
-        </datalist>
+        <select value={provinciaActual} onChange={(event) => updateProvincia(event.target.value)}>
+          <option value="">Selecciona provincia</option>
+          {PROVINCIAS.map((provincia) => <option key={provincia} value={provincia}>{provincia}</option>)}
+        </select>
       </label>
       <label>
         Municipio
-        <input
-          list={municipios.length ? `${idPrefix}-municipios` : undefined}
-          value={value.municipio || ""}
-          onChange={(event) => update("municipio", event.target.value)}
-        />
         {municipios.length ? (
-          <datalist id={`${idPrefix}-municipios`}>
-            {municipios.map((municipio) => <option key={municipio} value={municipio} />)}
-          </datalist>
-        ) : null}
+          <select value={municipioActual} onChange={(event) => update("municipio", event.target.value)}>
+            <option value="">Selecciona municipio</option>
+            {municipiosVisibles.map((municipio) => <option key={municipio} value={municipio}>{municipio}</option>)}
+          </select>
+        ) : (
+          <input
+            value={municipioActual}
+            onChange={(event) => update("municipio", event.target.value)}
+            placeholder={provinciaActual ? "Escribe municipio" : "Selecciona provincia"}
+          />
+        )}
       </label>
     </>
   );
