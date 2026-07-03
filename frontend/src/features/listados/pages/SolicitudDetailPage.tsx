@@ -525,44 +525,149 @@ export function SolicitudDetailPage() {
   const preparationIaLabel = isAdmin
     ? (procesarDocumentacionMutation.isPending ? "Leyendo IA" : "Lectura IA")
     : clienteIaButtonText(solicitud.lecturaIaCliente, procesarDocumentacionClienteMutation.isPending);
+  const vehiculo = solicitud.vehiculo;
+  const vehicleSummaryFacts = [
+    { label: "Marca", value: vehiculo?.marca },
+    { label: "Modelo", value: vehiculo?.modelo },
+    { label: "Bastidor", value: vehiculo?.bastidor },
+  ];
+  const vehicleDataComplete = Boolean(vehiculo?.marca && vehiculo?.modelo && vehiculo?.bastidor);
 
   return (
     <section className="request-page">
-      <div className="request-hero">
-        <div>
-          <p className="eyebrow">{isAdmin ? "Revision de solicitud" : "Seguimiento de solicitud"}</p>
-          <div className="case-title-row">
-            <MiniPlate value={solicitud.matricula} />
-            <div>
-              <h2>Solicitud #{solicitud.id}</h2>
-              <p>{solicitud.tipoTramite || "Sin tipo de tramite"}</p>
+      <div className="request-sheet">
+        <div className="request-hero">
+          <div className="request-hero__identity">
+            <p className="eyebrow">{isAdmin ? "Revision de solicitud" : "Seguimiento de solicitud"}</p>
+            <div className="case-title-row request-title-row">
+              <MiniPlate value={solicitud.matricula} />
+              <div>
+                <h2>Solicitud #{solicitud.id}</h2>
+                <p>{solicitud.tipoTramite || "Sin tipo de tramite"}</p>
+              </div>
             </div>
           </div>
+          <div className="request-hero__actions">
+            <StatusBadge tone={statusTone(solicitud.estado)}>{formatEnum(solicitud.estado)}</StatusBadge>
+            {solicitud.expedienteId ? (
+              <Link className="soft-button soft-button--compact" to={isAdmin ? `/expedientes/${solicitud.expedienteId}` : `/cliente/expedientes/${solicitud.expedienteId}`}>
+                <FolderCheck size={16} />
+                Ver expediente
+              </Link>
+            ) : null}
+            <Link className="soft-button soft-button--compact" to="/solicitudes">
+              <ArrowLeft size={16} />
+              Volver
+            </Link>
+            {!isAdmin && !isClosed ? (
+              <button className="soft-button soft-button--compact" onClick={() => setTemplateDialogOpen(true)} type="button">
+                <FileSignature size={16} />
+                Generar docs
+              </button>
+            ) : null}
+            {!isAdmin && !isClosed ? (
+              <Link className="soft-button soft-button--compact" to={`/cliente/solicitudes/${solicitud.id}/editar`}>
+                <Pencil size={16} />
+                Editar
+              </Link>
+            ) : null}
+          </div>
         </div>
-        <div className="request-hero__actions">
-          <StatusBadge tone={statusTone(solicitud.estado)}>{formatEnum(solicitud.estado)}</StatusBadge>
-          {isAdmin && solicitud.expedienteId ? (
-            <Link className="soft-button soft-button--compact" to={`/expedientes/${solicitud.expedienteId}`}>
-              <FolderCheck size={16} />
-              Ver expediente
-            </Link>
-          ) : null}
-          <Link className="soft-button soft-button--compact" to="/solicitudes">
-            <ArrowLeft size={16} />
-            Volver
-          </Link>
-          {!isAdmin && !isClosed ? (
-            <button className="soft-button soft-button--compact" onClick={() => setTemplateDialogOpen(true)} type="button">
-              <FileSignature size={16} />
-              Generar docs
-            </button>
-          ) : null}
-          {!isAdmin && !isClosed ? (
-            <Link className="soft-button soft-button--compact" to={`/cliente/solicitudes/${solicitud.id}/editar`}>
-              <Pencil size={16} />
-              Editar
-            </Link>
-          ) : null}
+
+        <div className="request-summary-strip">
+          <section className="request-summary-block request-summary-block--vehicle" aria-labelledby="solicitud-vehiculo-title">
+            <div className="request-summary-block__head">
+              <span className="row-icon" aria-hidden="true">
+                <CarFront size={16} />
+              </span>
+              <div>
+                <h3 id="solicitud-vehiculo-title">Vehiculo</h3>
+                <p>{vehicleDataComplete ? "Datos listos" : "Faltan datos"}</p>
+              </div>
+              {!isClosed ? (
+                <Link className="icon-button request-summary-block__action" to={editSolicitudPath} aria-label="Editar vehiculo" title="Editar vehiculo">
+                  <Pencil size={15} />
+                </Link>
+              ) : null}
+            </div>
+            <dl className="request-summary-facts">
+              {vehicleSummaryFacts.map((item) => (
+                <div key={item.label}>
+                  <dt>{item.label}</dt>
+                  <dd>{item.value || "No consta"}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          <section className="request-summary-block request-summary-block--people" aria-labelledby="solicitud-interesados-title">
+            <div className="request-summary-block__head">
+              <span className="row-icon" aria-hidden="true">
+                <UserRound size={16} />
+              </span>
+              <div>
+                <h3 id="solicitud-interesados-title">Interesados</h3>
+                <p>{interesadosVisibles.length > 0 ? `${interesadosVisibles.length} registrados` : "Pendientes"}</p>
+              </div>
+              {!isClosed ? (
+                <div className="request-summary-actions">
+                  <button className="icon-button" onClick={() => setHabitualModalOpen(true)} type="button" aria-label="Asignar habitual" title="Habituales">
+                    <UserPlus size={15} />
+                  </button>
+                  <Link className="icon-button" to={editSolicitudPath} aria-label="Revisar interesados" title="Revisar datos">
+                    <Pencil size={15} />
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+            {interesadosVisibles.length === 0 ? <p className="rail-muted">No hay interesados registrados.</p> : null}
+            <div className="request-people-compact">
+              {interesadosVisibles.map((interesado, index) => {
+                const direccion = formatInteresadoAddress(interesado);
+                return (
+                  <article className="request-person-card" key={`${interesado.dni}-${index}`}>
+                    <header>
+                      <div>
+                        <strong>{interesado.nombre || "Interesado"}</strong>
+                        <span>{interesado.rol ? formatEnum(interesado.rol) : "Sin rol asignado"}</span>
+                      </div>
+                      <div className="request-person-card__badges">
+                        <StatusBadge tone={interesado.clienteHabitual ? "info" : "neutral"}>
+                          {interesado.clienteHabitual ? "Habitual" : "Puntual"}
+                        </StatusBadge>
+                        <StatusBadge tone={interesado.documentoIdentidadAportado ? "success" : "warning"}>
+                          {interesado.documentoIdentidadAportado ? "DNI OK" : "Falta DNI"}
+                        </StatusBadge>
+                      </div>
+                    </header>
+                    <dl className="request-person-facts">
+                      <div>
+                        <dt><IdCard size={13} /> ID</dt>
+                        <dd>{interesado.dni || "No consta"}</dd>
+                      </div>
+                      <div>
+                        <dt><Phone size={13} /> Tel.</dt>
+                        <dd>{interesado.telefono || "No consta"}</dd>
+                      </div>
+                      <div className="request-person-facts__wide">
+                        <dt><MapPin size={13} /> Direccion</dt>
+                        <dd>{direccion || "No consta"}</dd>
+                      </div>
+                    </dl>
+                    {interesado.requiereRepresentanteLegal ? (
+                      <div className={interesado.representanteLegalAportado ? "request-person-note is-success" : "request-person-note is-warning"}>
+                        {interesado.representanteLegalAportado ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+                        <span>
+                          Representante legal: {interesado.representanteLegalNombre || "pendiente"}
+                          {interesado.representanteLegalDni ? ` (${interesado.representanteLegalDni})` : ""}
+                        </span>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
         </div>
       </div>
 
@@ -585,28 +690,8 @@ export function SolicitudDetailPage() {
       {iaResult ? <SolicitudIaResultPanel response={iaResult} onDismiss={() => setIaResult(null)} /> : null}
       {iaError ? <SolicitudIaErrorPanel message={iaError} onDismiss={() => setIaError(null)} /> : null}
 
-      {!isAdmin ? <ClientStatusCallout solicitud={solicitud} expedientePath={isAdmin ? undefined : "/cliente/expedientes"} /> : null}
-      {!isAdmin && !isClosed ? (
-        <SolicitudClienteIaPanel
-          lecturaIa={solicitud.lecturaIaCliente}
-          loading={procesarDocumentacionClienteMutation.isPending}
-          onRequest={() => void handleProcessClienteIa()}
-        />
-      ) : null}
-
       {!isClosed ? (
         <>
-          <div id="solicitud-documentacion-completa">
-            <CompleteExpedienteUploadPanel
-              onUploadCompleteExpediente={handleUploadCompleteSolicitud}
-              processing={completeSolicitudProcessing}
-              processingJob={completeSolicitudJob}
-              minimized={completeSolicitudMinimized}
-              onToggleMinimized={() => setCompleteSolicitudMinimized((current) => !current)}
-              title="Aportar documentacion completa"
-              description="Sube el PDF completo de la solicitud y el sistema intentara separar automaticamente los documentos detectados."
-            />
-          </div>
           <SolicitudPreparationAssistant
             editPath={editSolicitudPath}
             error={preparacionQuery.isError}
@@ -617,83 +702,22 @@ export function SolicitudDetailPage() {
             onReadWithIa={isAdmin ? () => handleProcessDocumentacionIa(false) : () => void handleProcessClienteIa()}
             onOpenTemplates={() => setTemplateDialogOpen(true)}
             preparation={preparacionQuery.data}
+            showIaShortcut={!isAdmin}
             title={preparationTitle}
           />
+          <div className="request-upload-compact" id="solicitud-documentacion-completa">
+            <CompleteExpedienteUploadPanel
+              onUploadCompleteExpediente={handleUploadCompleteSolicitud}
+              processing={completeSolicitudProcessing}
+              processingJob={completeSolicitudJob}
+              minimized={completeSolicitudMinimized}
+              onToggleMinimized={() => setCompleteSolicitudMinimized((current) => !current)}
+              title="Aportar documentacion completa"
+              description="Sube el PDF completo para separar automaticamente los documentos."
+            />
+          </div>
         </>
       ) : null}
-
-      <SolicitudVehiclePanel solicitud={solicitud} editPath={editSolicitudPath} isClosed={isClosed} />
-
-      <section className="panel request-people-panel">
-        <div className="panel-heading request-people-heading">
-          <div>
-            <h2>Interesados</h2>
-            <p>{interesadosVisibles.length > 0 ? "Datos clave para preparar y firmar documentos." : "Anade comprador, vendedor o titular para continuar."}</p>
-          </div>
-          {!isClosed ? (
-            <div className="button-group">
-              <button className="soft-button soft-button--compact" onClick={() => setHabitualModalOpen(true)} type="button">
-                <UserPlus size={16} />
-                Habituales
-              </button>
-              <Link className="soft-button soft-button--compact" to={editSolicitudPath}>
-                <Pencil size={16} />
-                Revisar datos
-              </Link>
-            </div>
-          ) : null}
-        </div>
-        {interesadosVisibles.length === 0 ? <p className="rail-muted">No hay interesados registrados.</p> : null}
-        <div className="request-people-grid">
-          {interesadosVisibles.map((interesado, index) => {
-            const direccion = formatInteresadoAddress(interesado);
-            return (
-              <article className="request-person-card" key={`${interesado.dni}-${index}`}>
-                <header>
-                  <div className="row-icon" aria-hidden="true">
-                    <UserRound size={18} />
-                  </div>
-                  <div>
-                    <strong>{interesado.nombre || "Interesado"}</strong>
-                    <span>{interesado.rol ? formatEnum(interesado.rol) : "Sin rol asignado"}</span>
-                  </div>
-                  <div className="request-person-card__badges">
-                    <StatusBadge tone={interesado.clienteHabitual ? "info" : "neutral"}>
-                      {interesado.clienteHabitual ? "Cliente habitual" : "Interesado puntual"}
-                    </StatusBadge>
-                    <StatusBadge tone={interesado.documentoIdentidadAportado ? "success" : "warning"}>
-                      {interesado.documentoIdentidadAportado ? "DNI/CIF aportado" : "Falta DNI/CIF"}
-                    </StatusBadge>
-                  </div>
-                </header>
-                <dl className="request-person-facts">
-                  <div>
-                    <dt><IdCard size={14} /> Identificacion</dt>
-                    <dd>{interesado.dni || "No consta"}</dd>
-                  </div>
-                  <div>
-                    <dt><Phone size={14} /> Telefono</dt>
-                    <dd>{interesado.telefono || "No consta"}</dd>
-                  </div>
-                  <div className="request-person-facts__wide">
-                    <dt><MapPin size={14} /> Direccion</dt>
-                    <dd>{direccion || "No consta"}</dd>
-                  </div>
-                </dl>
-                {interesado.requiereRepresentanteLegal ? (
-                  <div className={interesado.representanteLegalAportado ? "request-person-note is-success" : "request-person-note is-warning"}>
-                    {interesado.representanteLegalAportado ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
-                    <span>
-                      Representante legal: {interesado.representanteLegalNombre || "pendiente"}
-                      {interesado.representanteLegalDni ? ` (${interesado.representanteLegalDni})` : ""}
-                    </span>
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-      </section>
 
       <div className="request-grid request-grid--wide">
         <section className="panel" id="solicitud-documentos">
@@ -924,46 +948,6 @@ function SolicitudHabitualesPanel({
   );
 }
 
-function SolicitudVehiclePanel({ solicitud, editPath, isClosed }: { solicitud: SolicitudDetail; editPath: string; isClosed: boolean }) {
-  const vehiculo = solicitud.vehiculo;
-  const facts = [
-    { label: "Matricula", value: vehiculo?.matricula || solicitud.matricula },
-    { label: "Marca", value: vehiculo?.marca },
-    { label: "Modelo", value: vehiculo?.modelo },
-    { label: "Bastidor", value: vehiculo?.bastidor },
-  ];
-  const completed = facts.filter((item) => Boolean(item.value)).length;
-  return (
-    <section className="panel request-vehicle-panel">
-      <div className="panel-heading request-vehicle-heading">
-        <div className="request-vehicle-title">
-          <span className="request-vehicle-icon" aria-hidden="true">
-            <CarFront size={18} />
-          </span>
-          <div>
-            <h2>Vehiculo</h2>
-            <p>{completed === facts.length ? "Datos principales completos." : "Revisa marca, modelo y bastidor antes de generar documentos."}</p>
-          </div>
-        </div>
-        {!isClosed ? (
-          <Link className="soft-button soft-button--compact" to={editPath}>
-            <Pencil size={16} />
-            Editar vehiculo
-          </Link>
-        ) : null}
-      </div>
-      <dl className="request-vehicle-grid">
-        {facts.map((item) => (
-          <div key={item.label}>
-            <dt>{item.label}</dt>
-            <dd>{item.value || "No consta"}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-}
-
 function SolicitudDocumentReading({
   documento,
   canAddIdentity = false,
@@ -1179,6 +1163,7 @@ function SolicitudPreparationAssistant({
   iaPending,
   onReadWithIa,
   onOpenTemplates,
+  showIaShortcut = false,
 }: {
   preparation?: SolicitudPreparacionTraspaso;
   loading: boolean;
@@ -1190,6 +1175,7 @@ function SolicitudPreparationAssistant({
   iaPending: boolean;
   onReadWithIa: () => void;
   onOpenTemplates: () => void;
+  showIaShortcut?: boolean;
 }) {
   const [detailOpen, setDetailOpen] = useState(false);
 
@@ -1235,6 +1221,7 @@ function SolicitudPreparationAssistant({
   const progress = clampPercent(preparation.progreso);
   const tone = preparationTone(preparation.estado);
   const action = preparation.siguienteAccion;
+  const showSecondaryIaAction = showIaShortcut && action?.tipo !== "REVISAR_IA";
 
   return (
     <section className={`request-assistant request-assistant--${tone}`} aria-label={title}>
@@ -1272,6 +1259,12 @@ function SolicitudPreparationAssistant({
         </div>
       ) : null}
       <div className="request-assistant__tools">
+        {showSecondaryIaAction ? (
+          <button className="soft-button soft-button--compact" disabled={iaDisabled} onClick={onReadWithIa} type="button">
+            {iaPending ? <Loader2 size={16} /> : <Sparkles size={16} />}
+            {iaLabel}
+          </button>
+        ) : null}
         <button className="soft-button soft-button--compact" onClick={() => setDetailOpen(true)} type="button">
           <Info size={16} />
           Ver detalle
@@ -1496,51 +1489,6 @@ function SolicitudIaResultPanel({ response, onDismiss }: { response: SolicitudDo
   );
 }
 
-function SolicitudClienteIaPanel({
-  lecturaIa,
-  loading,
-  onRequest,
-}: {
-  lecturaIa?: LecturaIaSolicitudCliente | null;
-  loading: boolean;
-  onRequest: () => void;
-}) {
-  const disabled = loading || !lecturaIa?.puedeSolicitar;
-  const buttonText = clienteIaButtonText(lecturaIa, loading);
-  return (
-    <section className="client-ai-panel" aria-label="Lectura IA de la solicitud">
-      <div className="exp-panel__heading">
-        <div>
-          <p className="eyebrow">Lectura IA</p>
-          <h3>Revision automatica</h3>
-        </div>
-      </div>
-      <div className="client-ai-panel__body">
-        <span className={`client-ai-panel__icon ${loading ? "client-ai-panel__icon--active" : ""}`}>
-          {loading ? <Loader2 size={18} /> : <Sparkles size={18} />}
-        </span>
-        <div>
-          <strong>{lecturaIa?.mensaje || "Lectura IA no disponible."}</strong>
-          <small>
-            {lecturaIa ? `Documentos: ${lecturaIa.documentosIdentidad} identidad / ${lecturaIa.documentosVehiculo ?? 0} vehiculo` : "Aporta la documentacion minima para habilitar la lectura."}
-          </small>
-          {lecturaIa && !lecturaIa.documentacionSuficiente && lecturaIa.bloqueosDocumentales.length > 0 ? (
-            <ul className="client-ai-blockers">
-              {lecturaIa.bloqueosDocumentales.slice(0, 3).map((bloqueo) => (
-                <li key={bloqueo}>{bloqueo}</li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-        <button className="primary-button primary-button--compact" disabled={disabled} onClick={onRequest} type="button">
-          {loading ? <Loader2 size={15} /> : <Sparkles size={15} />}
-          {buttonText}
-        </button>
-      </div>
-    </section>
-  );
-}
-
 function clienteIaButtonText(lecturaIa?: LecturaIaSolicitudCliente | null, loading = false) {
   if (loading) return "Solicitando";
   if (!lecturaIa) return "No disponible";
@@ -1575,12 +1523,9 @@ function AdminActions({
   onStateChange: (estado: string) => void;
 }) {
   return (
-    <section className="rail-card rail-card--action">
-      <div className="rail-card__heading">
-        <h3>Acciones administrativas</h3>
-        <StatusBadge tone={statusTone(solicitud.estado)}>{formatEnum(solicitud.estado)}</StatusBadge>
-      </div>
-      {isClosed ? <p>Esta solicitud ya no admite conversion directa.</p> : null}
+    <section className="request-admin-toolbar" aria-label="Acciones administrativas">
+      <strong>Acciones</strong>
+      {isClosed ? <span>Solicitud cerrada</span> : null}
       <div className="button-group">
         {!isClosed ? (
           <>
@@ -1664,63 +1609,6 @@ function SolicitudIaProgressModal() {
       </div>
     </div>
   );
-}
-
-function ClientStatusCallout({ solicitud, expedientePath = "/expedientes" }: { solicitud: SolicitudDetail; expedientePath?: string }) {
-  if (solicitud.estado === "CONVERTIDA" && solicitud.expedienteId) {
-    return (
-      <section className="request-status-callout request-status-callout--success">
-        <CheckCircle2 size={24} />
-        <div>
-          <strong>Tu solicitud ya se ha convertido en expediente.</strong>
-          <p>Desde ahora puedes seguir el avance del tramite en la ficha del expediente.</p>
-        </div>
-        <Link className="primary-button primary-button--compact" to={`${expedientePath}/${solicitud.expedienteId}`}>
-          Ver expediente
-        </Link>
-      </section>
-    );
-  }
-
-  const statusCopy = clientStatusCopy(solicitud.estado);
-  return (
-    <section className={`request-status-callout request-status-callout--${statusCopy.tone}`}>
-      {statusCopy.tone === "warning" ? <AlertTriangle size={24} /> : <MessageSquare size={24} />}
-      <div>
-        <strong>{statusCopy.title}</strong>
-        <p>{statusCopy.copy}</p>
-      </div>
-    </section>
-  );
-}
-
-function clientStatusCopy(status?: string | null) {
-  if (status === "PENDIENTE_DOCUMENTACION") {
-    return {
-      tone: "warning",
-      title: "Necesitamos que completes la documentacion.",
-      copy: "Revisa los mensajes y documentos asociados. Cuando lo tengas listo podremos volver a revisar la solicitud.",
-    };
-  }
-  if (status === "REVISANDO_INCIDENCIAS") {
-    return {
-      tone: "info",
-      title: "Estamos revisando la incidencia.",
-      copy: "La gestoria esta comprobando la informacion aportada antes de continuar con el tramite.",
-    };
-  }
-  if (status === "RECHAZADO") {
-    return {
-      tone: "danger",
-      title: "Esta solicitud ha sido rechazada.",
-      copy: "Puedes consultar el historial y los mensajes para ver el motivo registrado.",
-    };
-  }
-  return {
-    tone: "info",
-    title: "Tu solicitud esta pendiente de revision.",
-    copy: "La gestoria revisara los datos y la documentacion antes de convertirla en expediente.",
-  };
 }
 
 function MiniPlate({ value }: { value?: string | null }) {
