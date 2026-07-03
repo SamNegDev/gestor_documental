@@ -8,11 +8,13 @@ type Props = {
   label: string;
   value?: string | null;
   placeholder?: string;
+  className?: string;
+  dataField?: string;
   onChange: (value: string) => void;
   onSelect: (interesado: InteresadoSearchResult) => void;
 };
 
-export function InteresadoAutocomplete({ label, value, placeholder, onChange, onSelect }: Props) {
+export function InteresadoAutocomplete({ label, value, placeholder, className, dataField, onChange, onSelect }: Props) {
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<InteresadoSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,7 +69,7 @@ export function InteresadoAutocomplete({ label, value, placeholder, onChange, on
   };
 
   return (
-    <label className="interesado-autocomplete" ref={wrapperRef}>
+    <label className={["interesado-autocomplete", className].filter(Boolean).join(" ")} data-field={dataField} ref={wrapperRef}>
       {label}
       <span className="interesado-autocomplete__input">
         <Search size={15} />

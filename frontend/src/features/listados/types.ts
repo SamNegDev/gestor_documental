@@ -209,6 +209,8 @@ export interface SolicitudPreparacionAccion {
   titulo: string;
   detalle?: string | null;
   bloque?: string | null;
+  campo?: string | null;
+  label?: string | null;
 }
 
 export interface SolicitudPreparacionItem {
@@ -218,6 +220,7 @@ export interface SolicitudPreparacionItem {
   detalle?: string | null;
   accionTipo?: string | null;
   accionLabel?: string | null;
+  accionCampo?: string | null;
 }
 
 export interface SolicitudPreparacionBloque {

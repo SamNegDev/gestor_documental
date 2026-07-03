@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, FilePlus2, Loader2, Save } from "lucide-react";
 import { InteresadoAutocomplete } from "../../expedientes/components/InteresadoAutocomplete";
 import { humanizeEnum } from "../../expedientes/utils/formatters";
@@ -252,8 +252,10 @@ function interestedBlockLabel(index: number, batecom: boolean) {
 export function SolicitudFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isEdit = Boolean(id);
   const [form, setForm] = useState<SolicitudUpsertInput>(emptyForm);
+  const focusField = searchParams.get("focus") || searchParams.get("missing") || "";
 
   const catalogsQuery = useQuery({
     queryKey: ["solicitudes", "catalogos-listado"],
@@ -299,6 +301,22 @@ export function SolicitudFormPage() {
     [catalogsQuery.data, form.tipoTramiteId],
   );
   const isBatecom = isBatecomType(selectedType?.nombre);
+  const fieldClassName = (field: string, baseClassName?: string) =>
+    [baseClassName, focusField === field ? "edit-field--missing" : null].filter(Boolean).join(" ") || undefined;
+
+  useEffect(() => {
+    if (!focusField || loading) return;
+    const timeoutId = window.setTimeout(() => {
+      const target = document.querySelector<HTMLElement>(`[data-field="${focusField}"]`);
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      const input = target.matches("input, select, textarea")
+        ? target
+        : target.querySelector<HTMLElement>("input, select, textarea");
+      input?.focus({ preventScroll: true });
+    }, 120);
+    return () => window.clearTimeout(timeoutId);
+  }, [focusField, loading]);
 
   if (loading) {
     return (
@@ -345,7 +363,7 @@ export function SolicitudFormPage() {
             </div>
           </div>
           <div className="edit-form-grid">
-            <label>
+            <label className={fieldClassName("tipoTramiteId")} data-field="tipoTramiteId">
               Tipo de tramite
               <select
                 value={form.tipoTramiteId || ""}
@@ -365,27 +383,27 @@ export function SolicitudFormPage() {
                 ))}
               </select>
             </label>
-            <label>
+            <label className={fieldClassName("matricula")} data-field="matricula">
               Matricula
               <input value={form.matricula} onChange={(event) => setForm({ ...form, matricula: uppercaseInput(event.target.value) })} required />
             </label>
-            <label>
+            <label className={fieldClassName("vehiculoMarca")} data-field="vehiculoMarca">
               Marca
               <input value={form.vehiculoMarca || ""} onChange={(event) => setForm({ ...form, vehiculoMarca: uppercaseInput(event.target.value) })} />
             </label>
-            <label>
+            <label className={fieldClassName("vehiculoModelo")} data-field="vehiculoModelo">
               Modelo
               <input value={form.vehiculoModelo || ""} onChange={(event) => setForm({ ...form, vehiculoModelo: uppercaseInput(event.target.value) })} />
             </label>
-            <label>
+            <label className={fieldClassName("vehiculoBastidor")} data-field="vehiculoBastidor">
               Bastidor
               <input value={form.vehiculoBastidor || ""} onChange={(event) => setForm({ ...form, vehiculoBastidor: uppercaseInput(event.target.value) })} />
             </label>
-            <label>
+            <label className={fieldClassName("operacionPrecioVenta")} data-field="operacionPrecioVenta">
               Precio de venta
               <input inputMode="decimal" value={form.operacionPrecioVenta || ""} onChange={(event) => setForm({ ...form, operacionPrecioVenta: uppercaseInput(event.target.value) })} />
             </label>
-            <label className="edit-form-grid__wide">
+            <label className={fieldClassName("observaciones", "edit-form-grid__wide")} data-field="observaciones">
               Observaciones
               <textarea rows={4} value={form.observaciones || ""} onChange={(event) => setForm({ ...form, observaciones: uppercaseInput(event.target.value) })} />
             </label>
@@ -400,7 +418,13 @@ export function SolicitudFormPage() {
                 <h2>Datos opcionales</h2>
               </div>
             </div>
-            <InteresadoFields form={form} index={index} onChange={setForm} lockedRole={isBatecom ? BATECOM_ROLE_ORDER[index - 1] : undefined} />
+            <InteresadoFields
+              focusField={focusField}
+              form={form}
+              index={index}
+              onChange={setForm}
+              lockedRole={isBatecom ? BATECOM_ROLE_ORDER[index - 1] : undefined}
+            />
           </section>
         ))}
 
@@ -423,14 +447,18 @@ function InteresadoFields({
   index,
   onChange,
   lockedRole,
+  focusField,
 }: {
   form: SolicitudUpsertInput;
   index: number;
   onChange: (form: SolicitudUpsertInput) => void;
   lockedRole?: string;
+  focusField?: string;
 }) {
   const prefix = `interesado${index}` as "interesado1" | "interesado2" | "interesado3";
   const field = (name: string) => `${prefix}${name}` as keyof SolicitudUpsertInput;
+  const fieldClassName = (fieldName: string, baseClassName?: string) =>
+    [baseClassName, focusField === fieldName ? "edit-field--missing" : null].filter(Boolean).join(" ") || undefined;
   const addressValue: AddressValue = {
     direccion: form[field("Direccion")] as string,
     tipoVia: form[field("TipoVia")] as string,
@@ -486,6 +514,8 @@ function InteresadoFields({
   return (
     <div className="edit-form-grid">
       <InteresadoAutocomplete
+        className={fieldClassName(field("Dni") as string)}
+        dataField={field("Dni") as string}
         label="DNI/CIF"
         value={(form[field("Dni")] as string) || ""}
         placeholder="Buscar por DNI/CIF"
@@ -493,12 +523,14 @@ function InteresadoFields({
         onSelect={applyInteresado}
       />
       {form[field("Dni")] ? (
-        <label>
+        <label className={fieldClassName(field("Nombre") as string)} data-field={field("Nombre") as string}>
           Nombre completo/Razon social
           <input value={(form[field("Nombre")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Nombre")]: uppercaseInput(event.target.value) })} />
         </label>
       ) : (
         <InteresadoAutocomplete
+          className={fieldClassName(field("Nombre") as string)}
+          dataField={field("Nombre") as string}
           label="Nombre completo/Razon social"
           value={(form[field("Nombre")] as string) || ""}
           placeholder="Buscar por nombre o razon social"
@@ -506,7 +538,7 @@ function InteresadoFields({
           onSelect={applyInteresado}
         />
       )}
-      <label>
+      <label className={fieldClassName(field("Rol") as string)} data-field={field("Rol") as string}>
         Rol
         <select
           value={lockedRole || (form[field("Rol")] as string) || ""}
@@ -521,11 +553,11 @@ function InteresadoFields({
           ))}
         </select>
       </label>
-      <label>
+      <label className={fieldClassName(field("Telefono") as string)} data-field={field("Telefono") as string}>
         Telefono
         <input value={(form[field("Telefono")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Telefono")]: uppercaseInput(event.target.value) })} />
       </label>
-      <label className="edit-form-grid__wide">
+      <label className={fieldClassName(field("Direccion") as string, "edit-form-grid__wide")} data-field={field("Direccion") as string}>
         Direccion libre
         <textarea
           rows={1}
@@ -533,7 +565,14 @@ function InteresadoFields({
           onChange={(event) => onChange({ ...form, [field("Direccion")]: uppercaseInput(event.target.value) })}
         />
       </label>
-      <AddressFields idPrefix={`solicitud-${prefix}`} value={addressValue} onChange={updateAddress} wideClassName="edit-form-grid__wide" />
+      <AddressFields
+        fieldNamePrefix={prefix}
+        highlightField={focusField}
+        idPrefix={`solicitud-${prefix}`}
+        value={addressValue}
+        onChange={updateAddress}
+        wideClassName="edit-form-grid__wide"
+      />
     </div>
   );
 }

@@ -1070,6 +1070,14 @@
   font-size: 0.82rem;
 }
 
+.soft-button--tiny {
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 0.76rem;
+  gap: 5px;
+}
+
 .primary-button--compact {
   min-height: 30px;
   padding: 0 10px;

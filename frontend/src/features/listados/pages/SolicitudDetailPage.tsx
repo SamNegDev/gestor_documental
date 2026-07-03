@@ -44,8 +44,10 @@ import type {
   SolicitudDocumentacionIaResponse,
   SolicitudIdentidadDetectadaInput,
   SolicitudInteresadoHabitual,
+  SolicitudPreparacionAccion,
   SolicitudPreparacionBloque,
   SolicitudPreparacionDocumento,
+  SolicitudPreparacionItem,
   SolicitudPreparacionTraspaso,
 } from "../types";
 const COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX = "gestor.solicitudCompleta.job.";
@@ -1325,11 +1327,11 @@ function SolicitudPreparationAssistant({
             {action.detalle ? <span>{action.detalle}</span> : null}
           </div>
           <SolicitudPreparationAction
+            action={action}
             iaDisabled={iaDisabled}
             iaLabel={iaLabel}
             iaPending={iaPending}
             onReadWithIa={onReadWithIa}
-            tipo={action.tipo}
             editPath={editPath}
             onOpenTemplates={onOpenTemplates}
           />
@@ -1363,7 +1365,7 @@ function SolicitudPreparationAssistant({
             <div className="request-assistant-modal__body">
               <div className="request-assistant__blocks">
                 {preparation.bloques.map((bloque) => (
-                  <SolicitudPreparationBlock bloque={bloque} key={bloque.codigo} />
+                  <SolicitudPreparationBlock bloque={bloque} editPath={editPath} key={bloque.codigo} />
                 ))}
               </div>
               {preparation.documentosGenerables.length > 0 ? (
@@ -1387,9 +1389,10 @@ function SolicitudPreparationAssistant({
   );
 }
 
-function SolicitudPreparationBlock({ bloque }: { bloque: SolicitudPreparacionBloque }) {
+function SolicitudPreparationBlock({ bloque, editPath }: { bloque: SolicitudPreparacionBloque; editPath: string }) {
   const tone = preparationTone(bloque.estado);
-  const pendingItem = bloque.items.find((item) => item.estado !== "OK") ?? bloque.items[0];
+  const pendingItems = bloque.items.filter((item) => item.estado !== "OK");
+  const pendingItem = pendingItems[0] ?? bloque.items[0];
   const progress = bloque.total > 0 ? clampPercent((bloque.completados / bloque.total) * 100) : 0;
   return (
     <div className={`request-assistant__block is-${tone}`}>
@@ -1405,6 +1408,19 @@ function SolicitudPreparationBlock({ bloque }: { bloque: SolicitudPreparacionBlo
       <div className="request-assistant__block-progress" aria-hidden="true">
         <span style={{ width: `${progress}%` }} />
       </div>
+      {pendingItems.length > 0 ? (
+        <ul className="request-assistant__missing-list">
+          {pendingItems.map((item) => (
+            <li key={item.codigo}>
+              <span>
+                <strong>{item.etiqueta}</strong>
+                {item.detalle ? <small>{item.detalle}</small> : null}
+              </span>
+              <SolicitudPreparationItemAction editPath={editPath} item={item} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -1423,7 +1439,7 @@ function SolicitudPreparationDocument({ documento }: { documento: SolicitudPrepa
 }
 
 function SolicitudPreparationAction({
-  tipo,
+  action,
   editPath,
   iaDisabled,
   iaLabel,
@@ -1431,7 +1447,7 @@ function SolicitudPreparationAction({
   onReadWithIa,
   onOpenTemplates,
 }: {
-  tipo?: string | null;
+  action?: SolicitudPreparacionAccion | null;
   editPath: string;
   iaDisabled: boolean;
   iaLabel: string;
@@ -1439,7 +1455,16 @@ function SolicitudPreparationAction({
   onReadWithIa: () => void;
   onOpenTemplates: () => void;
 }) {
+  const tipo = action?.tipo;
   if (!tipo || tipo === "NINGUNA") return null;
+  if (tipo === "COMPLETAR_PLANTILLA" && action?.campo) {
+    return (
+      <Link className="soft-button soft-button--compact" to={buildPreparationEditPath(editPath, action.campo)}>
+        <Pencil size={16} />
+        {preparationActionLabel(action)}
+      </Link>
+    );
+  }
   if (tipo === "GENERAR_DOCUMENTOS" || tipo === "COMPLETAR_PLANTILLA") {
     return (
       <button className="primary-button primary-button--compact" onClick={onOpenTemplates} type="button">
@@ -1466,13 +1491,67 @@ function SolicitudPreparationAction({
   }
   if (tipo.startsWith("COMPLETAR") || tipo.startsWith("REVISAR")) {
     return (
-      <Link className="soft-button soft-button--compact" to={editPath}>
+      <Link className="soft-button soft-button--compact" to={buildPreparationEditPath(editPath, action?.campo)}>
         <Pencil size={16} />
-        Editar datos
+        {preparationActionLabel(action)}
+      </Link>
+    );
+  }
+  if (tipo === "GENERAR_DOCUMENTO") {
+    return (
+      <button className="soft-button soft-button--compact" onClick={onOpenTemplates} type="button">
+        <FileSignature size={16} />
+        Preparar doc
+      </button>
+    );
+  }
+  return null;
+}
+
+function SolicitudPreparationItemAction({ item, editPath }: { item: SolicitudPreparacionItem; editPath: string }) {
+  const tipo = item.accionTipo;
+  if (!tipo) return null;
+  if (tipo === "SUBIR_DOCUMENTO") {
+    return (
+      <a className="soft-button soft-button--tiny" href="#solicitud-documentacion-completa">
+        <FileText size={14} />
+        {item.accionLabel || "Aportar"}
+      </a>
+    );
+  }
+  if (tipo.startsWith("COMPLETAR") || tipo.startsWith("REVISAR")) {
+    return (
+      <Link className="soft-button soft-button--tiny" to={buildPreparationEditPath(editPath, item.accionCampo)}>
+        <Pencil size={14} />
+        {item.accionLabel || "Editar"}
       </Link>
     );
   }
   return null;
+}
+
+function buildPreparationEditPath(editPath: string, campo?: string | null) {
+  if (!campo) {
+    return editPath;
+  }
+  const separator = editPath.includes("?") ? "&" : "?";
+  return `${editPath}${separator}focus=${encodeURIComponent(campo)}&missing=${encodeURIComponent(campo)}`;
+}
+
+function preparationActionLabel(action?: SolicitudPreparacionAccion | null) {
+  if (action?.label) {
+    return action.label;
+  }
+  if (action?.campo === "operacionPrecioVenta") {
+    return "Editar precio";
+  }
+  if (action?.campo?.startsWith("interesado") && action?.campo.endsWith("NombreVia")) {
+    return `Editar ${action.titulo?.toLowerCase() || "direccion"}`;
+  }
+  if (action?.titulo) {
+    return `Editar ${action.titulo.toLowerCase()}`;
+  }
+  return "Editar datos";
 }
 
 function clampPercent(value?: number | null) {

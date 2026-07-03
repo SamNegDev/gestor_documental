@@ -280,6 +280,49 @@ class SolicitudPreparacionTraspasoServiceImplTest {
         assertThat(documento(response, "CONTRATO_COMPRAVENTA").faltantes()).doesNotContain("Precio");
     }
 
+    @Test
+    void indicaCampoYAccionCuandoFaltaPrecio() {
+        Solicitud solicitud = solicitudBase(16L);
+        solicitud.setVehiculoMarca("Seat");
+        solicitud.setVehiculoModelo("Ibiza");
+        solicitud.setVehiculoBastidor("VF123456789ABCDE1");
+        solicitud.setInteresado1Rol(RolInteresado.VENDEDOR);
+        solicitud.setInteresado1Nombre("Maria Luisa Menendez Morejudo");
+        solicitud.setInteresado1Dni("50975033H");
+        solicitud.setInteresado1TipoVia("Calle");
+        solicitud.setInteresado1NombreVia("Rosario de Gaya");
+        solicitud.setInteresado1NumeroVia("89");
+        solicitud.setInteresado1CodigoPostal("38329");
+        solicitud.setInteresado1Municipio("El Rosario");
+        solicitud.setInteresado2Rol(RolInteresado.COMPRADOR);
+        solicitud.setInteresado2Nombre("Antonio Maldonado Carmona");
+        solicitud.setInteresado2Dni("42793999S");
+        solicitud.setInteresado2TipoVia("Calle");
+        solicitud.setInteresado2NombreVia("Igone");
+        solicitud.setInteresado2NumeroVia("4");
+        solicitud.setInteresado2CodigoPostal("38000");
+        solicitud.setInteresado2Municipio("Santa Cruz de Tenerife");
+
+        Documento dniVendedor = documento(70L, TipoDocumento.DNI);
+        Documento dniComprador = documento(71L, TipoDocumento.DNI);
+        Documento permiso = documento(72L, TipoDocumento.PERMISO_CIRCULACION);
+        Documento ficha = documento(73L, TipoDocumento.FICHA_TECNICA);
+
+        when(solicitudRepository.findById(16L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(16L)).thenReturn(List.of(dniVendedor, dniComprador, permiso, ficha));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(70L, 71L, 72L, 73L))).thenReturn(List.of(
+                lecturaIdentidad(dniVendedor, "50975033H"),
+                lecturaIdentidad(dniComprador, "42793999S")
+        ));
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(70L, 71L, 72L, 73L))).thenReturn(List.of());
+
+        SolicitudPreparacionTraspasoResponse response = service.obtenerPreparacion(16L, usuario);
+
+        assertThat(response.siguienteAccion().titulo()).isEqualTo("Precio de venta");
+        assertThat(response.siguienteAccion().campo()).isEqualTo("operacionPrecioVenta");
+        assertThat(response.siguienteAccion().label()).isEqualTo("Editar precio");
+    }
+
     private Solicitud solicitudBase(Long id) {
         Solicitud solicitud = new Solicitud();
         solicitud.setId(id);

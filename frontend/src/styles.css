@@ -2200,6 +2200,14 @@ select {
   background: oklch(94% 0.045 232);
 }
 
+.soft-button--tiny {
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 0.76rem;
+  gap: 5px;
+}
+
 .soft-button--danger {
   border-color: oklch(72% 0.14 28);
   color: oklch(44% 0.15 28);
@@ -6759,6 +6767,29 @@ input.records-table-filter {
   font-variant-numeric: tabular-nums;
 }
 
+.request-assistant__missing-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.request-assistant__missing-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid color-mix(in oklch, var(--line) 75%, transparent);
+  border-radius: 7px;
+  background: color-mix(in oklch, var(--panel) 82%, var(--panel-soft));
+}
+
+.request-assistant__missing-list .soft-button--tiny {
+  white-space: nowrap;
+}
+
 .request-assistant__documents {
   display: grid;
   gap: 9px;
@@ -6962,6 +6993,19 @@ input.records-table-filter {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.edit-field--missing {
+  color: oklch(42% 0.16 28) !important;
+}
+
+.edit-field--missing input,
+.edit-field--missing select,
+.edit-field--missing textarea,
+.edit-field--missing .interesado-autocomplete__input {
+  border-color: oklch(58% 0.2 28) !important;
+  background: oklch(98% 0.02 28);
+  box-shadow: 0 0 0 3px oklch(72% 0.14 28 / 0.2);
 }
 
 .client-branding-panel {

@@ -141,17 +141,20 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
     private BloqueCalculo bloqueInteresados(PreparacionContext context) {
         List<ItemCalculo> items = new ArrayList<>();
         Map<RolInteresado, InteresadoSlot> porRol = interesadosPorRol(context.interesados());
-        for (RolInteresado rol : context.rolesEsperados()) {
+        for (int index = 0; index < context.rolesEsperados().size(); index++) {
+            RolInteresado rol = context.rolesEsperados().get(index);
             InteresadoSlot interesado = porRol.get(rol);
             String rolLabel = rolLabel(rol);
             if (interesado == null) {
+                int slotSugerido = Math.min(index + 1, 3);
                 items.add(item(
                         "rol_" + rol.name().toLowerCase(Locale.ROOT),
                         capitalize(rolLabel),
                         EstadoItem.BLOQUEANTE,
                         "Falta informar el " + rolLabel + ".",
                         "COMPLETAR_INTERESADO",
-                        "Completar " + rolLabel
+                        "Editar " + rolLabel,
+                        "interesado" + slotSugerido + "Rol"
                 ));
                 continue;
             }
@@ -179,7 +182,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                     EstadoItem.BLOQUEANTE,
                     "Falta DNI/NIE/CIF del " + rolLabel + ".",
                     "COMPLETAR_INTERESADO",
-                    "Anadir identificacion"
+                    "Editar identificacion",
+                    "interesado" + interesado.slot() + "Dni"
             );
         }
         if (!identificadorValido(identificador)) {
@@ -189,7 +193,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                     EstadoItem.BLOQUEANTE,
                     "El identificador " + identificador + " no pasa la validacion.",
                     "REVISAR_DATO",
-                    "Revisar identificador"
+                    "Revisar identificador",
+                    "interesado" + interesado.slot() + "Dni"
             );
         }
         return item(
@@ -211,7 +216,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                     EstadoItem.PENDIENTE,
                     "Primero hay que corregir el identificador.",
                     "COMPLETAR_INTERESADO",
-                    "Corregir datos"
+                    "Corregir identificacion",
+                    "interesado" + interesado.slot() + "Dni"
             );
         }
         if (documentoIdentidadAportado(context, identificador)) {
@@ -252,7 +258,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                 direccionEstado.estado(),
                 direccionEstado.detalle(),
                 "COMPLETAR_DATO",
-                "Completar direccion"
+                "Editar direccion " + rolLabel,
+                direccionEstado.accionCampo()
         );
     }
 
@@ -264,7 +271,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                 texto(context.solicitud().getMatricula()) != null ? EstadoItem.OK : EstadoItem.BLOQUEANTE,
                 texto(context.solicitud().getMatricula()) != null ? normalizarTexto(context.solicitud().getMatricula()) : "Falta matricula de la solicitud.",
                 texto(context.solicitud().getMatricula()) != null ? null : "COMPLETAR_DATO",
-                texto(context.solicitud().getMatricula()) != null ? null : "Completar matricula"
+                texto(context.solicitud().getMatricula()) != null ? null : "Editar matricula",
+                texto(context.solicitud().getMatricula()) != null ? null : "matricula"
         ));
         items.add(itemDocumentacionVehiculo(context));
         String bastidor = mejorBastidor(context);
@@ -276,7 +284,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                 bastidor != null ? EstadoItem.OK : EstadoItem.PENDIENTE,
                 bastidor != null ? bastidor : "No consta bastidor estructurado; se pedira para el contrato si hace falta.",
                 bastidor != null ? null : "COMPLETAR_DATO",
-                bastidor != null ? null : "Completar bastidor"
+                bastidor != null ? null : "Editar bastidor",
+                bastidor != null ? null : "vehiculoBastidor"
         ));
         items.add(item(
                 "marca_modelo",
@@ -286,7 +295,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                         ? normalizarTexto(marca + " " + modelo)
                         : "Falta completar marca y modelo para proponer el contrato.",
                 marca != null && modelo != null ? null : "COMPLETAR_DATO",
-                marca != null && modelo != null ? null : "Completar vehiculo"
+                marca != null && modelo != null ? null : (marca == null ? "Editar marca" : "Editar modelo"),
+                marca != null && modelo != null ? null : (marca == null ? "vehiculoMarca" : "vehiculoModelo")
         ));
         return bloque("VEHICULO", "Vehiculo", items);
     }
@@ -331,7 +341,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                 tramite != null ? EstadoItem.OK : EstadoItem.BLOQUEANTE,
                 tramite != null ? tramite.name().replace('_', ' ') : "Falta tipo de tramite.",
                 tramite != null ? null : "COMPLETAR_DATO",
-                tramite != null ? null : "Completar tramite"
+                tramite != null ? null : "Editar tramite",
+                tramite != null ? null : "tipoTramiteId"
         ));
 
         Map<RolInteresado, InteresadoSlot> porRol = interesadosPorRol(context.interesados());
@@ -345,7 +356,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                 rolesMinimos ? EstadoItem.OK : EstadoItem.BLOQUEANTE,
                 rolesMinimos ? "Los roles minimos estan informados." : "Faltan roles para preparar el traspaso.",
                 rolesMinimos ? null : "COMPLETAR_INTERESADO",
-                rolesMinimos ? null : "Completar roles"
+                rolesMinimos ? null : "Editar roles",
+                rolesMinimos ? null : "interesado1Rol"
         ));
 
         boolean contratoOFactura = context.documentos().stream().anyMatch(documento -> TIPOS_ROLES.contains(documento.getTipoDocumento()));
@@ -365,7 +377,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                 precio != null ? EstadoItem.OK : EstadoItem.PENDIENTE,
                 precio != null ? precio : "Falta precio para generar contrato de compraventa.",
                 precio != null ? null : "COMPLETAR_DATO",
-                precio != null ? null : "Completar precio"
+                precio != null ? null : "Editar precio",
+                precio != null ? null : "operacionPrecioVenta"
         ));
 
         DocumentoRolesLectura lecturaRoles = mejorLecturaRoles(context);
@@ -482,10 +495,103 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
     }
 
     private ItemCalculo item(String codigo, String etiqueta, EstadoItem estado, String detalle, String accionTipo, String accionLabel) {
+        return item(codigo, etiqueta, estado, detalle, accionTipo, accionLabel, campoAccionPorCodigo(codigo));
+    }
+
+    private ItemCalculo item(
+            String codigo,
+            String etiqueta,
+            EstadoItem estado,
+            String detalle,
+            String accionTipo,
+            String accionLabel,
+            String accionCampo
+    ) {
         return new ItemCalculo(
                 estado,
-                new SolicitudPreparacionItemResponse(codigo, etiqueta, estado.name(), detalle, accionTipo, accionLabel)
+                new SolicitudPreparacionItemResponse(codigo, etiqueta, estado.name(), detalle, accionTipo, accionLabel, accionCampo)
         );
+    }
+
+    private String campoAccionPorCodigo(String codigo) {
+        if (codigo == null) {
+            return null;
+        }
+        if ("matricula".equals(codigo)) {
+            return "matricula";
+        }
+        if ("bastidor".equals(codigo)) {
+            return "vehiculoBastidor";
+        }
+        if ("marca_modelo".equals(codigo)) {
+            return "vehiculoMarca";
+        }
+        if ("tipo_tramite".equals(codigo)) {
+            return "tipoTramiteId";
+        }
+        if ("precio".equals(codigo)) {
+            return "operacionPrecioVenta";
+        }
+        if ("roles_operacion".equals(codigo)) {
+            return "interesado1Rol";
+        }
+        Integer slot = slotDesdeCodigo(codigo);
+        if (slot == null) {
+            return null;
+        }
+        if (codigo.startsWith("identificador_") || codigo.startsWith("soporte_identidad_")) {
+            return "interesado" + slot + "Dni";
+        }
+        if (codigo.startsWith("direccion_")) {
+            return "interesado" + slot + "NombreVia";
+        }
+        return null;
+    }
+
+    private Integer slotDesdeCodigo(String codigo) {
+        String[] partes = codigo.split("_");
+        if (partes.length == 0) {
+            return null;
+        }
+        try {
+            int slot = Integer.parseInt(partes[partes.length - 1]);
+            return slot >= 1 && slot <= 3 ? slot : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private String campoDocumentoPendiente(SolicitudPreparacionDocumentoResponse documento) {
+        return documento.faltantes().stream()
+                .findFirst()
+                .map(this::campoDocumentoFaltante)
+                .orElse(null);
+    }
+
+    private String labelDocumentoPendiente(SolicitudPreparacionDocumentoResponse documento) {
+        return documento.faltantes().stream()
+                .findFirst()
+                .map(faltante -> "Editar " + faltante.toLowerCase(Locale.ROOT))
+                .orElse("Completar datos");
+    }
+
+    private String campoDocumentoFaltante(String faltante) {
+        if (faltante == null) {
+            return null;
+        }
+        return switch (faltante) {
+            case "Precio" -> "operacionPrecioVenta";
+            case "Bastidor" -> "vehiculoBastidor";
+            case "Marca" -> "vehiculoMarca";
+            case "Modelo" -> "vehiculoModelo";
+            case "Matricula" -> "matricula";
+            case "Domicilio del comprador", "Domicilio del vehiculo" -> "interesado1NombreVia";
+            case "Domicilio del vendedor" -> "interesado2NombreVia";
+            case "Comprador" -> "interesado1Nombre";
+            case "Vendedor" -> "interesado2Nombre";
+            case "Mandante", "Domicilio del mandante", "Localidad del mandante" -> "interesado1NombreVia";
+            default -> null;
+        };
     }
 
     private String estadoGlobal(List<BloqueCalculo> bloques, List<SolicitudPreparacionDocumentoResponse> documentos) {
@@ -515,7 +621,9 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                                 response.accionTipo(),
                                 response.etiqueta(),
                                 response.detalle(),
-                                bloque.response().codigo()
+                                bloque.response().codigo(),
+                                response.accionCampo(),
+                                response.accionLabel()
                         );
                     }
                 }
@@ -528,7 +636,9 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                         "COMPLETAR_PLANTILLA",
                         "Completar " + documento.nombre().toLowerCase(Locale.ROOT),
                         "Faltan: " + String.join(", ", documento.faltantes()),
-                        "DOCUMENTOS"
+                        "DOCUMENTOS",
+                        campoDocumentoPendiente(documento),
+                        labelDocumentoPendiente(documento)
                 ))
                 .orElseGet(() -> {
                     boolean todosAportados = !documentos.isEmpty()
@@ -791,13 +901,70 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
 
     private DireccionEstado direccionEstado(InteresadoSlot interesado) {
         if (!direccionNoVacia(interesado)) {
-            return new DireccionEstado(EstadoItem.PENDIENTE, "Falta direccion del " + rolLabel(interesado.rol()) + ".");
+            return new DireccionEstado(
+                    EstadoItem.PENDIENTE,
+                    "Falta direccion del " + rolLabel(interesado.rol()) + ".",
+                    "interesado" + interesado.slot() + "NombreVia"
+            );
         }
         String compuesta = direccionCompuesta(interesado);
         if (direccionSuficiente(interesado)) {
-            return new DireccionEstado(EstadoItem.OK, compuesta);
+            return new DireccionEstado(EstadoItem.OK, compuesta, null);
         }
-        return new DireccionEstado(EstadoItem.AVISO, "Direccion parcial: " + compuesta);
+        String campo = primerCampoDireccionPendiente(interesado);
+        return new DireccionEstado(
+                EstadoItem.AVISO,
+                "Direccion parcial: falta " + etiquetaCampoDireccion(campo) + ". Actual: " + compuesta,
+                campo
+        );
+    }
+
+    private String primerCampoDireccionPendiente(InteresadoSlot interesado) {
+        String prefix = "interesado" + interesado.slot();
+        if (texto(interesado.nombreVia()) == null) {
+            return prefix + "NombreVia";
+        }
+        boolean detalleVia = texto(interesado.numeroVia()) != null
+                || texto(interesado.bloque()) != null
+                || texto(interesado.portal()) != null
+                || texto(interesado.escalera()) != null
+                || texto(interesado.piso()) != null
+                || texto(interesado.puerta()) != null;
+        if (!detalleVia && texto(interesado.codigoPostal()) == null) {
+            return prefix + "NumeroVia";
+        }
+        if (texto(interesado.codigoPostal()) == null && !tieneCodigoPostal(interesado)) {
+            return prefix + "CodigoPostal";
+        }
+        if (texto(interesado.provincia()) == null) {
+            return prefix + "Provincia";
+        }
+        if (texto(interesado.municipio()) == null) {
+            return prefix + "Municipio";
+        }
+        return prefix + "NombreVia";
+    }
+
+    private String etiquetaCampoDireccion(String campo) {
+        if (campo == null) {
+            return "revisar la direccion";
+        }
+        if (campo.endsWith("NombreVia")) {
+            return "separar la via";
+        }
+        if (campo.endsWith("NumeroVia")) {
+            return "numero o detalle de via";
+        }
+        if (campo.endsWith("CodigoPostal")) {
+            return "codigo postal";
+        }
+        if (campo.endsWith("Provincia")) {
+            return "provincia";
+        }
+        if (campo.endsWith("Municipio")) {
+            return "municipio";
+        }
+        return "revisar la direccion";
     }
 
     private boolean direccionSuficiente(InteresadoSlot interesado) {
@@ -1002,7 +1169,7 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
     private record RequisitoDocumento(boolean completo, String etiqueta) {
     }
 
-    private record DireccionEstado(EstadoItem estado, String detalle) {
+    private record DireccionEstado(EstadoItem estado, String detalle, String accionCampo) {
     }
 
     private enum EstadoItem {
