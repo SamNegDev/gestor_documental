@@ -2826,14 +2826,16 @@ select {
 
 .solicitud-reading-identities {
   display: grid;
-  gap: 8px;
+  gap: 5px;
 }
 
 .solicitud-reading-identity {
   display: grid;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 12px;
   border-top: 1px solid color-mix(in oklch, var(--line) 52%, transparent);
-  padding-top: 8px;
+  padding-top: 6px;
 }
 
 .solicitud-reading-identity:first-child {
@@ -2843,15 +2845,15 @@ select {
 
 .solicitud-reading-identity__main {
   display: grid;
-  gap: 5px;
+  gap: 3px;
   min-width: 0;
 }
 
 .solicitud-reading-identity__summary {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -2862,7 +2864,7 @@ select {
 .solicitud-reading-identity__summary span {
   display: block;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 850;
   line-height: 1.1;
   text-transform: uppercase;
@@ -2871,35 +2873,35 @@ select {
 .solicitud-reading-identity__summary strong {
   display: block;
   color: var(--ink-strong);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 850;
-  line-height: 1.25;
+  line-height: 1.18;
   overflow-wrap: anywhere;
 }
 
 .solicitud-reading-identity__summary code {
   flex: 0 0 auto;
-  max-width: 42%;
-  padding: 3px 7px;
+  max-width: 34%;
+  padding: 2px 6px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--panel);
   color: var(--ink);
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 850;
-  line-height: 1.2;
+  line-height: 1.15;
   overflow-wrap: anywhere;
 }
 
 .solicitud-reading-identity__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: 2px 8px;
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.69rem;
   font-weight: 650;
-  line-height: 1.35;
+  line-height: 1.2;
 }
 
 .solicitud-reading-identity__meta span {
@@ -2910,9 +2912,9 @@ select {
 .solicitud-reading-identity__note {
   margin: 0;
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.69rem;
   font-weight: 650;
-  line-height: 1.35;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
@@ -2923,23 +2925,22 @@ select {
 
 .solicitud-reading-identity__actions {
   display: grid;
-  grid-template-columns: minmax(132px, 160px) minmax(112px, 144px) auto;
+  grid-template-columns: minmax(118px, 142px) minmax(104px, 128px) auto;
   align-items: center;
   justify-content: start;
-  gap: 6px;
-  padding-top: 7px;
-  border-top: 1px solid color-mix(in oklch, var(--line) 44%, transparent);
+  gap: 5px;
+  padding-top: 0;
 }
 
 .solicitud-reading-identity__actions select,
 .solicitud-reading-identity__identifier {
-  height: 32px;
+  height: 28px;
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--panel);
   color: var(--ink);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
@@ -2948,8 +2949,20 @@ select {
 }
 
 .solicitud-reading-identity__actions .soft-button {
-  min-height: 32px;
+  min-height: 28px;
+  padding-block: 4px;
   white-space: nowrap;
+}
+
+@media (max-width: 1120px) {
+  .solicitud-reading-identity {
+    grid-template-columns: 1fr;
+  }
+
+  .solicitud-reading-identity__actions {
+    padding-top: 5px;
+    border-top: 1px solid color-mix(in oklch, var(--line) 44%, transparent);
+  }
 }
 
 @media (max-width: 760px) {
