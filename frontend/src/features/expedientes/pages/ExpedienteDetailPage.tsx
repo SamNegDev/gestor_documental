@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CalendarClock, ClipboardCheck, Download, FilePlus2, FileText, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ShieldAlert, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Download, FilePlus2, FileText, Info, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ShieldAlert, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
 import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteUploadPanel";
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
 import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
@@ -51,6 +51,7 @@ import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 import { uppercaseInput } from "../../../shared/utils/text";
 import type {
+  ActualizacionDocumentalExpediente,
   DocumentoExpediente,
   ExpedienteDetail,
   ExpedienteEditInput,
@@ -671,6 +672,57 @@ function InterestedPartiesCorrectionDialog({
   );
 }
 
+function ExpedienteIaErrorPanel({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <section className="solicitud-ia-result solicitud-ia-result--danger" role="alert" aria-live="assertive">
+      <div className="solicitud-ia-result__heading">
+        <AlertTriangle size={20} />
+        <div>
+          <strong>No se pudo actualizar con IA</strong>
+          <span>{message}</span>
+        </div>
+        <button className="soft-button soft-button--compact" type="button" onClick={onDismiss}>Cerrar</button>
+      </div>
+    </section>
+  );
+}
+
+function ExpedienteIaResultPanel({ response, onDismiss }: { response: ActualizacionDocumentalExpediente; onDismiss: () => void }) {
+  const tone = response.requiereRevision ? "warning" : response.datosAplicados || response.yaEstabaCorrecta ? "success" : "info";
+  const title = response.requiereRevision
+    ? "Lectura completada con revision pendiente"
+    : response.yaEstabaCorrecta
+      ? "El expediente ya estaba correcto"
+      : response.datosAplicados
+        ? "Datos aplicados al expediente"
+        : "Lectura completada";
+  const detalles = response.detalles?.length ? response.detalles : response.avisos ?? [];
+
+  return (
+    <section className={`solicitud-ia-result solicitud-ia-result--${tone}`} role="status" aria-live="polite">
+      <div className="solicitud-ia-result__heading">
+        {tone === "warning" ? <AlertTriangle size={20} /> : tone === "success" ? <CheckCircle2 size={20} /> : <Info size={20} />}
+        <div>
+          <strong>{title}</strong>
+          <span>{response.mensaje || "Proceso finalizado."}</span>
+        </div>
+        <button className="soft-button soft-button--compact" type="button" onClick={onDismiss}>Cerrar</button>
+      </div>
+      <div className="solicitud-ia-result__metrics">
+        <span>Identidades: {response.lecturasIdentidadNuevas} nuevas / {response.lecturasIdentidadReutilizadas} reutilizadas</span>
+        <span>Vehiculo: {response.lecturasVehiculoNuevas} nuevas / {response.lecturasVehiculoReutilizadas} reutilizadas</span>
+        <span>Roles: {response.lecturasRolesNuevas} nuevas / {response.lecturasRolesReutilizadas} reutilizadas</span>
+        <span>Aplicaciones: {response.datosAplicados}</span>
+      </div>
+      {detalles.length ? (
+        <ul>
+          {detalles.slice(0, 6).map((detalle) => <li key={detalle}>{detalle}</li>)}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
 export function ExpedienteDetailPage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
@@ -700,6 +752,8 @@ export function ExpedienteDetailPage() {
   const [readingRolesId, setReadingRolesId] = useState<number | null>(null);
   const [applyingRolesId, setApplyingRolesId] = useState<number | null>(null);
   const [updatingDocuments, setUpdatingDocuments] = useState(false);
+  const [iaResult, setIaResult] = useState<ActualizacionDocumentalExpediente | null>(null);
+  const [iaError, setIaError] = useState<string | null>(null);
   const { confirm, dialog } = useConfirmDialog();
 
   const refreshRelatedData = useCallback(async () => {
@@ -931,27 +985,26 @@ export function ExpedienteDetailPage() {
     }
   };
 
-  const handleUpdateFromExistingDocuments = async () => {
+  const handleUpdateFromExistingDocuments = async (options?: { forzarRelectura?: boolean }) => {
     if (!expediente || updatingDocuments) return;
+    const force = Boolean(options?.forzarRelectura);
     const confirmed = await confirm({
-      title: "Actualizar con documentos existentes",
-      description: "Se leeran DNI/CIF y contratos/facturas ya subidos, se aplicaran los datos seguros y se sincronizara el checklist documental.",
-      confirmLabel: "Actualizar",
+      title: force ? "Releer documentacion con IA" : "Actualizar con IA",
+      description: force
+        ? "Se volveran a leer DNI/CIF, documentos de vehiculo y contratos/facturas, aunque ya tengan lectura previa. Despues se aplicaran solo los datos seguros."
+        : "Se leeran o reutilizaran DNI/CIF, documentos de vehiculo y contratos/facturas ya subidos, se aplicaran los datos seguros y se sincronizara el checklist documental.",
+      confirmLabel: force ? "Releer IA" : "Actualizar",
     });
     if (!confirmed) return;
     setUpdatingDocuments(true);
+    setIaError(null);
     try {
-      const result = await updateExpedienteFromExistingDocuments(expediente.id);
+      const result = await updateExpedienteFromExistingDocuments(expediente.id, { forzarRelectura: force });
       await refreshExpediente();
-      const resumen = [
-        `${result.identidadesLeidas} identidad${result.identidadesLeidas === 1 ? "" : "es"} leida${result.identidadesLeidas === 1 ? "" : "s"}`,
-        `${result.operacionesLeidas} contrato/factura revisado${result.operacionesLeidas === 1 ? "" : "s"}`,
-        `${result.datosAplicados} aplicacion${result.datosAplicados === 1 ? "" : "es"} realizada${result.datosAplicados === 1 ? "" : "s"}`,
-      ].join(", ");
-      const avisos = result.avisos?.length ? `\n\nAvisos:\n${result.avisos.slice(0, 6).join("\n")}` : "";
-      alert(`Actualizacion completada: ${resumen}.${avisos}`);
+      setIaResult(result);
     } catch (cause) {
-      alert(cause instanceof ApiError ? cause.details || "No se pudo actualizar con los documentos existentes." : "No se pudo actualizar con los documentos existentes.");
+      setIaResult(null);
+      setIaError(cause instanceof ApiError ? cause.details || "No se pudo actualizar con IA." : "No se pudo actualizar con IA.");
     } finally {
       setUpdatingDocuments(false);
     }
@@ -1396,11 +1449,20 @@ export function ExpedienteDetailPage() {
             <button
               className="soft-button"
               disabled={updatingDocuments}
-              onClick={handleUpdateFromExistingDocuments}
+              onClick={() => handleUpdateFromExistingDocuments()}
               type="button"
             >
               {updatingDocuments ? <Loader2 className="button-spinner" size={16} /> : <RefreshCw size={16} />}
-              Actualizar datos
+              Actualizar con IA
+            </button>
+            <button
+              className="soft-button"
+              disabled={updatingDocuments}
+              onClick={() => handleUpdateFromExistingDocuments({ forzarRelectura: true })}
+              type="button"
+            >
+              {updatingDocuments ? <Loader2 className="button-spinner" size={16} /> : <RefreshCw size={16} />}
+              Releer IA
             </button>
             <button
               className="soft-button milestone-action--warning"
@@ -1431,6 +1493,8 @@ export function ExpedienteDetailPage() {
           </div>
         </section>
       ) : null}
+      {iaError ? <ExpedienteIaErrorPanel message={iaError} onDismiss={() => setIaError(null)} /> : null}
+      {iaResult ? <ExpedienteIaResultPanel response={iaResult} onDismiss={() => setIaResult(null)} /> : null}
 
       <div className="exp-process-layout">
         <div className="exp-process-main">

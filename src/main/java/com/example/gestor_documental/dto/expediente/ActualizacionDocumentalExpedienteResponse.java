@@ -17,8 +17,21 @@ import lombok.Setter;
 public class ActualizacionDocumentalExpedienteResponse {
     private int identidadesLeidas;
     private int operacionesLeidas;
+    private int vehiculosLeidos;
+    private int lecturasIdentidadNuevas;
+    private int lecturasIdentidadReutilizadas;
+    private int lecturasRolesNuevas;
+    private int lecturasRolesReutilizadas;
+    private int lecturasVehiculoNuevas;
+    private int lecturasVehiculoReutilizadas;
     private int datosAplicados;
+    private boolean yaEstabaCorrecta;
+    private boolean requiereRevision;
+    private String mensaje;
 
     @Builder.Default
     private List<String> avisos = new ArrayList<>();
+
+    @Builder.Default
+    private List<String> detalles = new ArrayList<>();
 }

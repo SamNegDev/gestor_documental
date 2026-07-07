@@ -340,9 +340,10 @@ public class ExpedienteApiController {
     @PostMapping("/{id}/documentacion/actualizar")
     public ActualizacionDocumentalExpedienteResponse actualizarDocumentacionExistente(
             @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean forzarRelectura,
             Authentication authentication
     ) {
-        return documentacionActualizacionService.actualizarDesdeDocumentos(id, requireAdmin(authentication));
+        return documentacionActualizacionService.actualizarDesdeDocumentos(id, requireAdmin(authentication), forzarRelectura);
     }
 
     @PostMapping("/{id}/hitos/{codigo}/completar")

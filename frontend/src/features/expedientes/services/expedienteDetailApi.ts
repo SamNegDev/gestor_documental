@@ -25,8 +25,12 @@ export function updateExpedienteInteresados(id: string | number, interesados: Ex
   return apiPutJson(`/api/expedientes/${id}/interesados`, { interesados });
 }
 
-export function updateExpedienteFromExistingDocuments(id: string | number): Promise<ActualizacionDocumentalExpediente> {
-  return apiPostJson<ActualizacionDocumentalExpediente>(`/api/expedientes/${id}/documentacion/actualizar`, {});
+export function updateExpedienteFromExistingDocuments(
+  id: string | number,
+  options?: { forzarRelectura?: boolean },
+): Promise<ActualizacionDocumentalExpediente> {
+  const query = options?.forzarRelectura ? "?forzarRelectura=true" : "";
+  return apiPostJson<ActualizacionDocumentalExpediente>(`/api/expedientes/${id}/documentacion/actualizar${query}`, {});
 }
 
 export function createExpediente(input: ExpedienteEditInput): Promise<{ id: number }> {

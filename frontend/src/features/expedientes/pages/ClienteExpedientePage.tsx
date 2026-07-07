@@ -5,7 +5,9 @@ import { Link, useParams } from "react-router-dom";
 import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, Download, Eye, FileText, History, Loader2, MessageCircle, Upload } from "lucide-react";
 import { answerAdditionalInfo, getClienteExpediente, markClienteExpedienteMessagesRead, sendClienteExpedienteMessage, type ExpedienteCliente } from "../services/clienteExpedienteApi";
 import { uploadIncidentDocument } from "../services/expedienteDetailApi";
+import { uploadExpedienteDocument } from "../services/documentosApi";
 import { uploadRequirementDocument } from "../services/requisitosApi";
+import { DocumentUploadDialog, type DocumentUploadSubmit } from "../components/DocumentUploadDialog";
 import type { DocumentoExpediente, IncidenciaExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 import { uppercaseInput } from "../../../shared/utils/text";
@@ -203,6 +205,8 @@ export function ClienteExpedientePage() {
   const [message, setMessage] = useState("");
   const [additionalInfoResponse, setAdditionalInfoResponse] = useState("");
   const [uploadedIncidentIds, setUploadedIncidentIds] = useState<Set<number>>(new Set());
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadingStandaloneDocument, setUploadingStandaloneDocument] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -260,6 +264,21 @@ export function ClienteExpedientePage() {
       await refreshRelatedData();
     } catch {
       alert("No se pudo aportar el documento solicitado.");
+    }
+  };
+
+  const handleUploadStandaloneDocument = async (input: DocumentUploadSubmit) => {
+    if (!id || uploadingStandaloneDocument) return;
+    setUploadingStandaloneDocument(true);
+    try {
+      await uploadExpedienteDocument(Number(id), input.tipoDocumento, input.archivo, input.operacionId);
+      setUploadDialogOpen(false);
+      await load();
+      await refreshRelatedData();
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo subir el documento." : "No se pudo subir el documento.");
+    } finally {
+      setUploadingStandaloneDocument(false);
     }
   };
 
@@ -344,6 +363,7 @@ export function ClienteExpedientePage() {
   const informationRequested = expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL";
   const informationReceived = expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
   const latestAdminMessage = [...mensajes].reverse().find((mensaje) => mensaje.rolAutor === "ADMIN");
+  const canUploadStandaloneDocument = expediente.estado !== "FINALIZADO" && expediente.estado !== "RECHAZADO";
 
   return (
     <main className="client-expediente-page">
@@ -501,6 +521,12 @@ export function ClienteExpedientePage() {
             <p className="eyebrow">Documentos</p>
             <h3>Documentacion del expediente</h3>
           </div>
+          {canUploadStandaloneDocument ? (
+            <button className="soft-button" onClick={() => setUploadDialogOpen(true)} type="button">
+              <Upload size={16} />
+              Subir documento
+            </button>
+          ) : null}
         </div>
         <div className="documents-list">
           {documentos.length === 0 ? (
@@ -601,6 +627,12 @@ export function ClienteExpedientePage() {
           </Tabs.Content>
         </Tabs.Root>
       </section>
+      <DocumentUploadDialog
+        open={uploadDialogOpen}
+        saving={uploadingStandaloneDocument}
+        onClose={() => setUploadDialogOpen(false)}
+        onSubmit={handleUploadStandaloneDocument}
+      />
     </main>
   );
 }

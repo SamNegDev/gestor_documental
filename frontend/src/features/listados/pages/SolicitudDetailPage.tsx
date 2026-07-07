@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CarFront, CheckCircle2, FileSignature, FileText, FolderCheck, IdCard, Info, Loader2, MapPin, MessageSquare, Pencil, Phone, RefreshCw, RotateCcw, Scissors, Send, Sparkles, UserPlus, UserRound, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CarFront, CheckCircle2, FileSignature, FileText, FileUp, FolderCheck, IdCard, Info, Loader2, MapPin, MessageSquare, Pencil, Phone, RefreshCw, RotateCcw, Scissors, Send, Sparkles, UserPlus, UserRound, X } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { ApiError } from "../../../shared/api/http";
 import { uppercaseInput } from "../../../shared/utils/text";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { CompleteExpedienteUploadPanel } from "../../expedientes/components/CompleteExpedienteUploadPanel";
+import { DocumentUploadDialog, type DocumentUploadSubmit } from "../../expedientes/components/DocumentUploadDialog";
 import { DocumentTemplateDialog } from "../../expedientes/components/DocumentTemplateDialog";
 import { OcrReviewDialog } from "../../expedientes/components/OcrReviewDialog";
 import {
@@ -19,6 +20,7 @@ import {
   readDocumentIdentity,
   startCompleteSolicitudProcessing,
   updateDocument,
+  uploadSolicitudDocument,
 } from "../../expedientes/services/documentosApi";
 import type { DocumentoIdentidadDetectada, DocumentoIdentidadLectura, DocumentoExpediente, ProcesamientoExpedienteCompleto } from "../../expedientes/types/expedienteDetail.types";
 import { formatDocumentType } from "../../expedientes/utils/formatters";
@@ -69,6 +71,8 @@ export function SolicitudDetailPage() {
   const [iaResult, setIaResult] = useState<SolicitudDocumentacionIaResponse | null>(null);
   const [iaError, setIaError] = useState<string | null>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadingStandaloneDocument, setUploadingStandaloneDocument] = useState(false);
   const [habitualModalOpen, setHabitualModalOpen] = useState(false);
   const [habitualSearch, setHabitualSearch] = useState("");
   const { confirm, dialog } = useConfirmDialog();
@@ -259,6 +263,10 @@ export function SolicitudDetailPage() {
   const handleUploadCompleteSolicitud = async (archivo: File) => {
     const solicitud = solicitudQuery.data;
     if (!solicitud) return;
+    if (!archivo.name.toLowerCase().endsWith(".pdf")) {
+      alert("La documentacion completa debe subirse en formato PDF.");
+      return;
+    }
     setCompleteSolicitudProcessing(true);
     setCompleteSolicitudMinimized(false);
     try {
@@ -269,6 +277,21 @@ export function SolicitudDetailPage() {
     } catch {
       setCompleteSolicitudProcessing(false);
       alert("No se pudo iniciar la separacion del PDF completo de la solicitud.");
+    }
+  };
+
+  const handleUploadStandaloneDocument = async (input: DocumentUploadSubmit) => {
+    const solicitud = solicitudQuery.data;
+    if (!solicitud || uploadingStandaloneDocument) return;
+    setUploadingStandaloneDocument(true);
+    try {
+      await uploadSolicitudDocument(solicitud.id, input.tipoDocumento, input.archivo);
+      setUploadDialogOpen(false);
+      await refreshSolicitud();
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo subir el documento." : "No se pudo subir el documento.");
+    } finally {
+      setUploadingStandaloneDocument(false);
     }
   };
 
@@ -753,11 +776,21 @@ export function SolicitudDetailPage() {
         </>
       ) : null}
 
-      <div className="request-grid request-grid--wide">
+      <div className="request-grid request-grid--single">
         <section className="panel" id="solicitud-documentos">
           <div className="panel-heading">
             <h2>Documentos</h2>
             <div className="button-group">
+              {!isClosed ? (
+                <button
+                  className="soft-button soft-button--compact"
+                  onClick={() => setUploadDialogOpen(true)}
+                  type="button"
+                >
+                  <FileUp size={16} />
+                  Subir documento
+                </button>
+              ) : null}
               <button
                 className="soft-button soft-button--compact"
                 disabled={!hasSolicitudDocuments}
@@ -796,40 +829,40 @@ export function SolicitudDetailPage() {
             ))}
           </div>
         </section>
-
-        <section className="panel panel--messages">
-          <h2>
-            <MessageSquare size={18} /> Mensajes
-          </h2>
-          <div className="message-list">
-            {solicitud.mensajes.length === 0 ? <p className="rail-muted">Aun no hay mensajes en esta solicitud.</p> : null}
-            {solicitud.mensajes.map((item) => (
-              <article className={item.rolAutor === "ADMIN" ? "message message--admin" : "message message--cliente"} key={item.id}>
-                <div>
-                  <strong>{item.autor}</strong>
-                  <span>{item.fechaCreacion}</span>
-                </div>
-                <p>{item.contenido}</p>
-              </article>
-            ))}
-          </div>
-          <form
-            className="message-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (mensaje.trim()) {
-                mensajeMutation.mutate({ solicitudId: solicitud.id, contenido: mensaje.trim() });
-              }
-            }}
-          >
-            <textarea value={mensaje} onChange={(event) => setMensaje(uppercaseInput(event.target.value))} placeholder="Escribe un mensaje..." rows={3} />
-            <button className="primary-button primary-button--compact" disabled={mensajeMutation.isPending || !mensaje.trim()}>
-              <Send size={16} />
-              Enviar
-            </button>
-          </form>
-        </section>
       </div>
+
+      <section className="panel panel--messages">
+        <h2>
+          <MessageSquare size={18} /> Mensajes
+        </h2>
+        <div className="message-list">
+          {solicitud.mensajes.length === 0 ? <p className="rail-muted">Aun no hay mensajes en esta solicitud.</p> : null}
+          {solicitud.mensajes.map((item) => (
+            <article className={item.rolAutor === "ADMIN" ? "message message--admin" : "message message--cliente"} key={item.id}>
+              <div>
+                <strong>{item.autor}</strong>
+                <span>{item.fechaCreacion}</span>
+              </div>
+              <p>{item.contenido}</p>
+            </article>
+          ))}
+        </div>
+        <form
+          className="message-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (mensaje.trim()) {
+              mensajeMutation.mutate({ solicitudId: solicitud.id, contenido: mensaje.trim() });
+            }
+          }}
+        >
+          <textarea value={mensaje} onChange={(event) => setMensaje(uppercaseInput(event.target.value))} placeholder="Escribe un mensaje..." rows={3} />
+          <button className="primary-button primary-button--compact" disabled={mensajeMutation.isPending || !mensaje.trim()}>
+            <Send size={16} />
+            Enviar
+          </button>
+        </form>
+      </section>
 
       {solicitud.incidencias.length > 0 ? (
         <section className="panel">
@@ -885,6 +918,12 @@ export function SolicitudDetailPage() {
         onSaveDocument={handleSaveOcrDocument}
         onClose={() => setOcrReviewOpen(false)}
         open={ocrReviewOpen}
+      />
+      <DocumentUploadDialog
+        open={uploadDialogOpen}
+        saving={uploadingStandaloneDocument}
+        onClose={() => setUploadDialogOpen(false)}
+        onSubmit={handleUploadStandaloneDocument}
       />
       <DocumentTemplateDialog
         solicitudId={solicitud.id}

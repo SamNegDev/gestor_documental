@@ -219,7 +219,18 @@ export interface InconsistenciaDocumental {
 export interface ActualizacionDocumentalExpediente {
   identidadesLeidas: number;
   operacionesLeidas: number;
+  vehiculosLeidos: number;
+  lecturasIdentidadNuevas: number;
+  lecturasIdentidadReutilizadas: number;
+  lecturasRolesNuevas: number;
+  lecturasRolesReutilizadas: number;
+  lecturasVehiculoNuevas: number;
+  lecturasVehiculoReutilizadas: number;
   datosAplicados: number;
+  yaEstabaCorrecta: boolean;
+  requiereRevision: boolean;
+  mensaje?: string | null;
+  detalles: string[];
   avisos: string[];
 }
 

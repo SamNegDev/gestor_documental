@@ -5418,6 +5418,10 @@ input.records-table-filter {
   grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
 }
 
+.request-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .request-admin-toolbar {
   display: flex;
   align-items: center;
