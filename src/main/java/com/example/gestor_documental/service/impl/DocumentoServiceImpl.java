@@ -188,6 +188,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (archivo == null || archivo.isEmpty()) {
             return null;
         }
+        validarExpedienteCompletoPdf(archivo.getOriginalFilename());
 
         try {
             Expediente expediente = expedienteRepository.findById(expedienteId)
@@ -217,6 +218,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (docOriginal.getTipoDocumento() != TipoDocumento.EXPEDIENTE_COMPLETO) {
             throw new OperacionInvalidaException("El documento no es un expediente completo");
         }
+        validarExpedienteCompletoPdf(docOriginal.getNombreArchivoOriginal());
 
         Path rutaOriginal = obtenerCarpetaUploads().resolve(docOriginal.getNombreArchivo()).normalize();
         Path carpetaUploads = obtenerCarpetaUploads();
@@ -975,6 +977,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (archivo == null || archivo.isEmpty()) {
             return null;
         }
+        validarExpedienteCompletoPdf(archivo.getOriginalFilename());
 
         try {
             Solicitud solicitud = solicitudRepository.findById(solicitudId)
@@ -1002,6 +1005,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (docOriginal.getTipoDocumento() != TipoDocumento.EXPEDIENTE_COMPLETO) {
             throw new OperacionInvalidaException("El documento no es un expediente completo");
         }
+        validarExpedienteCompletoPdf(docOriginal.getNombreArchivoOriginal());
 
         Path rutaOriginal = obtenerCarpetaUploads().resolve(docOriginal.getNombreArchivo()).normalize();
         Path carpetaUploads = obtenerCarpetaUploads();
@@ -1289,6 +1293,12 @@ public class DocumentoServiceImpl implements DocumentoService {
 
         if (extension.isBlank() || !permitidas.contains(extension)) {
             throw new OperacionInvalidaException("Tipo de archivo no permitido");
+        }
+    }
+
+    private void validarExpedienteCompletoPdf(String nombreArchivo) {
+        if (!"pdf".equals(obtenerExtension(nombreArchivo != null ? nombreArchivo : ""))) {
+            throw new OperacionInvalidaException("El expediente completo debe subirse en formato PDF");
         }
     }
 

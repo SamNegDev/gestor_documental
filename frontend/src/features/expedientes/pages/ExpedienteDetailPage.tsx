@@ -7,6 +7,7 @@ import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
 import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
 import { DocumentRequirementsPanel } from "../components/DocumentRequirementsPanel";
 import { DocumentTemplateDialog } from "../components/DocumentTemplateDialog";
+import { DocumentUploadDialog, type DocumentUploadSubmit } from "../components/DocumentUploadDialog";
 import { DocumentsPanel } from "../components/DocumentsPanel";
 import { ExpedienteHeader } from "../components/ExpedienteHeader";
 import { IncidentAlertPanel } from "../components/IncidentAlertPanel";
@@ -693,6 +694,8 @@ export function ExpedienteDetailPage() {
   const [resolvingIncident, setResolvingIncident] = useState<IncidenciaExpediente | null>(null);
   const [activeOperationId, setActiveOperationId] = useState<number | null>(null);
   const [editingDocument, setEditingDocument] = useState<DocumentoExpediente | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadingStandaloneDocument, setUploadingStandaloneDocument] = useState(false);
   const [readingIdentityId, setReadingIdentityId] = useState<number | null>(null);
   const [readingRolesId, setReadingRolesId] = useState<number | null>(null);
   const [applyingRolesId, setApplyingRolesId] = useState<number | null>(null);
@@ -846,6 +849,20 @@ export function ExpedienteDetailPage() {
     }
   };
 
+  const handleUploadStandaloneDocument = async (input: DocumentUploadSubmit) => {
+    if (!expediente || uploadingStandaloneDocument) return;
+    setUploadingStandaloneDocument(true);
+    try {
+      await uploadExpedienteDocument(expediente.id, input.tipoDocumento, input.archivo, input.operacionId);
+      setUploadDialogOpen(false);
+      await refreshExpediente();
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo subir el documento." : "No se pudo subir el documento.");
+    } finally {
+      setUploadingStandaloneDocument(false);
+    }
+  };
+
   const handleUploadRequirement = async (requisito: RequisitoDocumental, archivo: File) => {
     try {
       await uploadRequirementDocument(requisito.id, archivo);
@@ -942,6 +959,10 @@ export function ExpedienteDetailPage() {
 
   const handleUploadCompleteExpediente = async (archivo: File) => {
     if (!expediente) return;
+    if (!archivo.name.toLowerCase().endsWith(".pdf")) {
+      alert("El expediente completo debe subirse en formato PDF.");
+      return;
+    }
     setCompleteExpedienteProcessing(true);
     setCompleteExpedienteMinimized(false);
     try {
@@ -949,9 +970,9 @@ export function ExpedienteDetailPage() {
       setCompleteExpedienteJob(job);
       window.localStorage.setItem(`${COMPLETE_EXPEDIENTE_JOB_STORAGE_PREFIX}${expediente.id}`, job.jobId);
       await refreshExpediente();
-    } catch {
+    } catch (cause) {
       setCompleteExpedienteProcessing(false);
-      alert("No se pudo iniciar la separacion del expediente completo.");
+      alert(cause instanceof ApiError ? cause.details || "No se pudo iniciar la separacion del expediente completo." : "No se pudo iniciar la separacion del expediente completo.");
     }
   };
 
@@ -1457,6 +1478,7 @@ export function ExpedienteDetailPage() {
             onOpenChecklist={() => setChecklistOpen(true)}
             onOpenReview={handleOpenDocumentReview}
             onOpenTemplates={() => setTemplateDialogOpen(true)}
+            onOpenUpload={() => setUploadDialogOpen(true)}
             onReadIdentity={handleReadDocumentIdentity}
             onReadRoles={handleReadDocumentRoles}
             onUploadDocument={handleUploadDocument}
@@ -1525,6 +1547,14 @@ export function ExpedienteDetailPage() {
         operaciones={operaciones}
         onClose={() => setEditingDocument(null)}
         onSubmit={handleEditDocument}
+      />
+      <DocumentUploadDialog
+        activeOperationId={activeOperation?.id ?? null}
+        operaciones={operaciones}
+        open={uploadDialogOpen}
+        saving={uploadingStandaloneDocument}
+        onClose={() => setUploadDialogOpen(false)}
+        onSubmit={handleUploadStandaloneDocument}
       />
       {dialog}
     </main>

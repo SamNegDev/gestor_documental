@@ -63,7 +63,12 @@ export function CompleteExpedienteUploadPanel({
           onChange={(event) => {
             const file = event.currentTarget.files?.[0];
             event.currentTarget.value = "";
-            if (file) onUploadCompleteExpediente(file);
+            if (!file) return;
+            if (!file.name.toLowerCase().endsWith(".pdf")) {
+              alert("El expediente completo debe subirse en formato PDF.");
+              return;
+            }
+            onUploadCompleteExpediente(file);
           }}
         />
       </label>

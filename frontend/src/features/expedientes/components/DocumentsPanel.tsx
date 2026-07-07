@@ -7,6 +7,7 @@ type Props = {
   onOpenChecklist: () => void;
   onOpenReview: () => void;
   onOpenTemplates: () => void;
+  onOpenUpload: () => void;
   onUploadDocument: (documento: DocumentoExpediente, archivo: File) => void;
   onEditDocument: (documento: DocumentoExpediente) => void;
   onDeleteDocument: (documento: DocumentoExpediente) => void;
@@ -23,6 +24,7 @@ export function DocumentsPanel({
   onOpenChecklist,
   onOpenReview,
   onOpenTemplates,
+  onOpenUpload,
   onUploadDocument,
   onEditDocument,
   onDeleteDocument,
@@ -45,6 +47,10 @@ export function DocumentsPanel({
         </div>
         <div className="exp-panel__heading-actions">
           <button className="soft-button" onClick={onOpenChecklist} type="button">Checklist</button>
+          <button className="soft-button" onClick={onOpenUpload} type="button">
+            <Upload size={16} />
+            Subir documento
+          </button>
           <button className="soft-button" disabled={!hasEditableDocuments} onClick={onOpenReview} type="button">
             <Scissors size={16} />
             Revisar documentos

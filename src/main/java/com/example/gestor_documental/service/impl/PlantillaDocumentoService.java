@@ -231,7 +231,12 @@ public class PlantillaDocumentoService {
             List<ExpedienteInteresado> relaciones) {
         if (plantilla == TipoPlantilla.MANDATO && vacio(valores.get("direccionMandante"))) {
             Interesado mandante = interesado(relaciones, valores.get("mandanteId"), false);
-            if (mandante != null) valores.put("direccionMandante", direccion(mandante));
+            if (mandante != null) {
+                valores.put("direccionMandante", nombreVia(mandante));
+                if (vacio(valores.get("localidadMandante"))) {
+                    valores.put("localidadMandante", limpiar(mandante.getMunicipio()));
+                }
+            }
         }
         if (plantilla == TipoPlantilla.CAMBIO_TITULARIDAD) {
             Interesado comprador = interesado(relaciones, valores.get("compradorId"), false);
@@ -327,10 +332,12 @@ public class PlantillaDocumentoService {
             set(form, "Nombre", mandante.getNombre());
             set(form, "DNI", mandante.getDni());
         }
-        String[] direccion = dividir(valores.get("direccionMandante"), 38);
+        String[] direccion = dividirPorCampos(form, valores.get("direccionMandante"), "calle", "calle1", 38);
         set(form, "Localidad", valores.get("localidadMandante"));
         set(form, "calle", direccion[0]);
         set(form, "calle1", direccion[1]);
+        set(form, "n\u00ba", mandante.getNumeroVia());
+        set(form, "CP", mandante.getCodigoPostal());
         set(form, "ASUNTO", valores.get("asunto"));
         set(form, "ASUNTO1", valores.get("asunto2"));
         set(form, "FECHA", LocalDate.now().format(DATE_LONG).toUpperCase(Locale.ROOT));
@@ -371,7 +378,7 @@ public class PlantillaDocumentoService {
         Interesado vendedor = interesado(relaciones, valores.get("vendedorId"), true);
         set(form, "Texto1", vendedor.getNombre());
         set(form, "Texto3", vendedor.getDni());
-        String[] direccionVendedor = dividir(valores.get("direccionVendedor"), 56);
+        String[] direccionVendedor = dividirPorCampos(form, valores.get("direccionVendedor"), "Texto4", "Texto5", 56);
         set(form, "Texto4", direccionVendedor[0]);
         set(form, "Texto5", direccionVendedor[1]);
         set(form, "Texto6", valores.get("marca"));
@@ -381,7 +388,7 @@ public class PlantillaDocumentoService {
         set(form, "Texto10", valores.get("cvf"));
         set(form, "Texto11", comprador.getNombre());
         set(form, "Texto12", comprador.getDni());
-        String[] direccionComprador = dividir(valores.get("direccionComprador"), 56);
+        String[] direccionComprador = dividirPorCampos(form, valores.get("direccionComprador"), "Texto13", "Texto14", 56);
         set(form, "Texto13", direccionComprador[0]);
         set(form, "Texto14", direccionComprador[1]);
         set(form, "Texto15", valores.get("precio"));
@@ -629,6 +636,37 @@ public class PlantillaDocumentoService {
         int corte = contenido.lastIndexOf(' ', maxPrimeraLinea);
         if (corte < maxPrimeraLinea / 2) corte = maxPrimeraLinea;
         return new String[] { contenido.substring(0, corte).trim(), contenido.substring(corte).trim() };
+    }
+
+    private String[] dividirPorCampos(PDAcroForm form, String texto, String primerCampo, String segundoCampo,
+            int maxPrimeraLineaFallback) {
+        int primeraLinea = capacidadCampo(form, primerCampo, maxPrimeraLineaFallback);
+        int segundaLinea = capacidadCampo(form, segundoCampo, Math.max(maxPrimeraLineaFallback, primeraLinea));
+        String contenido = limpiar(texto);
+        if (contenido.length() <= primeraLinea) {
+            return new String[] { contenido, "" };
+        }
+        int objetivo = contenido.length() <= primeraLinea + segundaLinea
+                ? Math.max(1, contenido.length() - segundaLinea)
+                : primeraLinea;
+        int limite = Math.min(primeraLinea, Math.max(objetivo, primeraLinea / 2));
+        int corte = contenido.lastIndexOf(' ', limite);
+        if (corte < objetivo / 2) {
+            corte = contenido.indexOf(' ', objetivo);
+        }
+        if (corte <= 0 || corte > primeraLinea) {
+            corte = primeraLinea;
+        }
+        return new String[] { contenido.substring(0, corte).trim(), contenido.substring(corte).trim() };
+    }
+
+    private int capacidadCampo(PDAcroForm form, String nombreCampo, int fallback) {
+        PDField field = form.getField(nombreCampo);
+        if (field == null || field.getWidgets().isEmpty() || field.getWidgets().get(0).getRectangle() == null) {
+            return fallback;
+        }
+        float ancho = field.getWidgets().get(0).getRectangle().getWidth();
+        return Math.max(8, Math.min(120, (int) Math.floor(ancho / 4.85)));
     }
 
     private String limpiar(String valor) {

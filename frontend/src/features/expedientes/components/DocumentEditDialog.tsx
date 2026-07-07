@@ -4,7 +4,7 @@ import type { DocumentoExpediente, OperacionExpediente } from "../types/expedien
 import { formatDocumentType } from "../utils/formatters";
 import { uppercaseInput } from "../../../shared/utils/text";
 
-const DOCUMENT_TYPES = [
+export const DOCUMENT_TYPES = [
   "DNI",
   "CIF",
   "CONTRATO_COMPRAVENTA",

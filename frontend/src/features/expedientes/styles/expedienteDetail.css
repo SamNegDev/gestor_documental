@@ -3017,6 +3017,37 @@
   padding: 0;
 }
 
+.document-upload-file {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-height: 42px;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px dashed #9fb3ae;
+  border-radius: 9px;
+  background: #f8fbfa;
+  color: var(--ink-strong);
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-transform: none;
+}
+
+.document-upload-file span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-upload-file input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .document-edit-toggle span,
 .document-edit-toggle small {
   display: block;

@@ -34,6 +34,8 @@ public class DatabaseSeeder implements CommandLineRunner {
                     new TipoIncidencia(TipoIncidenciaEnum.NOTIFICADO,
                             "El vehiculo consta ya como notificada su venta. Requiere aportar datos del notificador.",
                             true),
+                    new TipoIncidencia(TipoIncidenciaEnum.DENEGATORIA,
+                            "Existe una denegatoria o impedimento administrativo que bloquea la tramitacion.", true),
                     new TipoIncidencia(TipoIncidenciaEnum.RECHAZADO_DGT,
                             "Tramite rechazado explicitamente por la DGT por inconsistencia de datos.", true));
             tipoIncidenciaRepository.saveAll(incidencias);
@@ -65,6 +67,11 @@ public class DatabaseSeeder implements CommandLineRunner {
             tipoIncidenciaRepository.save(new TipoIncidencia(TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION,
                     "Falta documentacion necesaria u obligatoria para el tramite.", true));
             System.out.println("Se inserto el nuevo TipoIncidencia: PENDIENTE_DOCUMENTACION");
+        }
+        if (tipoIncidenciaRepository.findByNombre(TipoIncidenciaEnum.DENEGATORIA).isEmpty()) {
+            tipoIncidenciaRepository.save(new TipoIncidencia(TipoIncidenciaEnum.DENEGATORIA,
+                    "Existe una denegatoria o impedimento administrativo que bloquea la tramitacion.", true));
+            System.out.println("Se inserto el nuevo TipoIncidencia: DENEGATORIA");
         }
         if (tipoIncidenciaRepository.findByNombre(TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL).isEmpty()) {
             tipoIncidenciaRepository.save(new TipoIncidencia(TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL,
