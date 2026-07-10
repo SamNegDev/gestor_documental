@@ -1206,19 +1206,9 @@
   font-weight: 700;
 }
 
-.ocr-review-modal {
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  width: min(980px, 100%);
-  max-height: min(88vh, 860px);
-  overflow: hidden;
-}
-
 .ocr-review-list {
   display: grid;
   gap: 12px;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
 }
 
 .ocr-review-card {
@@ -2878,6 +2868,21 @@
 
 .exp-modal__panel--wide {
   width: min(980px, 100%);
+}
+
+.exp-modal__panel.ocr-review-modal {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(980px, 100%);
+  height: min(88dvh, 860px);
+  max-height: calc(100dvh - 36px);
+  overflow: hidden;
+}
+
+.ocr-review-modal .ocr-review-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
 }
 
 .interesados-correction-note {
