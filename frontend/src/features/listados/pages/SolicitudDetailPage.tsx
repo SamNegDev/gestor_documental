@@ -9,6 +9,7 @@ import { uppercaseInput } from "../../../shared/utils/text";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { CompleteExpedienteUploadPanel } from "../../expedientes/components/CompleteExpedienteUploadPanel";
 import { DocumentUploadDialog, type DocumentUploadSubmit } from "../../expedientes/components/DocumentUploadDialog";
+import { DocumentReadingPanel, normalizeIdentityIdentifier, type DocumentReadingExistingIdentity } from "../../expedientes/components/DocumentReadingPanel";
 import { DocumentTemplateDialog } from "../../expedientes/components/DocumentTemplateDialog";
 import { OcrReviewDialog } from "../../expedientes/components/OcrReviewDialog";
 import {
@@ -22,7 +23,7 @@ import {
   updateDocument,
   uploadSolicitudDocument,
 } from "../../expedientes/services/documentosApi";
-import type { DocumentoIdentidadDetectada, DocumentoIdentidadLectura, DocumentoExpediente, ProcesamientoExpedienteCompleto } from "../../expedientes/types/expedienteDetail.types";
+import type { DocumentoIdentidadDetectada, DocumentoExpediente, ProcesamientoExpedienteCompleto } from "../../expedientes/types/expedienteDetail.types";
 import { formatDocumentType } from "../../expedientes/utils/formatters";
 import "../../expedientes/styles/expedienteDetail.css";
 import {
@@ -810,7 +811,7 @@ export function SolicitudDetailPage() {
                 <div className="document-table__main">
                   <strong>{documento.nombreOriginal || documento.nombre}</strong>
                   <span>{formatDocumentType(documento.tipo)}{documento.interesadoNombre ? ` - ${documento.interesadoNombre}` : ""}</span>
-                  <SolicitudDocumentReading
+                  <DocumentReadingPanel
                     documento={documento}
                     canAddIdentity={!isClosed}
                     canRereadIdentity={!isClosed}
@@ -1024,251 +1025,7 @@ function SolicitudHabitualesPanel({
   );
 }
 
-type SolicitudExistingIdentity = {
-  identificador: string;
-  rol?: string | null;
-  nombre?: string | null;
-};
-
-function SolicitudDocumentReading({
-  documento,
-  canAddIdentity = false,
-  canRereadIdentity = false,
-  existingIdentities,
-  addingIdentity,
-  rereadingIdentity,
-  onAddIdentity,
-  onRereadIdentity,
-}: {
-  documento: DocumentoExpediente;
-  canAddIdentity?: boolean;
-  canRereadIdentity?: boolean;
-  existingIdentities: SolicitudExistingIdentity[];
-  addingIdentity: boolean;
-  rereadingIdentity: boolean;
-  onAddIdentity: (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string) => void;
-  onRereadIdentity: (documento: DocumentoExpediente) => void;
-}) {
-  const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
-  const [identifiers, setIdentifiers] = useState<Record<string, string>>({});
-  const identidad = documento.lecturaIdentidad;
-  const roles = documento.lecturaRoles;
-  const vehiculo = documento.lecturaVehiculo;
-  if (!identidad && !roles && !vehiculo) {
-    return null;
-  }
-  if (identidad) {
-    const detectadas = compactIdentityOptions(
-      identidad.identidadesDetectadas?.length ? identidad.identidadesDetectadas : [lecturaPrincipalComoIdentidad(identidad)],
-    );
-    return (
-      <div className={identidad.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
-        <div className="solicitud-reading__header">
-          <strong>{detectadas.length > 1 ? `${detectadas.length} DNI/CIF detectados` : "DNI/CIF detectado"}</strong>
-          <div className="solicitud-reading__header-actions">
-            <span>{confidenceLabel(identidad.confianzaGlobal)}</span>
-            {canRereadIdentity ? (
-              <button
-                className="soft-button soft-button--compact"
-                disabled={rereadingIdentity}
-                onClick={() => onRereadIdentity(documento)}
-                type="button"
-              >
-                {rereadingIdentity ? <Loader2 size={14} /> : <RefreshCw size={14} />}
-                Releer
-              </button>
-            ) : null}
-          </div>
-        </div>
-        <div className="solicitud-reading-identities">
-          {detectadas.map((item, index) => {
-            const key = identityKey(item, index);
-            const normalizedId = normalizeIdentityIdentifier(item.identificador);
-            const identifierValue = identifiers[key] ?? normalizedId ?? "";
-            const normalizedEditedId = normalizeIdentityIdentifier(identifierValue);
-            const matchedExisting = normalizedEditedId
-              ? existingIdentities.find((existing) => existing.identificador === normalizedEditedId)
-              : null;
-            const selectedRole = matchedExisting?.rol || selectedRoles[key] || "";
-            const roleLocked = Boolean(matchedExisting?.rol);
-            const submitLabel = matchedExisting ? "Asignar" : "Anadir";
-            return (
-              <div className="solicitud-reading-identity" key={key}>
-                <div className="solicitud-reading-identity__main">
-                  <div className="solicitud-reading-identity__summary">
-                    <div>
-                      <span>{item.tipoDocumentoDetectado || "Identidad"}</span>
-                      <strong>{identityDisplayName(item) || "Nombre no detectado"}</strong>
-                    </div>
-                    <code>{normalizedId || "Sin DNI/CIF"}</code>
-                  </div>
-                  <div className="solicitud-reading-identity__meta">
-                    {item.fechaNacimiento ? <span>Nac. {item.fechaNacimiento}</span> : null}
-                    {item.fechaCaducidad ? <span>Cad. {item.fechaCaducidad}</span> : null}
-                    {item.direccionTexto ? <span>{item.direccionTexto}</span> : null}
-                  </div>
-                  {matchedExisting ? (
-                    <p className="solicitud-reading-identity__match">Coincide con interesado: {[matchedExisting.nombre, matchedExisting.rol ? formatEnum(matchedExisting.rol) : null].filter(Boolean).join(" - ")}</p>
-                  ) : null}
-                  {item.observaciones ? (
-                    <p className="solicitud-reading-identity__note">{item.observaciones}</p>
-                  ) : null}
-                </div>
-                {canAddIdentity ? (
-                  <div className="solicitud-reading-identity__actions">
-                    <input
-                      aria-label="DNI/NIE/CIF revisado"
-                      className="solicitud-reading-identity__identifier"
-                      disabled={addingIdentity}
-                      onChange={(event) => setIdentifiers((current) => ({ ...current, [key]: uppercaseInput(event.target.value) }))}
-                      placeholder="DNI/NIE/CIF"
-                      value={identifierValue}
-                    />
-                    <select
-                      aria-label="Rol del interesado"
-                      disabled={addingIdentity || roleLocked}
-                      onChange={(event) => setSelectedRoles((current) => ({ ...current, [key]: event.target.value }))}
-                      value={selectedRole}
-                    >
-                      <option value="">Rol</option>
-                      {SOLICITUD_ROLES.map((rol) => (
-                        <option key={rol} value={rol}>{formatEnum(rol)}</option>
-                      ))}
-                    </select>
-                    <button
-                      className="soft-button soft-button--compact"
-                      disabled={addingIdentity || !selectedRole || !normalizedEditedId}
-                      onClick={() => onAddIdentity(documento, item, selectedRole, identifierValue)}
-                      type="button"
-                    >
-                      {addingIdentity ? <Loader2 size={14} /> : <UserPlus size={14} />}
-                      {submitLabel}
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-        <em>{identidad.mensaje || (identidad.requiereRevision ? "Revisar lectura" : "Lectura valida")}</em>
-      </div>
-    );
-  }
-  if (roles) {
-    return (
-      <div className={roles.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
-        <strong>Roles detectados</strong>
-        <span>Vendedor: {[roles.vendedorIdentificador, roles.vendedorNombre].filter(Boolean).join(" - ") || "Sin dato"}</span>
-        <span>Comprador: {[roles.compradorIdentificador, roles.compradorNombre].filter(Boolean).join(" - ") || "Sin dato"}</span>
-        {[roles.matricula, roles.bastidor].filter(Boolean).length ? <small>{[roles.matricula, roles.bastidor].filter(Boolean).join(" / ")}</small> : null}
-        <em>{confidenceLabel(roles.confianzaGlobal)} / {roles.mensaje || roles.motivoAplicacion || "Lectura registrada"}</em>
-      </div>
-    );
-  }
-  return vehiculo ? (
-    <div className={vehiculo.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
-      <strong>Vehiculo detectado</strong>
-      <span>{[vehiculo.marca, vehiculo.modeloVehiculo].filter(Boolean).join(" ") || "Sin marca/modelo"}</span>
-      {[vehiculo.matricula, vehiculo.bastidor].filter(Boolean).length ? <small>{[vehiculo.matricula, vehiculo.bastidor].filter(Boolean).join(" / ")}</small> : null}
-      <em>{confidenceLabel(vehiculo.confianzaGlobal)} / {vehiculo.mensaje || "Lectura registrada"}</em>
-    </div>
-  ) : null;
-}
-
-function confidenceLabel(value?: number | null) {
-  return typeof value === "number" ? `${Math.round(value * 100)}% confianza` : "Sin confianza";
-}
-
-function lecturaPrincipalComoIdentidad(lectura: DocumentoIdentidadLectura): DocumentoIdentidadDetectada {
-  return {
-    tipoDocumentoDetectado: lectura.tipoDocumentoDetectado,
-    identificador: lectura.identificador,
-    nombre: lectura.nombre,
-    apellido1: lectura.apellido1,
-    apellido2: lectura.apellido2,
-    razonSocial: lectura.razonSocial,
-    nombreCompleto: lectura.nombreCompleto,
-    fechaNacimiento: lectura.fechaNacimiento,
-    fechaCaducidad: lectura.fechaCaducidad,
-    direccionTexto: lectura.direccionTexto,
-    confianzaGlobal: lectura.confianzaGlobal,
-    requiereRevision: lectura.requiereRevision,
-    observaciones: lectura.mensaje,
-  };
-}
-
-function compactIdentityOptions(identidades: DocumentoIdentidadDetectada[]) {
-  const result: DocumentoIdentidadDetectada[] = [];
-  identidades.forEach((item) => {
-    const normalizedId = normalizeIdentityIdentifier(item.identificador);
-    const normalizedItem = {
-      ...item,
-      identificador: normalizedId?.startsWith("IDESP") ? null : normalizedId || item.identificador,
-    };
-    if (!normalizedItem.identificador && !identityDisplayName(normalizedItem)) {
-      return;
-    }
-    const index = result.findIndex((existing) => sameIdentityOption(existing, normalizedItem));
-    if (index >= 0) {
-      result[index] = mergeIdentityOption(result[index], normalizedItem);
-    } else {
-      result.push(normalizedItem);
-    }
-  });
-  return result;
-}
-
-function sameIdentityOption(first: DocumentoIdentidadDetectada, second: DocumentoIdentidadDetectada) {
-  const firstId = normalizeIdentityIdentifier(first.identificador);
-  const secondId = normalizeIdentityIdentifier(second.identificador);
-  if (firstId && secondId && firstId === secondId) {
-    return true;
-  }
-  const firstName = normalizeIdentityName(first);
-  const secondName = normalizeIdentityName(second);
-  return Boolean(firstName && firstName === secondName && (!firstId || !secondId));
-}
-
-function mergeIdentityOption(first: DocumentoIdentidadDetectada, second: DocumentoIdentidadDetectada): DocumentoIdentidadDetectada {
-  const firstId = normalizeIdentityIdentifier(first.identificador);
-  const secondId = normalizeIdentityIdentifier(second.identificador);
-  return {
-    ...first,
-    ...second,
-    identificador: firstId || secondId || first.identificador || second.identificador,
-    nombre: second.nombre || first.nombre,
-    apellido1: second.apellido1 || first.apellido1,
-    apellido2: second.apellido2 || first.apellido2,
-    razonSocial: second.razonSocial || first.razonSocial,
-    nombreCompleto: second.nombreCompleto || first.nombreCompleto,
-    fechaNacimiento: second.fechaNacimiento || first.fechaNacimiento,
-    fechaCaducidad: second.fechaCaducidad || first.fechaCaducidad,
-    direccionTexto: second.direccionTexto || first.direccionTexto,
-    confianzaGlobal: Math.max(first.confianzaGlobal ?? 0, second.confianzaGlobal ?? 0) || first.confianzaGlobal || second.confianzaGlobal,
-    requiereRevision: first.requiereRevision && second.requiereRevision,
-    observaciones: second.observaciones || first.observaciones,
-  };
-}
-
-function identityKey(item: DocumentoIdentidadDetectada, index: number) {
-  return normalizeIdentityIdentifier(item.identificador) || `${normalizeIdentityName(item) || "identidad"}-${index}`;
-}
-
-function identityDisplayName(item: DocumentoIdentidadDetectada) {
-  return item.nombreCompleto
-    || item.razonSocial
-    || [item.nombre, item.apellido1, item.apellido2].filter(Boolean).join(" ").trim()
-    || null;
-}
-
-function normalizeIdentityName(item: DocumentoIdentidadDetectada) {
-  return identityDisplayName(item)?.toUpperCase().replace(/[^A-Z0-9]/g, "") || null;
-}
-
-function normalizeIdentityIdentifier(value?: string | null) {
-  const normalized = value?.toUpperCase().replace(/[^A-Z0-9]/g, "") || "";
-  return normalized || null;
-}
+type SolicitudExistingIdentity = DocumentReadingExistingIdentity;
 
 function SolicitudPreparationAssistant({
   preparation,

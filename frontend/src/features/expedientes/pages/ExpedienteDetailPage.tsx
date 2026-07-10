@@ -6,6 +6,7 @@ import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteU
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
 import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
 import { DocumentRequirementsPanel } from "../components/DocumentRequirementsPanel";
+import { identityDisplayName, normalizeIdentityIdentifier } from "../components/DocumentReadingPanel";
 import { DocumentTemplateDialog } from "../components/DocumentTemplateDialog";
 import { DocumentUploadDialog, type DocumentUploadSubmit } from "../components/DocumentUploadDialog";
 import { DocumentsPanel } from "../components/DocumentsPanel";
@@ -119,14 +120,8 @@ function interesadoCorrectionFromExpediente(interesado: ExpedienteDetail["intere
   };
 }
 
-function identityDisplayName(identidad: DocumentoIdentidadDetectada) {
-  return identidad.razonSocial
-    || identidad.nombreCompleto
-    || [identidad.nombre, identidad.apellido1, identidad.apellido2].filter(Boolean).join(" ");
-}
-
 function normalizeIdentifier(value?: string | null) {
-  return uppercaseInput(value || "").replace(/[^A-Z0-9]/g, "");
+  return normalizeIdentityIdentifier(value) || "";
 }
 
 function hasInteresadoCorrectionData(interesado: InteresadoCorrection) {
@@ -768,6 +763,7 @@ export function ExpedienteDetailPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadingStandaloneDocument, setUploadingStandaloneDocument] = useState(false);
   const [readingIdentityId, setReadingIdentityId] = useState<number | null>(null);
+  const [addingIdentityDocumentId, setAddingIdentityDocumentId] = useState<number | null>(null);
   const [readingRolesId, setReadingRolesId] = useState<number | null>(null);
   const [updatingDocuments, setUpdatingDocuments] = useState(false);
   const [iaResult, setIaResult] = useState<ActualizacionDocumentalExpediente | null>(null);
@@ -1008,14 +1004,15 @@ export function ExpedienteDetailPage() {
     setInteresadosCorrectionOpen(true);
   };
 
-  const handleUseDetectedIdentity = (_documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada) => {
+  const handleUseDetectedIdentity = async (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string) => {
     if (!expediente) return;
-    const identifier = normalizeIdentifier(identidad.identificador);
+    const identifier = normalizeIdentifier(identificador || identidad.identificador);
     const detectedRow: InteresadoCorrection = {
       ...emptyInteresadoCorrection(),
       nombre: uppercaseInput(identityDisplayName(identidad)),
       dni: identifier,
       direccion: uppercaseInput(identidad.direccionTexto || ""),
+      rol,
     };
     const rows = expediente.interesados.map(interesadoCorrectionFromExpediente);
     const existingIndex = identifier ? rows.findIndex((row) => normalizeIdentifier(row.dni) === identifier) : -1;
@@ -1025,12 +1022,20 @@ export function ExpedienteDetailPage() {
         nombre: detectedRow.nombre || rows[existingIndex].nombre,
         dni: detectedRow.dni || rows[existingIndex].dni,
         direccion: detectedRow.direccion || rows[existingIndex].direccion,
+        rol: detectedRow.rol || rows[existingIndex].rol,
       };
     } else {
       rows.push(detectedRow);
     }
-    setInteresadosCorrectionInitialRows(rows);
-    setInteresadosCorrectionOpen(true);
+    setAddingIdentityDocumentId(documento.id);
+    try {
+      await updateExpedienteInteresados(expediente.id, rows.filter(hasInteresadoCorrectionData));
+      await refreshExpediente();
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo anadir la identidad al expediente." : "No se pudo anadir la identidad al expediente.");
+    } finally {
+      setAddingIdentityDocumentId(null);
+    }
   };
 
   const handleUploadCompleteExpediente = async (archivo: File) => {
@@ -1439,6 +1444,13 @@ export function ExpedienteDetailPage() {
     hiddenClosingDocumentTypes.add("MODELO_620");
   }
   const closingOperationId = operaciones.length > 1 ? activeOperation?.id ?? null : null;
+  const existingExpedienteIdentities = expediente.interesados.reduce<Array<{ identificador: string; rol?: string | null; nombre?: string | null }>>((result, interesado) => {
+    const identificador = normalizeIdentifier(interesado.dni);
+    if (identificador) {
+      result.push({ identificador, rol: interesado.rol, nombre: interesado.nombre });
+    }
+    return result;
+  }, []);
 
   return (
     <main className="exp-detail-page">
@@ -1558,7 +1570,9 @@ export function ExpedienteDetailPage() {
             onUploadRequirement={handleUploadRequirement}
           />
           <DocumentsPanel
+            addingIdentityDocumentId={addingIdentityDocumentId}
             documentos={expediente.documentos}
+            existingIdentities={existingExpedienteIdentities}
             onDeleteDocument={handleDeleteDocument}
             onEditDocument={setEditingDocument}
             onOpenReview={handleOpenDocumentReview}
