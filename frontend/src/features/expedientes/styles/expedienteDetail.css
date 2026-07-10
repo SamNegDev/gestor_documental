@@ -1206,9 +1206,19 @@
   font-weight: 700;
 }
 
+.ocr-review-modal {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(980px, 100%);
+  max-height: min(88vh, 860px);
+  overflow: hidden;
+}
+
 .ocr-review-list {
   display: grid;
   gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .ocr-review-card {

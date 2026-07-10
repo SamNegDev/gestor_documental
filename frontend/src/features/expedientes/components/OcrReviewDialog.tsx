@@ -199,7 +199,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
   return (
     <div className="exp-modal" role="dialog" aria-modal="true" aria-label="Revision OCR">
       <button className="exp-modal__backdrop" type="button" onClick={onClose} />
-      <section className="exp-modal__panel">
+      <section className="exp-modal__panel ocr-review-modal">
         <div className="exp-modal__header">
           <div>
             <p className="eyebrow">Revision documental</p>
