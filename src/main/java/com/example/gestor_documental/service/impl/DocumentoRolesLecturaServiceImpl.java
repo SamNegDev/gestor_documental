@@ -5,27 +5,19 @@ import com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaRespons
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoOperacionExpediente;
-import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Documento;
-import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
-import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Usuario;
-import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
-import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
 import com.example.gestor_documental.service.DocumentoService;
-import com.example.gestor_documental.service.HistorialCambioService;
-import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
-import com.example.gestor_documental.util.TextNormalizer;
 import com.example.gestor_documental.validation.DniNieValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,26 +43,19 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaService {
 
     private static final double CONFIANZA_MINIMA_AUTOMATICA = 0.90;
-    private static final double CONFIANZA_MINIMA_IDENTIDAD_CORROBORACION = 0.80;
 
     private final DocumentoService documentoService;
     private final DocumentoRepository documentoRepository;
     private final DocumentoRolesLecturaRepository lecturaRepository;
-    private final DocumentoIdentidadLecturaRepository identidadLecturaRepository;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
-    private final InteresadoRepository interesadoRepository;
-    private final HistorialCambioService historialCambioService;
-    private final RequisitoDocumentalExpedienteService requisitoDocumentalExpedienteService;
     private final OpenAiProperties openAiProperties;
     private final DniNieValidator dniNieValidator;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -115,72 +100,6 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         aplicarResultado(documento, lectura, resultado, modeloUsado);
         lectura = lecturaRepository.save(lectura);
         return DocumentoRolesLecturaResponse.from(lectura);
-    }
-
-    @Override
-    @Transactional
-    public DocumentoRolesLecturaResponse aplicarDatos(Long documentoId, Usuario admin) {
-        Documento documento = documentoService.obtenerDocumentoConPermiso(documentoId, admin);
-        DocumentoRolesLectura lectura = lecturaRepository.findByDocumentoId(documentoId)
-                .orElseThrow(() -> new OperacionInvalidaException("Primero debes leer roles del contrato o factura."));
-        Expediente expediente = documento.getExpediente();
-        if (expediente == null) {
-            throw new OperacionInvalidaException("El documento no pertenece a un expediente.");
-        }
-        if (esExpedienteBatecom(documento) && documento.getOperacion() == null) {
-            throw new OperacionInvalidaException("Selecciona si el contrato/factura pertenece a BATE o COM antes de aplicar datos.");
-        }
-        validarLecturaAplicable(lectura);
-        validarIdentidadesCorroboradas(documento, lectura);
-
-        Interesado vendedor = obtenerOCrearInteresado(
-                lectura.getVendedorIdentificador(),
-                lectura.getVendedorNombre(),
-                lectura.getVendedorDireccion());
-        Interesado comprador = obtenerOCrearInteresado(
-                lectura.getCompradorIdentificador(),
-                lectura.getCompradorNombre(),
-                lectura.getCompradorDireccion());
-        if (vendedor.getId().equals(comprador.getId())) {
-            throw new OperacionInvalidaException("Comprador y vendedor apuntan al mismo interesado.");
-        }
-
-        RolInteresado rolVendedor = rolVendedor(documento);
-        RolInteresado rolComprador = rolComprador(documento);
-        aplicarRelacion(expediente, vendedor, rolVendedor);
-        aplicarRelacion(expediente, comprador, rolComprador);
-        vincularIdentidadesLeidas(expediente);
-        sincronizarRequisitosExpediente(expediente, admin);
-        lectura.setVendedorInteresado(vendedor);
-        lectura.setCompradorInteresado(comprador);
-        lectura.setAplicadoExpediente(true);
-        lectura.setFechaAplicacion(LocalDateTime.now());
-        lectura.setMensaje("Datos aplicados al expediente.");
-        lectura = lecturaRepository.save(lectura);
-
-        historialCambioService.registrarCambioExpediente(
-                expediente,
-                admin,
-                "IA APLICAR DATOS",
-                "Se aplicaron " + rolVendedor.name().toLowerCase(Locale.ROOT) + " y "
-                        + rolComprador.name().toLowerCase(Locale.ROOT) + " desde " + nombreDocumento(documento) + ".");
-        return DocumentoRolesLecturaResponse.from(lectura);
-    }
-
-    private RolInteresado rolVendedor(Documento documento) {
-        if (documento.getOperacion() != null
-                && documento.getOperacion().getTipo() == TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM) {
-            return RolInteresado.COMPRAVENTA;
-        }
-        return RolInteresado.VENDEDOR;
-    }
-
-    private RolInteresado rolComprador(Documento documento) {
-        if (documento.getOperacion() != null
-                && documento.getOperacion().getTipo() == TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE) {
-            return RolInteresado.COMPRAVENTA;
-        }
-        return RolInteresado.COMPRADOR;
     }
 
     private void validarTipoDocumento(Documento documento) {
@@ -427,246 +346,6 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         JsonNode secondValue = node.get(second);
         node.set(first, secondValue == null ? objectMapper.nullNode() : secondValue);
         node.set(second, firstValue == null ? objectMapper.nullNode() : firstValue);
-    }
-
-    private void validarLecturaAplicable(DocumentoRolesLectura lectura) {
-        if (lectura.isRequiereRevision()) {
-            throw new OperacionInvalidaException("La lectura requiere revision manual antes de aplicar.");
-        }
-        if (lectura.getConfianzaGlobal() == null || lectura.getConfianzaGlobal() < CONFIANZA_MINIMA_AUTOMATICA) {
-            throw new OperacionInvalidaException("La confianza de la lectura no es suficiente para aplicar datos.");
-        }
-        if (!identificadorValido(lectura.getVendedorIdentificador()) || !identificadorValido(lectura.getCompradorIdentificador())) {
-            throw new OperacionInvalidaException("El DNI/NIE/CIF leido no supera las validaciones basicas.");
-        }
-        if (enBlanco(lectura.getVendedorIdentificador()) || enBlanco(lectura.getVendedorNombre())) {
-            throw new OperacionInvalidaException("Faltan datos suficientes del vendedor.");
-        }
-        if (enBlanco(lectura.getCompradorIdentificador()) || enBlanco(lectura.getCompradorNombre())) {
-            throw new OperacionInvalidaException("Faltan datos suficientes del comprador.");
-        }
-        if (lectura.getVendedorIdentificador().equalsIgnoreCase(lectura.getCompradorIdentificador())) {
-            throw new OperacionInvalidaException("Comprador y vendedor tienen el mismo DNI/CIF.");
-        }
-    }
-
-    private void validarIdentidadesCorroboradas(Documento documento, DocumentoRolesLectura lectura) {
-        Expediente expediente = documento.getExpediente();
-        if (expediente == null || expediente.getId() == null) {
-            return;
-        }
-        Set<String> identidades = identidadesConfirmadasExpediente(expediente);
-        validarRolCorroborado("vendedor", lectura.getVendedorIdentificador(), lectura.getVendedorNombre(), identidades, expediente);
-        validarRolCorroborado("comprador", lectura.getCompradorIdentificador(), lectura.getCompradorNombre(), identidades, expediente);
-    }
-
-    private Set<String> identidadesConfirmadasExpediente(Expediente expediente) {
-        Set<String> identidades = new HashSet<>();
-        if (expediente.getCliente() != null) {
-            String nifCliente = normalizarIdentificador(expediente.getCliente().getNif());
-            if (nifCliente != null) {
-                identidades.add(nifCliente);
-            }
-        }
-        List<Long> documentoIds = documentoRepository.findByExpedienteId(expediente.getId()).stream()
-                .filter(documento -> esDocumentoIdentidad(documento.getTipoDocumento()))
-                .map(Documento::getId)
-                .filter(id -> id != null)
-                .toList();
-        if (documentoIds.isEmpty()) {
-            return identidades;
-        }
-        identidadLecturaRepository.findByDocumentoIdIn(documentoIds).stream()
-                .filter(this::identidadConfirmada)
-                .map(DocumentoIdentidadLectura::getIdentificador)
-                .map(this::normalizarIdentificador)
-                .filter(identificador -> identificador != null)
-                .forEach(identidades::add);
-        return identidades;
-    }
-
-    private boolean identidadConfirmada(DocumentoIdentidadLectura lectura) {
-        String identificador = lectura != null ? normalizarIdentificador(lectura.getIdentificador()) : null;
-        return identificador != null
-                && identificadorValido(identificador)
-                && lectura.getConfianzaGlobal() != null
-                && lectura.getConfianzaGlobal() >= CONFIANZA_MINIMA_IDENTIDAD_CORROBORACION;
-    }
-
-    private void validarRolCorroborado(
-            String etiqueta,
-            String identificador,
-            String nombre,
-            Set<String> identidades,
-            Expediente expediente
-    ) {
-        String normalizado = normalizarIdentificador(identificador);
-        if (normalizado == null || !identidades.contains(normalizado)) {
-            throw new OperacionInvalidaException("No se aplica el " + etiqueta + ": falta DNI/CIF leido que corrobore el rol.");
-        }
-    }
-
-    private Interesado obtenerOCrearInteresado(String identificador, String nombre, String direccion) {
-        Interesado interesado = interesadoRepository.findByDni(identificador).orElse(null);
-        String direccionNormalizada = normalizarDireccionCompleta(direccion);
-        boolean creado = false;
-        boolean actualizado = false;
-        if (interesado == null) {
-            interesado = new Interesado();
-            interesado.setDni(identificador);
-            interesado.setNombre(TextNormalizer.upperOrNull(nombre));
-            interesado.setDireccion(direccionNormalizada);
-            interesado.setTipoPersona(inferirTipoPersona(identificador));
-            creado = true;
-        } else {
-            actualizado |= setIfBlank(interesado.getNombre(), TextNormalizer.upperOrNull(nombre), interesado::setNombre);
-            if (direccionNormalizada != null && !direccionNormalizada.equals(interesado.getDireccion())) {
-                interesado.setDireccion(direccionNormalizada);
-                actualizado = true;
-            }
-            if (interesado.getTipoPersona() == null) {
-                interesado.setTipoPersona(inferirTipoPersona(identificador));
-                actualizado = true;
-            }
-        }
-        return creado || actualizado ? interesadoRepository.save(interesado) : interesado;
-    }
-
-    private void aplicarRelacion(Expediente expediente, Interesado interesado, RolInteresado rol) {
-        List<ExpedienteInteresado> relaciones = expedienteInteresadoRepository.findByExpedienteId(expediente.getId());
-        relaciones.stream()
-                .filter(relacion -> relacion.getRol() == rol)
-                .filter(relacion -> relacion.getInteresado() != null)
-                .filter(relacion -> !relacion.getInteresado().getId().equals(interesado.getId()))
-                .findFirst()
-                .ifPresent(relacion -> {
-                    throw new OperacionInvalidaException("Ya existe otro interesado como " + rol.name() + ". Revisa manualmente.");
-                });
-
-        ExpedienteInteresado relacionExistente = relaciones.stream()
-                .filter(relacion -> relacion.getInteresado() != null && relacion.getInteresado().getId().equals(interesado.getId()))
-                .findFirst()
-                .orElse(null);
-        if (relacionExistente != null) {
-            if (relacionExistente.getRol() != null && relacionExistente.getRol() != rol) {
-                throw new OperacionInvalidaException("El interesado " + interesado.getNombre() + " ya figura como "
-                        + relacionExistente.getRol().name() + ".");
-            }
-            if (relacionExistente.getRol() == null) {
-                relacionExistente.setRol(rol);
-                expedienteInteresadoRepository.save(relacionExistente);
-            }
-            return;
-        }
-
-        ExpedienteInteresado nuevaRelacion = new ExpedienteInteresado();
-        nuevaRelacion.setExpediente(expediente);
-        nuevaRelacion.setInteresado(interesado);
-        nuevaRelacion.setRol(rol);
-        expedienteInteresadoRepository.save(nuevaRelacion);
-    }
-
-    private void vincularIdentidadesLeidas(Expediente expediente) {
-        if (expediente == null || expediente.getId() == null) {
-            return;
-        }
-        List<ExpedienteInteresado> relaciones = expedienteInteresadoRepository.findByExpedienteId(expediente.getId());
-        List<Documento> documentos = documentoRepository.findByExpedienteId(expediente.getId());
-        List<Long> documentoIds = documentos.stream()
-                .filter(documento -> esDocumentoIdentidad(documento.getTipoDocumento()))
-                .map(Documento::getId)
-                .filter(id -> id != null)
-                .toList();
-        if (documentoIds.isEmpty()) {
-            return;
-        }
-        identidadLecturaRepository.findByDocumentoIdIn(documentoIds).forEach(lectura -> {
-            String identificador = normalizarIdentificador(lectura.getIdentificador());
-            Interesado interesado = interesadoPorIdentificador(relaciones, identificador);
-            if (interesado == null || lectura.getConfianzaGlobal() == null
-                    || lectura.getConfianzaGlobal() < CONFIANZA_MINIMA_AUTOMATICA) {
-                return;
-            }
-            Documento documento = lectura.getDocumento();
-            if (documento != null) {
-                if (documento.getInteresado() == null) {
-                    documento.setInteresado(interesado);
-                }
-                if (lectura.getTipoDocumentoDetectado() != null && lectura.getTipoDocumentoDetectado() != documento.getTipoDocumento()) {
-                    documento.setTipoDocumento(lectura.getTipoDocumentoDetectado());
-                }
-                documentoRepository.save(documento);
-            }
-            actualizarDireccionDesdeIdentidad(interesado, lectura);
-            lectura.setInteresadoVinculado(interesado);
-            lectura.setVinculadoAutomaticamente(true);
-            lectura.setRequiereRevision(false);
-            lectura.setMensaje("Identidad leida y vinculada con interesado existente.");
-            identidadLecturaRepository.save(lectura);
-        });
-    }
-
-    private Interesado interesadoPorIdentificador(List<ExpedienteInteresado> relaciones, String identificador) {
-        if (identificador == null) {
-            return null;
-        }
-        return relaciones.stream()
-                .map(ExpedienteInteresado::getInteresado)
-                .filter(interesado -> interesado != null && identificador.equals(normalizarIdentificador(interesado.getDni())))
-                .distinct()
-                .findFirst()
-                .orElse(null);
-    }
-
-    private void actualizarDireccionDesdeIdentidad(Interesado interesado, DocumentoIdentidadLectura lectura) {
-        String direccion = normalizarDireccionCompleta(lectura.getDireccionTexto());
-        if (direccion != null && !direccion.equals(interesado.getDireccion())) {
-            interesado.setDireccion(direccion);
-            interesadoRepository.save(interesado);
-        }
-    }
-
-    private void sincronizarRequisitosExpediente(Expediente expediente, Usuario usuario) {
-        requisitoDocumentalExpedienteService.sincronizarYListar(
-                expediente,
-                expedienteInteresadoRepository.findByExpedienteId(expediente.getId()),
-                documentoRepository.findByExpedienteId(expediente.getId()),
-                usuario
-        );
-    }
-
-    private boolean setIfBlank(String actual, String nuevo, java.util.function.Consumer<String> setter) {
-        if ((actual == null || actual.isBlank()) && nuevo != null && !nuevo.isBlank()) {
-            setter.accept(nuevo);
-            return true;
-        }
-        return false;
-    }
-
-    private String normalizarDireccionCompleta(String direccion) {
-        String normalizada = direccion != null ? direccion.replaceAll("\\s+", " ").trim() : null;
-        return TextNormalizer.upperOrNull(normalizada);
-    }
-
-    private boolean esDocumentoIdentidad(TipoDocumento tipoDocumento) {
-        return tipoDocumento == TipoDocumento.DNI || tipoDocumento == TipoDocumento.CIF;
-    }
-
-    private TipoPersona inferirTipoPersona(String identificador) {
-        if (identificador == null || identificador.isBlank()) {
-            return TipoPersona.PARTICULAR;
-        }
-        char first = identificador.charAt(0);
-        if (Character.isLetter(first) && first != 'X' && first != 'Y' && first != 'Z') {
-            return TipoPersona.EMPRESA;
-        }
-        return TipoPersona.PARTICULAR;
-    }
-
-    private String nombreDocumento(Documento documento) {
-        return documento.getNombreArchivoOriginal() != null && !documento.getNombreArchivoOriginal().isBlank()
-                ? documento.getNombreArchivoOriginal()
-                : "documento " + documento.getId();
     }
 
     private Interesado resolverInteresadoVinculado(Documento documento, String identificador) {

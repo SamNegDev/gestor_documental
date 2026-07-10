@@ -2071,6 +2071,43 @@
   color: oklch(42% 0.11 76);
 }
 
+.document-detected-identities {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  max-width: 680px;
+}
+
+.document-detected-identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 92%, white);
+}
+
+.document-detected-identity div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.document-detected-identity strong,
+.document-detected-identity span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.document-detected-identity span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
 .document-row__actions {
   display: flex;
   gap: 6px;

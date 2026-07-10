@@ -162,15 +162,6 @@ public class DocumentoApiController {
         return ResponseEntity.ok(documentoRolesLecturaService.leerRoles(id, forzar, usuarioLogueado));
     }
 
-    @PostMapping("/documentos/{id}/lectura-roles/aplicar")
-    public ResponseEntity<DocumentoRolesLecturaResponse> aplicarLecturaRoles(
-            @PathVariable Long id,
-            Authentication authentication
-    ) {
-        Usuario admin = currentUserService.requireAdmin(authentication);
-        return ResponseEntity.ok(documentoRolesLecturaService.aplicarDatos(id, admin));
-    }
-
     @GetMapping("/documentos/{id}/lectura-vehiculo")
     public ResponseEntity<DocumentoVehiculoLecturaResponse> obtenerLecturaVehiculo(
             @PathVariable Long id,

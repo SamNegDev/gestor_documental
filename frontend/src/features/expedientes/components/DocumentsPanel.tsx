@@ -1,5 +1,5 @@
-import { CarFront, ClipboardCheck, Eye, FilePlus2, FileText, IdCard, Loader2, Pencil, Scissors, Trash2, Upload, UsersRound } from "lucide-react";
-import type { DocumentoExpediente } from "../types/expedienteDetail.types";
+import { CarFront, Eye, FilePlus2, FileText, IdCard, Loader2, Pencil, Scissors, Trash2, Upload, UserPlus, UsersRound } from "lucide-react";
+import type { DocumentoExpediente, DocumentoIdentidadDetectada } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 
 type Props = {
@@ -12,10 +12,9 @@ type Props = {
   onDeleteDocument: (documento: DocumentoExpediente) => void;
   onReadIdentity?: (documento: DocumentoExpediente) => void;
   onReadRoles?: (documento: DocumentoExpediente) => void;
-  onApplyRoles?: (documento: DocumentoExpediente) => void;
+  onUseDetectedIdentity?: (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada) => void;
   readingIdentityId?: number | null;
   readingRolesId?: number | null;
-  applyingRolesId?: number | null;
 };
 
 export function DocumentsPanel({
@@ -28,10 +27,9 @@ export function DocumentsPanel({
   onDeleteDocument,
   onReadIdentity,
   onReadRoles,
-  onApplyRoles,
+  onUseDetectedIdentity,
   readingIdentityId,
   readingRolesId,
-  applyingRolesId,
 }: Props) {
   const pendientesActuales = documentos.filter((documento) => documento.estado === "PENDIENTE" && documento.requeridoAhora);
   const hasEditableDocuments = documentos.some((documento) => documento.id);
@@ -71,8 +69,8 @@ export function DocumentsPanel({
           const canReadRoles = Boolean(documento.id && (documento.tipo === "CONTRATO_COMPRAVENTA" || documento.tipo === "FACTURA"));
           const readingIdentity = Boolean(documento.id && readingIdentityId === documento.id);
           const readingRoles = Boolean(documento.id && readingRolesId === documento.id);
-          const applyingRoles = Boolean(documento.id && applyingRolesId === documento.id);
           const lectura = documento.lecturaIdentidad;
+          const identidadesDetectadas = lectura?.identidadesDetectadas?.length ? lectura.identidadesDetectadas : [];
           const lecturaRoles = documento.lecturaRoles;
           const lecturaVehiculo = documento.lecturaVehiculo;
 
@@ -95,12 +93,40 @@ export function DocumentsPanel({
                     : documento.descripcion || "Documento pendiente"}
                 </small>
                 {lectura ? (
-                  <div className={`document-identity ${lectura.requiereRevision ? "document-identity--review" : "document-identity--linked"}`}>
-                    <IdCard size={14} />
-                    <span>{lectura.identificador || "Sin DNI/CIF"}</span>
-                    {lectura.nombreCompleto ? <span>{lectura.nombreCompleto}</span> : null}
-                    <em>{lectura.interesadoVinculadoNombre ? `vinculado a ${lectura.interesadoVinculadoNombre}` : "sin vincular"}</em>
-                  </div>
+                  <>
+                    <div className={`document-identity ${lectura.requiereRevision ? "document-identity--review" : "document-identity--linked"}`}>
+                      <IdCard size={14} />
+                      <span>{lectura.identificador || "Sin DNI/CIF"}</span>
+                      {lectura.nombreCompleto ? <span>{lectura.nombreCompleto}</span> : null}
+                      <em>{lectura.interesadoVinculadoNombre ? `vinculado a ${lectura.interesadoVinculadoNombre}` : "sin vincular"}</em>
+                    </div>
+                    {identidadesDetectadas.length > 0 ? (
+                      <div className="document-detected-identities" aria-label="Identidades detectadas">
+                        {identidadesDetectadas.map((identidad, identityIndex) => {
+                          const nombre = identidad.razonSocial
+                            || identidad.nombreCompleto
+                            || [identidad.nombre, identidad.apellido1, identidad.apellido2].filter(Boolean).join(" ");
+                          const key = `${identidad.identificador || nombre || "identidad"}-${identityIndex}`;
+                          return (
+                            <div className="document-detected-identity" key={key}>
+                              <div>
+                                <strong>{identidad.identificador || "Sin DNI/CIF"}</strong>
+                                {nombre ? <span>{nombre}</span> : null}
+                              </div>
+                              <button
+                                className="soft-button soft-button--compact"
+                                onClick={() => onUseDetectedIdentity?.(documento, identidad)}
+                                type="button"
+                              >
+                                <UserPlus size={14} />
+                                Usar en interesados
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
                 {lecturaRoles ? (
                   <div className={`document-roles ${lecturaRoles.requiereRevision ? "document-roles--review" : "document-roles--linked"}`}>
@@ -152,17 +178,6 @@ export function DocumentsPanel({
                     type="button"
                   >
                     {readingRoles ? <Loader2 className="document-row__identity-spinner" size={16} /> : <UsersRound size={16} />}
-                  </button>
-                ) : null}
-                {lecturaRoles?.aplicable ? (
-                  <button
-                    className="icon-button"
-                    disabled={applyingRoles}
-                    onClick={() => onApplyRoles?.(documento)}
-                    title="Aplicar datos al expediente"
-                    type="button"
-                  >
-                    {applyingRoles ? <Loader2 className="document-row__identity-spinner" size={16} /> : <ClipboardCheck size={16} />}
                   </button>
                 ) : null}
                 <label className="icon-button" title="Subir este documento">

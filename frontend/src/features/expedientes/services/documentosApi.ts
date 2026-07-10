@@ -67,10 +67,6 @@ export function readDocumentVehicle(documentoId: number, forzar = false): Promis
   return apiPostJson<DocumentoVehiculoLectura>(`/api/documentos/${documentoId}/lectura-vehiculo?forzar=${forzar ? "true" : "false"}`, {});
 }
 
-export function applyDocumentRoles(documentoId: number): Promise<DocumentoRolesLectura> {
-  return apiPostJson<DocumentoRolesLectura>(`/api/documentos/${documentoId}/lectura-roles/aplicar`, {});
-}
-
 export function getDocumentPageInfo(documentoId: number): Promise<{ totalPaginas: number }> {
   return apiGet<{ totalPaginas: number }>(`/api/documentos/${documentoId}/paginas`);
 }

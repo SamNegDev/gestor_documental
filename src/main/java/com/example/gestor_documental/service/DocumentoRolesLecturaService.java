@@ -8,6 +8,4 @@ public interface DocumentoRolesLecturaService {
     DocumentoRolesLecturaResponse obtenerLectura(Long documentoId, Usuario usuario);
 
     DocumentoRolesLecturaResponse leerRoles(Long documentoId, boolean forzar, Usuario usuario);
-
-    DocumentoRolesLecturaResponse aplicarDatos(Long documentoId, Usuario admin);
 }

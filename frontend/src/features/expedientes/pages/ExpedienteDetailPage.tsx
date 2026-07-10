@@ -19,7 +19,7 @@ import { NextActionPanel } from "../components/NextActionPanel";
 import { OcrReviewDialog } from "../components/OcrReviewDialog";
 import { PhaseMilestonesPanel } from "../components/PhaseMilestonesPanel";
 import { SecondaryExpedienteTabs } from "../components/SecondaryExpedienteTabs";
-import { applyDocumentRoles, deleteDocument, deleteDocumentPages, extractDocumentPages, getCompleteExpedienteProcessing, mergeDocuments, readDocumentIdentity, readDocumentRoles, startCompleteExpedienteProcessing, updateDocument, uploadExpedienteDocument } from "../services/documentosApi";
+import { deleteDocument, deleteDocumentPages, extractDocumentPages, getCompleteExpedienteProcessing, mergeDocuments, readDocumentIdentity, readDocumentRoles, startCompleteExpedienteProcessing, updateDocument, uploadExpedienteDocument } from "../services/documentosApi";
 import {
   completeExpedienteMilestone,
   finishExpediente,
@@ -52,6 +52,7 @@ import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFiel
 import { uppercaseInput } from "../../../shared/utils/text";
 import type {
   ActualizacionDocumentalExpediente,
+  DocumentoIdentidadDetectada,
   DocumentoExpediente,
   ExpedienteDetail,
   ExpedienteEditInput,
@@ -95,6 +96,37 @@ type InteresadoCorrection = ExpedienteEditInput["interesados"][number];
 
 function emptyInteresadoCorrection(): InteresadoCorrection {
   return { nombre: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
+}
+
+function interesadoCorrectionFromExpediente(interesado: ExpedienteDetail["interesados"][number]): InteresadoCorrection {
+  return {
+    nombre: uppercaseInput(interesado.nombre || ""),
+    dni: uppercaseInput(interesado.dni || ""),
+    telefono: uppercaseInput(interesado.telefono || ""),
+    direccion: uppercaseInput(interesado.direccion || ""),
+    tipoVia: uppercaseInput(interesado.tipoVia || ""),
+    nombreVia: uppercaseInput(interesado.nombreVia || ""),
+    numeroVia: uppercaseInput(interesado.numeroVia || ""),
+    bloque: uppercaseInput(interesado.bloque || ""),
+    portal: uppercaseInput(interesado.portal || ""),
+    escalera: uppercaseInput(interesado.escalera || ""),
+    piso: uppercaseInput(interesado.piso || ""),
+    puerta: uppercaseInput(interesado.puerta || ""),
+    codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
+    municipio: uppercaseInput(interesado.municipio || ""),
+    provincia: uppercaseInput(interesado.provincia || ""),
+    rol: interesado.rol || "",
+  };
+}
+
+function identityDisplayName(identidad: DocumentoIdentidadDetectada) {
+  return identidad.razonSocial
+    || identidad.nombreCompleto
+    || [identidad.nombre, identidad.apellido1, identidad.apellido2].filter(Boolean).join(" ");
+}
+
+function normalizeIdentifier(value?: string | null) {
+  return uppercaseInput(value || "").replace(/[^A-Z0-9]/g, "");
 }
 
 function hasInteresadoCorrectionData(interesado: InteresadoCorrection) {
@@ -515,40 +547,26 @@ function AdditionalInfoDialog({
 
 function InterestedPartiesCorrectionDialog({
   expediente,
+  initialRows,
   saving,
   onClose,
   onSubmit,
 }: {
   expediente: ExpedienteDetail;
+  initialRows?: InteresadoCorrection[] | null;
   saving: boolean;
   onClose: () => void;
   onSubmit: (interesados: InteresadoCorrection[]) => void;
 }) {
   const minimumRows = expediente.tipoTramite === "BATECOM" ? 3 : 2;
-  const initialRows = Math.max(minimumRows, expediente.interesados.length);
+  const seededRows = initialRows?.length ? initialRows : null;
+  const initialRowsCount = Math.max(minimumRows, seededRows?.length ?? expediente.interesados.length);
   const [rows, setRows] = useState<InteresadoCorrection[]>(
-    Array.from({ length: initialRows }).map((_, index) => {
+    Array.from({ length: initialRowsCount }).map((_, index) => {
+      const seededRow = seededRows?.[index];
+      if (seededRow) return seededRow;
       const interesado = expediente.interesados[index];
-      return interesado
-        ? {
-            nombre: uppercaseInput(interesado.nombre || ""),
-            dni: uppercaseInput(interesado.dni || ""),
-            telefono: uppercaseInput(interesado.telefono || ""),
-            direccion: uppercaseInput(interesado.direccion || ""),
-            tipoVia: uppercaseInput(interesado.tipoVia || ""),
-            nombreVia: uppercaseInput(interesado.nombreVia || ""),
-            numeroVia: uppercaseInput(interesado.numeroVia || ""),
-            bloque: uppercaseInput(interesado.bloque || ""),
-            portal: uppercaseInput(interesado.portal || ""),
-            escalera: uppercaseInput(interesado.escalera || ""),
-            piso: uppercaseInput(interesado.piso || ""),
-            puerta: uppercaseInput(interesado.puerta || ""),
-            codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
-            municipio: uppercaseInput(interesado.municipio || ""),
-            provincia: uppercaseInput(interesado.provincia || ""),
-            rol: interesado.rol || "",
-          }
-        : emptyInteresadoCorrection();
+      return interesado ? interesadoCorrectionFromExpediente(interesado) : emptyInteresadoCorrection();
     }),
   );
 
@@ -738,6 +756,7 @@ export function ExpedienteDetailPage() {
   const [incidentDialogOpen, setIncidentDialogOpen] = useState(false);
   const [additionalInfoDialogOpen, setAdditionalInfoDialogOpen] = useState(false);
   const [interesadosCorrectionOpen, setInteresadosCorrectionOpen] = useState(false);
+  const [interesadosCorrectionInitialRows, setInteresadosCorrectionInitialRows] = useState<InteresadoCorrection[] | null>(null);
   const [savingInteresadosCorrection, setSavingInteresadosCorrection] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [requirementOpenSignal, setRequirementOpenSignal] = useState(0);
@@ -750,7 +769,6 @@ export function ExpedienteDetailPage() {
   const [uploadingStandaloneDocument, setUploadingStandaloneDocument] = useState(false);
   const [readingIdentityId, setReadingIdentityId] = useState<number | null>(null);
   const [readingRolesId, setReadingRolesId] = useState<number | null>(null);
-  const [applyingRolesId, setApplyingRolesId] = useState<number | null>(null);
   const [updatingDocuments, setUpdatingDocuments] = useState(false);
   const [iaResult, setIaResult] = useState<ActualizacionDocumentalExpediente | null>(null);
   const [iaError, setIaError] = useState<string | null>(null);
@@ -960,31 +978,6 @@ export function ExpedienteDetailPage() {
     }
   };
 
-  const handleApplyDocumentRoles = async (documento: DocumentoExpediente) => {
-    if (!documento.id) return;
-    const confirmed = await confirm({
-      title: "Aplicar datos al expediente",
-      description: "Se vincularan comprador y vendedor, se guardara la direccion completa leida y se sincronizaran los requisitos documentales.",
-      confirmLabel: "Aplicar datos",
-      tone: "success",
-    });
-    if (!confirmed) return;
-
-    setApplyingRolesId(documento.id);
-    try {
-      await applyDocumentRoles(documento.id);
-      await refreshExpediente();
-    } catch (cause) {
-      if (cause instanceof ApiError && cause.details) {
-        alert(cause.details);
-        return;
-      }
-      alert("No se pudieron aplicar los datos al expediente.");
-    } finally {
-      setApplyingRolesId(null);
-    }
-  };
-
   const handleUpdateFromExistingDocuments = async (options?: { forzarRelectura?: boolean }) => {
     if (!expediente || updatingDocuments) return;
     const force = Boolean(options?.forzarRelectura);
@@ -1008,6 +1001,36 @@ export function ExpedienteDetailPage() {
     } finally {
       setUpdatingDocuments(false);
     }
+  };
+
+  const handleEditInteresados = () => {
+    setInteresadosCorrectionInitialRows(null);
+    setInteresadosCorrectionOpen(true);
+  };
+
+  const handleUseDetectedIdentity = (_documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada) => {
+    if (!expediente) return;
+    const identifier = normalizeIdentifier(identidad.identificador);
+    const detectedRow: InteresadoCorrection = {
+      ...emptyInteresadoCorrection(),
+      nombre: uppercaseInput(identityDisplayName(identidad)),
+      dni: identifier,
+      direccion: uppercaseInput(identidad.direccionTexto || ""),
+    };
+    const rows = expediente.interesados.map(interesadoCorrectionFromExpediente);
+    const existingIndex = identifier ? rows.findIndex((row) => normalizeIdentifier(row.dni) === identifier) : -1;
+    if (existingIndex >= 0) {
+      rows[existingIndex] = {
+        ...rows[existingIndex],
+        nombre: detectedRow.nombre || rows[existingIndex].nombre,
+        dni: detectedRow.dni || rows[existingIndex].dni,
+        direccion: detectedRow.direccion || rows[existingIndex].direccion,
+      };
+    } else {
+      rows.push(detectedRow);
+    }
+    setInteresadosCorrectionInitialRows(rows);
+    setInteresadosCorrectionOpen(true);
   };
 
   const handleUploadCompleteExpediente = async (archivo: File) => {
@@ -1051,6 +1074,7 @@ export function ExpedienteDetailPage() {
     try {
       await updateExpedienteInteresados(expediente.id, interesados);
       setInteresadosCorrectionOpen(false);
+      setInteresadosCorrectionInitialRows(null);
       await refreshExpediente();
     } catch (cause) {
       alert(cause instanceof ApiError ? cause.details || "No se pudieron corregir los interesados." : "No se pudieron corregir los interesados.");
@@ -1498,7 +1522,7 @@ export function ExpedienteDetailPage() {
 
       <div className="exp-process-layout">
         <div className="exp-process-main">
-          <InteresadosPanel interesados={expediente.interesados} onEditInteresados={() => setInteresadosCorrectionOpen(true)} />
+          <InteresadosPanel interesados={expediente.interesados} onEditInteresados={handleEditInteresados} />
           <NextActionPanel
             documentos={expediente.documentos}
             hitos={operationalHitos}
@@ -1534,16 +1558,15 @@ export function ExpedienteDetailPage() {
             onUploadRequirement={handleUploadRequirement}
           />
           <DocumentsPanel
-            applyingRolesId={applyingRolesId}
             documentos={expediente.documentos}
             onDeleteDocument={handleDeleteDocument}
             onEditDocument={setEditingDocument}
-            onApplyRoles={handleApplyDocumentRoles}
             onOpenReview={handleOpenDocumentReview}
             onOpenTemplates={() => setTemplateDialogOpen(true)}
             onOpenUpload={() => setUploadDialogOpen(true)}
             onReadIdentity={handleReadDocumentIdentity}
             onReadRoles={handleReadDocumentRoles}
+            onUseDetectedIdentity={handleUseDetectedIdentity}
             onUploadDocument={handleUploadDocument}
             readingIdentityId={readingIdentityId}
             readingRolesId={readingRolesId}
@@ -1584,8 +1607,12 @@ export function ExpedienteDetailPage() {
       {interesadosCorrectionOpen ? (
         <InterestedPartiesCorrectionDialog
           expediente={expediente}
+          initialRows={interesadosCorrectionInitialRows}
           saving={savingInteresadosCorrection}
-          onClose={() => setInteresadosCorrectionOpen(false)}
+          onClose={() => {
+            setInteresadosCorrectionOpen(false);
+            setInteresadosCorrectionInitialRows(null);
+          }}
           onSubmit={handleCorrectInteresados}
         />
       ) : null}
