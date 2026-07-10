@@ -47,6 +47,12 @@ function isImageDocument(documento: DocumentoExpediente) {
   return /\.(gif|jpe?g|png|webp)$/i.test(nombre);
 }
 
+function paginasPreview(documentoId: number | undefined, pageCounts: Record<number, number>) {
+  if (!documentoId) return [1];
+  const total = pageCounts[documentoId] ?? 0;
+  return Array.from({ length: Math.max(total, 1) }, (_, index) => index + 1);
+}
+
 export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, onDeleteDocument, onDeletePages, onExtractPages, onMergeDocuments, onSaveDocument, title = "Editor documental" }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editType, setEditType] = useState("");
@@ -214,7 +220,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
           <div className="ocr-review-list">
             {documentos.map((documento) => (
               <article className="ocr-review-card" key={documento.id ?? documento.nombre}>
-                <div className="ocr-review-card__preview">
+                <div className={`ocr-review-card__preview ${documento.id && !isImageDocument(documento) ? "ocr-review-card__preview--pages" : ""}`}>
                   {documento.id ? (
                     isImageDocument(documento) ? (
                       <img
@@ -223,11 +229,16 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                         loading="lazy"
                       />
                     ) : (
-                      <img
-                        src={`/api/documentos/${documento.id}/paginas/1/preview?v=${previewVersion}`}
-                        alt={documento.nombreOriginal || documento.nombre}
-                        loading="lazy"
-                      />
+                      paginasPreview(documento.id, pageCounts).map((pagina) => (
+                        <figure className="ocr-review-page-preview" key={pagina}>
+                          <img
+                            src={`/api/documentos/${documento.id}/paginas/${pagina}/preview?v=${previewVersion}`}
+                            alt={`${documento.nombreOriginal || documento.nombre} - pagina ${pagina}`}
+                            loading="lazy"
+                          />
+                          <figcaption>Pag. {pagina}</figcaption>
+                        </figure>
+                      ))
                     )
                   ) : null}
                 </div>

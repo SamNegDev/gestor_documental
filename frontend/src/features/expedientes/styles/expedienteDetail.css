@@ -1231,11 +1231,41 @@
   background: white;
 }
 
+.ocr-review-card__preview--pages {
+  align-content: start;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 8px;
+  place-items: stretch;
+  scrollbar-gutter: stable;
+}
+
 .ocr-review-card__preview img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.ocr-review-page-preview {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.ocr-review-page-preview img {
+  height: auto;
+  min-height: 0;
+  border: 1px solid oklch(88% 0.01 90);
+  border-radius: 6px;
+  background: white;
+}
+
+.ocr-review-page-preview figcaption {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-align: center;
 }
 
 .ocr-page-editor,
