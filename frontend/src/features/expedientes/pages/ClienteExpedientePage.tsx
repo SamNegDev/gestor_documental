@@ -179,7 +179,7 @@ function ClientDocumentRequirementsPanel({
             </div>
             <label className="primary-button primary-button--compact">
               <Upload size={15} />
-              Aportar
+              Aportar solicitado
               <input
                 hidden
                 type="file"
@@ -497,7 +497,7 @@ export function ClienteExpedientePage() {
               {expediente.estado === "REVISANDO_INCIDENCIAS" || uploadedIncidentIds.has(incidencia.id) || incidencia.pendienteRevisionCliente ? null : (
                 <label className="primary-button primary-button--danger">
                   <Upload size={16} />
-                  Aportar documento
+                  Responder incidencia
                   <input
                     hidden
                     type="file"
@@ -524,7 +524,7 @@ export function ClienteExpedientePage() {
           {canUploadStandaloneDocument ? (
             <button className="soft-button" onClick={() => setUploadDialogOpen(true)} type="button">
               <Upload size={16} />
-              Subir documento
+              Subir documento suelto
             </button>
           ) : null}
         </div>

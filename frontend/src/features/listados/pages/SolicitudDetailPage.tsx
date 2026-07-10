@@ -422,13 +422,13 @@ export function SolicitudDetailPage() {
     const solicitudActual = solicitudQuery.data;
     if (!solicitudActual) return;
     const confirmed = await confirm({
-      title: forzarRelectura ? "Releer documentacion con IA" : "Procesar documentacion",
+      title: forzarRelectura ? "Releer solicitud con IA" : "Leer solicitud con IA",
       description: forzarRelectura
         ? "Se volveran a leer DNI/CIF y contratos/facturas aunque ya tengan lectura previa. Las nuevas lecturas sustituiran a las anteriores para recalcular comprador y vendedor."
         : solicitudActual.tipoTramite === "BATECOM"
           ? "Se leeran DNI/CIF y contratos/facturas. El sistema buscara la compraventa que aparece como comprador en una operacion y vendedor en otra."
           : "Se leeran solo los DNI/CIF y factura/contrato que no tengan lectura previa. Si ya hay una lectura correcta se reutilizara para actualizar comprador y vendedor.",
-      confirmLabel: forzarRelectura ? "Releer" : "Procesar",
+      confirmLabel: forzarRelectura ? "Releer solicitud con IA" : "Leer solicitud con IA",
       cancelLabel: "Cancelar",
       tone: "default",
     });
@@ -448,7 +448,7 @@ export function SolicitudDetailPage() {
     const solicitudActual = solicitudQuery.data;
     if (!solicitudActual) return;
     const confirmed = await confirm({
-      title: "Solicitar lectura IA",
+      title: "Leer solicitud con IA",
       description: "Se revisara la documentacion aportada con IA. Puedes volver a solicitar lectura si aportas nueva documentacion o corriges datos.",
       confirmLabel: "Solicitar",
       cancelLabel: "Cancelar",
@@ -580,7 +580,7 @@ export function SolicitudDetailPage() {
     ? procesarDocumentacionMutation.isPending || !hasSolicitudDocuments
     : procesarDocumentacionClienteMutation.isPending || !solicitud.lecturaIaCliente?.puedeSolicitar;
   const preparationIaLabel = isAdmin
-    ? (procesarDocumentacionMutation.isPending ? "Leyendo IA" : "Lectura IA")
+    ? (procesarDocumentacionMutation.isPending ? "Leyendo IA" : "Leer solicitud con IA")
     : clienteIaButtonText(solicitud.lecturaIaCliente, procesarDocumentacionClienteMutation.isPending);
   const vehiculo = solicitud.vehiculo;
   const vehicleSummaryFacts = [
@@ -619,7 +619,7 @@ export function SolicitudDetailPage() {
             {!isAdmin && !isClosed ? (
               <button className="soft-button soft-button--compact" onClick={() => setTemplateDialogOpen(true)} type="button">
                 <FileSignature size={16} />
-                Generar docs
+                Preparar PDF
               </button>
             ) : null}
             {!isAdmin && !isClosed ? (
@@ -788,7 +788,7 @@ export function SolicitudDetailPage() {
                   type="button"
                 >
                   <FileUp size={16} />
-                  Subir documento
+                  Subir documento suelto
                 </button>
               ) : null}
               <button
@@ -1508,7 +1508,7 @@ function SolicitudPreparationAction({
     return (
       <button className="primary-button primary-button--compact" onClick={onOpenTemplates} type="button">
         <FileSignature size={16} />
-        Generar docs
+        Preparar PDF
       </button>
     );
   }
@@ -1516,7 +1516,7 @@ function SolicitudPreparationAction({
     return (
       <a className="soft-button soft-button--compact" href="#solicitud-documentacion-completa">
         <FileText size={16} />
-        Aportar docs
+        Ir a documentacion
       </a>
     );
   }
@@ -1540,7 +1540,7 @@ function SolicitudPreparationAction({
     return (
       <button className="soft-button soft-button--compact" onClick={onOpenTemplates} type="button">
         <FileSignature size={16} />
-        Preparar doc
+        Preparar PDF
       </button>
     );
   }
@@ -1726,19 +1726,19 @@ function AdminActions({
           <>
             <button className="primary-button primary-button--compact" disabled={pending || !canReadWithIa} onClick={onReadWithIa}>
               {iaPending ? <Loader2 size={16} /> : <FileText size={16} />}
-              {iaPending ? "Leyendo IA" : "Lectura IA"}
+              {iaPending ? "Leyendo IA" : "Leer solicitud con IA"}
             </button>
             <button className="soft-button soft-button--compact" disabled={pending || !canReadWithIa} onClick={onForceReadWithIa}>
               {iaPending ? <Loader2 size={16} /> : <RefreshCw size={16} />}
-              Releer IA
+              Releer solicitud con IA
             </button>
             <button className="soft-button soft-button--compact soft-button--danger" disabled={pending} onClick={onResetIaData} type="button">
               <RotateCcw size={16} />
-              Reset datos IA
+              Borrar datos IA
             </button>
             <button className="soft-button soft-button--compact" disabled={pending} onClick={onOpenTemplates} type="button">
               <FileSignature size={16} />
-              Generar docs
+              Preparar PDF
             </button>
             <Link className="soft-button soft-button--compact" to={`/solicitudes/${solicitud.id}/editar`}>
               <Pencil size={16} />
@@ -1746,7 +1746,7 @@ function AdminActions({
             </Link>
             <button className="primary-button primary-button--compact" disabled={pending} onClick={onConvert}>
               <FolderCheck size={16} />
-              Convertir
+              Crear expediente
             </button>
             <button className="soft-button soft-button--compact" disabled={pending} onClick={() => onStateChange("PENDIENTE_DOCUMENTACION")}>
               Pedir documentacion

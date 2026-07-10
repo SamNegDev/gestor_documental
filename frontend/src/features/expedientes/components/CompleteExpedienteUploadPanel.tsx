@@ -54,7 +54,7 @@ export function CompleteExpedienteUploadPanel({
       ) : null}
       <label className={`primary-button ${processing ? "primary-button--disabled" : ""}`}>
         <Upload size={16} />
-        {processing ? "En cola" : "Subir PDF"}
+        {processing ? "En cola" : "Subir PDF completo"}
         <input
           hidden
           disabled={processing}

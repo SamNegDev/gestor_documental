@@ -22,7 +22,7 @@ export function NextActionPanel({ hitos, documentos, siguientePaso, onOpenCheckl
   const fallbackActionAvailable = Boolean(siguienteHito?.accion && !isRollbackAction({ tipo: siguienteHito.accion, label: "" }));
   const actionAvailable = Boolean(primaryAction || fallbackActionAvailable);
   const primaryDisabled = Boolean(siguienteHito?.bloqueado || siguienteHito?.completado || (!checklistAction && !actionAvailable));
-  const primaryLabel = primaryAction?.label || (actionAvailable ? siguienteHito?.accionLabel || "Confirmar" : checklistAction ? "Aportar documento" : "Pendiente");
+  const primaryLabel = primaryAction?.label || (actionAvailable ? siguienteHito?.accionLabel || "Confirmar" : checklistAction ? "Ver checklist" : "Pendiente");
   const handlePrimary = () => {
     if (!siguienteHito) return;
     if (actionAvailable) {

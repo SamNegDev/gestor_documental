@@ -144,7 +144,7 @@ export function DocumentRequirementsPanel({
         <div className="requirement-heading-actions">
           <button className="soft-button soft-button--compact" type="button" onClick={() => setAdding(true)}>
             <Plus size={15} />
-            Añadir
+            Solicitar documento
           </button>
           <span className="exp-panel__counter">{pendientes}</span>
         </div>
@@ -210,7 +210,7 @@ export function DocumentRequirementsPanel({
               <button className="icon-button" type="button" title="Vincular documento" disabled={bloqueado} onClick={() => linkDocument(requisito)}>
                 <Link2 size={16} />
               </button>
-              <label className={`icon-button ${bloqueado ? "icon-button--disabled" : ""}`} title={bloqueado ? "Disponible cuando finalice el tramite" : "Subir documento"}>
+              <label className={`icon-button ${bloqueado ? "icon-button--disabled" : ""}`} title={bloqueado ? "Disponible cuando finalice el tramite" : "Aportar requisito"}>
                 <Upload size={16} />
                 <input
                   hidden
@@ -252,7 +252,7 @@ export function DocumentRequirementsPanel({
             <div className="exp-modal__header">
               <div>
                 <p className="eyebrow">Nueva solicitud</p>
-                <h3 id="requirement-create-title">Solicitar documentación</h3>
+                <h3 id="requirement-create-title">Solicitar documento al cliente</h3>
               </div>
               <button aria-label="Cerrar" className="icon-button" onClick={closeAdd} type="button">
                 <X size={16} />
@@ -305,7 +305,7 @@ export function DocumentRequirementsPanel({
               </button>
               <button className="primary-button" type="button" onClick={submitAdd}>
                 <Plus size={16} />
-                Crear requisito
+                Solicitar documento
               </button>
             </footer>
           </section>

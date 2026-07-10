@@ -49,9 +49,9 @@ export function SolicitudesListPage() {
   async function handleBulkConvert() {
     if (selectedSolicitudes.length === 0) return;
     const confirmed = await confirm({
-      title: "Convertir solicitudes",
-      description: `Se intentara convertir ${selectedSolicitudes.length} solicitudes seleccionadas. Las que ya no sean convertibles quedaran sin cambios.`,
-      confirmLabel: "Convertir posibles",
+      title: "Crear expedientes",
+      description: `Se intentara crear expediente para ${selectedSolicitudes.length} solicitudes seleccionadas. Las que ya no sean convertibles quedaran sin cambios.`,
+      confirmLabel: "Crear expedientes posibles",
       tone: "success",
     });
     if (!confirmed) return;
@@ -475,7 +475,7 @@ function SolicitudBulkActionsBar({
         </button>
         <button className="primary-button primary-button--compact" disabled={convertibleCount === 0} onClick={onConvert} type="button">
           <CheckCircle2 size={15} />
-          Convertir lote
+          Crear expedientes
         </button>
       </div>
     </div>

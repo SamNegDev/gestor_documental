@@ -56,7 +56,7 @@ export function IncidentResolutionDialog({
               <strong>Documentos vinculados a la incidencia</strong>
               <label className="soft-button soft-button--compact">
                 <Upload size={15} />
-                Subir documento
+                Subir documento a incidencia
                 <input
                   hidden
                   type="file"

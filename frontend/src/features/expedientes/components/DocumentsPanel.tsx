@@ -4,7 +4,6 @@ import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/forma
 
 type Props = {
   documentos: DocumentoExpediente[];
-  onOpenChecklist: () => void;
   onOpenReview: () => void;
   onOpenTemplates: () => void;
   onOpenUpload: () => void;
@@ -21,7 +20,6 @@ type Props = {
 
 export function DocumentsPanel({
   documentos,
-  onOpenChecklist,
   onOpenReview,
   onOpenTemplates,
   onOpenUpload,
@@ -46,10 +44,9 @@ export function DocumentsPanel({
           <h3>Documentos del expediente</h3>
         </div>
         <div className="exp-panel__heading-actions">
-          <button className="soft-button" onClick={onOpenChecklist} type="button">Checklist</button>
           <button className="soft-button" onClick={onOpenUpload} type="button">
             <Upload size={16} />
-            Subir documento
+            Subir documento suelto
           </button>
           <button className="soft-button" disabled={!hasEditableDocuments} onClick={onOpenReview} type="button">
             <Scissors size={16} />
@@ -57,7 +54,7 @@ export function DocumentsPanel({
           </button>
           <button className="primary-button" onClick={onOpenTemplates} type="button">
             <FilePlus2 size={16} />
-            Generar documento
+            Preparar PDF
           </button>
         </div>
       </div>
@@ -168,7 +165,7 @@ export function DocumentsPanel({
                     {applyingRoles ? <Loader2 className="document-row__identity-spinner" size={16} /> : <ClipboardCheck size={16} />}
                   </button>
                 ) : null}
-                <label className="icon-button" title="Subir documento">
+                <label className="icon-button" title="Subir este documento">
                   <Upload size={16} />
                   <input
                     hidden

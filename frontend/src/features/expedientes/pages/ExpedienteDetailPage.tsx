@@ -989,11 +989,11 @@ export function ExpedienteDetailPage() {
     if (!expediente || updatingDocuments) return;
     const force = Boolean(options?.forzarRelectura);
     const confirmed = await confirm({
-      title: force ? "Releer documentacion con IA" : "Actualizar con IA",
+      title: force ? "Releer expediente con IA" : "Actualizar expediente con IA",
       description: force
         ? "Se volveran a leer DNI/CIF, documentos de vehiculo y contratos/facturas, aunque ya tengan lectura previa. Despues se aplicaran solo los datos seguros."
         : "Se leeran o reutilizaran DNI/CIF, documentos de vehiculo y contratos/facturas ya subidos, se aplicaran los datos seguros y se sincronizara el checklist documental.",
-      confirmLabel: force ? "Releer IA" : "Actualizar",
+      confirmLabel: force ? "Releer expediente con IA" : "Actualizar expediente con IA",
     });
     if (!confirmed) return;
     setUpdatingDocuments(true);
@@ -1453,7 +1453,7 @@ export function ExpedienteDetailPage() {
               type="button"
             >
               {updatingDocuments ? <Loader2 className="button-spinner" size={16} /> : <RefreshCw size={16} />}
-              Actualizar con IA
+              Actualizar expediente con IA
             </button>
             <button
               className="soft-button"
@@ -1462,7 +1462,7 @@ export function ExpedienteDetailPage() {
               type="button"
             >
               {updatingDocuments ? <Loader2 className="button-spinner" size={16} /> : <RefreshCw size={16} />}
-              Releer IA
+              Releer expediente con IA
             </button>
             <button
               className="soft-button milestone-action--warning"
@@ -1470,7 +1470,7 @@ export function ExpedienteDetailPage() {
               type="button"
             >
               <ShieldAlert size={16} />
-              Abrir incidencia
+              Nueva incidencia
             </button>
             <button
               className="soft-button"
@@ -1479,7 +1479,7 @@ export function ExpedienteDetailPage() {
               type="button"
             >
               <FilePlus2 size={16} />
-              Solicitar documentacion
+              Solicitar documento
             </button>
             <button
               className="primary-button"
@@ -1539,7 +1539,6 @@ export function ExpedienteDetailPage() {
             onDeleteDocument={handleDeleteDocument}
             onEditDocument={setEditingDocument}
             onApplyRoles={handleApplyDocumentRoles}
-            onOpenChecklist={() => setChecklistOpen(true)}
             onOpenReview={handleOpenDocumentReview}
             onOpenTemplates={() => setTemplateDialogOpen(true)}
             onOpenUpload={() => setUploadDialogOpen(true)}

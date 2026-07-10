@@ -109,7 +109,7 @@ export function DocumentUploadDialog({
           </button>
           <button className="primary-button" disabled={!archivo || saving} onClick={submit} type="button">
             {saving ? <Loader2 className="button-spinner" size={16} /> : <FileUp size={16} />}
-            {saving ? "Subiendo..." : "Subir documento"}
+            {saving ? "Subiendo..." : "Subir documento suelto"}
           </button>
         </footer>
       </section>

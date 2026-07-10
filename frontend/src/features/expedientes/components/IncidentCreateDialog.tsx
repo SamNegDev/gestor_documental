@@ -77,7 +77,7 @@ export function IncidentCreateDialog({ open, tipos, loading, mode = "incident", 
             type="button"
           >
             <AlertTriangle size={16} />
-            {isInformationRequest ? "Enviar solicitud" : "Abrir incidencia"}
+            {isInformationRequest ? "Enviar solicitud" : "Nueva incidencia"}
           </button>
         </footer>
       </section>
