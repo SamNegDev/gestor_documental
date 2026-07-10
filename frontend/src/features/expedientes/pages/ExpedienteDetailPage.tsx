@@ -1004,12 +1004,12 @@ export function ExpedienteDetailPage() {
     setInteresadosCorrectionOpen(true);
   };
 
-  const handleUseDetectedIdentity = async (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string) => {
+  const handleUseDetectedIdentity = async (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string, nombreCompleto: string) => {
     if (!expediente) return;
     const identifier = normalizeIdentifier(identificador || identidad.identificador);
     const detectedRow: InteresadoCorrection = {
       ...emptyInteresadoCorrection(),
-      nombre: uppercaseInput(identityDisplayName(identidad)),
+      nombre: uppercaseInput(nombreCompleto || identityDisplayName(identidad)),
       dni: identifier,
       direccion: uppercaseInput(identidad.direccionTexto || ""),
       rol,

@@ -2925,7 +2925,7 @@ select {
 
 .solicitud-reading-identity__actions {
   display: grid;
-  grid-template-columns: minmax(118px, 142px) minmax(104px, 128px) auto;
+  grid-template-columns: minmax(180px, 260px) minmax(118px, 142px) minmax(104px, 128px) auto;
   align-items: center;
   justify-content: start;
   gap: 5px;
@@ -2933,6 +2933,7 @@ select {
 }
 
 .solicitud-reading-identity__actions select,
+.solicitud-reading-identity__name,
 .solicitud-reading-identity__identifier {
   height: 28px;
   min-width: 0;
@@ -2944,6 +2945,7 @@ select {
   font-weight: 800;
 }
 
+.solicitud-reading-identity__name,
 .solicitud-reading-identity__identifier {
   width: 100%;
 }
@@ -2986,6 +2988,7 @@ select {
   }
 
   .solicitud-reading-identity__actions select,
+  .solicitud-reading-identity__name,
   .solicitud-reading-identity__identifier,
   .solicitud-reading-identity__actions .soft-button {
     width: 100%;

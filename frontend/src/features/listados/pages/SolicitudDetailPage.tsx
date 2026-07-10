@@ -9,7 +9,7 @@ import { uppercaseInput } from "../../../shared/utils/text";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { CompleteExpedienteUploadPanel } from "../../expedientes/components/CompleteExpedienteUploadPanel";
 import { DocumentUploadDialog, type DocumentUploadSubmit } from "../../expedientes/components/DocumentUploadDialog";
-import { DocumentReadingPanel, normalizeIdentityIdentifier, type DocumentReadingExistingIdentity } from "../../expedientes/components/DocumentReadingPanel";
+import { DocumentReadingPanel, identityDisplayName, normalizeIdentityIdentifier, type DocumentReadingExistingIdentity } from "../../expedientes/components/DocumentReadingPanel";
 import { DocumentTemplateDialog } from "../../expedientes/components/DocumentTemplateDialog";
 import { OcrReviewDialog } from "../../expedientes/components/OcrReviewDialog";
 import {
@@ -485,7 +485,7 @@ export function SolicitudDetailPage() {
     }
   };
 
-  const handleAddDetectedIdentity = async (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string) => {
+  const handleAddDetectedIdentity = async (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string, nombreCompleto: string) => {
     const solicitudActual = solicitudQuery.data;
     if (!solicitudActual) return;
     if (!rol) {
@@ -497,6 +497,7 @@ export function SolicitudDetailPage() {
       alert("Revisa el DNI/NIE/CIF antes de anadir la identidad.");
       return;
     }
+    const nombreRevisado = uppercaseInput(nombreCompleto || identityDisplayName(identidad) || "");
     try {
       await anadirIdentidadDetectadaMutation.mutateAsync({
         solicitudId: solicitudActual.id,
@@ -510,7 +511,7 @@ export function SolicitudDetailPage() {
           apellido1: identidad.apellido1,
           apellido2: identidad.apellido2,
           razonSocial: identidad.razonSocial,
-          nombreCompleto: identidad.nombreCompleto,
+          nombreCompleto: nombreRevisado || identidad.nombreCompleto,
           fechaNacimiento: identidad.fechaNacimiento,
           fechaCaducidad: identidad.fechaCaducidad,
           direccionTexto: identidad.direccionTexto,

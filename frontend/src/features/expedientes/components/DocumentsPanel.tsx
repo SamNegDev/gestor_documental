@@ -13,7 +13,7 @@ type Props = {
   onDeleteDocument: (documento: DocumentoExpediente) => void;
   onReadIdentity?: (documento: DocumentoExpediente) => void;
   onReadRoles?: (documento: DocumentoExpediente) => void;
-  onUseDetectedIdentity?: (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string) => void;
+  onUseDetectedIdentity?: (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string, nombreCompleto: string) => void;
   existingIdentities?: DocumentReadingExistingIdentity[];
   addingIdentityDocumentId?: number | null;
   readingIdentityId?: number | null;

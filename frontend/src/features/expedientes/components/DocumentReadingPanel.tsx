@@ -20,7 +20,7 @@ type Props = {
   addingIdentity?: boolean;
   rereadingIdentity?: boolean;
   roles?: string[];
-  onAddIdentity?: (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string) => void;
+  onAddIdentity?: (documento: DocumentoExpediente, identidad: DocumentoIdentidadDetectada, rol: string, identificador: string, nombreCompleto: string) => void;
   onRereadIdentity?: (documento: DocumentoExpediente) => void;
 };
 
@@ -37,6 +37,7 @@ export function DocumentReadingPanel({
 }: Props) {
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
   const [identifiers, setIdentifiers] = useState<Record<string, string>>({});
+  const [names, setNames] = useState<Record<string, string>>({});
   const identidad = documento.lecturaIdentidad;
   const rolesLectura = documento.lecturaRoles;
   const vehiculo = documento.lecturaVehiculo;
@@ -72,6 +73,7 @@ export function DocumentReadingPanel({
             const key = identityKey(item, index);
             const normalizedId = normalizeIdentityIdentifier(item.identificador);
             const identifierValue = identifiers[key] ?? normalizedId ?? "";
+            const nameValue = names[key] ?? uppercaseInput(identityDisplayName(item) || "");
             const normalizedEditedId = normalizeIdentityIdentifier(identifierValue);
             const matchedExisting = normalizedEditedId
               ? existingIdentities.find((existing) => existing.identificador === normalizedEditedId)
@@ -104,6 +106,14 @@ export function DocumentReadingPanel({
                 {canAddIdentity ? (
                   <div className="solicitud-reading-identity__actions">
                     <input
+                      aria-label="Nombre revisado"
+                      className="solicitud-reading-identity__name"
+                      disabled={addingIdentity}
+                      onChange={(event) => setNames((current) => ({ ...current, [key]: uppercaseInput(event.target.value) }))}
+                      placeholder="Nombre completo"
+                      value={nameValue}
+                    />
+                    <input
                       aria-label="DNI/NIE/CIF revisado"
                       className="solicitud-reading-identity__identifier"
                       disabled={addingIdentity}
@@ -125,7 +135,7 @@ export function DocumentReadingPanel({
                     <button
                       className="soft-button soft-button--compact"
                       disabled={addingIdentity || !selectedRole || !normalizedEditedId}
-                      onClick={() => onAddIdentity?.(documento, item, selectedRole, identifierValue)}
+                      onClick={() => onAddIdentity?.(documento, item, selectedRole, identifierValue, nameValue)}
                       type="button"
                     >
                       {addingIdentity ? <Loader2 size={14} /> : <UserPlus size={14} />}
