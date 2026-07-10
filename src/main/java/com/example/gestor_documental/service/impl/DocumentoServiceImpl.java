@@ -16,10 +16,7 @@ import com.example.gestor_documental.model.OperacionExpediente;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
-import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
-import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
-import com.example.gestor_documental.repository.DocumentoVehiculoLecturaRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.ClienteRepository;
@@ -60,9 +57,6 @@ public class DocumentoServiceImpl implements DocumentoService {
     private static final String ACCION_CARGAR_DOCUMENTO = "CARGAR DOCUMENTO";
 
     private final DocumentoRepository documentoRepository;
-    private final DocumentoIdentidadLecturaRepository documentoIdentidadLecturaRepository;
-    private final DocumentoRolesLecturaRepository documentoRolesLecturaRepository;
-    private final DocumentoVehiculoLecturaRepository documentoVehiculoLecturaRepository;
     private final ExpedienteRepository expedienteRepository;
     private final IncidenciaRepository incidenciaRepository;
     private final ClienteRepository clienteRepository;
@@ -935,7 +929,6 @@ public class DocumentoServiceImpl implements DocumentoService {
 
             Path rutaPrincipal = obtenerCarpetaUploads().resolve(principal.getNombreArchivo()).normalize();
             Files.write(rutaPrincipal, pdfSplitService.unirDocumentos(contenidos));
-            eliminarLecturasDocumento(principal);
 
             if (tipoDocumento != null) {
                 principal.setTipoDocumento(tipoDocumento);
@@ -1120,7 +1113,6 @@ public class DocumentoServiceImpl implements DocumentoService {
     }
 
     private void eliminarDocumentoFusionado(Documento documento) throws IOException {
-        eliminarLecturasDocumento(documento);
         Path ruta = obtenerCarpetaUploads().resolve(documento.getNombreArchivo()).normalize();
         Path carpetaUploads = obtenerCarpetaUploads();
         if (!ruta.startsWith(carpetaUploads)) {
@@ -1128,15 +1120,6 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
         Files.deleteIfExists(ruta);
         documentoRepository.delete(documento);
-    }
-
-    private void eliminarLecturasDocumento(Documento documento) {
-        if (documento == null || documento.getId() == null) {
-            return;
-        }
-        documentoIdentidadLecturaRepository.deleteByDocumentoId(documento.getId());
-        documentoRolesLecturaRepository.deleteByDocumentoId(documento.getId());
-        documentoVehiculoLecturaRepository.deleteByDocumentoId(documento.getId());
     }
 
     private Path obtenerCarpetaUploads() {

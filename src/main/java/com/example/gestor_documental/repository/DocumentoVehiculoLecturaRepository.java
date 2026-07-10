@@ -15,6 +15,4 @@ public interface DocumentoVehiculoLecturaRepository extends JpaRepository<Docume
 
     @EntityGraph(attributePaths = {"documento"})
     List<DocumentoVehiculoLectura> findByDocumentoIdIn(Collection<Long> documentoIds);
-
-    void deleteByDocumentoId(Long documentoId);
 }

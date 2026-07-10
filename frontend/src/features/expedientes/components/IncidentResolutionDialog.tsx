@@ -32,7 +32,6 @@ export function IncidentResolutionDialog({
     if (!documento.id) return false;
     return !documentosRevision.some((vinculado) => vinculado.id === documento.id);
   });
-  const documentoPreview = documentosVinculables.find((documento) => String(documento.id) === documentoSeleccionado);
 
   return (
     <div className="exp-modal" role="presentation">
@@ -92,17 +91,16 @@ export function IncidentResolutionDialog({
               ))
             )}
             {documentosVinculables.length > 0 ? (
-              <div className="incident-link-block">
-                <div className="incident-link-row">
-                  <select onChange={(event) => setDocumentoSeleccionado(event.target.value)} value={documentoSeleccionado}>
+              <div className="incident-link-row">
+                <select onChange={(event) => setDocumentoSeleccionado(event.target.value)} value={documentoSeleccionado}>
                   <option value="">Vincular documento existente</option>
                   {documentosVinculables.map((documento) => (
                     <option key={documento.id || documento.nombre} value={documento.id || ""}>
                       {documento.nombreOriginal || documento.nombre} · {formatDocumentType(documento.tipo)}
                     </option>
                   ))}
-                  </select>
-                  <button
+                </select>
+                <button
                   className="soft-button soft-button--compact"
                   disabled={!documentoSeleccionado}
                   onClick={() => {
@@ -110,22 +108,9 @@ export function IncidentResolutionDialog({
                     setDocumentoSeleccionado("");
                   }}
                   type="button"
-                  >
-                    Vincular
-                  </button>
-                </div>
-                {documentoPreview?.id ? (
-                  <div className="incident-link-preview">
-                    <div>
-                      <strong>{documentoPreview.nombreOriginal || documentoPreview.nombre}</strong>
-                      <small>{formatDocumentType(documentoPreview.tipo)} Â· {formatDateTime(documentoPreview.fechaSubida)}</small>
-                    </div>
-                    <img
-                      alt={`Vista previa de ${documentoPreview.nombreOriginal || documentoPreview.nombre}`}
-                      src={`/api/documentos/${documentoPreview.id}/paginas/0/preview`}
-                    />
-                  </div>
-                ) : null}
+                >
+                  Vincular
+                </button>
               </div>
             ) : null}
           </div>

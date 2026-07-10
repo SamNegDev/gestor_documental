@@ -50,17 +50,19 @@ public class DatabaseSeeder implements CommandLineRunner {
                     new TipoTramite(TipoTramiteEnum.BAJA, "Baja de vehiculo"),
                     new TipoTramite(TipoTramiteEnum.DUPLICADO, "Duplicado de tarjeta ITV"),
                     new TipoTramite(TipoTramiteEnum.MATRICULACION, "Matriculacion de vehiculo"),
-                    new TipoTramite(TipoTramiteEnum.NOTIFICACION_VENTA, "Notificacion de venta"),
-                    new TipoTramite(TipoTramiteEnum.HERENCIA, "Herencia"),
-                    new TipoTramite(TipoTramiteEnum.CUESTIONES_VARIAS, "Cuestiones varias"));
+                    new TipoTramite(TipoTramiteEnum.NOTIFICACION_VENTA, "Notificacion de venta"));
             tipoTramiteRepository.saveAll(tiposTramite);
             System.out.println("Base de datos inicializada: Se insertaron " + tiposTramite.size()
                     + " registros base para TipoTramite.");
         }
-        asegurarTipoTramite(TipoTramiteEnum.BATECOM, "BATECOM");
-        asegurarTipoTramite(TipoTramiteEnum.NOTIFICACION_VENTA, "Notificacion de venta");
-        asegurarTipoTramite(TipoTramiteEnum.HERENCIA, "Herencia");
-        asegurarTipoTramite(TipoTramiteEnum.CUESTIONES_VARIAS, "Cuestiones varias");
+        if (tipoTramiteRepository.findAll().stream().noneMatch(tipo -> tipo.getNombre() == TipoTramiteEnum.BATECOM)) {
+            tipoTramiteRepository.save(new TipoTramite(TipoTramiteEnum.BATECOM, "BATECOM"));
+            System.out.println("Se inserto el nuevo TipoTramite: BATECOM");
+        }
+        if (tipoTramiteRepository.findAll().stream().noneMatch(tipo -> tipo.getNombre() == TipoTramiteEnum.NOTIFICACION_VENTA)) {
+            tipoTramiteRepository.save(new TipoTramite(TipoTramiteEnum.NOTIFICACION_VENTA, "Notificacion de venta"));
+            System.out.println("Se inserto el nuevo TipoTramite: NOTIFICACION_VENTA");
+        }
         if (tipoIncidenciaRepository.findByNombre(TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION).isEmpty()) {
             tipoIncidenciaRepository.save(new TipoIncidencia(TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION,
                     "Falta documentacion necesaria u obligatoria para el tramite.", true));
@@ -75,13 +77,6 @@ public class DatabaseSeeder implements CommandLineRunner {
             tipoIncidenciaRepository.save(new TipoIncidencia(TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL,
                     "Se necesita una respuesta o aclaracion adicional del cliente.", true));
             System.out.println("Se inserto el nuevo TipoIncidencia: SOLICITADA_INFORMACION_ADICIONAL");
-        }
-    }
-
-    private void asegurarTipoTramite(TipoTramiteEnum nombre, String descripcion) {
-        if (tipoTramiteRepository.findByNombre(nombre).isEmpty()) {
-            tipoTramiteRepository.save(new TipoTramite(nombre, descripcion));
-            System.out.println("Se inserto el nuevo TipoTramite: " + nombre);
         }
     }
 }
