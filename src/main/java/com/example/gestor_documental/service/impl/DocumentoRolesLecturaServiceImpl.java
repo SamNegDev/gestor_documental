@@ -430,9 +430,6 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
     }
 
     private void validarLecturaAplicable(DocumentoRolesLectura lectura) {
-        if (lectura.isAplicadoExpediente()) {
-            throw new OperacionInvalidaException("Estos datos ya se aplicaron al expediente.");
-        }
         if (lectura.isRequiereRevision()) {
             throw new OperacionInvalidaException("La lectura requiere revision manual antes de aplicar.");
         }

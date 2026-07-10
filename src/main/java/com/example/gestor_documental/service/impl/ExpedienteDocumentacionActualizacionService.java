@@ -4,6 +4,7 @@ import com.example.gestor_documental.dto.expediente.ActualizacionDocumentalExped
 import com.example.gestor_documental.dto.expediente.DocumentoIdentidadLecturaResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoVehiculoLecturaResponse;
+import com.example.gestor_documental.model.DocumentoRolesLectura;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
@@ -31,6 +32,7 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -149,6 +151,9 @@ public class ExpedienteDocumentacionActualizacionService {
             }
             try {
                 boolean existia = documentoRolesLecturaRepository.findByDocumentoId(documento.getId()).isPresent();
+                DocumentoRolesLectura lecturaAnterior = documentoRolesLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
+                boolean aplicadaAntes = lecturaAnterior != null && lecturaAnterior.isAplicadoExpediente();
+                String interesadosAntes = resumenInteresados(expedienteId);
                 DocumentoRolesLecturaResponse lectura = documentoRolesLecturaService.leerRoles(documento.getId(), forzarRelectura, admin);
                 contadores.operacionesLeidas++;
                 if (existia && !forzarRelectura) {
@@ -156,14 +161,19 @@ public class ExpedienteDocumentacionActualizacionService {
                 } else {
                     contadores.rolesNueva++;
                 }
-                if (lectura == null || !lectura.isAplicable()) {
+                if (lectura == null || (!lectura.isAplicable() && !lectura.isAplicadoExpediente())) {
                     requiereRevision = true;
                     detalles.add(nombreDocumento(documento) + ": roles leidos, no aplicables automaticamente"
                             + motivo(lectura != null ? lectura.getMotivoAplicacion() : null) + ".");
                     continue;
                 }
                 documentoRolesLecturaService.aplicarDatos(documento.getId(), admin);
-                datosAplicados++;
+                String interesadosDespues = resumenInteresados(expedienteId);
+                if (!aplicadaAntes || !Objects.equals(interesadosAntes, interesadosDespues)) {
+                    datosAplicados++;
+                } else {
+                    detalles.add(nombreDocumento(documento) + ": interesados ya estaban aplicados; se comprobaron sin cambios.");
+                }
             } catch (RuntimeException exception) {
                 requiereRevision = true;
                 detalles.add(nombreDocumento(documento) + ": no se pudieron aplicar datos (" + mensaje(exception) + ").");
@@ -292,6 +302,22 @@ public class ExpedienteDocumentacionActualizacionService {
 
     private String motivo(String motivo) {
         return motivo != null && !motivo.isBlank() ? ": " + motivo : "";
+    }
+
+    private String resumenInteresados(Long expedienteId) {
+        return expedienteInteresadoRepository.findByExpedienteId(expedienteId).stream()
+                .map(relacion -> {
+                    String rol = relacion.getRol() != null ? relacion.getRol().name() : "SIN_ROL";
+                    if (relacion.getInteresado() == null) {
+                        return rol + ":SIN_INTERESADO";
+                    }
+                    return rol + ":"
+                            + normalizarIdentificador(relacion.getInteresado().getDni()) + ":"
+                            + TextNormalizer.upperOrNull(relacion.getInteresado().getNombre()) + ":"
+                            + TextNormalizer.upperOrNull(relacion.getInteresado().getDireccion());
+                })
+                .sorted()
+                .collect(java.util.stream.Collectors.joining("|"));
     }
 
     private String normalizarMatricula(String value) {
