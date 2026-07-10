@@ -15,4 +15,6 @@ public interface DocumentoRolesLecturaRepository extends JpaRepository<Documento
 
     @EntityGraph(attributePaths = {"documento", "vendedorInteresado", "compradorInteresado"})
     List<DocumentoRolesLectura> findByDocumentoIdIn(Collection<Long> documentoIds);
+
+    void deleteByDocumentoId(Long documentoId);
 }
