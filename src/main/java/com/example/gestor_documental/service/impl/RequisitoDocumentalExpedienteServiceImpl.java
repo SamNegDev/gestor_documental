@@ -36,6 +36,8 @@ import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
+import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
+import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson.IdentidadDetectada;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -876,7 +878,8 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             return false;
         }
         if (documento.getInteresado() != null) {
-            return Objects.equals(documento.getInteresado().getId(), requisito.getInteresado().getId());
+            return Objects.equals(documento.getInteresado().getId(), requisito.getInteresado().getId())
+                    || lecturaIdentidadCubreRequisito(documento, requisito);
         }
         if (lecturaIdentidadCubreRequisito(documento, requisito)) {
             return true;
@@ -892,14 +895,44 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             return false;
         }
         DocumentoIdentidadLectura lectura = identidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null);
-        if (lectura == null || lectura.getConfianzaGlobal() == null || lectura.getConfianzaGlobal() < CONFIANZA_MINIMA_IDENTIDAD) {
+        if (lectura == null) {
             return false;
         }
-        if (!normalizarIdentificador(requisito.getInteresado().getDni()).equals(normalizarIdentificador(lectura.getIdentificador()))) {
+        String identificadorRequisito = normalizarIdentificador(requisito.getInteresado().getDni());
+        if (identificadorRequisito.isBlank()) {
             return false;
         }
-        TipoDocumento tipoDetectado = lectura.getTipoDocumentoDetectado();
-        return tipoDetectado == null || tipoDocumentoCubreRequisito(tipoDetectado, requisito.getTipoDocumento());
+        return DocumentoIdentidadLecturaJson.extraer(lectura).stream()
+                .anyMatch(identidad -> identidadDetectadaCubreRequisito(identidad, identificadorRequisito, requisito.getTipoDocumento()));
+    }
+
+    private boolean identidadDetectadaCubreRequisito(
+            IdentidadDetectada identidad,
+            String identificadorRequisito,
+            TipoDocumento tipoDocumentoRequisito
+    ) {
+        if (identidad == null || identidad.confianzaGlobal() == null || identidad.confianzaGlobal() < CONFIANZA_MINIMA_IDENTIDAD) {
+            return false;
+        }
+        if (!identificadorRequisito.equals(normalizarIdentificador(identidad.identificador()))) {
+            return false;
+        }
+        TipoDocumento tipoDetectado = tipoIdentidadDetectada(identidad.tipoDocumento());
+        return tipoDetectado == null || tipoDocumentoCubreRequisito(tipoDetectado, tipoDocumentoRequisito);
+    }
+
+    private TipoDocumento tipoIdentidadDetectada(String valor) {
+        if (valor == null) {
+            return null;
+        }
+        String normalizado = valor.trim().toUpperCase(Locale.ROOT);
+        if (normalizado.contains("CIF")) {
+            return TipoDocumento.CIF;
+        }
+        if (normalizado.contains("DNI") || normalizado.contains("NIE")) {
+            return TipoDocumento.DNI;
+        }
+        return null;
     }
 
     private Optional<Documento> documentoIdentidadGaCubreRequisito(
