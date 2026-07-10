@@ -223,9 +223,10 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                         loading="lazy"
                       />
                     ) : (
-                      <iframe
-                        src={`/documentos/ver/${documento.id}?v=${previewVersion}#toolbar=0&navpanes=0&scrollbar=0`}
-                        title={documento.nombreOriginal || documento.nombre}
+                      <img
+                        src={`/api/documentos/${documento.id}/paginas/1/preview?v=${previewVersion}`}
+                        alt={documento.nombreOriginal || documento.nombre}
+                        loading="lazy"
                       />
                     )
                   ) : null}
