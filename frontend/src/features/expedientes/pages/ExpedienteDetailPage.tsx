@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Download, FilePlus2, FileText, Info, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ShieldAlert, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
@@ -50,7 +50,7 @@ import {
 import { ApiError } from "../../../shared/api/http";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import type {
   ActualizacionDocumentalExpediente,
   DocumentoIdentidadDetectada,
@@ -96,12 +96,16 @@ const COMPLETE_DOCUMENT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 type InteresadoCorrection = ExpedienteEditInput["interesados"][number];
 
 function emptyInteresadoCorrection(): InteresadoCorrection {
-  return { nombre: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
+  return { nombre: "", nombrePila: "", apellido1: "", apellido2: "", razonSocial: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
 }
 
 function interesadoCorrectionFromExpediente(interesado: ExpedienteDetail["interesados"][number]): InteresadoCorrection {
   return {
     nombre: uppercaseInput(interesado.nombre || ""),
+    nombrePila: uppercaseInput(interesado.nombrePila || ""),
+    apellido1: uppercaseInput(interesado.apellido1 || ""),
+    apellido2: uppercaseInput(interesado.apellido2 || ""),
+    razonSocial: uppercaseInput(interesado.razonSocial || ""),
     dni: uppercaseInput(interesado.dni || ""),
     telefono: uppercaseInput(interesado.telefono || ""),
     direccion: uppercaseInput(interesado.direccion || ""),
@@ -518,7 +522,7 @@ function AdditionalInfoDialog({
           <label>
             Informacion solicitada
             <textarea
-              onChange={(event) => setContenido(uppercaseInput(event.target.value))}
+              onChange={(event) => uppercaseInputPreservingCursor(event, setContenido)}
               placeholder="Ej. CONFIRMAR PRECIO DE VENTA DEL CONTRATO"
               rows={4}
               value={contenido}
@@ -568,11 +572,18 @@ function InterestedPartiesCorrectionDialog({
   const updateRow = (index: number, field: keyof InteresadoCorrection, value: string) => {
     setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: uppercaseInput(value) } : row)));
   };
+  const updateRowInput = (index: number, field: keyof InteresadoCorrection, event: ChangeEvent<HTMLInputElement>) => {
+    uppercaseInputPreservingCursor(event, (value) => updateRow(index, field, value));
+  };
 
   const selectInteresado = (index: number, interesado: InteresadoSearchResult) => {
     setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? {
       ...row,
       nombre: uppercaseInput(interesado.nombre || ""),
+      nombrePila: uppercaseInput(interesado.nombrePila || ""),
+      apellido1: uppercaseInput(interesado.apellido1 || ""),
+      apellido2: uppercaseInput(interesado.apellido2 || ""),
+      razonSocial: uppercaseInput(interesado.razonSocial || ""),
       dni: uppercaseInput(interesado.dni || ""),
       telefono: uppercaseInput(interesado.telefono || ""),
       direccion: uppercaseInput(interesado.direccion || ""),
@@ -639,7 +650,7 @@ function InterestedPartiesCorrectionDialog({
               />
               <label>
                 <span>DNI / CIF</span>
-                <input value={row.dni || ""} onChange={(event) => updateRow(index, "dni", event.target.value)} />
+                <input value={row.dni || ""} onChange={(event) => updateRowInput(index, "dni", event)} />
               </label>
               <label>
                 <span>Rol</span>
@@ -654,7 +665,7 @@ function InterestedPartiesCorrectionDialog({
               </label>
               <label>
                 <span>Telefono</span>
-                <input value={row.telefono || ""} onChange={(event) => updateRow(index, "telefono", event.target.value)} />
+                <input value={row.telefono || ""} onChange={(event) => updateRowInput(index, "telefono", event)} />
               </label>
               <AddressFields
                 idPrefix={`expediente-correction-${index}`}
@@ -1010,8 +1021,23 @@ export function ExpedienteDetailPage() {
     const detectedRow: InteresadoCorrection = {
       ...emptyInteresadoCorrection(),
       nombre: uppercaseInput(nombreCompleto || identityDisplayName(identidad)),
+      nombrePila: uppercaseInput(identidad.nombre || ""),
+      apellido1: uppercaseInput(identidad.apellido1 || ""),
+      apellido2: uppercaseInput(identidad.apellido2 || ""),
+      razonSocial: uppercaseInput(identidad.razonSocial || ""),
       dni: identifier,
       direccion: uppercaseInput(identidad.direccionTexto || ""),
+      tipoVia: uppercaseInput(identidad.tipoVia || ""),
+      nombreVia: uppercaseInput(identidad.nombreVia || ""),
+      numeroVia: uppercaseInput(identidad.numeroVia || ""),
+      bloque: uppercaseInput(identidad.bloque || ""),
+      portal: uppercaseInput(identidad.portal || ""),
+      escalera: uppercaseInput(identidad.escalera || ""),
+      piso: uppercaseInput(identidad.piso || ""),
+      puerta: uppercaseInput(identidad.puerta || ""),
+      codigoPostal: uppercaseInput(identidad.codigoPostal || ""),
+      municipio: uppercaseInput(identidad.municipio || ""),
+      provincia: uppercaseInput(identidad.provincia || ""),
       rol,
     };
     const rows = expediente.interesados.map(interesadoCorrectionFromExpediente);
@@ -1022,6 +1048,17 @@ export function ExpedienteDetailPage() {
         nombre: detectedRow.nombre || rows[existingIndex].nombre,
         dni: detectedRow.dni || rows[existingIndex].dni,
         direccion: detectedRow.direccion || rows[existingIndex].direccion,
+        tipoVia: detectedRow.tipoVia || rows[existingIndex].tipoVia,
+        nombreVia: detectedRow.nombreVia || rows[existingIndex].nombreVia,
+        numeroVia: detectedRow.numeroVia || rows[existingIndex].numeroVia,
+        bloque: detectedRow.bloque || rows[existingIndex].bloque,
+        portal: detectedRow.portal || rows[existingIndex].portal,
+        escalera: detectedRow.escalera || rows[existingIndex].escalera,
+        piso: detectedRow.piso || rows[existingIndex].piso,
+        puerta: detectedRow.puerta || rows[existingIndex].puerta,
+        codigoPostal: detectedRow.codigoPostal || rows[existingIndex].codigoPostal,
+        municipio: detectedRow.municipio || rows[existingIndex].municipio,
+        provincia: detectedRow.provincia || rows[existingIndex].provincia,
         rol: detectedRow.rol || rows[existingIndex].rol,
       };
     } else {

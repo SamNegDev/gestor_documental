@@ -9,7 +9,7 @@ import { ListFiltersBar } from "../components/ListFiltersBar";
 import { ListPageChrome } from "../components/ListPageChrome";
 import type { ExpedienteListItem, ListCatalogs, ListFilters } from "../types";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { searchInteresados } from "../../expedientes/services/expedienteDetailApi";
 import type { InteresadoSearchResult } from "../../expedientes/types/expedienteDetail.types";
@@ -311,7 +311,7 @@ function ExpedientesTable({
               <input
                 className="records-table-filter"
                 value={filters.matricula || ""}
-                onChange={(event) => nextFilter("matricula", uppercaseInput(event.target.value))}
+                onChange={(event) => uppercaseInputPreservingCursor(event, (value) => nextFilter("matricula", value))}
                 placeholder="Buscar"
               />
             </th>
@@ -711,7 +711,7 @@ function InteresadoListFilter({ value, onChange }: { value: string; onChange: (v
       <input
         className="records-table-filter"
         onChange={(event) => {
-          onChange(uppercaseInput(event.target.value));
+          uppercaseInputPreservingCursor(event, onChange);
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}

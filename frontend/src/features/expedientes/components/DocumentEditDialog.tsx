@@ -2,7 +2,7 @@ import { FilePenLine, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { DocumentoExpediente, OperacionExpediente } from "../types/expedienteDetail.types";
 import { formatDocumentType } from "../utils/formatters";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 
 export const DOCUMENT_TYPES = [
   "DNI",
@@ -136,7 +136,7 @@ export function DocumentEditDialog({ documento, operaciones = [], onClose, onSub
           {!nombreAutomatico ? (
             <label>
               Nombre personalizado
-              <input value={nombreArchivo} onChange={(event) => setNombreArchivo(uppercaseInput(event.target.value))} />
+              <input value={nombreArchivo} onChange={(event) => uppercaseInputPreservingCursor(event, setNombreArchivo)} />
             </label>
           ) : null}
         </div>

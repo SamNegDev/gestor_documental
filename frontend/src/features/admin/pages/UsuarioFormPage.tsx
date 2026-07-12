@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save, UserRoundCheck } from "lucide-react";
 import { createUsuario, getUsuario, getUsuarioCatalogs, updateUsuario } from "../services/adminApi";
 import type { UsuarioInput } from "../types";
-import { cleanLowerText, cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
+import { cleanLowerText, cleanUpperText, uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 
 function emptyUsuario(): UsuarioInput {
   return {
@@ -87,6 +87,9 @@ export function UsuarioFormPage() {
     onSuccess: () => navigate("/admin/usuarios"),
     onError: (cause) => alert(cause instanceof Error ? cause.message : "No se pudo guardar el usuario."),
   });
+  const updateUpperField = (field: keyof UsuarioInput, event: ChangeEvent<HTMLInputElement>) => {
+    uppercaseInputPreservingCursor(event, (value) => setForm((current) => ({ ...current, [field]: value })));
+  };
 
   return (
     <main className="request-form-page admin-page">
@@ -112,11 +115,11 @@ export function UsuarioFormPage() {
           <div className="edit-form-grid">
             <label>
               Nombre
-              <input value={form.nombre} required onChange={(event) => setForm({ ...form, nombre: uppercaseInput(event.target.value) })} />
+              <input value={form.nombre} required onChange={(event) => updateUpperField("nombre", event)} />
             </label>
             <label>
               Apellidos
-              <input value={form.apellidos} required onChange={(event) => setForm({ ...form, apellidos: uppercaseInput(event.target.value) })} />
+              <input value={form.apellidos} required onChange={(event) => updateUpperField("apellidos", event)} />
             </label>
             <label>
               Email

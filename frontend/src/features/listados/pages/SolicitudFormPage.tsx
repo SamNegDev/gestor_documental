@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, FilePlus2, Loader2, Save } from "lucide-react";
 import { InteresadoAutocomplete } from "../../expedientes/components/InteresadoAutocomplete";
 import { humanizeEnum } from "../../expedientes/utils/formatters";
-import { cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
+import { cleanUpperText, uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 import { createSolicitud, getSolicitudDetail, getSolicitudListCatalogs, updateSolicitud } from "../services/listadosApi";
 import type { InteresadoSearchResult } from "../../expedientes/types/expedienteDetail.types";
@@ -26,6 +26,10 @@ function emptyForm(): SolicitudUpsertInput {
     observaciones: "",
     interesado1Rol: "",
     interesado1Nombre: "",
+    interesado1NombrePila: "",
+    interesado1Apellido1: "",
+    interesado1Apellido2: "",
+    interesado1RazonSocial: "",
     interesado1Dni: "",
     interesado1Telefono: "",
     interesado1Direccion: "",
@@ -42,6 +46,10 @@ function emptyForm(): SolicitudUpsertInput {
     interesado1Provincia: "",
     interesado2Rol: "",
     interesado2Nombre: "",
+    interesado2NombrePila: "",
+    interesado2Apellido1: "",
+    interesado2Apellido2: "",
+    interesado2RazonSocial: "",
     interesado2Dni: "",
     interesado2Telefono: "",
     interesado2Direccion: "",
@@ -58,6 +66,10 @@ function emptyForm(): SolicitudUpsertInput {
     interesado2Provincia: "",
     interesado3Rol: "",
     interesado3Nombre: "",
+    interesado3NombrePila: "",
+    interesado3Apellido1: "",
+    interesado3Apellido2: "",
+    interesado3RazonSocial: "",
     interesado3Dni: "",
     interesado3Telefono: "",
     interesado3Direccion: "",
@@ -92,6 +104,10 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     observaciones: uppercaseInput(solicitud.observaciones || ""),
     interesado1Rol: interesado1?.rol || "",
     interesado1Nombre: uppercaseInput(interesado1?.nombre || ""),
+    interesado1NombrePila: uppercaseInput(interesado1?.nombrePila || ""),
+    interesado1Apellido1: uppercaseInput(interesado1?.apellido1 || ""),
+    interesado1Apellido2: uppercaseInput(interesado1?.apellido2 || ""),
+    interesado1RazonSocial: uppercaseInput(interesado1?.razonSocial || ""),
     interesado1Dni: uppercaseInput(interesado1?.dni || ""),
     interesado1Telefono: uppercaseInput(interesado1?.telefono || ""),
     interesado1Direccion: uppercaseInput(interesado1?.direccion || ""),
@@ -108,6 +124,10 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     interesado1Provincia: uppercaseInput(interesado1?.provincia || ""),
     interesado2Rol: interesado2?.rol || "",
     interesado2Nombre: uppercaseInput(interesado2?.nombre || ""),
+    interesado2NombrePila: uppercaseInput(interesado2?.nombrePila || ""),
+    interesado2Apellido1: uppercaseInput(interesado2?.apellido1 || ""),
+    interesado2Apellido2: uppercaseInput(interesado2?.apellido2 || ""),
+    interesado2RazonSocial: uppercaseInput(interesado2?.razonSocial || ""),
     interesado2Dni: uppercaseInput(interesado2?.dni || ""),
     interesado2Telefono: uppercaseInput(interesado2?.telefono || ""),
     interesado2Direccion: uppercaseInput(interesado2?.direccion || ""),
@@ -124,6 +144,10 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     interesado2Provincia: uppercaseInput(interesado2?.provincia || ""),
     interesado3Rol: interesado3?.rol || "",
     interesado3Nombre: uppercaseInput(interesado3?.nombre || ""),
+    interesado3NombrePila: uppercaseInput(interesado3?.nombrePila || ""),
+    interesado3Apellido1: uppercaseInput(interesado3?.apellido1 || ""),
+    interesado3Apellido2: uppercaseInput(interesado3?.apellido2 || ""),
+    interesado3RazonSocial: uppercaseInput(interesado3?.razonSocial || ""),
     interesado3Dni: uppercaseInput(interesado3?.dni || ""),
     interesado3Telefono: uppercaseInput(interesado3?.telefono || ""),
     interesado3Direccion: uppercaseInput(interesado3?.direccion || ""),
@@ -156,6 +180,10 @@ function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
     observaciones: cleanUpperText(form.observaciones),
     interesado1Rol: cleanUpperText(form.interesado1Rol),
     interesado1Nombre: cleanUpperText(form.interesado1Nombre),
+    interesado1NombrePila: cleanUpperText(form.interesado1NombrePila),
+    interesado1Apellido1: cleanUpperText(form.interesado1Apellido1),
+    interesado1Apellido2: cleanUpperText(form.interesado1Apellido2),
+    interesado1RazonSocial: cleanUpperText(form.interesado1RazonSocial),
     interesado1Dni: cleanUpperText(form.interesado1Dni),
     interesado1Telefono: cleanUpperText(form.interesado1Telefono),
     interesado1Direccion: cleanUpperText(form.interesado1Direccion),
@@ -172,6 +200,10 @@ function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
     interesado1Provincia: cleanUpperText(form.interesado1Provincia),
     interesado2Rol: cleanUpperText(form.interesado2Rol),
     interesado2Nombre: cleanUpperText(form.interesado2Nombre),
+    interesado2NombrePila: cleanUpperText(form.interesado2NombrePila),
+    interesado2Apellido1: cleanUpperText(form.interesado2Apellido1),
+    interesado2Apellido2: cleanUpperText(form.interesado2Apellido2),
+    interesado2RazonSocial: cleanUpperText(form.interesado2RazonSocial),
     interesado2Dni: cleanUpperText(form.interesado2Dni),
     interesado2Telefono: cleanUpperText(form.interesado2Telefono),
     interesado2Direccion: cleanUpperText(form.interesado2Direccion),
@@ -188,6 +220,10 @@ function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
     interesado2Provincia: cleanUpperText(form.interesado2Provincia),
     interesado3Rol: cleanUpperText(form.interesado3Rol),
     interesado3Nombre: cleanUpperText(form.interesado3Nombre),
+    interesado3NombrePila: cleanUpperText(form.interesado3NombrePila),
+    interesado3Apellido1: cleanUpperText(form.interesado3Apellido1),
+    interesado3Apellido2: cleanUpperText(form.interesado3Apellido2),
+    interesado3RazonSocial: cleanUpperText(form.interesado3RazonSocial),
     interesado3Dni: cleanUpperText(form.interesado3Dni),
     interesado3Telefono: cleanUpperText(form.interesado3Telefono),
     interesado3Direccion: cleanUpperText(form.interesado3Direccion),
@@ -224,6 +260,10 @@ function clearThirdInteresado(form: SolicitudUpsertInput): SolicitudUpsertInput 
     ...form,
     interesado3Rol: "",
     interesado3Nombre: "",
+    interesado3NombrePila: "",
+    interesado3Apellido1: "",
+    interesado3Apellido2: "",
+    interesado3RazonSocial: "",
     interesado3Dni: "",
     interesado3Telefono: "",
     interesado3Direccion: "",
@@ -303,6 +343,9 @@ export function SolicitudFormPage() {
   const isBatecom = isBatecomType(selectedType?.nombre);
   const fieldClassName = (field: string, baseClassName?: string) =>
     [baseClassName, focusField === field ? "edit-field--missing" : null].filter(Boolean).join(" ") || undefined;
+  const updateInput = (field: keyof SolicitudUpsertInput, event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    uppercaseInputPreservingCursor(event, (value) => setForm((current) => ({ ...current, [field]: value })));
+  };
 
   useEffect(() => {
     if (!focusField || loading) return;
@@ -385,27 +428,27 @@ export function SolicitudFormPage() {
             </label>
             <label className={fieldClassName("matricula")} data-field="matricula">
               Matricula
-              <input value={form.matricula} onChange={(event) => setForm({ ...form, matricula: uppercaseInput(event.target.value) })} required />
+              <input value={form.matricula} onChange={(event) => updateInput("matricula", event)} required />
             </label>
             <label className={fieldClassName("vehiculoMarca")} data-field="vehiculoMarca">
               Marca
-              <input value={form.vehiculoMarca || ""} onChange={(event) => setForm({ ...form, vehiculoMarca: uppercaseInput(event.target.value) })} />
+              <input value={form.vehiculoMarca || ""} onChange={(event) => updateInput("vehiculoMarca", event)} />
             </label>
             <label className={fieldClassName("vehiculoModelo")} data-field="vehiculoModelo">
               Modelo
-              <input value={form.vehiculoModelo || ""} onChange={(event) => setForm({ ...form, vehiculoModelo: uppercaseInput(event.target.value) })} />
+              <input value={form.vehiculoModelo || ""} onChange={(event) => updateInput("vehiculoModelo", event)} />
             </label>
             <label className={fieldClassName("vehiculoBastidor")} data-field="vehiculoBastidor">
               Bastidor
-              <input value={form.vehiculoBastidor || ""} onChange={(event) => setForm({ ...form, vehiculoBastidor: uppercaseInput(event.target.value) })} />
+              <input value={form.vehiculoBastidor || ""} onChange={(event) => updateInput("vehiculoBastidor", event)} />
             </label>
             <label className={fieldClassName("operacionPrecioVenta")} data-field="operacionPrecioVenta">
               Precio de venta
-              <input inputMode="decimal" value={form.operacionPrecioVenta || ""} onChange={(event) => setForm({ ...form, operacionPrecioVenta: uppercaseInput(event.target.value) })} />
+              <input inputMode="decimal" value={form.operacionPrecioVenta || ""} onChange={(event) => updateInput("operacionPrecioVenta", event)} />
             </label>
             <label className={fieldClassName("observaciones", "edit-form-grid__wide")} data-field="observaciones">
               Observaciones
-              <textarea rows={4} value={form.observaciones || ""} onChange={(event) => setForm({ ...form, observaciones: uppercaseInput(event.target.value) })} />
+              <textarea rows={4} value={form.observaciones || ""} onChange={(event) => updateInput("observaciones", event)} />
             </label>
           </div>
         </section>
@@ -490,10 +533,17 @@ function InteresadoFields({
       [field("Provincia")]: value.provincia,
     });
   };
+  const updateTextInput = (name: string, event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    uppercaseInputPreservingCursor(event, (value) => onChange({ ...form, [field(name)]: value }));
+  };
   const applyInteresado = (interesado: InteresadoSearchResult) => {
     onChange({
       ...form,
       [field("Nombre")]: uppercaseInput(interesado.nombre || ""),
+      [field("NombrePila")]: uppercaseInput(interesado.nombrePila || ""),
+      [field("Apellido1")]: uppercaseInput(interesado.apellido1 || ""),
+      [field("Apellido2")]: uppercaseInput(interesado.apellido2 || ""),
+      [field("RazonSocial")]: uppercaseInput(interesado.razonSocial || ""),
       [field("Dni")]: uppercaseInput(interesado.dni || ""),
       [field("Telefono")]: uppercaseInput(interesado.telefono || ""),
       [field("Direccion")]: uppercaseInput(interesado.direccion || ""),
@@ -525,7 +575,7 @@ function InteresadoFields({
       {form[field("Dni")] ? (
         <label className={fieldClassName(field("Nombre") as string)} data-field={field("Nombre") as string}>
           Nombre completo/Razon social
-          <input value={(form[field("Nombre")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Nombre")]: uppercaseInput(event.target.value) })} />
+          <input value={(form[field("Nombre")] as string) || ""} onChange={(event) => updateTextInput("Nombre", event)} />
         </label>
       ) : (
         <InteresadoAutocomplete
@@ -555,14 +605,14 @@ function InteresadoFields({
       </label>
       <label className={fieldClassName(field("Telefono") as string)} data-field={field("Telefono") as string}>
         Telefono
-        <input value={(form[field("Telefono")] as string) || ""} onChange={(event) => onChange({ ...form, [field("Telefono")]: uppercaseInput(event.target.value) })} />
+        <input value={(form[field("Telefono")] as string) || ""} onChange={(event) => updateTextInput("Telefono", event)} />
       </label>
       <label className={fieldClassName(field("Direccion") as string, "edit-form-grid__wide")} data-field={field("Direccion") as string}>
         Direccion libre
         <textarea
           rows={1}
           value={(form[field("Direccion")] as string) || ""}
-          onChange={(event) => onChange({ ...form, [field("Direccion")]: uppercaseInput(event.target.value) })}
+          onChange={(event) => updateTextInput("Direccion", event)}
         />
       </label>
       <AddressFields

@@ -33,6 +33,7 @@ public final class DocumentoIdentidadLecturaJson {
                 lectura.getFechaNacimiento(),
                 lectura.getFechaCaducidad(),
                 lectura.getDireccionTexto(),
+                DireccionEstructurada.fromLectura(lectura),
                 lectura.getConfianzaGlobal(),
                 lectura.isRequiereRevision(),
                 lectura.getMensaje()
@@ -81,9 +82,27 @@ public final class DocumentoIdentidadLecturaJson {
                 texto(node, "fechaNacimiento"),
                 texto(node, "fechaCaducidad"),
                 texto(node, "direccionTexto"),
+                direccionDesdeNodo(node),
                 numero(node, "confianzaGlobal"),
                 booleano(node, "requiereRevision"),
                 primerNoVacio(texto(node, "observaciones"), texto(node, "mensaje"))
+        );
+    }
+
+    private static DireccionEstructurada direccionDesdeNodo(JsonNode node) {
+        JsonNode direccion = node.path("direccion");
+        return DireccionEstructurada.of(
+                primerNoVacio(texto(node, "tipoVia"), texto(direccion, "tipoVia")),
+                primerNoVacio(texto(node, "nombreVia"), texto(direccion, "nombreVia")),
+                primerNoVacio(texto(node, "numeroVia"), texto(direccion, "numeroVia")),
+                primerNoVacio(texto(node, "bloque"), texto(direccion, "bloque")),
+                primerNoVacio(texto(node, "portal"), texto(direccion, "portal")),
+                primerNoVacio(texto(node, "escalera"), texto(direccion, "escalera")),
+                primerNoVacio(texto(node, "piso"), texto(direccion, "piso")),
+                primerNoVacio(texto(node, "puerta"), texto(direccion, "puerta")),
+                primerNoVacio(texto(node, "codigoPostal"), texto(direccion, "codigoPostal")),
+                primerNoVacio(texto(node, "municipio"), texto(direccion, "municipio")),
+                primerNoVacio(texto(node, "provincia"), texto(direccion, "provincia"))
         );
     }
 
@@ -149,6 +168,7 @@ public final class DocumentoIdentidadLecturaJson {
                 limpiarTexto(identidad.fechaNacimiento()),
                 limpiarTexto(identidad.fechaCaducidad()),
                 limpiarTexto(identidad.direccionTexto()),
+                identidad.direccion(),
                 identidad.confianzaGlobal(),
                 identidad.requiereRevision(),
                 limpiarTexto(identidad.observaciones())
@@ -205,6 +225,7 @@ public final class DocumentoIdentidadLecturaJson {
                 primerNoVacio(preferida.fechaNacimiento(), respaldo.fechaNacimiento()),
                 primerNoVacio(preferida.fechaCaducidad(), respaldo.fechaCaducidad()),
                 direccionMasCompleta(preferida.direccionTexto(), respaldo.direccionTexto()),
+                DireccionEstructurada.combinar(preferida.direccion(), respaldo.direccion()),
                 confianzaMaxima(first.confianzaGlobal(), second.confianzaGlobal()),
                 first.requiereRevision() && second.requiereRevision(),
                 primerNoVacio(preferida.observaciones(), respaldo.observaciones())
@@ -227,6 +248,9 @@ public final class DocumentoIdentidadLecturaJson {
         }
         if (identidad.direccionTexto() != null) {
             score++;
+        }
+        if (identidad.direccion() != null) {
+            score += identidad.direccion().puntuacion();
         }
         score += (int) Math.round((identidad.confianzaGlobal() != null ? identidad.confianzaGlobal() : 0.0) * 10);
         return score;
@@ -332,12 +356,57 @@ public final class DocumentoIdentidadLecturaJson {
             String fechaNacimiento,
             String fechaCaducidad,
             String direccionTexto,
+            DireccionEstructurada direccion,
             Double confianzaGlobal,
             boolean requiereRevision,
             String observaciones
     ) {
         private boolean tieneDatos() {
             return primerNoVacio(identificador, nombre, apellido1, apellido2, razonSocial) != null;
+        }
+
+        public String tipoVia() {
+            return direccion != null ? direccion.tipoVia() : null;
+        }
+
+        public String nombreVia() {
+            return direccion != null ? direccion.nombreVia() : null;
+        }
+
+        public String numeroVia() {
+            return direccion != null ? direccion.numeroVia() : null;
+        }
+
+        public String bloque() {
+            return direccion != null ? direccion.bloque() : null;
+        }
+
+        public String portal() {
+            return direccion != null ? direccion.portal() : null;
+        }
+
+        public String escalera() {
+            return direccion != null ? direccion.escalera() : null;
+        }
+
+        public String piso() {
+            return direccion != null ? direccion.piso() : null;
+        }
+
+        public String puerta() {
+            return direccion != null ? direccion.puerta() : null;
+        }
+
+        public String codigoPostal() {
+            return direccion != null ? direccion.codigoPostal() : null;
+        }
+
+        public String municipio() {
+            return direccion != null ? direccion.municipio() : null;
+        }
+
+        public String provincia() {
+            return direccion != null ? direccion.provincia() : null;
         }
     }
 }

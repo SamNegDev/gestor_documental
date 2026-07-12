@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink, FileText, MapPin, Pencil, Phone, Save, Trash2, Upload, UserCheck, UserRound, X } from "lucide-react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
@@ -8,7 +8,7 @@ import { TramitesRegistroTable } from "../components/TramitesRegistroTable";
 import { RegistroSummary } from "../components/RegistroSummary";
 import type { DocumentoExpediente } from "../../expedientes/types/expedienteDetail.types";
 import type { InteresadoRegistroUpdateInput } from "../types";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 import { ApiError } from "../../../shared/api/http";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
@@ -76,6 +76,10 @@ export function InteresadoRegistroDetailPage() {
     setForm({
       dni: query.data.dni || "",
       nombre: query.data.nombre || "",
+      nombrePila: query.data.nombrePila || "",
+      apellido1: query.data.apellido1 || "",
+      apellido2: query.data.apellido2 || "",
+      razonSocial: query.data.razonSocial || "",
       telefono: query.data.telefono || "",
       direccion: query.data.direccion || "",
       tipoVia: query.data.tipoVia || "",
@@ -103,6 +107,9 @@ export function InteresadoRegistroDetailPage() {
 
   const updateField = (field: keyof InteresadoRegistroUpdateInput, value: string) => {
     setForm((current) => ({ ...current, [field]: uppercaseInput(value) }));
+  };
+  const updateFieldInput = (field: keyof InteresadoRegistroUpdateInput, event: ChangeEvent<HTMLInputElement>) => {
+    uppercaseInputPreservingCursor(event, (value) => updateField(field, value));
   };
   const updateAddress = (value: AddressValue) => {
     setForm((current) => ({ ...current, ...value, direccion: "" }));
@@ -143,9 +150,9 @@ export function InteresadoRegistroDetailPage() {
           <button className="icon-button" onClick={() => setEditing(false)} title="Cerrar edicion" type="button"><X size={16} /></button>
         </div>
         <form className="vehicle-edit-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(form); }}>
-          <label><span>DNI / CIF</span><input required value={form.dni || ""} onChange={(event) => updateField("dni", event.target.value)} /></label>
-          <label><span>Nombre</span><input required value={form.nombre || ""} onChange={(event) => updateField("nombre", event.target.value)} /></label>
-          <label><span>Telefono</span><input value={form.telefono || ""} onChange={(event) => updateField("telefono", event.target.value)} /></label>
+          <label><span>DNI / CIF</span><input required value={form.dni || ""} onChange={(event) => updateFieldInput("dni", event)} /></label>
+          <label><span>Nombre</span><input required value={form.nombre || ""} onChange={(event) => updateFieldInput("nombre", event)} /></label>
+          <label><span>Telefono</span><input value={form.telefono || ""} onChange={(event) => updateFieldInput("telefono", event)} /></label>
           <label><span>Tipo</span><select value={form.tipoPersona || "PARTICULAR"} onChange={(event) => updateField("tipoPersona", event.target.value)}><option value="PARTICULAR">PARTICULAR</option><option value="EMPRESA">EMPRESA</option></select></label>
           <AddressFields idPrefix="interesado-registro" value={form} onChange={updateAddress} wideClassName="vehicle-edit-form__wide" />
           {mutation.isError ? <p className="form-error">{mutation.error instanceof ApiError ? mutation.error.details || "No se pudo guardar la ficha." : "No se pudo guardar la ficha."}</p> : null}

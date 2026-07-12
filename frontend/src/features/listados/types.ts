@@ -64,6 +64,10 @@ export interface SolicitudListItem {
 
 export interface InteresadoSolicitud {
   nombre?: string | null;
+  nombrePila?: string | null;
+  apellido1?: string | null;
+  apellido2?: string | null;
+  razonSocial?: string | null;
   rol?: string | null;
   dni?: string | null;
   telefono?: string | null;
@@ -160,12 +164,27 @@ export interface SolicitudIdentidadDetectadaInput {
   fechaNacimiento?: string | null;
   fechaCaducidad?: string | null;
   direccionTexto?: string | null;
+  tipoVia?: string | null;
+  nombreVia?: string | null;
+  numeroVia?: string | null;
+  bloque?: string | null;
+  portal?: string | null;
+  escalera?: string | null;
+  piso?: string | null;
+  puerta?: string | null;
+  codigoPostal?: string | null;
+  municipio?: string | null;
+  provincia?: string | null;
 }
 
 export interface SolicitudInteresadoHabitual {
   id: number;
   dni?: string | null;
   nombre?: string | null;
+  nombrePila?: string | null;
+  apellido1?: string | null;
+  apellido2?: string | null;
+  razonSocial?: string | null;
   telefono?: string | null;
   direccion?: string | null;
   tipoVia?: string | null;
@@ -260,6 +279,10 @@ export interface SolicitudUpsertInput {
   observaciones?: string | null;
   interesado1Rol?: string | null;
   interesado1Nombre?: string | null;
+  interesado1NombrePila?: string | null;
+  interesado1Apellido1?: string | null;
+  interesado1Apellido2?: string | null;
+  interesado1RazonSocial?: string | null;
   interesado1Dni?: string | null;
   interesado1Telefono?: string | null;
   interesado1Direccion?: string | null;
@@ -276,6 +299,10 @@ export interface SolicitudUpsertInput {
   interesado1Provincia?: string | null;
   interesado2Rol?: string | null;
   interesado2Nombre?: string | null;
+  interesado2NombrePila?: string | null;
+  interesado2Apellido1?: string | null;
+  interesado2Apellido2?: string | null;
+  interesado2RazonSocial?: string | null;
   interesado2Dni?: string | null;
   interesado2Telefono?: string | null;
   interesado2Direccion?: string | null;
@@ -292,6 +319,10 @@ export interface SolicitudUpsertInput {
   interesado2Provincia?: string | null;
   interesado3Rol?: string | null;
   interesado3Nombre?: string | null;
+  interesado3NombrePila?: string | null;
+  interesado3Apellido1?: string | null;
+  interesado3Apellido2?: string | null;
+  interesado3RazonSocial?: string | null;
   interesado3Dni?: string | null;
   interesado3Telefono?: string | null;
   interesado3Direccion?: string | null;

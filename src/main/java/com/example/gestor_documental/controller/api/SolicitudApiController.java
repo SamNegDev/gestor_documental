@@ -478,6 +478,10 @@ public class SolicitudApiController {
         solicitud.setObservaciones(TextNormalizer.upperOrNull(request.getObservaciones()));
         solicitud.setInteresado1Rol(request.getInteresado1Rol());
         solicitud.setInteresado1Nombre(TextNormalizer.upperOrNull(request.getInteresado1Nombre()));
+        solicitud.setInteresado1NombrePila(TextNormalizer.upperOrNull(request.getInteresado1NombrePila()));
+        solicitud.setInteresado1Apellido1(TextNormalizer.upperOrNull(request.getInteresado1Apellido1()));
+        solicitud.setInteresado1Apellido2(TextNormalizer.upperOrNull(request.getInteresado1Apellido2()));
+        solicitud.setInteresado1RazonSocial(TextNormalizer.upperOrNull(request.getInteresado1RazonSocial()));
         solicitud.setInteresado1Dni(TextNormalizer.upperOrNull(request.getInteresado1Dni()));
         solicitud.setInteresado1Telefono(TextNormalizer.upperOrNull(request.getInteresado1Telefono()));
         solicitud.setInteresado1Direccion(TextNormalizer.upperOrNull(request.getInteresado1Direccion()));
@@ -494,6 +498,10 @@ public class SolicitudApiController {
         solicitud.setInteresado1Provincia(TextNormalizer.upperOrNull(request.getInteresado1Provincia()));
         solicitud.setInteresado2Rol(request.getInteresado2Rol());
         solicitud.setInteresado2Nombre(TextNormalizer.upperOrNull(request.getInteresado2Nombre()));
+        solicitud.setInteresado2NombrePila(TextNormalizer.upperOrNull(request.getInteresado2NombrePila()));
+        solicitud.setInteresado2Apellido1(TextNormalizer.upperOrNull(request.getInteresado2Apellido1()));
+        solicitud.setInteresado2Apellido2(TextNormalizer.upperOrNull(request.getInteresado2Apellido2()));
+        solicitud.setInteresado2RazonSocial(TextNormalizer.upperOrNull(request.getInteresado2RazonSocial()));
         solicitud.setInteresado2Dni(TextNormalizer.upperOrNull(request.getInteresado2Dni()));
         solicitud.setInteresado2Telefono(TextNormalizer.upperOrNull(request.getInteresado2Telefono()));
         solicitud.setInteresado2Direccion(TextNormalizer.upperOrNull(request.getInteresado2Direccion()));
@@ -510,6 +518,10 @@ public class SolicitudApiController {
         solicitud.setInteresado2Provincia(TextNormalizer.upperOrNull(request.getInteresado2Provincia()));
         solicitud.setInteresado3Rol(request.getInteresado3Rol());
         solicitud.setInteresado3Nombre(TextNormalizer.upperOrNull(request.getInteresado3Nombre()));
+        solicitud.setInteresado3NombrePila(TextNormalizer.upperOrNull(request.getInteresado3NombrePila()));
+        solicitud.setInteresado3Apellido1(TextNormalizer.upperOrNull(request.getInteresado3Apellido1()));
+        solicitud.setInteresado3Apellido2(TextNormalizer.upperOrNull(request.getInteresado3Apellido2()));
+        solicitud.setInteresado3RazonSocial(TextNormalizer.upperOrNull(request.getInteresado3RazonSocial()));
         solicitud.setInteresado3Dni(TextNormalizer.upperOrNull(request.getInteresado3Dni()));
         solicitud.setInteresado3Telefono(TextNormalizer.upperOrNull(request.getInteresado3Telefono()));
         solicitud.setInteresado3Direccion(TextNormalizer.upperOrNull(request.getInteresado3Direccion()));
@@ -705,6 +717,10 @@ public class SolicitudApiController {
                 .id(interesado.getId())
                 .dni(interesado.getDni())
                 .nombre(interesado.getNombre())
+                .nombrePila(interesado.getNombrePila())
+                .apellido1(interesado.getApellido1())
+                .apellido2(interesado.getApellido2())
+                .razonSocial(interesado.getRazonSocial())
                 .telefono(interesado.getTelefono())
                 .direccion(interesado.getDireccion())
                 .tipoVia(interesado.getTipoVia())
@@ -747,6 +763,10 @@ public class SolicitudApiController {
                     solicitud,
                     documentos,
                     solicitud.getInteresado1Nombre(),
+                    solicitud.getInteresado1NombrePila(),
+                    solicitud.getInteresado1Apellido1(),
+                    solicitud.getInteresado1Apellido2(),
+                    solicitud.getInteresado1RazonSocial(),
                     solicitud.getInteresado1Rol() != null ? solicitud.getInteresado1Rol().name() : null,
                     solicitud.getInteresado1Dni(),
                     solicitud.getInteresado1Telefono(),
@@ -785,6 +805,10 @@ public class SolicitudApiController {
                     solicitud,
                     documentos,
                     solicitud.getInteresado2Nombre(),
+                    solicitud.getInteresado2NombrePila(),
+                    solicitud.getInteresado2Apellido1(),
+                    solicitud.getInteresado2Apellido2(),
+                    solicitud.getInteresado2RazonSocial(),
                     solicitud.getInteresado2Rol() != null ? solicitud.getInteresado2Rol().name() : null,
                     solicitud.getInteresado2Dni(),
                     solicitud.getInteresado2Telefono(),
@@ -823,6 +847,10 @@ public class SolicitudApiController {
                     solicitud,
                     documentos,
                     solicitud.getInteresado3Nombre(),
+                    solicitud.getInteresado3NombrePila(),
+                    solicitud.getInteresado3Apellido1(),
+                    solicitud.getInteresado3Apellido2(),
+                    solicitud.getInteresado3RazonSocial(),
                     solicitud.getInteresado3Rol() != null ? solicitud.getInteresado3Rol().name() : null,
                     solicitud.getInteresado3Dni(),
                     solicitud.getInteresado3Telefono(),
@@ -861,6 +889,10 @@ public class SolicitudApiController {
             Solicitud solicitud,
             List<Documento> documentos,
             String nombre,
+            String nombrePila,
+            String apellido1,
+            String apellido2,
+            String razonSocial,
             String rol,
             String dni,
             String telefono,
@@ -886,6 +918,10 @@ public class SolicitudApiController {
 
         return InteresadoSolicitudResponse.builder()
                 .nombre(nombre)
+                .nombrePila(nombrePila)
+                .apellido1(apellido1)
+                .apellido2(apellido2)
+                .razonSocial(razonSocial)
                 .rol(rol)
                 .dni(dni)
                 .telefono(telefono)

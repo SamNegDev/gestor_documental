@@ -152,6 +152,10 @@ public class RegistroApiController {
             Interesado nuevo = new Interesado();
             nuevo.setDni(dni);
             nuevo.setNombre(request.nombre());
+            nuevo.setNombrePila(request.nombrePila());
+            nuevo.setApellido1(request.apellido1());
+            nuevo.setApellido2(request.apellido2());
+            nuevo.setRazonSocial(request.razonSocial());
             nuevo.setTelefono(request.telefono());
             nuevo.setDireccion(request.direccion());
             nuevo.setTipoVia(request.tipoVia());
@@ -282,6 +286,10 @@ public class RegistroApiController {
                 .toList();
         return InteresadoRegistroResponse.builder()
                 .id(interesado.getId()).dni(interesado.getDni()).nombre(interesado.getNombre())
+                .nombrePila(interesado.getNombrePila())
+                .apellido1(interesado.getApellido1())
+                .apellido2(interesado.getApellido2())
+                .razonSocial(interesado.getRazonSocial())
                 .telefono(interesado.getTelefono()).direccion(interesado.getDireccion())
                 .tipoVia(interesado.getTipoVia())
                 .nombreVia(interesado.getNombreVia())

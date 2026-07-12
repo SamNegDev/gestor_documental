@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import type { TipoIncidencia } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 
 type Props = {
   open: boolean;
@@ -58,7 +58,7 @@ export function IncidentCreateDialog({ open, tipos, loading, mode = "incident", 
           <label>
             Observaciones
             <textarea
-              onChange={(event) => setObservaciones(uppercaseInput(event.target.value))}
+              onChange={(event) => uppercaseInputPreservingCursor(event, setObservaciones)}
               placeholder={isInformationRequest ? "Ej. CONFIRMAR PRECIO DE VENTA DEL CONTRATO" : "Detalle opcional para el cliente"}
               rows={4}
               value={observaciones}

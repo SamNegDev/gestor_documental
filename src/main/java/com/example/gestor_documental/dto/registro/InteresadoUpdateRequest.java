@@ -5,6 +5,10 @@ import com.example.gestor_documental.enums.TipoPersona;
 public record InteresadoUpdateRequest(
         String dni,
         String nombre,
+        String nombrePila,
+        String apellido1,
+        String apellido2,
+        String razonSocial,
         String telefono,
         String direccion,
         String tipoVia,

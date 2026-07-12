@@ -26,6 +26,17 @@ public class DocumentoIdentidadDetectadaResponse {
     private String fechaNacimiento;
     private String fechaCaducidad;
     private String direccionTexto;
+    private String tipoVia;
+    private String nombreVia;
+    private String numeroVia;
+    private String bloque;
+    private String portal;
+    private String escalera;
+    private String piso;
+    private String puerta;
+    private String codigoPostal;
+    private String municipio;
+    private String provincia;
     private Double confianzaGlobal;
     private boolean requiereRevision;
     private String observaciones;
@@ -45,6 +56,17 @@ public class DocumentoIdentidadDetectadaResponse {
                 .fechaNacimiento(identidad.fechaNacimiento())
                 .fechaCaducidad(identidad.fechaCaducidad())
                 .direccionTexto(identidad.direccionTexto())
+                .tipoVia(identidad.tipoVia())
+                .nombreVia(identidad.nombreVia())
+                .numeroVia(identidad.numeroVia())
+                .bloque(identidad.bloque())
+                .portal(identidad.portal())
+                .escalera(identidad.escalera())
+                .piso(identidad.piso())
+                .puerta(identidad.puerta())
+                .codigoPostal(identidad.codigoPostal())
+                .municipio(identidad.municipio())
+                .provincia(identidad.provincia())
                 .confianzaGlobal(identidad.confianzaGlobal())
                 .requiereRevision(identidad.requiereRevision())
                 .observaciones(identidad.observaciones())

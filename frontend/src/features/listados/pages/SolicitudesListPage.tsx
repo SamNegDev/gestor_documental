@@ -9,7 +9,7 @@ import { ListFiltersBar } from "../components/ListFiltersBar";
 import { ListPageChrome } from "../components/ListPageChrome";
 import type { ListCatalogs, ListFilters, SolicitudListItem } from "../types";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import { PaginationBar } from "../components/PaginationBar";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 
@@ -324,7 +324,7 @@ function SolicitudesTable({
               <input
                 className="records-table-filter"
                 value={filters.matricula || ""}
-                onChange={(event) => nextFilter("matricula", uppercaseInput(event.target.value))}
+                onChange={(event) => uppercaseInputPreservingCursor(event, (value) => nextFilter("matricula", value))}
                 placeholder="Buscar"
               />
             </th>

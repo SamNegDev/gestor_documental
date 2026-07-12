@@ -30,6 +30,7 @@ import com.example.gestor_documental.service.DocumentoRolesLecturaService;
 import com.example.gestor_documental.service.DocumentoVehiculoLecturaService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
+import com.example.gestor_documental.util.DireccionEstructurada;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson.IdentidadDetectada;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
@@ -51,8 +52,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -581,7 +584,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return new IdentidadSolicitud(
                 base.identificador(),
                 nombreMasCompleto(base.nombreCompleto(), respaldo.nombreCompleto(), null),
+                primerNoVacio(base.nombrePila(), respaldo.nombrePila()),
+                primerNoVacio(base.apellido1(), respaldo.apellido1()),
+                primerNoVacio(base.apellido2(), respaldo.apellido2()),
+                primerNoVacio(base.razonSocial(), respaldo.razonSocial()),
                 direccionMasCompleta(base.direccionTexto(), respaldo.direccionTexto()),
+                DireccionEstructurada.combinar(base.direccion(), respaldo.direccion()),
                 Math.max(confianza(actual.confianzaGlobal()), confianza(candidata.confianzaGlobal())),
                 actual.requiereRevision() && candidata.requiereRevision(),
                 base.lecturaPrincipal() != null ? base.lecturaPrincipal() : respaldo.lecturaPrincipal()
@@ -595,7 +603,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return new IdentidadSolicitud(
                 normalizarIdentificador(lectura.getIdentificador()),
                 nombreCompletoIdentidad(lectura),
+                normalizarTexto(lectura.getNombre()),
+                normalizarTexto(lectura.getApellido1()),
+                normalizarTexto(lectura.getApellido2()),
+                normalizarNombre(lectura.getRazonSocial()),
                 normalizarTexto(lectura.getDireccionTexto()),
+                DireccionEstructurada.fromLectura(lectura),
                 lectura.getConfianzaGlobal(),
                 lectura.isRequiereRevision(),
                 lectura
@@ -609,7 +622,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return new IdentidadSolicitud(
                 normalizarIdentificador(identidad.identificador()),
                 nombreCompletoIdentidad(identidad),
+                normalizarTexto(identidad.nombre()),
+                normalizarTexto(identidad.apellido1()),
+                normalizarTexto(identidad.apellido2()),
+                normalizarNombre(identidad.razonSocial()),
                 normalizarTexto(identidad.direccionTexto()),
+                identidad.direccion(),
                 identidad.confianzaGlobal(),
                 identidad.requiereRevision(),
                 mismaIdentidad(lectura, identidad) ? lectura : null
@@ -732,7 +750,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return new PersonaSolicitud(
                 identificador,
                 nombreMasCompleto(nombreIdentidad, nombreRoles, nombreCatalogo),
-                direccionMasCompleta(direccionIdentidad, direccionBate, direccionCom)
+                identidad != null ? identidad.nombrePila() : null,
+                identidad != null ? identidad.apellido1() : null,
+                identidad != null ? identidad.apellido2() : null,
+                identidad != null ? identidad.razonSocial() : null,
+                direccionMasCompleta(direccionIdentidad, direccionBate, direccionCom),
+                identidad != null ? identidad.direccion() : null
         );
     }
 
@@ -887,7 +910,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return new PersonaSolicitud(
                 identificador,
                 nombreMasCompleto(nombreIdentidad, nombreRoles, nombreCatalogo),
-                direccionMasCompleta(direccionIdentidad, direccionRoles)
+                identidad != null ? identidad.nombrePila() : null,
+                identidad != null ? identidad.apellido1() : null,
+                identidad != null ? identidad.apellido2() : null,
+                identidad != null ? identidad.razonSocial() : null,
+                direccionMasCompleta(direccionIdentidad, direccionRoles),
+                identidad != null ? identidad.direccion() : null
         );
     }
 
@@ -948,9 +976,14 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             solicitud.setInteresado1Rol(rol);
             solicitud.setInteresado1Dni(persona.identificador());
             solicitud.setInteresado1Nombre(persona.nombre());
+            solicitud.setInteresado1NombrePila(persona.nombrePila());
+            solicitud.setInteresado1Apellido1(persona.apellido1());
+            solicitud.setInteresado1Apellido2(persona.apellido2());
+            solicitud.setInteresado1RazonSocial(persona.razonSocial());
             if (persona.direccion() != null) {
                 solicitud.setInteresado1Direccion(persona.direccion());
             }
+            aplicarDireccionEstructurada(solicitud, 1, persona.direccionEstructurada());
             return;
         }
         if (slot == 2) {
@@ -958,9 +991,14 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             solicitud.setInteresado2Rol(rol);
             solicitud.setInteresado2Dni(persona.identificador());
             solicitud.setInteresado2Nombre(persona.nombre());
+            solicitud.setInteresado2NombrePila(persona.nombrePila());
+            solicitud.setInteresado2Apellido1(persona.apellido1());
+            solicitud.setInteresado2Apellido2(persona.apellido2());
+            solicitud.setInteresado2RazonSocial(persona.razonSocial());
             if (persona.direccion() != null) {
                 solicitud.setInteresado2Direccion(persona.direccion());
             }
+            aplicarDireccionEstructurada(solicitud, 2, persona.direccionEstructurada());
             return;
         }
         if (slot == 3) {
@@ -968,12 +1006,60 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             solicitud.setInteresado3Rol(rol);
             solicitud.setInteresado3Dni(persona.identificador());
             solicitud.setInteresado3Nombre(persona.nombre());
+            solicitud.setInteresado3NombrePila(persona.nombrePila());
+            solicitud.setInteresado3Apellido1(persona.apellido1());
+            solicitud.setInteresado3Apellido2(persona.apellido2());
+            solicitud.setInteresado3RazonSocial(persona.razonSocial());
             if (persona.direccion() != null) {
                 solicitud.setInteresado3Direccion(persona.direccion());
             }
+            aplicarDireccionEstructurada(solicitud, 3, persona.direccionEstructurada());
             return;
         }
         throw new OperacionInvalidaException("No hay un bloque libre para aplicar " + rol.name() + " en la solicitud.");
+    }
+
+    private void aplicarDireccionEstructurada(Solicitud solicitud, int slot, DireccionEstructurada direccion) {
+        if (direccion == null) {
+            return;
+        }
+        if (slot == 1) {
+            solicitud.setInteresado1TipoVia(direccion.tipoVia());
+            solicitud.setInteresado1NombreVia(direccion.nombreVia());
+            solicitud.setInteresado1NumeroVia(direccion.numeroVia());
+            solicitud.setInteresado1Bloque(direccion.bloque());
+            solicitud.setInteresado1Portal(direccion.portal());
+            solicitud.setInteresado1Escalera(direccion.escalera());
+            solicitud.setInteresado1Piso(direccion.piso());
+            solicitud.setInteresado1Puerta(direccion.puerta());
+            solicitud.setInteresado1CodigoPostal(direccion.codigoPostal());
+            solicitud.setInteresado1Municipio(direccion.municipio());
+            solicitud.setInteresado1Provincia(direccion.provincia());
+        } else if (slot == 2) {
+            solicitud.setInteresado2TipoVia(direccion.tipoVia());
+            solicitud.setInteresado2NombreVia(direccion.nombreVia());
+            solicitud.setInteresado2NumeroVia(direccion.numeroVia());
+            solicitud.setInteresado2Bloque(direccion.bloque());
+            solicitud.setInteresado2Portal(direccion.portal());
+            solicitud.setInteresado2Escalera(direccion.escalera());
+            solicitud.setInteresado2Piso(direccion.piso());
+            solicitud.setInteresado2Puerta(direccion.puerta());
+            solicitud.setInteresado2CodigoPostal(direccion.codigoPostal());
+            solicitud.setInteresado2Municipio(direccion.municipio());
+            solicitud.setInteresado2Provincia(direccion.provincia());
+        } else if (slot == 3) {
+            solicitud.setInteresado3TipoVia(direccion.tipoVia());
+            solicitud.setInteresado3NombreVia(direccion.nombreVia());
+            solicitud.setInteresado3NumeroVia(direccion.numeroVia());
+            solicitud.setInteresado3Bloque(direccion.bloque());
+            solicitud.setInteresado3Portal(direccion.portal());
+            solicitud.setInteresado3Escalera(direccion.escalera());
+            solicitud.setInteresado3Piso(direccion.piso());
+            solicitud.setInteresado3Puerta(direccion.puerta());
+            solicitud.setInteresado3CodigoPostal(direccion.codigoPostal());
+            solicitud.setInteresado3Municipio(direccion.municipio());
+            solicitud.setInteresado3Provincia(direccion.provincia());
+        }
     }
 
     private int encontrarSlot(Solicitud solicitud, RolInteresado rol, String identificador) {
@@ -1277,6 +1363,14 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         }
     }
 
+    private String primerNoVacio(String first, String second) {
+        return Stream.of(first, second)
+                .map(this::normalizarTexto)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    }
+
     private boolean nombresCompatibles(String referencia, String candidato) {
         String ref = normalizarNombre(referencia);
         String cand = normalizarNombre(candidato);
@@ -1413,13 +1507,27 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         private int vehiculoReutilizada;
     }
 
-    private record PersonaSolicitud(String identificador, String nombre, String direccion) {
+    private record PersonaSolicitud(
+            String identificador,
+            String nombre,
+            String nombrePila,
+            String apellido1,
+            String apellido2,
+            String razonSocial,
+            String direccion,
+            DireccionEstructurada direccionEstructurada
+    ) {
     }
 
     private record IdentidadSolicitud(
             String identificador,
             String nombreCompleto,
+            String nombrePila,
+            String apellido1,
+            String apellido2,
+            String razonSocial,
             String direccionTexto,
+            DireccionEstructurada direccion,
             Double confianzaGlobal,
             boolean requiereRevision,
             DocumentoIdentidadLectura lecturaPrincipal

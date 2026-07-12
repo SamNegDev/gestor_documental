@@ -85,6 +85,10 @@ public class Solicitud {
     private RolInteresado interesado1Rol;
 
     private String interesado1Nombre;
+    private String interesado1NombrePila;
+    private String interesado1Apellido1;
+    private String interesado1Apellido2;
+    private String interesado1RazonSocial;
     private String interesado1Dni;
     private String interesado1Telefono;
     private String interesado1Direccion;
@@ -105,6 +109,10 @@ public class Solicitud {
     private RolInteresado interesado2Rol;
 
     private String interesado2Nombre;
+    private String interesado2NombrePila;
+    private String interesado2Apellido1;
+    private String interesado2Apellido2;
+    private String interesado2RazonSocial;
     private String interesado2Dni;
     private String interesado2Telefono;
     private String interesado2Direccion;
@@ -125,6 +133,10 @@ public class Solicitud {
     private RolInteresado interesado3Rol;
 
     private String interesado3Nombre;
+    private String interesado3NombrePila;
+    private String interesado3Apellido1;
+    private String interesado3Apellido2;
+    private String interesado3RazonSocial;
     private String interesado3Dni;
     private String interesado3Telefono;
     private String interesado3Direccion;

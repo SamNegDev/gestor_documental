@@ -33,6 +33,17 @@ public class DocumentoIdentidadLecturaResponse {
     private String fechaNacimiento;
     private String fechaCaducidad;
     private String direccionTexto;
+    private String tipoVia;
+    private String nombreVia;
+    private String numeroVia;
+    private String bloque;
+    private String portal;
+    private String escalera;
+    private String piso;
+    private String puerta;
+    private String codigoPostal;
+    private String municipio;
+    private String provincia;
     private Double confianzaGlobal;
     private boolean requiereRevision;
     private boolean vinculadoAutomaticamente;
@@ -62,6 +73,17 @@ public class DocumentoIdentidadLecturaResponse {
                 .fechaNacimiento(lectura.getFechaNacimiento())
                 .fechaCaducidad(lectura.getFechaCaducidad())
                 .direccionTexto(lectura.getDireccionTexto())
+                .tipoVia(lectura.getTipoVia())
+                .nombreVia(lectura.getNombreVia())
+                .numeroVia(lectura.getNumeroVia())
+                .bloque(lectura.getBloque())
+                .portal(lectura.getPortal())
+                .escalera(lectura.getEscalera())
+                .piso(lectura.getPiso())
+                .puerta(lectura.getPuerta())
+                .codigoPostal(lectura.getCodigoPostal())
+                .municipio(lectura.getMunicipio())
+                .provincia(lectura.getProvincia())
                 .confianzaGlobal(lectura.getConfianzaGlobal())
                 .requiereRevision(lectura.isRequiereRevision())
                 .vinculadoAutomaticamente(lectura.isVinculadoAutomaticamente())

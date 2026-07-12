@@ -40,6 +40,10 @@ export interface UsuarioResumen {
 export interface InteresadoExpediente {
   id: number;
   nombre: string;
+  nombrePila?: string | null;
+  apellido1?: string | null;
+  apellido2?: string | null;
+  razonSocial?: string | null;
   rol?: string;
   dni?: string;
   telefono?: string;
@@ -60,6 +64,10 @@ export interface InteresadoExpediente {
 export interface InteresadoSearchResult {
   id: number;
   nombre: string;
+  nombrePila?: string | null;
+  apellido1?: string | null;
+  apellido2?: string | null;
+  razonSocial?: string | null;
   dni?: string | null;
   telefono?: string | null;
   direccion?: string | null;
@@ -110,6 +118,17 @@ export interface DocumentoIdentidadLectura {
   fechaNacimiento?: string | null;
   fechaCaducidad?: string | null;
   direccionTexto?: string | null;
+  tipoVia?: string | null;
+  nombreVia?: string | null;
+  numeroVia?: string | null;
+  bloque?: string | null;
+  portal?: string | null;
+  escalera?: string | null;
+  piso?: string | null;
+  puerta?: string | null;
+  codigoPostal?: string | null;
+  municipio?: string | null;
+  provincia?: string | null;
   confianzaGlobal?: number | null;
   requiereRevision: boolean;
   vinculadoAutomaticamente: boolean;
@@ -133,6 +152,17 @@ export interface DocumentoIdentidadDetectada {
   fechaNacimiento?: string | null;
   fechaCaducidad?: string | null;
   direccionTexto?: string | null;
+  tipoVia?: string | null;
+  nombreVia?: string | null;
+  numeroVia?: string | null;
+  bloque?: string | null;
+  portal?: string | null;
+  escalera?: string | null;
+  piso?: string | null;
+  puerta?: string | null;
+  codigoPostal?: string | null;
+  municipio?: string | null;
+  provincia?: string | null;
   confianzaGlobal?: number | null;
   requiereRevision: boolean;
   observaciones?: string | null;
@@ -308,6 +338,10 @@ export interface ExpedienteEditInput {
   observaciones?: string | null;
   interesados: Array<{
     nombre?: string | null;
+    nombrePila?: string | null;
+    apellido1?: string | null;
+    apellido2?: string | null;
+    razonSocial?: string | null;
     dni?: string | null;
     telefono?: string | null;
     direccion?: string | null;

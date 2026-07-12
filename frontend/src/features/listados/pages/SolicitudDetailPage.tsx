@@ -5,7 +5,7 @@ import { AlertTriangle, ArrowLeft, CarFront, CheckCircle2, FileSignature, FileTe
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { ApiError } from "../../../shared/api/http";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { CompleteExpedienteUploadPanel } from "../../expedientes/components/CompleteExpedienteUploadPanel";
 import { DocumentUploadDialog, type DocumentUploadSubmit } from "../../expedientes/components/DocumentUploadDialog";
@@ -515,6 +515,17 @@ export function SolicitudDetailPage() {
           fechaNacimiento: identidad.fechaNacimiento,
           fechaCaducidad: identidad.fechaCaducidad,
           direccionTexto: identidad.direccionTexto,
+          tipoVia: identidad.tipoVia,
+          nombreVia: identidad.nombreVia,
+          numeroVia: identidad.numeroVia,
+          bloque: identidad.bloque,
+          portal: identidad.portal,
+          escalera: identidad.escalera,
+          piso: identidad.piso,
+          puerta: identidad.puerta,
+          codigoPostal: identidad.codigoPostal,
+          municipio: identidad.municipio,
+          provincia: identidad.provincia,
         },
       });
     } catch (cause) {
@@ -858,7 +869,7 @@ export function SolicitudDetailPage() {
             }
           }}
         >
-          <textarea value={mensaje} onChange={(event) => setMensaje(uppercaseInput(event.target.value))} placeholder="Escribe un mensaje..." rows={3} />
+          <textarea value={mensaje} onChange={(event) => uppercaseInputPreservingCursor(event, setMensaje)} placeholder="Escribe un mensaje..." rows={3} />
           <button className="primary-button primary-button--compact" disabled={mensajeMutation.isPending || !mensaje.trim()}>
             <Send size={16} />
             Enviar
@@ -966,7 +977,7 @@ function SolicitudHabitualesPanel({
         </div>
         <input
           aria-label="Buscar cliente habitual"
-          onChange={(event) => onSearch(uppercaseInput(event.target.value))}
+          onChange={(event) => uppercaseInputPreservingCursor(event, onSearch)}
           placeholder="Buscar por nombre o DNI"
           value={search}
         />

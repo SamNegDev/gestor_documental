@@ -6,7 +6,7 @@ import { getCompleteExpedienteProcessing } from "../services/documentosApi";
 import type { ExpedienteEditCatalogs, ProcesamientoExpedienteCompleto } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
 import { ApiError } from "../../../shared/api/http";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import "../styles/expedienteDetail.css";
 
 type BulkRowStatus = "PENDIENTE" | "CREANDO" | "EN_COLA" | "PROCESANDO" | "COMPLETADO" | "ERROR";
@@ -223,7 +223,7 @@ export function ExpedienteBulkCreatePage() {
               </label>
               <label>
                 <span>Matricula</span>
-                <input disabled={saving} value={row.matricula} onChange={(event) => updateRow(row.id, { matricula: uppercaseInput(event.target.value) })} />
+                <input disabled={saving} value={row.matricula} onChange={(event) => uppercaseInputPreservingCursor(event, (value) => updateRow(row.id, { matricula: value }))} />
               </label>
               <label className="bulk-file-input">
                 <Upload size={15} />

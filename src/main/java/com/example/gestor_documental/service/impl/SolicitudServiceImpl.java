@@ -348,6 +348,10 @@ public class SolicitudServiceImpl implements SolicitudService {
          InteresadoFormDto interesado1dto = new InteresadoFormDto();
          interesado1dto.setDni(solicitud.getInteresado1Dni());
          interesado1dto.setNombre(solicitud.getInteresado1Nombre());
+         interesado1dto.setNombrePila(solicitud.getInteresado1NombrePila());
+         interesado1dto.setApellido1(solicitud.getInteresado1Apellido1());
+         interesado1dto.setApellido2(solicitud.getInteresado1Apellido2());
+         interesado1dto.setRazonSocial(solicitud.getInteresado1RazonSocial());
          interesado1dto.setRol(solicitud.getInteresado1Rol());
          interesado1dto.setDireccion(solicitud.getInteresado1Direccion());
          interesado1dto.setTelefono(solicitud.getInteresado1Telefono());
@@ -366,6 +370,10 @@ public class SolicitudServiceImpl implements SolicitudService {
          InteresadoFormDto interesado2dto = new InteresadoFormDto();
          interesado2dto.setDni(solicitud.getInteresado2Dni());
          interesado2dto.setNombre(solicitud.getInteresado2Nombre());
+         interesado2dto.setNombrePila(solicitud.getInteresado2NombrePila());
+         interesado2dto.setApellido1(solicitud.getInteresado2Apellido1());
+         interesado2dto.setApellido2(solicitud.getInteresado2Apellido2());
+         interesado2dto.setRazonSocial(solicitud.getInteresado2RazonSocial());
          interesado2dto.setRol(solicitud.getInteresado2Rol());
          interesado2dto.setDireccion(solicitud.getInteresado2Direccion());
          interesado2dto.setTelefono(solicitud.getInteresado2Telefono());
@@ -384,6 +392,10 @@ public class SolicitudServiceImpl implements SolicitudService {
          InteresadoFormDto interesado3dto = new InteresadoFormDto();
          interesado3dto.setDni(solicitud.getInteresado3Dni());
          interesado3dto.setNombre(solicitud.getInteresado3Nombre());
+         interesado3dto.setNombrePila(solicitud.getInteresado3NombrePila());
+         interesado3dto.setApellido1(solicitud.getInteresado3Apellido1());
+         interesado3dto.setApellido2(solicitud.getInteresado3Apellido2());
+         interesado3dto.setRazonSocial(solicitud.getInteresado3RazonSocial());
          interesado3dto.setRol(solicitud.getInteresado3Rol());
          interesado3dto.setDireccion(solicitud.getInteresado3Direccion());
          interesado3dto.setTelefono(solicitud.getInteresado3Telefono());
@@ -852,9 +864,8 @@ public class SolicitudServiceImpl implements SolicitudService {
         int slotExistente = slotPorDni(solicitud, identificador);
         if (slotExistente != 0) {
             validarRolInteresadoExistente(solicitud, slotExistente, request.getRol());
-            completarInteresadoExistente(solicitud, slotExistente, request.getRol(), nombre, request.getDireccionTexto());
-            Interesado interesadoVinculado = resolverInteresadoVinculadoManual(solicitud, request, identificador, slotExistente, nombre);
-            validarLecturaIdentidadManual(solicitud, request, identificador, interesadoVinculado);
+            completarInteresadoExistente(solicitud, slotExistente, request.getRol(), nombre, request);
+            validarLecturaIdentidadManual(solicitud, request, identificador, null);
             validarInteresadosSolicitud(solicitud);
             normalizarSolicitud(solicitud);
             solicitud.setFechaUltimaModificacion(LocalDateTime.now());
@@ -874,9 +885,8 @@ public class SolicitudServiceImpl implements SolicitudService {
             throw new OperacionInvalidaException("La solicitud ya tiene los tres interesados ocupados");
         }
 
-        aplicarInteresadoDetectado(solicitud, slot, request.getRol(), nombre, identificador, request.getDireccionTexto());
-        Interesado interesadoVinculado = resolverInteresadoVinculadoManual(solicitud, request, identificador, slot, nombre);
-        validarLecturaIdentidadManual(solicitud, request, identificador, interesadoVinculado);
+        aplicarInteresadoDetectado(solicitud, slot, request.getRol(), nombre, identificador, request);
+        validarLecturaIdentidadManual(solicitud, request, identificador, null);
         validarInteresadosSolicitud(solicitud);
         normalizarSolicitud(solicitud);
         solicitud.setFechaUltimaModificacion(LocalDateTime.now());
@@ -978,6 +988,17 @@ public class SolicitudServiceImpl implements SolicitudService {
         lectura.setFechaNacimiento(limitarTexto(request.getFechaNacimiento(), 20));
         lectura.setFechaCaducidad(limitarTexto(request.getFechaCaducidad(), 20));
         lectura.setDireccionTexto(limitarTexto(request.getDireccionTexto(), 500));
+        lectura.setTipoVia(limitarTexto(request.getTipoVia(), 30));
+        lectura.setNombreVia(limitarTexto(request.getNombreVia(), 120));
+        lectura.setNumeroVia(limitarTexto(request.getNumeroVia(), 20));
+        lectura.setBloque(limitarTexto(request.getBloque(), 20));
+        lectura.setPortal(limitarTexto(request.getPortal(), 20));
+        lectura.setEscalera(limitarTexto(request.getEscalera(), 20));
+        lectura.setPiso(limitarTexto(request.getPiso(), 20));
+        lectura.setPuerta(limitarTexto(request.getPuerta(), 20));
+        lectura.setCodigoPostal(limitarTexto(request.getCodigoPostal(), 10));
+        lectura.setMunicipio(limitarTexto(request.getMunicipio(), 80));
+        lectura.setProvincia(limitarTexto(request.getProvincia(), 80));
         lectura.setConfianzaGlobal(CONFIANZA_IDENTIDAD_VALIDADA_MANUALMENTE);
         lectura.setRequiereRevision(false);
         lectura.setVinculadoAutomaticamente(false);
@@ -1074,6 +1095,17 @@ public class SolicitudServiceImpl implements SolicitudService {
         putNullable(identidad, "fechaNacimiento", request.getFechaNacimiento());
         putNullable(identidad, "fechaCaducidad", request.getFechaCaducidad());
         putNullable(identidad, "direccionTexto", request.getDireccionTexto());
+        putNullable(identidad, "tipoVia", request.getTipoVia());
+        putNullable(identidad, "nombreVia", request.getNombreVia());
+        putNullable(identidad, "numeroVia", request.getNumeroVia());
+        putNullable(identidad, "bloque", request.getBloque());
+        putNullable(identidad, "portal", request.getPortal());
+        putNullable(identidad, "escalera", request.getEscalera());
+        putNullable(identidad, "piso", request.getPiso());
+        putNullable(identidad, "puerta", request.getPuerta());
+        putNullable(identidad, "codigoPostal", request.getCodigoPostal());
+        putNullable(identidad, "municipio", request.getMunicipio());
+        putNullable(identidad, "provincia", request.getProvincia());
         identidad.put("confianzaGlobal", CONFIANZA_IDENTIDAD_VALIDADA_MANUALMENTE);
         identidad.put("requiereRevision", false);
         identidad.put("observaciones", "Identidad corregida y validada manualmente.");
@@ -1162,7 +1194,7 @@ public class SolicitudServiceImpl implements SolicitudService {
             int slot,
             RolInteresado rol,
             String nombre,
-            String direccion
+            SolicitudIdentidadDetectadaRequest request
     ) {
         if (rolSlot(solicitud, slot) == null) {
             setRolSlot(solicitud, slot, rol);
@@ -1170,9 +1202,11 @@ public class SolicitudServiceImpl implements SolicitudService {
         if (TextNormalizer.upperOrNull(nombreSlot(solicitud, slot)) == null) {
             setNombreSlot(solicitud, slot, nombre);
         }
+        completarNombreEstructuradoSlot(solicitud, slot, request);
         if (TextNormalizer.upperOrNull(direccionSlot(solicitud, slot)) == null) {
-            setDireccionSlot(solicitud, slot, TextNormalizer.upperOrNull(direccion));
+            setDireccionSlot(solicitud, slot, direccionSolicitud(request));
         }
+        completarDireccionEstructuradaSlot(solicitud, slot, request);
     }
 
     private Interesado resolverInteresadoVinculadoManual(
@@ -1196,6 +1230,7 @@ public class SolicitudServiceImpl implements SolicitudService {
                 interesado.setDireccion(direccion);
                 cambiado = true;
             }
+            cambiado |= completarDireccionEstructuradaInteresado(interesado, request);
             return cambiado ? interesadoService.guardar(interesado) : interesado;
         }
 
@@ -1204,6 +1239,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         nuevo.setNombre(nombre != null ? nombre : identificador);
         nuevo.setDireccion(direccion);
         nuevo.setTipoPersona(esCif(identificador) ? TipoPersona.EMPRESA : TipoPersona.PARTICULAR);
+        completarDireccionEstructuradaInteresado(nuevo, request);
         return interesadoService.guardar(nuevo);
     }
 
@@ -1214,6 +1250,29 @@ public class SolicitudServiceImpl implements SolicitudService {
             }
         }
         return null;
+    }
+
+    private void completarNombreEstructuradoSlot(Solicitud solicitud, int slot, SolicitudIdentidadDetectadaRequest request) {
+        String nombrePila = TextNormalizer.upperOrNull(request.getNombre());
+        String apellido1 = TextNormalizer.upperOrNull(request.getApellido1());
+        String apellido2 = TextNormalizer.upperOrNull(request.getApellido2());
+        String razonSocial = NombrePersonaNormalizer.normalizar(request.getRazonSocial());
+        if (slot == 1) {
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1NombrePila()) == null) solicitud.setInteresado1NombrePila(nombrePila);
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1Apellido1()) == null) solicitud.setInteresado1Apellido1(apellido1);
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1Apellido2()) == null) solicitud.setInteresado1Apellido2(apellido2);
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1RazonSocial()) == null) solicitud.setInteresado1RazonSocial(razonSocial);
+        } else if (slot == 2) {
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2NombrePila()) == null) solicitud.setInteresado2NombrePila(nombrePila);
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2Apellido1()) == null) solicitud.setInteresado2Apellido1(apellido1);
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2Apellido2()) == null) solicitud.setInteresado2Apellido2(apellido2);
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2RazonSocial()) == null) solicitud.setInteresado2RazonSocial(razonSocial);
+        } else {
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3NombrePila()) == null) solicitud.setInteresado3NombrePila(nombrePila);
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3Apellido1()) == null) solicitud.setInteresado3Apellido1(apellido1);
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3Apellido2()) == null) solicitud.setInteresado3Apellido2(apellido2);
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3RazonSocial()) == null) solicitud.setInteresado3RazonSocial(razonSocial);
+        }
     }
 
     private int slotParaInteresadoHabitual(Solicitud solicitud, RolInteresado rol, Interesado interesado, String identificador) {
@@ -1363,6 +1422,10 @@ public class SolicitudServiceImpl implements SolicitudService {
         if (slot == 1) {
             solicitud.setInteresado1Rol(rol);
             solicitud.setInteresado1Nombre(nombre);
+            solicitud.setInteresado1NombrePila(interesado.getNombrePila());
+            solicitud.setInteresado1Apellido1(interesado.getApellido1());
+            solicitud.setInteresado1Apellido2(interesado.getApellido2());
+            solicitud.setInteresado1RazonSocial(interesado.getRazonSocial());
             solicitud.setInteresado1Dni(identificador);
             solicitud.setInteresado1Telefono(interesado.getTelefono());
             solicitud.setInteresado1Direccion(direccion);
@@ -1380,6 +1443,10 @@ public class SolicitudServiceImpl implements SolicitudService {
         } else if (slot == 2) {
             solicitud.setInteresado2Rol(rol);
             solicitud.setInteresado2Nombre(nombre);
+            solicitud.setInteresado2NombrePila(interesado.getNombrePila());
+            solicitud.setInteresado2Apellido1(interesado.getApellido1());
+            solicitud.setInteresado2Apellido2(interesado.getApellido2());
+            solicitud.setInteresado2RazonSocial(interesado.getRazonSocial());
             solicitud.setInteresado2Dni(identificador);
             solicitud.setInteresado2Telefono(interesado.getTelefono());
             solicitud.setInteresado2Direccion(direccion);
@@ -1397,6 +1464,10 @@ public class SolicitudServiceImpl implements SolicitudService {
         } else {
             solicitud.setInteresado3Rol(rol);
             solicitud.setInteresado3Nombre(nombre);
+            solicitud.setInteresado3NombrePila(interesado.getNombrePila());
+            solicitud.setInteresado3Apellido1(interesado.getApellido1());
+            solicitud.setInteresado3Apellido2(interesado.getApellido2());
+            solicitud.setInteresado3RazonSocial(interesado.getRazonSocial());
             solicitud.setInteresado3Dni(identificador);
             solicitud.setInteresado3Telefono(interesado.getTelefono());
             solicitud.setInteresado3Direccion(direccion);
@@ -1433,25 +1504,38 @@ public class SolicitudServiceImpl implements SolicitudService {
             RolInteresado rol,
             String nombre,
             String identificador,
-            String direccion
+            SolicitudIdentidadDetectadaRequest request
     ) {
-        String direccionNormalizada = TextNormalizer.upperOrNull(direccion);
+        String direccionNormalizada = direccionSolicitud(request);
         if (slot == 1) {
             solicitud.setInteresado1Rol(rol);
             solicitud.setInteresado1Nombre(nombre);
+            solicitud.setInteresado1NombrePila(TextNormalizer.upperOrNull(request.getNombre()));
+            solicitud.setInteresado1Apellido1(TextNormalizer.upperOrNull(request.getApellido1()));
+            solicitud.setInteresado1Apellido2(TextNormalizer.upperOrNull(request.getApellido2()));
+            solicitud.setInteresado1RazonSocial(NombrePersonaNormalizer.normalizar(request.getRazonSocial()));
             solicitud.setInteresado1Dni(identificador);
             solicitud.setInteresado1Direccion(direccionNormalizada);
         } else if (slot == 2) {
             solicitud.setInteresado2Rol(rol);
             solicitud.setInteresado2Nombre(nombre);
+            solicitud.setInteresado2NombrePila(TextNormalizer.upperOrNull(request.getNombre()));
+            solicitud.setInteresado2Apellido1(TextNormalizer.upperOrNull(request.getApellido1()));
+            solicitud.setInteresado2Apellido2(TextNormalizer.upperOrNull(request.getApellido2()));
+            solicitud.setInteresado2RazonSocial(NombrePersonaNormalizer.normalizar(request.getRazonSocial()));
             solicitud.setInteresado2Dni(identificador);
             solicitud.setInteresado2Direccion(direccionNormalizada);
         } else {
             solicitud.setInteresado3Rol(rol);
             solicitud.setInteresado3Nombre(nombre);
+            solicitud.setInteresado3NombrePila(TextNormalizer.upperOrNull(request.getNombre()));
+            solicitud.setInteresado3Apellido1(TextNormalizer.upperOrNull(request.getApellido1()));
+            solicitud.setInteresado3Apellido2(TextNormalizer.upperOrNull(request.getApellido2()));
+            solicitud.setInteresado3RazonSocial(NombrePersonaNormalizer.normalizar(request.getRazonSocial()));
             solicitud.setInteresado3Dni(identificador);
             solicitud.setInteresado3Direccion(direccionNormalizada);
         }
+        completarDireccionEstructuradaSlot(solicitud, slot, request);
     }
 
     private String nombreInteresadoDetectado(SolicitudIdentidadDetectadaRequest request, String fallback) {
@@ -1476,6 +1560,10 @@ public class SolicitudServiceImpl implements SolicitudService {
     private void limpiarInteresado1(Solicitud solicitud) {
         solicitud.setInteresado1Rol(null);
         solicitud.setInteresado1Nombre(null);
+        solicitud.setInteresado1NombrePila(null);
+        solicitud.setInteresado1Apellido1(null);
+        solicitud.setInteresado1Apellido2(null);
+        solicitud.setInteresado1RazonSocial(null);
         solicitud.setInteresado1Dni(null);
         solicitud.setInteresado1Telefono(null);
         solicitud.setInteresado1Direccion(null);
@@ -1495,6 +1583,10 @@ public class SolicitudServiceImpl implements SolicitudService {
     private void limpiarInteresado2(Solicitud solicitud) {
         solicitud.setInteresado2Rol(null);
         solicitud.setInteresado2Nombre(null);
+        solicitud.setInteresado2NombrePila(null);
+        solicitud.setInteresado2Apellido1(null);
+        solicitud.setInteresado2Apellido2(null);
+        solicitud.setInteresado2RazonSocial(null);
         solicitud.setInteresado2Dni(null);
         solicitud.setInteresado2Telefono(null);
         solicitud.setInteresado2Direccion(null);
@@ -1514,6 +1606,10 @@ public class SolicitudServiceImpl implements SolicitudService {
     private void limpiarInteresado3(Solicitud solicitud) {
         solicitud.setInteresado3Rol(null);
         solicitud.setInteresado3Nombre(null);
+        solicitud.setInteresado3NombrePila(null);
+        solicitud.setInteresado3Apellido1(null);
+        solicitud.setInteresado3Apellido2(null);
+        solicitud.setInteresado3RazonSocial(null);
         solicitud.setInteresado3Dni(null);
         solicitud.setInteresado3Telefono(null);
         solicitud.setInteresado3Direccion(null);
@@ -1584,6 +1680,10 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setOperacionPrecioVenta(TextNormalizer.upperOrNull(solicitud.getOperacionPrecioVenta()));
         solicitud.setObservaciones(TextNormalizer.upperOrNull(solicitud.getObservaciones()));
         solicitud.setInteresado1Nombre(NombrePersonaNormalizer.normalizar(solicitud.getInteresado1Nombre()));
+        solicitud.setInteresado1NombrePila(TextNormalizer.upperOrNull(solicitud.getInteresado1NombrePila()));
+        solicitud.setInteresado1Apellido1(TextNormalizer.upperOrNull(solicitud.getInteresado1Apellido1()));
+        solicitud.setInteresado1Apellido2(TextNormalizer.upperOrNull(solicitud.getInteresado1Apellido2()));
+        solicitud.setInteresado1RazonSocial(NombrePersonaNormalizer.normalizar(solicitud.getInteresado1RazonSocial()));
         solicitud.setInteresado1Dni(TextNormalizer.upperOrNull(solicitud.getInteresado1Dni()));
         solicitud.setInteresado1Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado1Telefono()));
         solicitud.setInteresado1TipoVia(TextNormalizer.upperOrNull(solicitud.getInteresado1TipoVia()));
@@ -1611,6 +1711,10 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitud.getInteresado1Municipio(),
                 solicitud.getInteresado1Provincia()));
         solicitud.setInteresado2Nombre(NombrePersonaNormalizer.normalizar(solicitud.getInteresado2Nombre()));
+        solicitud.setInteresado2NombrePila(TextNormalizer.upperOrNull(solicitud.getInteresado2NombrePila()));
+        solicitud.setInteresado2Apellido1(TextNormalizer.upperOrNull(solicitud.getInteresado2Apellido1()));
+        solicitud.setInteresado2Apellido2(TextNormalizer.upperOrNull(solicitud.getInteresado2Apellido2()));
+        solicitud.setInteresado2RazonSocial(NombrePersonaNormalizer.normalizar(solicitud.getInteresado2RazonSocial()));
         solicitud.setInteresado2Dni(TextNormalizer.upperOrNull(solicitud.getInteresado2Dni()));
         solicitud.setInteresado2Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado2Telefono()));
         solicitud.setInteresado2TipoVia(TextNormalizer.upperOrNull(solicitud.getInteresado2TipoVia()));
@@ -1638,6 +1742,10 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitud.getInteresado2Municipio(),
                 solicitud.getInteresado2Provincia()));
         solicitud.setInteresado3Nombre(NombrePersonaNormalizer.normalizar(solicitud.getInteresado3Nombre()));
+        solicitud.setInteresado3NombrePila(TextNormalizer.upperOrNull(solicitud.getInteresado3NombrePila()));
+        solicitud.setInteresado3Apellido1(TextNormalizer.upperOrNull(solicitud.getInteresado3Apellido1()));
+        solicitud.setInteresado3Apellido2(TextNormalizer.upperOrNull(solicitud.getInteresado3Apellido2()));
+        solicitud.setInteresado3RazonSocial(NombrePersonaNormalizer.normalizar(solicitud.getInteresado3RazonSocial()));
         solicitud.setInteresado3Dni(TextNormalizer.upperOrNull(solicitud.getInteresado3Dni()));
         solicitud.setInteresado3Telefono(TextNormalizer.upperOrNull(solicitud.getInteresado3Telefono()));
         solicitud.setInteresado3TipoVia(TextNormalizer.upperOrNull(solicitud.getInteresado3TipoVia()));
@@ -1689,6 +1797,112 @@ public class SolicitudServiceImpl implements SolicitudService {
             return direccionCompuesta;
         }
         return direccionNormalizada != null ? direccionNormalizada : direccionCompuesta;
+    }
+
+    private String direccionSolicitud(SolicitudIdentidadDetectadaRequest request) {
+        return direccionSolicitud(
+                request.getDireccionTexto(),
+                request.getTipoVia(),
+                request.getNombreVia(),
+                request.getNumeroVia(),
+                request.getBloque(),
+                request.getPortal(),
+                request.getEscalera(),
+                request.getPiso(),
+                request.getPuerta(),
+                request.getCodigoPostal(),
+                request.getMunicipio(),
+                request.getProvincia()
+        );
+    }
+
+    private void completarDireccionEstructuradaSlot(Solicitud solicitud, int slot, SolicitudIdentidadDetectadaRequest request) {
+        if (slot == 1) {
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1TipoVia()) == null) solicitud.setInteresado1TipoVia(TextNormalizer.upperOrNull(request.getTipoVia()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1NombreVia()) == null) solicitud.setInteresado1NombreVia(TextNormalizer.upperOrNull(request.getNombreVia()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1NumeroVia()) == null) solicitud.setInteresado1NumeroVia(TextNormalizer.upperOrNull(request.getNumeroVia()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1Bloque()) == null) solicitud.setInteresado1Bloque(TextNormalizer.upperOrNull(request.getBloque()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1Portal()) == null) solicitud.setInteresado1Portal(TextNormalizer.upperOrNull(request.getPortal()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1Escalera()) == null) solicitud.setInteresado1Escalera(TextNormalizer.upperOrNull(request.getEscalera()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1Piso()) == null) solicitud.setInteresado1Piso(TextNormalizer.upperOrNull(request.getPiso()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1Puerta()) == null) solicitud.setInteresado1Puerta(TextNormalizer.upperOrNull(request.getPuerta()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1CodigoPostal()) == null) solicitud.setInteresado1CodigoPostal(TextNormalizer.upperOrNull(request.getCodigoPostal()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1Municipio()) == null) solicitud.setInteresado1Municipio(TextNormalizer.upperOrNull(request.getMunicipio()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado1Provincia()) == null) solicitud.setInteresado1Provincia(TextNormalizer.upperOrNull(request.getProvincia()));
+        } else if (slot == 2) {
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2TipoVia()) == null) solicitud.setInteresado2TipoVia(TextNormalizer.upperOrNull(request.getTipoVia()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2NombreVia()) == null) solicitud.setInteresado2NombreVia(TextNormalizer.upperOrNull(request.getNombreVia()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2NumeroVia()) == null) solicitud.setInteresado2NumeroVia(TextNormalizer.upperOrNull(request.getNumeroVia()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2Bloque()) == null) solicitud.setInteresado2Bloque(TextNormalizer.upperOrNull(request.getBloque()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2Portal()) == null) solicitud.setInteresado2Portal(TextNormalizer.upperOrNull(request.getPortal()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2Escalera()) == null) solicitud.setInteresado2Escalera(TextNormalizer.upperOrNull(request.getEscalera()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2Piso()) == null) solicitud.setInteresado2Piso(TextNormalizer.upperOrNull(request.getPiso()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2Puerta()) == null) solicitud.setInteresado2Puerta(TextNormalizer.upperOrNull(request.getPuerta()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2CodigoPostal()) == null) solicitud.setInteresado2CodigoPostal(TextNormalizer.upperOrNull(request.getCodigoPostal()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2Municipio()) == null) solicitud.setInteresado2Municipio(TextNormalizer.upperOrNull(request.getMunicipio()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado2Provincia()) == null) solicitud.setInteresado2Provincia(TextNormalizer.upperOrNull(request.getProvincia()));
+        } else if (slot == 3) {
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3TipoVia()) == null) solicitud.setInteresado3TipoVia(TextNormalizer.upperOrNull(request.getTipoVia()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3NombreVia()) == null) solicitud.setInteresado3NombreVia(TextNormalizer.upperOrNull(request.getNombreVia()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3NumeroVia()) == null) solicitud.setInteresado3NumeroVia(TextNormalizer.upperOrNull(request.getNumeroVia()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3Bloque()) == null) solicitud.setInteresado3Bloque(TextNormalizer.upperOrNull(request.getBloque()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3Portal()) == null) solicitud.setInteresado3Portal(TextNormalizer.upperOrNull(request.getPortal()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3Escalera()) == null) solicitud.setInteresado3Escalera(TextNormalizer.upperOrNull(request.getEscalera()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3Piso()) == null) solicitud.setInteresado3Piso(TextNormalizer.upperOrNull(request.getPiso()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3Puerta()) == null) solicitud.setInteresado3Puerta(TextNormalizer.upperOrNull(request.getPuerta()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3CodigoPostal()) == null) solicitud.setInteresado3CodigoPostal(TextNormalizer.upperOrNull(request.getCodigoPostal()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3Municipio()) == null) solicitud.setInteresado3Municipio(TextNormalizer.upperOrNull(request.getMunicipio()));
+            if (TextNormalizer.upperOrNull(solicitud.getInteresado3Provincia()) == null) solicitud.setInteresado3Provincia(TextNormalizer.upperOrNull(request.getProvincia()));
+        }
+    }
+
+    private boolean completarDireccionEstructuradaInteresado(Interesado interesado, SolicitudIdentidadDetectadaRequest request) {
+        boolean cambiado = false;
+        if (TextNormalizer.upperOrNull(interesado.getTipoVia()) == null && TextNormalizer.upperOrNull(request.getTipoVia()) != null) {
+            interesado.setTipoVia(TextNormalizer.upperOrNull(request.getTipoVia()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getNombreVia()) == null && TextNormalizer.upperOrNull(request.getNombreVia()) != null) {
+            interesado.setNombreVia(TextNormalizer.upperOrNull(request.getNombreVia()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getNumeroVia()) == null && TextNormalizer.upperOrNull(request.getNumeroVia()) != null) {
+            interesado.setNumeroVia(TextNormalizer.upperOrNull(request.getNumeroVia()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getBloque()) == null && TextNormalizer.upperOrNull(request.getBloque()) != null) {
+            interesado.setBloque(TextNormalizer.upperOrNull(request.getBloque()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getPortal()) == null && TextNormalizer.upperOrNull(request.getPortal()) != null) {
+            interesado.setPortal(TextNormalizer.upperOrNull(request.getPortal()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getEscalera()) == null && TextNormalizer.upperOrNull(request.getEscalera()) != null) {
+            interesado.setEscalera(TextNormalizer.upperOrNull(request.getEscalera()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getPiso()) == null && TextNormalizer.upperOrNull(request.getPiso()) != null) {
+            interesado.setPiso(TextNormalizer.upperOrNull(request.getPiso()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getPuerta()) == null && TextNormalizer.upperOrNull(request.getPuerta()) != null) {
+            interesado.setPuerta(TextNormalizer.upperOrNull(request.getPuerta()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getCodigoPostal()) == null && TextNormalizer.upperOrNull(request.getCodigoPostal()) != null) {
+            interesado.setCodigoPostal(TextNormalizer.upperOrNull(request.getCodigoPostal()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getMunicipio()) == null && TextNormalizer.upperOrNull(request.getMunicipio()) != null) {
+            interesado.setMunicipio(TextNormalizer.upperOrNull(request.getMunicipio()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getProvincia()) == null && TextNormalizer.upperOrNull(request.getProvincia()) != null) {
+            interesado.setProvincia(TextNormalizer.upperOrNull(request.getProvincia()));
+            cambiado = true;
+        }
+        return cambiado;
     }
 
     private void completarVehiculoDesdeSolicitud(Vehiculo vehiculo, Solicitud solicitud) {

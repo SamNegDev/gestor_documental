@@ -28,6 +28,18 @@ public class Interesado {
     @Column (nullable = false, length = 120)
     private String nombre;
 
+    @Column(length = 160)
+    private String nombrePila;
+
+    @Column(length = 160)
+    private String apellido1;
+
+    @Column(length = 160)
+    private String apellido2;
+
+    @Column(length = 220)
+    private String razonSocial;
+
     @Column (length = 200)
     private String direccion;
 

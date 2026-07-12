@@ -21,4 +21,15 @@ public class SolicitudIdentidadDetectadaRequest {
     private String fechaNacimiento;
     private String fechaCaducidad;
     private String direccionTexto;
+    private String tipoVia;
+    private String nombreVia;
+    private String numeroVia;
+    private String bloque;
+    private String portal;
+    private String escalera;
+    private String piso;
+    private String puerta;
+    private String codigoPostal;
+    private String municipio;
+    private String provincia;
 }

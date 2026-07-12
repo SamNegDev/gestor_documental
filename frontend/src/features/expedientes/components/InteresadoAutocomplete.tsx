@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search, UserRoundCheck } from "lucide-react";
 import { searchInteresados } from "../services/expedienteDetailApi";
 import type { InteresadoSearchResult } from "../types/expedienteDetail.types";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 
 type Props = {
   label: string;
@@ -83,7 +83,7 @@ export function InteresadoAutocomplete({ label, value, placeholder, className, d
             }
           }}
           onChange={(event) => {
-            onChange(uppercaseInput(event.target.value));
+            uppercaseInputPreservingCursor(event, onChange);
             setOpen(true);
           }}
         />

@@ -227,6 +227,10 @@ public class ExpedienteApiController {
                 .map(interesado -> InteresadoSearchResponse.builder()
                         .id(interesado.getId())
                         .nombre(interesado.getNombre())
+                        .nombrePila(interesado.getNombrePila())
+                        .apellido1(interesado.getApellido1())
+                        .apellido2(interesado.getApellido2())
+                        .razonSocial(interesado.getRazonSocial())
                         .dni(interesado.getDni())
                         .telefono(interesado.getTelefono())
                         .direccion(interesado.getDireccion())
@@ -553,6 +557,10 @@ public class ExpedienteApiController {
     private InteresadoFormDto mapInteresado(InteresadoExpedienteRequest interesado) {
         InteresadoFormDto dto = new InteresadoFormDto();
         dto.setNombre(TextNormalizer.upperOrNull(interesado.getNombre()));
+        dto.setNombrePila(TextNormalizer.upperOrNull(interesado.getNombrePila()));
+        dto.setApellido1(TextNormalizer.upperOrNull(interesado.getApellido1()));
+        dto.setApellido2(TextNormalizer.upperOrNull(interesado.getApellido2()));
+        dto.setRazonSocial(TextNormalizer.upperOrNull(interesado.getRazonSocial()));
         dto.setDni(TextNormalizer.upperOrNull(interesado.getDni()));
         dto.setTelefono(TextNormalizer.upperOrNull(interesado.getTelefono()));
         dto.setDireccion(TextNormalizer.upperOrNull(interesado.getDireccion()));

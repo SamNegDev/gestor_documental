@@ -3206,6 +3206,106 @@
 
 .exp-panel__heading-actions { display: flex; align-items: center; gap: 8px; }
 
+.identity-review-modal__panel {
+  width: min(1220px, calc(100vw - 32px));
+  max-height: min(900px, calc(100vh - 32px));
+}
+
+.identity-review-modal__body {
+  display: grid;
+  grid-template-columns: minmax(340px, 0.9fr) minmax(0, 1.1fr);
+  min-height: 620px;
+  gap: 18px;
+  overflow: hidden;
+}
+
+.identity-review-modal__preview {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-width: 0;
+  gap: 10px;
+}
+
+.identity-review-modal__preview iframe {
+  width: 100%;
+  height: 100%;
+  min-height: 540px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f3f5f4;
+}
+
+.identity-review-modal__preview .soft-button {
+  justify-self: flex-start;
+}
+
+.identity-review-modal__form {
+  min-width: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.identity-review-modal__locked {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #bfd2cd;
+  border-radius: 8px;
+  background: #f3f8f6;
+}
+
+.identity-review-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.identity-review-modal__form label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.identity-review-modal__form label > span {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.identity-review-modal__form input,
+.identity-review-modal__form textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink-strong);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 750;
+  padding: 9px 10px;
+}
+
+.identity-review-modal__form textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.identity-review-modal__form input[readonly],
+.identity-review-modal__form textarea[readonly] {
+  border-color: #bdd3ce;
+  background: #edf6f3;
+  color: #204f48;
+}
+
+.identity-review-modal__wide-field {
+  grid-column: span 2;
+}
+
 .template-dialog {
   width: min(1180px, calc(100vw - 32px));
   max-height: min(860px, calc(100vh - 32px));
@@ -3553,6 +3653,15 @@
   .template-dialog__summary {
     display: none;
   }
+
+  .identity-review-modal__body {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .identity-review-modal__preview iframe {
+    min-height: 420px;
+  }
 }
 
 @media (max-width: 860px) {
@@ -3596,5 +3705,17 @@
 
   .template-fields {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .identity-review-modal__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .identity-review-modal__wide-field {
+    grid-column: auto;
+  }
+
+  .identity-review-modal__preview iframe {
+    min-height: 320px;
   }
 }

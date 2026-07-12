@@ -152,6 +152,10 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 .orElseGet(() -> {
                     Interesado nuevoInteresado = new Interesado();
                     nuevoInteresado.setNombre(NombrePersonaNormalizer.normalizar(dto.getNombre()));
+                    nuevoInteresado.setNombrePila(TextNormalizer.upperOrNull(dto.getNombrePila()));
+                    nuevoInteresado.setApellido1(TextNormalizer.upperOrNull(dto.getApellido1()));
+                    nuevoInteresado.setApellido2(TextNormalizer.upperOrNull(dto.getApellido2()));
+                    nuevoInteresado.setRazonSocial(NombrePersonaNormalizer.normalizar(dto.getRazonSocial()));
                     nuevoInteresado.setDni(TextNormalizer.upperOrNull(dto.getDni()));
                     nuevoInteresado.setTelefono(TextNormalizer.upperOrNull(dto.getTelefono()));
                     nuevoInteresado.setTipoVia(TextNormalizer.upperOrNull(dto.getTipoVia()));
@@ -173,6 +177,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                                     dto.getCodigoPostal(), dto.getMunicipio(), dto.getProvincia()));
                     return interesadoService.guardar(nuevoInteresado);
                 });
+        completarNombreEstructuradoSiVacio(interesado, dto);
 
         boolean yaRelacionado = expedienteInteresadoRepository
                 .findByExpedienteIdAndInteresadoId(expediente.getId(), interesado.getId())
@@ -188,6 +193,29 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         relacion.setRol(dto.getRol());
 
         expedienteInteresadoRepository.save(relacion);
+    }
+
+    private void completarNombreEstructuradoSiVacio(Interesado interesado, InteresadoFormDto dto) {
+        boolean cambiado = false;
+        if (TextNormalizer.upperOrNull(interesado.getNombrePila()) == null && TextNormalizer.upperOrNull(dto.getNombrePila()) != null) {
+            interesado.setNombrePila(TextNormalizer.upperOrNull(dto.getNombrePila()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getApellido1()) == null && TextNormalizer.upperOrNull(dto.getApellido1()) != null) {
+            interesado.setApellido1(TextNormalizer.upperOrNull(dto.getApellido1()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getApellido2()) == null && TextNormalizer.upperOrNull(dto.getApellido2()) != null) {
+            interesado.setApellido2(TextNormalizer.upperOrNull(dto.getApellido2()));
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getRazonSocial()) == null && TextNormalizer.upperOrNull(dto.getRazonSocial()) != null) {
+            interesado.setRazonSocial(NombrePersonaNormalizer.normalizar(dto.getRazonSocial()));
+            cambiado = true;
+        }
+        if (cambiado) {
+            interesadoService.guardar(interesado);
+        }
     }
 
     /**

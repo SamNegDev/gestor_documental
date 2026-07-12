@@ -21,6 +21,7 @@ import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
+import com.example.gestor_documental.util.DireccionEstructurada;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson.IdentidadDetectada;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
@@ -211,7 +212,9 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 Si el documento tiene campos "Apellidos" y "Nombre", apellido1/apellido2 salen de Apellidos y nombre sale de Nombre.
                 Empresas: usa razonSocial y deja nombre/apellidos en null.
                 Fechas: formato dd/MM/yyyy. Si una fecha no aparece clara, null.
-                Direccion: una sola linea solo si aparece en el documento.
+                Direccion: devuelve direccionTexto en una sola linea si aparece.
+                Si la direccion aparece clara, separala tambien en tipoVia, nombreVia, numeroVia, bloque, portal, escalera, piso, puerta, codigoPostal, municipio y provincia.
+                No inventes campos de direccion: si una parte no aparece clara, null.
                 No inventes datos ni completes segundos nombres si no se ven. Si un identificador no se lee con seguridad, devuelve null y confianza baja en esa entrada.
                 Devuelve solo el JSON del esquema.
                 """.formatted(documento.getTipoDocumento() != null ? documento.getTipoDocumento().name() : "");
@@ -281,6 +284,23 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         lectura.setFechaNacimiento(limitar(principal != null ? principal.fechaNacimiento() : null, 20));
         lectura.setFechaCaducidad(limitar(principal != null ? principal.fechaCaducidad() : null, 20));
         lectura.setDireccionTexto(limitar(principal != null ? principal.direccionTexto() : null, 500));
+        lectura.setTipoVia(limitar(principal != null ? principal.tipoVia() : null, 30));
+        lectura.setNombreVia(limitar(principal != null ? principal.nombreVia() : null, 120));
+        lectura.setNumeroVia(limitar(principal != null ? principal.numeroVia() : null, 20));
+        lectura.setBloque(limitar(principal != null ? principal.bloque() : null, 20));
+        lectura.setPortal(limitar(principal != null ? principal.portal() : null, 20));
+        lectura.setEscalera(limitar(principal != null ? principal.escalera() : null, 20));
+        lectura.setPiso(limitar(principal != null ? principal.piso() : null, 20));
+        lectura.setPuerta(limitar(principal != null ? principal.puerta() : null, 20));
+        lectura.setCodigoPostal(limitar(principal != null ? principal.codigoPostal() : null, 10));
+        lectura.setMunicipio(limitar(principal != null ? principal.municipio() : null, 80));
+        lectura.setProvincia(limitar(principal != null ? principal.provincia() : null, 80));
+        if (TextNormalizer.upperOrNull(lectura.getDireccionTexto()) == null) {
+            DireccionEstructurada direccion = DireccionEstructurada.fromLectura(lectura);
+            if (direccion != null) {
+                lectura.setDireccionTexto(direccion.textoCompuesto());
+            }
+        }
         lectura.setConfianzaGlobal(confianza);
         lectura.setInteresadoVinculado(interesadoVinculado);
         lectura.setVinculadoAutomaticamente(!requiereRevision && interesadoVinculado != null);
@@ -340,9 +360,47 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         if ((interesado.getNombre() == null || interesado.getNombre().isBlank()) && nombreCompleto != null) {
             interesado.setNombre(nombreCompleto);
         }
+        completarNombreEstructurado(interesado, lectura);
         String direccion = normalizarDireccionCompleta(lectura.getDireccionTexto());
         if (direccion != null) {
             interesado.setDireccion(direccion);
+        }
+        actualizarDireccionEstructurada(interesado, lectura);
+    }
+
+    private void actualizarDireccionEstructurada(Interesado interesado, DocumentoIdentidadLectura lectura) {
+        if (TextNormalizer.upperOrNull(lectura.getTipoVia()) != null) {
+            interesado.setTipoVia(TextNormalizer.upperOrNull(lectura.getTipoVia()));
+        }
+        if (TextNormalizer.upperOrNull(lectura.getNombreVia()) != null) {
+            interesado.setNombreVia(TextNormalizer.upperOrNull(lectura.getNombreVia()));
+        }
+        if (TextNormalizer.upperOrNull(lectura.getNumeroVia()) != null) {
+            interesado.setNumeroVia(TextNormalizer.upperOrNull(lectura.getNumeroVia()));
+        }
+        if (TextNormalizer.upperOrNull(lectura.getBloque()) != null) {
+            interesado.setBloque(TextNormalizer.upperOrNull(lectura.getBloque()));
+        }
+        if (TextNormalizer.upperOrNull(lectura.getPortal()) != null) {
+            interesado.setPortal(TextNormalizer.upperOrNull(lectura.getPortal()));
+        }
+        if (TextNormalizer.upperOrNull(lectura.getEscalera()) != null) {
+            interesado.setEscalera(TextNormalizer.upperOrNull(lectura.getEscalera()));
+        }
+        if (TextNormalizer.upperOrNull(lectura.getPiso()) != null) {
+            interesado.setPiso(TextNormalizer.upperOrNull(lectura.getPiso()));
+        }
+        if (TextNormalizer.upperOrNull(lectura.getPuerta()) != null) {
+            interesado.setPuerta(TextNormalizer.upperOrNull(lectura.getPuerta()));
+        }
+        if (TextNormalizer.upperOrNull(lectura.getCodigoPostal()) != null) {
+            interesado.setCodigoPostal(TextNormalizer.upperOrNull(lectura.getCodigoPostal()));
+        }
+        if (TextNormalizer.upperOrNull(lectura.getMunicipio()) != null) {
+            interesado.setMunicipio(TextNormalizer.upperOrNull(lectura.getMunicipio()));
+        }
+        if (TextNormalizer.upperOrNull(lectura.getProvincia()) != null) {
+            interesado.setProvincia(TextNormalizer.upperOrNull(lectura.getProvincia()));
         }
     }
 
@@ -407,8 +465,10 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             interesado = new Interesado();
             interesado.setDni(identificador);
             interesado.setNombre(nombreCompletoResultado(resultado, identificador));
+            aplicarNombreEstructurado(interesado, resultado);
             interesado.setTipoPersona(inferirTipoPersona(identificador, tipoDetectado));
             interesado.setDireccion(normalizarDireccionCompleta(resultado != null ? resultado.direccionTexto() : null));
+            aplicarDireccionEstructurada(interesado, resultado);
             interesado = interesadoRepository.save(interesado);
         }
         Interesado interesadoFinal = interesado;
@@ -428,6 +488,48 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             clienteInteresadoRepository.save(relacion);
         }
         return interesado;
+    }
+
+    private void aplicarDireccionEstructurada(Interesado interesado, IdentidadDetectada resultado) {
+        if (resultado == null) {
+            return;
+        }
+        interesado.setTipoVia(TextNormalizer.upperOrNull(resultado.tipoVia()));
+        interesado.setNombreVia(TextNormalizer.upperOrNull(resultado.nombreVia()));
+        interesado.setNumeroVia(TextNormalizer.upperOrNull(resultado.numeroVia()));
+        interesado.setBloque(TextNormalizer.upperOrNull(resultado.bloque()));
+        interesado.setPortal(TextNormalizer.upperOrNull(resultado.portal()));
+        interesado.setEscalera(TextNormalizer.upperOrNull(resultado.escalera()));
+        interesado.setPiso(TextNormalizer.upperOrNull(resultado.piso()));
+        interesado.setPuerta(TextNormalizer.upperOrNull(resultado.puerta()));
+        interesado.setCodigoPostal(TextNormalizer.upperOrNull(resultado.codigoPostal()));
+        interesado.setMunicipio(TextNormalizer.upperOrNull(resultado.municipio()));
+        interesado.setProvincia(TextNormalizer.upperOrNull(resultado.provincia()));
+    }
+
+    private void completarNombreEstructurado(Interesado interesado, DocumentoIdentidadLectura lectura) {
+        if (TextNormalizer.upperOrNull(interesado.getNombrePila()) == null && TextNormalizer.upperOrNull(lectura.getNombre()) != null) {
+            interesado.setNombrePila(TextNormalizer.upperOrNull(lectura.getNombre()));
+        }
+        if (TextNormalizer.upperOrNull(interesado.getApellido1()) == null && TextNormalizer.upperOrNull(lectura.getApellido1()) != null) {
+            interesado.setApellido1(TextNormalizer.upperOrNull(lectura.getApellido1()));
+        }
+        if (TextNormalizer.upperOrNull(interesado.getApellido2()) == null && TextNormalizer.upperOrNull(lectura.getApellido2()) != null) {
+            interesado.setApellido2(TextNormalizer.upperOrNull(lectura.getApellido2()));
+        }
+        if (TextNormalizer.upperOrNull(interesado.getRazonSocial()) == null && NombrePersonaNormalizer.normalizar(lectura.getRazonSocial()) != null) {
+            interesado.setRazonSocial(NombrePersonaNormalizer.normalizar(lectura.getRazonSocial()));
+        }
+    }
+
+    private void aplicarNombreEstructurado(Interesado interesado, IdentidadDetectada resultado) {
+        if (resultado == null) {
+            return;
+        }
+        interesado.setNombrePila(TextNormalizer.upperOrNull(resultado.nombre()));
+        interesado.setApellido1(TextNormalizer.upperOrNull(resultado.apellido1()));
+        interesado.setApellido2(TextNormalizer.upperOrNull(resultado.apellido2()));
+        interesado.setRazonSocial(NombrePersonaNormalizer.normalizar(resultado.razonSocial()));
     }
 
     private String nombreCompletoResultado(IdentidadDetectada resultado, String fallback) {
@@ -554,6 +656,17 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         props.set("fechaNacimiento", nullableString("Formato dd/MM/yyyy."));
         props.set("fechaCaducidad", nullableString("Formato dd/MM/yyyy."));
         props.set("direccionTexto", nullableString("Direccion completa en una linea."));
+        props.set("tipoVia", nullableString("Tipo de via: CALLE, AVENIDA, CARRETERA, CAMINO, PLAZA, etc."));
+        props.set("nombreVia", nullableString("Nombre de la via sin tipo ni numero."));
+        props.set("numeroVia", nullableString("Numero de la via si aparece."));
+        props.set("bloque", nullableString("Bloque si aparece."));
+        props.set("portal", nullableString("Portal si aparece."));
+        props.set("escalera", nullableString("Escalera si aparece."));
+        props.set("piso", nullableString("Piso, planta o Pxx si aparece."));
+        props.set("puerta", nullableString("Puerta, letra o mano si aparece."));
+        props.set("codigoPostal", nullableString("Codigo postal de 5 digitos si aparece."));
+        props.set("municipio", nullableString("Municipio/localidad si aparece claro."));
+        props.set("provincia", nullableString("Provincia si aparece clara."));
         props.set("confianzaGlobal", nullableNumber("Confianza entre 0 y 1."));
         props.set("requiereRevision", nullableBoolean("true si algun dato clave no es seguro."));
         props.set("observaciones", nullableString("Motivo breve si requiere revision."));

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CheckCircle2, Eye, RotateCcw, Upload, X } from "lucide-react";
 import type { DocumentoExpediente, IncidenciaExpediente } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 
 type Props = {
   incidencia: IncidenciaExpediente | null;
@@ -118,7 +118,7 @@ export function IncidentResolutionDialog({
           <label>
             Motivo si se vuelve a reclamar
             <textarea
-              onChange={(event) => setObservaciones(uppercaseInput(event.target.value))}
+              onChange={(event) => uppercaseInputPreservingCursor(event, setObservaciones)}
               placeholder="Indica por que la documentacion no resuelve la incidencia"
               rows={3}
               value={observaciones}

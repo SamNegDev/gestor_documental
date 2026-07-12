@@ -16,6 +16,14 @@ public class InteresadoFormDto {
 
     @Size(max = 120, message = "El nombre no debe tener mas de 120 caracteres")
     private String nombre;
+    @Size(max = 160, message = "El nombre propio no debe tener mas de 160 caracteres")
+    private String nombrePila;
+    @Size(max = 160, message = "El primer apellido no debe tener mas de 160 caracteres")
+    private String apellido1;
+    @Size(max = 160, message = "El segundo apellido no debe tener mas de 160 caracteres")
+    private String apellido2;
+    @Size(max = 220, message = "La razon social no debe tener mas de 220 caracteres")
+    private String razonSocial;
     @Size(max = 20, message = "El DNI/NIE no puede superar los 20 caracteres")
     private String dni;
     @Size(max = 20, message = "El telefono no puede superar los 20 caracteres")

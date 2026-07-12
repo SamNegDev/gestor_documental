@@ -4,7 +4,7 @@ import { useState } from "react";
 import { History, MessageCircle, MessageSquareWarning, MessagesSquare } from "lucide-react";
 import type { ExpedienteDetail } from "../types/expedienteDetail.types";
 import { formatDateTime, humanizeEnum } from "../utils/formatters";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 
 type Props = {
   expediente: ExpedienteDetail;
@@ -95,7 +95,7 @@ export function SecondaryExpedienteTabs({ expediente, onOpenMessages, onSendMess
         <Tabs.Content value="mensajes" className="secondary-tabs__content">
           <form className="message-form" onSubmit={handleSubmit}>
             <textarea
-              onChange={(event) => setMessage(uppercaseInput(event.target.value))}
+              onChange={(event) => uppercaseInputPreservingCursor(event, setMessage)}
               placeholder="Escribe un mensaje para este expediente"
               rows={3}
               value={message}

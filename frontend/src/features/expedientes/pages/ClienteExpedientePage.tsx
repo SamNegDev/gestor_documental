@@ -10,7 +10,7 @@ import { uploadRequirementDocument } from "../services/requisitosApi";
 import { DocumentUploadDialog, type DocumentUploadSubmit } from "../components/DocumentUploadDialog";
 import type { DocumentoExpediente, IncidenciaExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import { clientInitials } from "../../../shared/utils/clientBranding";
 import { ApiError } from "../../../shared/api/http";
 import "../styles/expedienteDetail.css";
@@ -454,7 +454,7 @@ export function ClienteExpedientePage() {
             {informationRequested ? (
               <div className="client-incident-response">
                 <textarea
-                  onChange={(event) => setAdditionalInfoResponse(uppercaseInput(event.target.value))}
+                  onChange={(event) => uppercaseInputPreservingCursor(event, setAdditionalInfoResponse)}
                   placeholder="Escribe tu respuesta"
                   rows={3}
                   value={additionalInfoResponse}
@@ -585,7 +585,7 @@ export function ClienteExpedientePage() {
           <Tabs.Content value="mensajes" className="secondary-tabs__content">
             <div className="client-message-box">
               <textarea
-                onChange={(event) => setMessage(uppercaseInput(event.target.value))}
+                onChange={(event) => uppercaseInputPreservingCursor(event, setMessage)}
                 placeholder="Escribe un mensaje"
                 rows={3}
                 value={message}

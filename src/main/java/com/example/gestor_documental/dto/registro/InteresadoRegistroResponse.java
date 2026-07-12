@@ -11,6 +11,10 @@ public class InteresadoRegistroResponse {
     private Long id;
     private String dni;
     private String nombre;
+    private String nombrePila;
+    private String apellido1;
+    private String apellido2;
+    private String razonSocial;
     private String telefono;
     private String direccion;
     private String tipoVia;

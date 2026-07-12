@@ -2,7 +2,7 @@ import { AlertTriangle, CheckCircle2, CircleDashed, FileText, Link2, Plus, Slash
 import { useEffect, useState } from "react";
 import type { DocumentoExpediente, InconsistenciaDocumental, InteresadoExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 import { formatDocumentType, humanizeEnum } from "../utils/formatters";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 
 type Props = {
   requisitos: RequisitoDocumental[];
@@ -294,7 +294,7 @@ export function DocumentRequirementsPanel({
                   value={descripcion}
                   placeholder="Añade una indicación concreta para el cliente"
                   rows={3}
-                  onChange={(event) => setDescripcion(uppercaseInput(event.target.value))}
+                  onChange={(event) => uppercaseInputPreservingCursor(event, setDescripcion)}
                 />
               </label>
             </div>
@@ -410,7 +410,7 @@ export function DocumentRequirementsPanel({
               <label>
                 Motivo
                 <textarea
-                  onChange={(event) => setOmitReason(uppercaseInput(event.target.value))}
+                  onChange={(event) => uppercaseInputPreservingCursor(event, setOmitReason)}
                   rows={3}
                   value={omitReason}
                 />

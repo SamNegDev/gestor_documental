@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AlertCircle, ArrowLeft, Loader2, Save } from "lucide-react";
 import {
@@ -8,7 +8,7 @@ import {
 } from "../services/expedienteDetailApi";
 import type { ExpedienteDetail, ExpedienteEditCatalogs, ExpedienteEditInput, InteresadoSearchResult } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
-import { cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
+import { cleanUpperText, uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 import { InteresadoAutocomplete } from "../components/InteresadoAutocomplete";
 import "../styles/expedienteDetail.css";
@@ -20,7 +20,7 @@ const BATECOM_LABELS = ["Vendedor inicial", "Compraventa", "Comprador final"];
 type InteresadoForm = ExpedienteEditInput["interesados"][number];
 
 function emptyInteresado(): InteresadoForm {
-  return { nombre: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
+  return { nombre: "", nombrePila: "", apellido1: "", apellido2: "", razonSocial: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
 }
 
 function ensureBatecomInteresados(interesados: InteresadoForm[]) {
@@ -72,6 +72,10 @@ function buildInitialForm(expediente: ExpedienteDetail): ExpedienteEditInput {
     return interesado
       ? {
           nombre: uppercaseInput(interesado.nombre || ""),
+          nombrePila: uppercaseInput(interesado.nombrePila || ""),
+          apellido1: uppercaseInput(interesado.apellido1 || ""),
+          apellido2: uppercaseInput(interesado.apellido2 || ""),
+          razonSocial: uppercaseInput(interesado.razonSocial || ""),
           dni: uppercaseInput(interesado.dni || ""),
           telefono: uppercaseInput(interesado.telefono || ""),
           direccion: uppercaseInput(interesado.direccion || ""),
@@ -111,6 +115,10 @@ function buildSavePayload(form: ExpedienteEditInput): ExpedienteEditInput {
     observaciones: cleanText(form.observaciones),
     interesados: form.interesados.map((interesado) => ({
       nombre: cleanText(interesado.nombre),
+      nombrePila: cleanText(interesado.nombrePila),
+      apellido1: cleanText(interesado.apellido1),
+      apellido2: cleanText(interesado.apellido2),
+      razonSocial: cleanText(interesado.razonSocial),
       dni: cleanText(interesado.dni),
       telefono: cleanText(interesado.telefono),
       direccion: cleanText(interesado.direccion),
@@ -183,6 +191,9 @@ export function ExpedienteEditPage() {
       return { ...current, [field]: typeof value === "string" ? uppercaseInput(value) : value };
     });
   };
+  const updateFieldInput = (field: keyof ExpedienteEditInput, event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    uppercaseInputPreservingCursor(event, (value) => updateField(field, value));
+  };
 
   const updateInteresado = (index: number, field: keyof InteresadoForm, value: string) => {
     setForm((current) => {
@@ -191,6 +202,9 @@ export function ExpedienteEditPage() {
       interesados[index] = { ...interesados[index], [field]: uppercaseInput(value) };
       return { ...current, interesados };
     });
+  };
+  const updateInteresadoInput = (index: number, field: keyof InteresadoForm, event: ChangeEvent<HTMLInputElement>) => {
+    uppercaseInputPreservingCursor(event, (value) => updateInteresado(index, field, value));
   };
 
   const updateInteresadoAddress = (index: number, value: AddressValue) => {
@@ -209,6 +223,10 @@ export function ExpedienteEditPage() {
       interesados[index] = {
         ...interesados[index],
         nombre: uppercaseInput(interesado.nombre || ""),
+        nombrePila: uppercaseInput(interesado.nombrePila || ""),
+        apellido1: uppercaseInput(interesado.apellido1 || ""),
+        apellido2: uppercaseInput(interesado.apellido2 || ""),
+        razonSocial: uppercaseInput(interesado.razonSocial || ""),
         dni: uppercaseInput(interesado.dni || ""),
         telefono: uppercaseInput(interesado.telefono || ""),
         direccion: uppercaseInput(interesado.direccion || ""),
@@ -318,14 +336,14 @@ export function ExpedienteEditPage() {
             </label>
             <label>
               Matricula
-              <input value={form.matricula || ""} onChange={(event) => updateField("matricula", event.target.value)} />
+              <input value={form.matricula || ""} onChange={(event) => updateFieldInput("matricula", event)} />
             </label>
             <label className="edit-form-grid__wide">
               Observaciones
               <textarea
                 rows={4}
                 value={form.observaciones || ""}
-                onChange={(event) => updateField("observaciones", event.target.value)}
+                onChange={(event) => updateFieldInput("observaciones", event)}
               />
             </label>
           </div>
@@ -374,7 +392,7 @@ export function ExpedienteEditPage() {
                 </label>
                 <label>
                   Telefono
-                  <input value={interesado.telefono || ""} onChange={(event) => updateInteresado(index, "telefono", event.target.value)} />
+                  <input value={interesado.telefono || ""} onChange={(event) => updateInteresadoInput(index, "telefono", event)} />
                 </label>
                 <AddressFields
                   idPrefix={`expediente-edit-${index}`}

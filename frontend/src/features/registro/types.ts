@@ -14,6 +14,10 @@ export interface InteresadoRegistro {
   id: number;
   dni: string;
   nombre: string;
+  nombrePila?: string | null;
+  apellido1?: string | null;
+  apellido2?: string | null;
+  razonSocial?: string | null;
   telefono?: string | null;
   direccion?: string | null;
   tipoVia?: string | null;
@@ -39,6 +43,10 @@ export interface InteresadoRegistro {
 export interface InteresadoRegistroUpdateInput {
   dni?: string | null;
   nombre?: string | null;
+  nombrePila?: string | null;
+  apellido1?: string | null;
+  apellido2?: string | null;
+  razonSocial?: string | null;
   telefono?: string | null;
   direccion?: string | null;
   tipoVia?: string | null;

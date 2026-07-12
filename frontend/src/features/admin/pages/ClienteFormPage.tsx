@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Building2, ExternalLink, FileText, Image, Mail, MessageCircle, Save, Trash2, Upload, UserRound } from "lucide-react";
@@ -16,7 +16,7 @@ import {
 import type { ClienteInput } from "../types";
 import type { DocumentoExpediente } from "../../expedientes/types/expedienteDetail.types";
 import { readDocumentIdentity } from "../../expedientes/services/documentosApi";
-import { cleanLowerText, cleanUpperText, uppercaseInput } from "../../../shared/utils/text";
+import { cleanLowerText, cleanUpperText, uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 
 type LogoType = "principal" | "compacto";
@@ -252,6 +252,9 @@ export function ClienteFormPage() {
     onSuccess: () => navigate("/admin/clientes"),
     onError: (cause) => alert(cause instanceof Error ? cause.message : "No se pudo guardar el cliente."),
   });
+  const updateUpperField = (field: keyof ClienteInput, event: ChangeEvent<HTMLInputElement>) => {
+    uppercaseInputPreservingCursor(event, (value) => setForm((current) => ({ ...current, [field]: value })));
+  };
 
   return (
     <main className="request-form-page admin-page">
@@ -316,11 +319,11 @@ export function ClienteFormPage() {
           <div className="edit-form-grid">
             <label>
               NIF/CIF
-              <input value={form.nif} maxLength={20} required onChange={(event) => setForm({ ...form, nif: uppercaseInput(event.target.value) })} />
+              <input value={form.nif} maxLength={20} required onChange={(event) => updateUpperField("nif", event)} />
             </label>
             <label>
               Nombre / razon social
-              <input value={form.nombre} maxLength={120} required onChange={(event) => setForm({ ...form, nombre: uppercaseInput(event.target.value) })} />
+              <input value={form.nombre} maxLength={120} required onChange={(event) => updateUpperField("nombre", event)} />
             </label>
             <label>
               Email
@@ -328,7 +331,7 @@ export function ClienteFormPage() {
             </label>
             <label>
               Telefono
-              <input value={form.telefono || ""} maxLength={20} onChange={(event) => setForm({ ...form, telefono: uppercaseInput(event.target.value) })} />
+              <input value={form.telefono || ""} maxLength={20} onChange={(event) => updateUpperField("telefono", event)} />
             </label>
             <label>
               Canal de avisos
@@ -341,7 +344,7 @@ export function ClienteFormPage() {
             </label>
             <label className="edit-form-grid__wide">
               Direccion
-              <input value={form.direccion || ""} maxLength={200} onChange={(event) => setForm({ ...form, direccion: uppercaseInput(event.target.value) })} />
+              <input value={form.direccion || ""} maxLength={200} onChange={(event) => updateUpperField("direccion", event)} />
             </label>
           </div>
         </section>

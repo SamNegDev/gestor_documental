@@ -1,5 +1,6 @@
+import type { ChangeEvent } from "react";
 import { municipiosParaProvincia, PROVINCIAS, TIPOS_VIA } from "../utils/addressCatalog";
-import { uppercaseInput } from "../utils/text";
+import { uppercaseInput, uppercaseInputPreservingCursor } from "../utils/text";
 
 export type AddressValue = {
   direccion?: string | null;
@@ -35,6 +36,9 @@ export function AddressFields({ idPrefix, value, onChange, fieldNamePrefix, high
     : municipios;
   const update = (field: keyof AddressValue, rawValue: string) => {
     onChange({ ...value, [field]: uppercaseInput(rawValue) });
+  };
+  const updateInput = (field: keyof AddressValue, event: ChangeEvent<HTMLInputElement>) => {
+    uppercaseInputPreservingCursor(event, (nextValue) => onChange({ ...value, [field]: nextValue }));
   };
   const updateProvincia = (rawValue: string) => {
     const provincia = uppercaseInput(rawValue);
@@ -72,42 +76,42 @@ export function AddressFields({ idPrefix, value, onChange, fieldNamePrefix, high
       ) : null}
       <label className={fieldClassName("TipoVia", "address-field address-field--type")} data-field={fieldName("TipoVia")}>
         Tipo
-        <input list={`${idPrefix}-tipos-via`} value={value.tipoVia || ""} onChange={(event) => update("tipoVia", event.target.value)} />
+        <input list={`${idPrefix}-tipos-via`} value={value.tipoVia || ""} onChange={(event) => updateInput("tipoVia", event)} />
         <datalist id={`${idPrefix}-tipos-via`}>
           {TIPOS_VIA.map((tipo) => <option key={tipo} value={tipo} />)}
         </datalist>
       </label>
       <label className={fieldClassName("NombreVia", "address-field address-field--street")} data-field={fieldName("NombreVia")}>
         Via
-        <input value={value.nombreVia || ""} onChange={(event) => update("nombreVia", event.target.value)} />
+        <input value={value.nombreVia || ""} onChange={(event) => updateInput("nombreVia", event)} />
       </label>
       <label className={fieldClassName("NumeroVia", "address-field address-field--xs")} data-field={fieldName("NumeroVia")}>
         Num.
-        <input maxLength={20} value={value.numeroVia || ""} onChange={(event) => update("numeroVia", event.target.value)} />
+        <input maxLength={20} value={value.numeroVia || ""} onChange={(event) => updateInput("numeroVia", event)} />
       </label>
       <label className={fieldClassName("Bloque", "address-field address-field--xs")} data-field={fieldName("Bloque")}>
         Bloq.
-        <input maxLength={20} value={value.bloque || ""} onChange={(event) => update("bloque", event.target.value)} />
+        <input maxLength={20} value={value.bloque || ""} onChange={(event) => updateInput("bloque", event)} />
       </label>
       <label className={fieldClassName("Portal", "address-field address-field--xs")} data-field={fieldName("Portal")}>
         Portal
-        <input maxLength={20} value={value.portal || ""} onChange={(event) => update("portal", event.target.value)} />
+        <input maxLength={20} value={value.portal || ""} onChange={(event) => updateInput("portal", event)} />
       </label>
       <label className={fieldClassName("Escalera", "address-field address-field--xs")} data-field={fieldName("Escalera")}>
         Esc.
-        <input maxLength={20} value={value.escalera || ""} onChange={(event) => update("escalera", event.target.value)} />
+        <input maxLength={20} value={value.escalera || ""} onChange={(event) => updateInput("escalera", event)} />
       </label>
       <label className={fieldClassName("Piso", "address-field address-field--xs")} data-field={fieldName("Piso")}>
         Piso
-        <input maxLength={20} value={value.piso || ""} onChange={(event) => update("piso", event.target.value)} />
+        <input maxLength={20} value={value.piso || ""} onChange={(event) => updateInput("piso", event)} />
       </label>
       <label className={fieldClassName("Puerta", "address-field address-field--xs")} data-field={fieldName("Puerta")}>
         Pta.
-        <input maxLength={20} value={value.puerta || ""} onChange={(event) => update("puerta", event.target.value)} />
+        <input maxLength={20} value={value.puerta || ""} onChange={(event) => updateInput("puerta", event)} />
       </label>
       <label className={fieldClassName("CodigoPostal", "address-field address-field--postal")} data-field={fieldName("CodigoPostal")}>
         C.P.
-        <input inputMode="numeric" maxLength={10} value={value.codigoPostal || ""} onChange={(event) => update("codigoPostal", event.target.value)} />
+        <input inputMode="numeric" maxLength={10} value={value.codigoPostal || ""} onChange={(event) => updateInput("codigoPostal", event)} />
       </label>
       <label className={fieldClassName("Provincia", "address-field address-field--province")} data-field={fieldName("Provincia")}>
         Provincia
@@ -126,7 +130,7 @@ export function AddressFields({ idPrefix, value, onChange, fieldNamePrefix, high
         ) : (
           <input
             value={municipioActual}
-            onChange={(event) => update("municipio", event.target.value)}
+            onChange={(event) => updateInput("municipio", event)}
             placeholder={provinciaActual ? "Escribe municipio" : "Selecciona provincia"}
           />
         )}

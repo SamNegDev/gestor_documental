@@ -1,4 +1,4 @@
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Plus, Save, UserRound, X } from "lucide-react";
 import { Link, useOutletContext } from "react-router-dom";
@@ -6,7 +6,7 @@ import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { createInteresadoHabitual, getInteresadosRegistro } from "../services/registroApi";
 import { RegistroFilters } from "../components/RegistroFilters";
 import type { InteresadoRegistroUpdateInput } from "../types";
-import { uppercaseInput } from "../../../shared/utils/text";
+import { uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 import { ApiError } from "../../../shared/api/http";
 import "../../expedientes/styles/expedienteDetail.css";
@@ -38,6 +38,9 @@ export function InteresadosRegistroPage() {
   const canCreateHabitual = user?.rol === "CLIENTE";
   const showingHabituales = vista === "HABITUALES";
   const updateField = (field: keyof InteresadoRegistroUpdateInput, value: string) => setForm((current) => ({ ...current, [field]: uppercaseInput(value) }));
+  const updateFieldInput = (field: keyof InteresadoRegistroUpdateInput, event: ChangeEvent<HTMLInputElement>) => {
+    uppercaseInputPreservingCursor(event, (value) => updateField(field, value));
+  };
   const updateAddress = (value: AddressValue) => setForm((current) => ({ ...current, ...value, direccion: "" }));
 
   return (
@@ -122,9 +125,9 @@ export function InteresadosRegistroPage() {
               </button>
             </div>
             <form className="vehicle-edit-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(form); }}>
-              <label><span>DNI / CIF</span><input required value={form.dni || ""} onChange={(event) => updateField("dni", event.target.value)} /></label>
-              <label><span>Nombre</span><input required value={form.nombre || ""} onChange={(event) => updateField("nombre", event.target.value)} /></label>
-              <label><span>Telefono</span><input value={form.telefono || ""} onChange={(event) => updateField("telefono", event.target.value)} /></label>
+              <label><span>DNI / CIF</span><input required value={form.dni || ""} onChange={(event) => updateFieldInput("dni", event)} /></label>
+              <label><span>Nombre</span><input required value={form.nombre || ""} onChange={(event) => updateFieldInput("nombre", event)} /></label>
+              <label><span>Telefono</span><input value={form.telefono || ""} onChange={(event) => updateFieldInput("telefono", event)} /></label>
               <label><span>Tipo</span><select value={form.tipoPersona || "PARTICULAR"} onChange={(event) => updateField("tipoPersona", event.target.value)}><option value="PARTICULAR">PARTICULAR</option><option value="EMPRESA">EMPRESA</option></select></label>
               <AddressFields idPrefix="interesado-habitual" value={form} onChange={updateAddress} wideClassName="vehicle-edit-form__wide" />
               {mutation.isError ? <p className="form-error">{mutation.error instanceof ApiError ? mutation.error.details || "No se pudo crear el cliente habitual." : "No se pudo crear el cliente habitual."}</p> : null}
