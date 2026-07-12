@@ -3450,3 +3450,151 @@
     justify-content: flex-start;
   }
 }
+
+/* Dense expediente surfaces must degrade by stacking, never by squeezing text
+   into unusable columns. */
+.exp-page,
+.exp-panel,
+.exp-header,
+.exp-detail-layout,
+.exp-process-layout,
+.exp-detail-layout__main,
+.exp-detail-layout__side,
+.exp-process-main,
+.exp-process-side,
+.exp-quick-actions,
+.documents-list,
+.document-row,
+.requirement-row,
+.incident-alert-item,
+.operation-tabs,
+.template-dialog,
+.template-dialog__body,
+.template-dialog__form,
+.interesados-correction-row {
+  min-width: 0;
+}
+
+.exp-header,
+.exp-header__main,
+.exp-header__actions,
+.exp-panel__heading,
+.exp-panel__heading-actions,
+.next-action-panel,
+.next-action-panel__actions,
+.incident-alert-panel__heading,
+.incident-alert-item__actions,
+.operation-tabs,
+.document-row__actions,
+.template-dialog__context {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.exp-header__title,
+.exp-header__meta,
+.exp-panel__heading > div,
+.next-action-panel__body,
+.incident-alert-item__body,
+.document-row__body,
+.template-field,
+.interesado-card,
+.interesado-card dl,
+.interesados-correction-row > label {
+  min-width: 0;
+}
+
+.exp-header__title h1,
+.exp-header__meta span,
+.next-action-panel__body p,
+.incident-alert-item__body p,
+.document-row__body strong,
+.document-row__body span,
+.document-row__body small,
+.template-field input,
+.template-field select,
+.template-field textarea {
+  max-width: 100%;
+}
+
+.document-state,
+.closure-docs-status,
+.operation-tab,
+.template-option {
+  max-width: 100%;
+  white-space: normal;
+}
+
+@media (max-width: 1320px) {
+  .exp-detail-layout,
+  .exp-process-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .exp-detail-layout__side,
+  .exp-process-side {
+    order: -1;
+    position: static;
+  }
+
+  .document-row {
+    grid-template-columns: auto minmax(0, 1fr) minmax(86px, auto);
+  }
+
+  .document-row__actions {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
+  }
+
+  .template-dialog__body {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+
+  .template-dialog__summary {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .document-row,
+  .checklist-row,
+  .requirement-row,
+  .incident-alert-item,
+  .next-action-panel,
+  .complete-upload-panel,
+  .ocr-review-card {
+    grid-template-columns: 1fr;
+  }
+
+  .document-state,
+  .document-row__actions {
+    grid-column: auto;
+  }
+
+  .document-row__actions,
+  .next-action-panel__actions,
+  .incident-alert-item__actions {
+    justify-content: flex-start;
+  }
+
+  .template-dialog {
+    width: 100%;
+    max-height: 94vh;
+  }
+
+  .template-dialog__body {
+    display: block;
+    overflow: auto;
+  }
+
+  .template-dialog__templates {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .template-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

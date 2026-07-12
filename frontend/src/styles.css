@@ -7794,3 +7794,235 @@ input.records-table-filter {
     width: 100%;
   }
 }
+
+/* Structural responsive guardrails for dense operational screens.
+   These rules protect against labels/cards collapsing when users change zoom,
+   window width, or desktop resolution. */
+.app-shell,
+.workspace,
+.content,
+.panel,
+.request-page,
+.request-sheet,
+.dashboard-page,
+.request-form-page,
+.registry-page,
+.registry-detail-page,
+.task-list,
+.followup-list,
+.whatsapp-list,
+.documents-list,
+.solicitud-reading,
+.records-panel,
+.records-table-scroll {
+  min-width: 0;
+}
+
+.topbar,
+.ia-review-header,
+.dashboard-hero,
+.records-header,
+.records-header__actions,
+.records-panel__heading,
+.panel-heading,
+.bulk-actions-bar,
+.bulk-actions-bar__actions,
+.request-hero,
+.request-admin-toolbar,
+.whatsapp-attachments__header,
+.productivity-heading,
+.productivity-filter,
+.list-period-toolbar,
+.registry-filters,
+.registry-profile__actions {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.topbar__title,
+.topbar__user,
+.dashboard-hero > div,
+.records-header > div,
+.records-panel__heading > div,
+.panel-heading > div,
+.request-hero__identity,
+.request-admin-toolbar > span,
+.request-person-card header > div,
+.task-row__headline,
+.followup-row__detail,
+.whatsapp-row__message,
+.registry-profile > div,
+.registry-profile__facts,
+.registry-profile__people {
+  min-width: 0;
+}
+
+.soft-button,
+.primary-button,
+.secondary-button,
+.danger-button,
+.status-badge,
+.records-document-status,
+.task-priority,
+.ga-status-pill {
+  max-width: 100%;
+}
+
+.soft-button,
+.primary-button,
+.secondary-button,
+.danger-button {
+  white-space: normal;
+}
+
+.status-badge,
+.records-document-status,
+.task-priority,
+.ga-status-pill {
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.request-person-card header > div:first-child strong,
+.request-person-card header > div:first-child span,
+.dashboard-row strong,
+.dashboard-row span,
+.task-row strong,
+.task-row span,
+.task-row small,
+.followup-row strong,
+.followup-row span,
+.followup-row small,
+.whatsapp-row strong,
+.whatsapp-row span,
+.whatsapp-row small,
+.whatsapp-attachment-row strong,
+.whatsapp-attachment-row span,
+.whatsapp-attachment-row small,
+.registry-row strong,
+.registry-row small,
+.registry-profile h2,
+.registry-profile__facts span,
+.registry-profile__people span {
+  min-width: 0;
+}
+
+.request-person-facts,
+.request-summary-facts,
+.dashboard-metrics,
+.dashboard-grid,
+.request-grid,
+.request-grid--wide,
+.followup-config__grid,
+.ia-metrics,
+.ia-fields,
+.ia-review-grid {
+  min-width: 0;
+}
+
+@media (max-width: 1320px) {
+  .topbar {
+    gap: 14px;
+    padding-inline: 24px;
+  }
+
+  .topbar__title {
+    flex-basis: 220px;
+  }
+
+  .global-search {
+    flex: 1 1 320px;
+    min-width: min(100%, 240px);
+  }
+
+  .ia-metrics,
+  .dashboard-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ia-review-grid,
+  .dashboard-grid,
+  .request-grid,
+  .request-grid--wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .task-row--client,
+  .task-row--client.task-row--with-context,
+  .task-row--admin,
+  .task-row--admin.task-row--with-context {
+    grid-template-columns: 38px minmax(0, 1fr) minmax(112px, auto) auto;
+    grid-template-areas: "icon main priority actions";
+  }
+
+  .task-row__context,
+  .task-row__client,
+  .task-row__age {
+    display: none;
+  }
+
+  .followup-row {
+    grid-template-columns: 38px minmax(0, 1fr) minmax(150px, auto) auto;
+  }
+
+  .followup-row__detail,
+  .followup-row > div:nth-of-type(4) {
+    display: none;
+  }
+
+  .whatsapp-row {
+    grid-template-columns: 38px minmax(0, 1fr) minmax(180px, 1fr) auto;
+  }
+
+  .whatsapp-row__links {
+    display: none;
+  }
+
+  .whatsapp-attachment-row {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+  }
+
+  .whatsapp-attachment-row > div:nth-of-type(2) {
+    display: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .records-table-scroll {
+    overflow-x: auto;
+  }
+
+  .records-table {
+    min-width: 760px;
+  }
+}
+
+@media (max-width: 860px) {
+  .ia-metrics,
+  .dashboard-metrics,
+  .followup-config__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .task-row,
+  .task-row--admin,
+  .task-row--client,
+  .task-row--admin.task-row--with-context,
+  .task-row--client.task-row--with-context,
+  .followup-row,
+  .whatsapp-row,
+  .whatsapp-attachment-row {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+  }
+
+  .task-row__actions,
+  .followup-row__actions,
+  .whatsapp-row__actions {
+    align-self: start;
+  }
+
+  .followup-row > div:nth-of-type(3),
+  .whatsapp-row__message {
+    display: none;
+  }
+}
