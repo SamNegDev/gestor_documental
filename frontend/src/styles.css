@@ -2784,6 +2784,7 @@ select {
 
 .solicitud-reading__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -2807,6 +2808,7 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 6px;
   flex: 0 0 auto;
 }
@@ -2831,7 +2833,7 @@ select {
 
 .solicitud-reading-identity {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(0, 560px);
   align-items: start;
   gap: 8px 12px;
   border-top: 1px solid color-mix(in oklch, var(--line) 52%, transparent);
@@ -2876,12 +2878,12 @@ select {
   font-size: 0.78rem;
   font-weight: 850;
   line-height: 1.18;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .solicitud-reading-identity__summary code {
   flex: 0 0 auto;
-  max-width: 34%;
+  max-width: min(42%, 150px);
   padding: 2px 6px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -2891,7 +2893,8 @@ select {
   font-size: 0.72rem;
   font-weight: 850;
   line-height: 1.15;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  white-space: nowrap;
 }
 
 .solicitud-reading-identity__meta {
@@ -2925,10 +2928,11 @@ select {
 
 .solicitud-reading-identity__actions {
   display: grid;
-  grid-template-columns: minmax(180px, 260px) minmax(118px, 142px) minmax(104px, 128px) auto;
+  grid-template-columns: minmax(170px, 1.4fr) minmax(116px, 0.75fr) minmax(108px, 0.75fr) auto;
   align-items: center;
   justify-content: start;
   gap: 5px;
+  min-width: 0;
   padding-top: 0;
 }
 
@@ -2951,19 +2955,31 @@ select {
 }
 
 .solicitud-reading-identity__actions .soft-button {
+  width: max-content;
   min-height: 28px;
   padding-block: 4px;
   white-space: nowrap;
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 1280px) {
   .solicitud-reading-identity {
     grid-template-columns: 1fr;
   }
 
   .solicitud-reading-identity__actions {
+    grid-template-columns: minmax(180px, 1.4fr) minmax(118px, 0.75fr) minmax(118px, 0.75fr) auto;
     padding-top: 5px;
     border-top: 1px solid color-mix(in oklch, var(--line) 44%, transparent);
+  }
+}
+
+@media (max-width: 960px) {
+  .solicitud-reading-identity__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .solicitud-reading-identity__actions .soft-button {
+    width: 100%;
   }
 }
 
@@ -5339,7 +5355,7 @@ input.records-table-filter {
 
 .request-summary-strip {
   display: grid;
-  grid-template-columns: minmax(280px, 0.86fr) minmax(0, 1.34fr);
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
   border-top: 1px solid var(--line);
 }
 
@@ -5503,12 +5519,13 @@ input.records-table-filter {
 
 .request-people-compact {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 8px;
 }
 
 .request-person-card {
   display: grid;
+  overflow: hidden;
   min-width: 0;
   gap: 8px;
   padding: 9px 10px;
@@ -5519,9 +5536,10 @@ input.records-table-filter {
 
 .request-person-card header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .request-person-card header > div:first-child {
@@ -5560,15 +5578,17 @@ input.records-table-filter {
   justify-content: flex-end;
   gap: 5px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .request-person-card__badges .status-badge {
   justify-self: auto;
+  max-width: 100%;
 }
 
 .request-person-facts {
   display: grid;
-  grid-template-columns: minmax(72px, 0.46fr) minmax(82px, 0.42fr) minmax(150px, 1fr);
+  grid-template-columns: minmax(74px, 0.45fr) minmax(88px, 0.45fr) minmax(150px, 1fr);
   gap: 7px 10px;
   margin: 0;
 }
@@ -5609,6 +5629,7 @@ input.records-table-filter {
 
 .request-person-note {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 7px;
   min-width: 0;
@@ -5619,6 +5640,32 @@ input.records-table-filter {
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 720;
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 1280px) {
+  .request-summary-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .request-summary-block--vehicle {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 760px) {
+  .request-person-card header {
+    grid-template-columns: 1fr;
+  }
+
+  .request-person-card__badges {
+    justify-content: flex-start;
+  }
+
+  .request-person-facts {
+    grid-template-columns: 1fr;
+  }
 }
 
 .request-person-note svg {
