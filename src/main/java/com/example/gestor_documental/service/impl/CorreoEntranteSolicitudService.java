@@ -18,6 +18,7 @@ import com.example.gestor_documental.repository.UsuarioRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.OcrPdfService;
+import com.example.gestor_documental.service.PdfSplitService;
 import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
 import com.example.gestor_documental.util.TextNormalizer;
 import jakarta.mail.Address;
@@ -71,6 +72,7 @@ public class CorreoEntranteSolicitudService {
     private final SolicitudRepository solicitudRepository;
     private final DocumentoService documentoService;
     private final OcrPdfService ocrPdfService;
+    private final PdfSplitService pdfSplitService;
     private final HistorialCambioService historialCambioService;
     private final SolicitudDocumentacionIaService solicitudDocumentacionIaService;
     private final RestClient restClient = RestClient.create();
@@ -225,7 +227,7 @@ public class CorreoEntranteSolicitudService {
             return;
         }
 
-        crearSolicitudDesdeAdjunto(messageId, asunto, remitente, adjuntos.get(0));
+        crearSolicitudDesdeAdjuntos(messageId, asunto, remitente, adjuntos);
         mensaje.setFlag(Flags.Flag.SEEN, true);
     }
 
@@ -249,7 +251,7 @@ public class CorreoEntranteSolicitudService {
                 marcarLeidoGraph(token, graphId);
                 return;
             }
-            crearSolicitudDesdeAdjunto(messageId, asunto, remitente, adjuntos.get(0));
+            crearSolicitudDesdeAdjuntos(messageId, asunto, remitente, adjuntos);
             marcarLeidoGraph(token, graphId);
         } catch (Exception exception) {
             registrarProcesado(messageId, asunto, remitente, null, null, "ERROR", exception.getMessage());
@@ -258,10 +260,11 @@ public class CorreoEntranteSolicitudService {
         }
     }
 
-    private void crearSolicitudDesdeAdjunto(String messageId, String asunto, String remitente, AdjuntoPdf adjunto) {
+    private void crearSolicitudDesdeAdjuntos(String messageId, String asunto, String remitente, List<AdjuntoPdf> adjuntos) {
         Cliente cliente = resolverCliente(remitente)
                 .orElseThrow(() -> new IllegalStateException("No se encontro cliente para el remitente ni cliente por defecto configurado."));
         Usuario admin = resolverAdmin();
+        AdjuntoPdf adjunto = prepararExpedienteCompleto(adjuntos);
 
         MultipartFile archivo = new BytesMultipartFile(adjunto.nombre(), adjunto.contenido(), "application/pdf");
         String textoDeteccion = asunto + " " + adjunto.nombre() + " " + ocrPdfService.extraerTextoCompleto(archivo);
@@ -288,7 +291,34 @@ public class CorreoEntranteSolicitudService {
         );
         documentoService.guardarParaSolicitud(guardada.getId(), archivo, TipoDocumento.EXPEDIENTE_COMPLETO, admin);
         intentarLecturaIaSolicitud(guardada, admin);
-        registrarProcesado(messageId, asunto, remitente, matricula, guardada.getId(), "PROCESADO", "Solicitud creada desde PDF adjunto.");
+        registrarProcesado(messageId, asunto, remitente, matricula, guardada.getId(), "PROCESADO",
+                adjuntos.size() > 1
+                        ? "Solicitud creada desde " + adjuntos.size() + " PDFs adjuntos unificados."
+                        : "Solicitud creada desde PDF adjunto.");
+    }
+
+    private AdjuntoPdf prepararExpedienteCompleto(List<AdjuntoPdf> adjuntos) {
+        if (adjuntos == null || adjuntos.isEmpty()) {
+            throw new IllegalStateException("No contiene adjuntos PDF.");
+        }
+        if (adjuntos.size() == 1) {
+            return adjuntos.get(0);
+        }
+        List<byte[]> documentos = new ArrayList<>();
+        for (AdjuntoPdf adjunto : adjuntos) {
+            documentos.add(adjunto.contenido());
+        }
+        return new AdjuntoPdf(nombreExpedienteCompleto(adjuntos), pdfSplitService.unirDocumentos(documentos));
+    }
+
+    private String nombreExpedienteCompleto(List<AdjuntoPdf> adjuntos) {
+        String base = adjuntos.stream()
+                .map(AdjuntoPdf::nombre)
+                .filter(nombre -> !isBlank(nombre))
+                .findFirst()
+                .orElse("expediente_completo.pdf");
+        String nombre = base.replaceAll("(?i)\\.pdf$", "");
+        return nombre + "_unificado.pdf";
     }
 
     private void intentarLecturaIaSolicitud(Solicitud solicitud, Usuario admin) {
