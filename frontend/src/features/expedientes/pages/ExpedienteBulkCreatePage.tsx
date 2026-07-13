@@ -15,6 +15,7 @@ type BulkRow = {
   id: string;
   tipoTramiteId: number;
   matricula: string;
+  observaciones: string;
   archivo: File | null;
   expedienteId?: number;
   job?: ProcesamientoExpedienteCompleto | null;
@@ -27,6 +28,7 @@ function newRow(catalogs: ExpedienteEditCatalogs | null): BulkRow {
     id: crypto.randomUUID(),
     tipoTramiteId: catalogs?.tiposTramite[0]?.id || 0,
     matricula: "",
+    observaciones: "",
     archivo: null,
     status: "PENDIENTE",
   };
@@ -120,6 +122,7 @@ export function ExpedienteBulkCreatePage() {
           clienteId,
           tipoTramiteId: row.tipoTramiteId,
           matricula: uppercaseInput(row.matricula),
+          observaciones: uppercaseInput(row.observaciones),
           archivo: row.archivo as File,
         });
         updateRow(row.id, {
@@ -205,6 +208,7 @@ export function ExpedienteBulkCreatePage() {
           <div className="bulk-create-row bulk-create-row--head" role="row">
             <span>Tipo de tramite</span>
             <span>Matricula</span>
+            <span>Observaciones</span>
             <span>PDF completo</span>
             <span>Estado</span>
             <span />
@@ -224,6 +228,10 @@ export function ExpedienteBulkCreatePage() {
               <label>
                 <span>Matricula</span>
                 <input disabled={saving} value={row.matricula} onChange={(event) => uppercaseInputPreservingCursor(event, (value) => updateRow(row.id, { matricula: value }))} />
+              </label>
+              <label>
+                <span>Observaciones</span>
+                <input disabled={saving} value={row.observaciones} onChange={(event) => uppercaseInputPreservingCursor(event, (value) => updateRow(row.id, { observaciones: value }))} />
               </label>
               <label className="bulk-file-input">
                 <Upload size={15} />

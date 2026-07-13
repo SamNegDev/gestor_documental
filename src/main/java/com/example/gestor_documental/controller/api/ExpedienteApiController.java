@@ -280,6 +280,7 @@ public class ExpedienteApiController {
             @RequestParam Long clienteId,
             @RequestParam Long tipoTramiteId,
             @RequestParam String matricula,
+            @RequestParam(required = false) String observaciones,
             @RequestParam("archivo") MultipartFile archivo,
             Authentication authentication
     ) {
@@ -290,7 +291,9 @@ public class ExpedienteApiController {
 
         Expediente expediente = new Expediente();
         expediente.setMatricula(TextNormalizer.upperOrNull(matricula));
-        expediente.setObservaciones("CREACION MULTIPLE");
+        expediente.setObservaciones(TextNormalizer.upperOrNull(observaciones) != null
+                ? TextNormalizer.upperOrNull(observaciones)
+                : "CREACION MULTIPLE");
 
         Expediente creado = expedienteService.crearExpedienteCompleto(
                 expediente,
@@ -338,6 +341,30 @@ public class ExpedienteApiController {
     ) {
         Usuario admin = requireAdmin(authentication);
         expedienteService.corregirInteresados(id, admin, mapInteresados(request));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/vinculo-tramite")
+    public ResponseEntity<Void> vincularTramite(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            Authentication authentication
+    ) {
+        Usuario admin = requireAdmin(authentication);
+        Long origenId = parseLong(body != null ? body.get("origenId") : null);
+        if (origenId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Indica el expediente origen");
+        }
+        expedienteService.vincularTramiteDependiente(id, origenId, body != null ? body.get("motivo") : null, admin);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/vinculo-tramite/desvincular")
+    public ResponseEntity<Void> desvincularTramite(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        expedienteService.desvincularTramiteDependiente(id, requireAdmin(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -725,6 +752,14 @@ public class ExpedienteApiController {
             return estados.stream().distinct().toList();
         }
         return estado != null ? List.of(estado) : List.of();
+    }
+
+    private Long parseLong(String valor) {
+        try {
+            return valor != null && !valor.isBlank() ? Long.parseLong(valor.trim()) : null;
+        } catch (NumberFormatException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Identificador de expediente no valido");
+        }
     }
 
     private boolean contiene(String valor, String query) {

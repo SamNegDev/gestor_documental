@@ -421,7 +421,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             bloqueos.add("Falta DNI/NIE/CIF para validar la identidad.");
         }
         if (!informeDgt && !(permisoCirculacion && fichaTecnica)) {
-            bloqueos.add("Falta permiso de circulacion y ficha tecnica, o Informe DGT.");
+            bloqueos.add("Falta permiso de circulacion, ficha tecnica o Informe DGT.");
         }
         return new DocumentacionSolicitudCliente(documentosIdentidad, documentosVehiculo, documentosRoles, bloqueos);
     }

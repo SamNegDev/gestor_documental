@@ -124,6 +124,7 @@ public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
 
     List<Expediente> findByFechaUltimaModificacionIsNullOrModificadoPorIsNull();
     List<Expediente> findByEstadoExpediente(EstadoExpediente estadoExpediente);
+    List<Expediente> findByExpedienteVinculadoOrigenIdAndEstadoExpediente(Long expedienteId, EstadoExpediente estadoExpediente);
 
     int countByCliente(Cliente cliente);
 

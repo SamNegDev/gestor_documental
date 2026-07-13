@@ -245,6 +245,33 @@ class SolicitudPreparacionTraspasoServiceImplTest {
     }
 
     @Test
+    void aceptaFichaTecnicaSinPermisoParaLecturaDeVehiculo() {
+        Solicitud solicitud = solicitudBase(17L);
+        solicitud.setInteresado1Rol(RolInteresado.VENDEDOR);
+        solicitud.setInteresado1Nombre("Maria Luisa Menendez Morejudo");
+        solicitud.setInteresado1Dni("50975033H");
+        solicitud.setInteresado2Rol(RolInteresado.COMPRADOR);
+        solicitud.setInteresado2Nombre("Antonio Maldonado Carmona");
+        solicitud.setInteresado2Dni("42793999S");
+
+        Documento dniVendedor = documento(80L, TipoDocumento.DNI);
+        Documento dniComprador = documento(81L, TipoDocumento.DNI);
+        Documento ficha = documento(82L, TipoDocumento.FICHA_TECNICA);
+
+        when(solicitudRepository.findById(17L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(17L)).thenReturn(List.of(dniVendedor, dniComprador, ficha));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(80L, 81L, 82L))).thenReturn(List.of(
+                lecturaIdentidad(dniVendedor, "50975033H"),
+                lecturaIdentidad(dniComprador, "42793999S")
+        ));
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(80L, 81L, 82L))).thenReturn(List.of());
+
+        SolicitudPreparacionTraspasoResponse response = service.obtenerPreparacion(17L, usuario);
+
+        assertThat(itemEstado(response, "VEHICULO", "documentacion_vehiculo")).isEqualTo("OK");
+    }
+
+    @Test
     void usaPrecioManualDeSolicitudParaPrepararContrato() {
         Solicitud solicitud = solicitudBase(15L);
         solicitud.setVehiculoMarca("Seat");

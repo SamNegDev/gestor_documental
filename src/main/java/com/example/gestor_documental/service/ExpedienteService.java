@@ -80,6 +80,12 @@ public interface ExpedienteService {
 
     void reanudarTrasDocumentacion(Long id, Usuario usuarioLogueado);
 
+    void vincularTramiteDependiente(Long expedienteId, Long expedienteOrigenId, String motivo, Usuario usuarioLogueado);
+
+    void desvincularTramiteDependiente(Long expedienteId, Usuario usuarioLogueado);
+
+    void reanudarDependientesSiListo(Long expedienteOrigenId, Usuario usuarioLogueado);
+
     Expediente actualizarExpediente(Long id, Expediente expedienteActualizado, Usuario usuarioLogueado, Long clienteId, Long tipoTramiteId, InteresadoFormDto interesado1, InteresadoFormDto interesado2);
 
     Expediente actualizarExpediente(Long id, Expediente expedienteActualizado, Usuario usuarioLogueado, Long clienteId, Long tipoTramiteId, List<InteresadoFormDto> interesados);

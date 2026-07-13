@@ -6,6 +6,7 @@ export type ExpedienteStatus =
   | "ENVIADO_DGT"
   | "REVISANDO_INCIDENCIAS"
   | "PENDIENTE_DOCUMENTACION"
+  | "PENDIENTE_TRAMITE_VINCULADO"
   | "SOLICITADA_INFORMACION_ADICIONAL"
   | "INFORMACION_ADICIONAL_RECIBIDA";
 
@@ -472,6 +473,13 @@ export interface ExpedienteDetail {
   fechaUltimaModificacion?: string | null;
   observaciones?: string | null;
   solicitudId?: number | null;
+  tramiteVinculado?: {
+    origenId: number;
+    origenReferencia: string;
+    origenEstado?: string | null;
+    motivoEspera?: string | null;
+    esperandoFinalizacion: boolean;
+  } | null;
   siguientePaso?: HitoExpediente | null;
   mensajesNoLeidos?: number;
   cliente?: ClienteResumen | null;

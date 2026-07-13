@@ -76,7 +76,7 @@
 
 .bulk-create-row {
   display: grid;
-  grid-template-columns: minmax(190px, 1.2fr) minmax(120px, 0.7fr) minmax(210px, 1.2fr) minmax(220px, 1fr) 40px;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(110px, 0.6fr) minmax(170px, 1fr) minmax(190px, 1.1fr) minmax(210px, 1fr) 40px;
   align-items: center;
   gap: 10px;
   padding: 10px;
@@ -342,6 +342,41 @@
   margin-top: 3px;
   color: var(--muted);
   font-weight: 700;
+}
+
+.exp-linked-panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding-top: 12px;
+  border-top: 1px solid oklch(86% 0.04 232);
+}
+
+.exp-linked-panel small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.exp-linked-panel__form {
+  display: grid;
+  grid-template-columns: minmax(86px, 0.6fr) minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.exp-linked-panel__form input {
+  min-height: 38px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+  font-weight: 800;
+  padding: 0 10px;
 }
 
 .closure-docs-panel {
@@ -3523,6 +3558,11 @@
 
   .exp-quick-actions__buttons > button {
     width: 100%;
+  }
+
+  .exp-linked-panel,
+  .exp-linked-panel__form {
+    grid-template-columns: 1fr;
   }
 
   .client-incident-response {

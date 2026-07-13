@@ -56,6 +56,13 @@ public class Expediente {
     @Column (length = 200)
     private String observaciones;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "expediente_vinculado_origen_id")
+    private Expediente expedienteVinculadoOrigen;
+
+    @Column(length = 500)
+    private String motivoEsperaVinculo;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "tipo_tramite_id")
     private TipoTramite tipoTramite;

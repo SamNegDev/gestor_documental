@@ -305,7 +305,7 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
         boolean permiso = documentoAportado(context, Set.of(TipoDocumento.PERMISO_CIRCULACION));
         boolean ficha = documentoAportado(context, Set.of(TipoDocumento.FICHA_TECNICA));
         boolean informeDgt = documentoAportado(context, Set.of(TipoDocumento.INFORME_DGT));
-        boolean suficiente = informeDgt || (permiso && ficha);
+        boolean suficiente = permiso || ficha || informeDgt;
         return item(
                 "documentacion_vehiculo",
                 "Permiso/ficha o Informe DGT",
@@ -324,12 +324,12 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
             return "Permiso de circulacion y ficha tecnica aportados.";
         }
         if (permiso) {
-            return "Permiso aportado; falta ficha tecnica o Informe DGT.";
+            return "Permiso de circulacion aportado.";
         }
         if (ficha) {
-            return "Ficha tecnica aportada; falta permiso de circulacion o Informe DGT.";
+            return "Ficha tecnica aportada.";
         }
-        return "Falta permiso de circulacion y ficha tecnica, o Informe DGT.";
+        return "Falta permiso de circulacion, ficha tecnica o Informe DGT.";
     }
 
     private BloqueCalculo bloqueOperacion(PreparacionContext context) {

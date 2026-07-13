@@ -3,6 +3,7 @@ package com.example.gestor_documental.service.impl;
 import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.ExpedienteDetailResponse;
+import com.example.gestor_documental.dto.expediente.ExpedienteVinculadoResponse;
 import com.example.gestor_documental.dto.expediente.HistorialExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.HitoAccionResponse;
 import com.example.gestor_documental.dto.expediente.HitoExpedienteResponse;
@@ -139,6 +140,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .fechaUltimaModificacion(formatearFecha(expediente.getFechaUltimaModificacion()))
                 .observaciones(expediente.getObservaciones())
                 .solicitudId(expediente.getSolicitud() != null ? expediente.getSolicitud().getId() : null)
+                .tramiteVinculado(mapTramiteVinculado(expediente))
                 .siguientePaso(calcularSiguientePaso(estadoDetalle, hitos))
                 .mensajesNoLeidos((int) mensajeService.contarNoLeidosExpediente(expedienteId, usuarioLogueado))
                 .cliente(mapCliente(expediente.getCliente()))
@@ -189,7 +191,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         boolean finalizado = estadoOperativo == EstadoExpediente.FINALIZADO;
         boolean conIncidencia = estadoOperativo == EstadoExpediente.INCIDENCIA
                 || estadoOperativo == EstadoExpediente.REVISANDO_INCIDENCIAS;
-        boolean documentacionSolicitada = estadoOperativo == EstadoExpediente.PENDIENTE_DOCUMENTACION;
+        boolean documentacionSolicitada = estadoOperativo == EstadoExpediente.PENDIENTE_DOCUMENTACION
+                || estadoOperativo == EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO;
         boolean informacionSolicitada = estadoOperativo == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL;
         boolean informacionRecibida = estadoOperativo == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA;
         boolean requisitosInicialesPendientes = !documentacionBaseCompleta;
@@ -211,6 +214,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         if (estado == EstadoExpediente.FINALIZADO
                 || estado == EstadoExpediente.RECHAZADO
                 || estado == EstadoExpediente.PENDIENTE_DOCUMENTACION
+                || estado == EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO
                 || estado == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
                 || estado == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA
                 || estado == EstadoExpediente.INCIDENCIA
@@ -239,6 +243,9 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         }
         if (estadoOperativo == EstadoExpediente.PENDIENTE_DOCUMENTACION) {
             return "Pendiente de documentacion";
+        }
+        if (estadoOperativo == EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO) {
+            return "Pendiente de tramite vinculado";
         }
         if (estadoOperativo == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL) {
             return "Solicitada informacion adicional";
@@ -1118,6 +1125,20 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .telefono(cliente.getTelefono())
                 .logoPrincipalUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.PRINCIPAL))
                 .logoCompactoUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.COMPACTO))
+                .build();
+    }
+
+    private ExpedienteVinculadoResponse mapTramiteVinculado(Expediente expediente) {
+        Expediente origen = expediente.getExpedienteVinculadoOrigen();
+        if (origen == null) {
+            return null;
+        }
+        return ExpedienteVinculadoResponse.builder()
+                .origenId(origen.getId())
+                .origenReferencia("EXP-" + origen.getId())
+                .origenEstado(origen.getEstadoExpediente() != null ? origen.getEstadoExpediente().name() : null)
+                .motivoEspera(expediente.getMotivoEsperaVinculo())
+                .esperandoFinalizacion(expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO)
                 .build();
     }
 

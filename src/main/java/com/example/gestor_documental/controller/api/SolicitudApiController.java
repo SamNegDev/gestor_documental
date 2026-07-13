@@ -358,6 +358,7 @@ public class SolicitudApiController {
     public CreacionConProcesamientoResponse crearSolicitudConProcesamiento(
             @RequestParam Long tipoTramiteId,
             @RequestParam String matricula,
+            @RequestParam(required = false) String observaciones,
             @RequestParam("archivo") MultipartFile archivo,
             Authentication authentication
     ) {
@@ -371,7 +372,9 @@ public class SolicitudApiController {
 
         Solicitud solicitud = new Solicitud();
         solicitud.setMatricula(TextNormalizer.upperOrNull(matricula));
-        solicitud.setObservaciones("CREACION MULTIPLE");
+        solicitud.setObservaciones(TextNormalizer.upperOrNull(observaciones) != null
+                ? TextNormalizer.upperOrNull(observaciones)
+                : "CREACION MULTIPLE");
 
         Solicitud creada = solicitudService.crearSolicitudCompleta(
                 solicitud,

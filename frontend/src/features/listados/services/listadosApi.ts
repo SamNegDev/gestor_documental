@@ -59,10 +59,11 @@ export function createSolicitud(input: SolicitudUpsertInput) {
   return apiPostJson<{ id: number }>("/api/solicitudes", input);
 }
 
-export function createSolicitudWithCompleteProcessing(input: { tipoTramiteId: number; matricula: string; archivo: File }) {
+export function createSolicitudWithCompleteProcessing(input: { tipoTramiteId: number; matricula: string; observaciones?: string; archivo: File }) {
   const formData = new FormData();
   formData.append("tipoTramiteId", String(input.tipoTramiteId));
   formData.append("matricula", input.matricula);
+  if (input.observaciones?.trim()) formData.append("observaciones", input.observaciones.trim());
   formData.append("archivo", input.archivo);
   return apiPostForm<CreacionConProcesamiento>("/api/solicitudes/creacion-multiple", formData);
 }

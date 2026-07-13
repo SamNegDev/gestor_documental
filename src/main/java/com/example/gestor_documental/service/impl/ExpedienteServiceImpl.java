@@ -3,6 +3,7 @@ package com.example.gestor_documental.service.impl;
 import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
@@ -12,6 +13,7 @@ import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
+import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
@@ -42,6 +44,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     private final TipoTramiteService tipoTramiteService;
     private final IncidenciaRepository incidenciaRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoDocumentalRepository;
+    private final DocumentoRepository documentoRepository;
     private final HistorialCambioService historialCambioService;
     private final VehiculoService vehiculoService;
 
@@ -270,6 +273,92 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 usuarioLogueado,
                 "CAMBIO ESTADO",
                 "El estado cambió de '" + estadoAnterior.name() + "' a '" + nuevoEstado.name() + "'");
+        if (nuevoEstado == EstadoExpediente.FINALIZADO) {
+            reanudarTramitesDependientes(expediente, usuarioLogueado);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void vincularTramiteDependiente(Long expedienteId, Long expedienteOrigenId, String motivo, Usuario usuarioLogueado) {
+        Expediente expediente = expedienteRepository.findById(expedienteId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
+        Expediente origen = expedienteRepository.findById(expedienteOrigenId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente origen no encontrado"));
+        if (usuarioLogueado == null || usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo el administrador puede vincular tramites.");
+        }
+        if (!tienePermisoExpediente(expediente, usuarioLogueado) || !tienePermisoExpediente(origen, usuarioLogueado)) {
+            throw new AccesoDenegadoException("No tienes permiso para vincular estos expedientes");
+        }
+        if (expediente.getId().equals(origen.getId())) {
+            throw new OperacionInvalidaException("Un expediente no puede vincularse consigo mismo.");
+        }
+        if (origen.getExpedienteVinculadoOrigen() != null
+                && expediente.getId().equals(origen.getExpedienteVinculadoOrigen().getId())) {
+            throw new OperacionInvalidaException("No se puede crear un vinculo circular entre tramites.");
+        }
+        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
+                || expediente.getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
+            throw new OperacionInvalidaException("No se puede pausar un expediente cerrado.");
+        }
+
+        expediente.setExpedienteVinculadoOrigen(origen);
+        expediente.setMotivoEsperaVinculo(TextNormalizer.upperOrNull(motivo));
+        if (expediente.getEstadoExpediente() != EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO) {
+            expediente.setEstadoPrevioPausa(expediente.getEstadoExpediente());
+        }
+        expediente.setEstadoExpediente(EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO);
+        expediente.setFechaUltimaModificacion(LocalDateTime.now());
+        expediente.setModificadoPor(usuarioLogueado);
+        expedienteRepository.save(expediente);
+        historialCambioService.registrarCambioExpediente(
+                expediente,
+                usuarioLogueado,
+                "TRAMITE VINCULADO",
+                "El expediente queda a la espera de finalizar EXP-" + origen.getId() + ".");
+
+        if (origen.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
+            reanudarTramiteDependiente(expediente, origen, usuarioLogueado);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void desvincularTramiteDependiente(Long expedienteId, Usuario usuarioLogueado) {
+        Expediente expediente = expedienteRepository.findById(expedienteId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
+        if (usuarioLogueado == null || usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new AccesoDenegadoException("Solo el administrador puede desvincular tramites.");
+        }
+        if (!tienePermisoExpediente(expediente, usuarioLogueado)) {
+            throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
+        }
+        Expediente origen = expediente.getExpedienteVinculadoOrigen();
+        expediente.setExpedienteVinculadoOrigen(null);
+        expediente.setMotivoEsperaVinculo(null);
+        if (expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO) {
+            expediente.setEstadoExpediente(estadoReanudacion(expediente));
+        }
+        expediente.setEstadoPrevioPausa(null);
+        expediente.setFechaUltimaModificacion(LocalDateTime.now());
+        expediente.setModificadoPor(usuarioLogueado);
+        expedienteRepository.save(expediente);
+        historialCambioService.registrarCambioExpediente(
+                expediente,
+                usuarioLogueado,
+                "TRAMITE DESVINCULADO",
+                origen != null ? "Se elimino el vinculo con EXP-" + origen.getId() + "." : "Se elimino el vinculo de espera.");
+    }
+
+    @Override
+    @Transactional
+    public void reanudarDependientesSiListo(Long expedienteOrigenId, Usuario usuarioLogueado) {
+        Expediente origen = expedienteRepository.findById(expedienteOrigenId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Expediente origen no encontrado"));
+        if (origen.getEstadoExpediente() == EstadoExpediente.FINALIZADO && documentoDgtFinal(origen).isPresent()) {
+            reanudarTramitesDependientes(origen, usuarioLogueado);
+        }
     }
 
     @Override
@@ -385,11 +474,56 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         EstadoExpediente previo = expediente.getEstadoPrevioPausa();
         if (previo == null
                 || previo == EstadoExpediente.PENDIENTE_DOCUMENTACION
+                || previo == EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO
                 || previo == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
                 || previo == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA) {
             return EstadoExpediente.EN_TRAMITE;
         }
         return previo;
+    }
+
+    private void reanudarTramitesDependientes(Expediente origen, Usuario usuario) {
+        if (documentoDgtFinal(origen).isEmpty()) {
+            return;
+        }
+        expedienteRepository.findByExpedienteVinculadoOrigenIdAndEstadoExpediente(
+                        origen.getId(),
+                        EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO
+                )
+                .forEach(dependiente -> reanudarTramiteDependiente(dependiente, origen, usuario));
+    }
+
+    private void reanudarTramiteDependiente(Expediente dependiente, Expediente origen, Usuario usuario) {
+        documentoDgtFinal(origen).ifPresent(documentoOrigen -> {
+            Documento documento = new Documento();
+            documento.setExpediente(dependiente);
+            documento.setTipoDocumento(documentoOrigen.getTipoDocumento());
+            documento.setNombreArchivo(documentoOrigen.getNombreArchivo());
+            documento.setNombreArchivoOriginal(documentoOrigen.getNombreArchivoOriginal());
+            documento.setDescripcionArchivo("Vinculado automaticamente desde EXP-" + origen.getId());
+            documento.setCliente(documentoOrigen.getCliente());
+            documento.setSubidoPor(usuario);
+            documentoRepository.save(documento);
+        });
+        dependiente.setEstadoExpediente(estadoReanudacion(dependiente));
+        dependiente.setEstadoPrevioPausa(null);
+        dependiente.setFechaUltimaModificacion(LocalDateTime.now());
+        dependiente.setModificadoPor(usuario);
+        expedienteRepository.save(dependiente);
+        historialCambioService.registrarCambioExpediente(
+                dependiente,
+                usuario,
+                "TRAMITE VINCULADO LISTO",
+                "EXP-" + origen.getId() + " finalizo; se vinculo el justificante DGT disponible y el expediente retoma su tramitacion.");
+    }
+
+    private Optional<Documento> documentoDgtFinal(Expediente origen) {
+        return documentoRepository.findByExpedienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(
+                        origen.getId(),
+                        List.of(TipoDocumento.COMPROBANTE_DGT, TipoDocumento.HUELLA_TRAMITE)
+                )
+                .stream()
+                .findFirst();
     }
 
     private Optional<EstadoExpediente> estadoBloqueantePorIncidenciasActivas(Long expedienteId) {

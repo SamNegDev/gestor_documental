@@ -237,6 +237,9 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
         if (expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION) {
             throw new OperacionInvalidaException("Hay documentacion solicitada pendiente antes de continuar.");
         }
+        if (expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO) {
+            throw new OperacionInvalidaException("El expediente esta a la espera de finalizar el tramite vinculado.");
+        }
         if (!incidenciaRepository.findByExpedienteIdAndResueltaFalse(expediente.getId()).isEmpty()) {
             throw new OperacionInvalidaException("Hay incidencias activas antes de continuar.");
         }

@@ -2,7 +2,7 @@ import { AlertCircle, CheckCircle2, Clock3, History, Tags } from "lucide-react";
 import type { TramiteRegistro } from "../types";
 import { formatEnum } from "./TramitesRegistroTable";
 
-const attentionStates = new Set(["INCIDENCIA", "PENDIENTE_DOCUMENTACION", "SOLICITADA_INFORMACION_ADICIONAL", "REVISANDO_INCIDENCIAS"]);
+const attentionStates = new Set(["INCIDENCIA", "PENDIENTE_DOCUMENTACION", "PENDIENTE_TRAMITE_VINCULADO", "SOLICITADA_INFORMACION_ADICIONAL", "REVISANDO_INCIDENCIAS"]);
 
 export function RegistroSummary({ tramites, roles = [] }: { tramites: TramiteRegistro[]; roles?: string[] }) {
   const finalizados = tramites.filter((tramite) => tramite.estado === "FINALIZADO").length;

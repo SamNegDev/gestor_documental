@@ -753,6 +753,8 @@ function NextStepSummary({ expediente }: { expediente: ExpedienteListItem }) {
       : "Sin acciones pendientes";
   } else if (expediente.estado === "PENDIENTE_DOCUMENTACION") {
     label = "Esperar documentacion";
+  } else if (expediente.estado === "PENDIENTE_TRAMITE_VINCULADO") {
+    label = "Esperar tramite vinculado";
   } else if (expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL") {
     label = "Esperar respuesta del cliente";
   } else if (expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" || expediente.estado === "REVISANDO_INCIDENCIAS") {
@@ -837,7 +839,7 @@ function ListSkeleton() {
 function statusTone(status?: string | null) {
   if (status === "FINALIZADO" || status === "CONVERTIDA") return "success";
   if (status === "INCIDENCIA") return "danger";
-  if (status === "PENDIENTE_DOCUMENTACION") return "warning";
+  if (status === "PENDIENTE_DOCUMENTACION" || status === "PENDIENTE_TRAMITE_VINCULADO") return "warning";
   if (status === "REVISANDO_INCIDENCIAS" || status === "ENVIADO_DGT" || status === "INFORMACION_ADICIONAL_RECIBIDA") return "info";
   if (status === "SOLICITADA_INFORMACION_ADICIONAL") return "info";
   if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION") return "neutral";
@@ -860,6 +862,8 @@ function formatStatusLabel(value?: string | null) {
       return "PENDIENTE DE RESPUESTA";
     case "PENDIENTE_DOCUMENTACION":
       return "PENDIENTE DOCUMENTACION";
+    case "PENDIENTE_TRAMITE_VINCULADO":
+      return "PENDIENTE TRAMITE VINCULADO";
     case "INFORMACION_ADICIONAL_RECIBIDA":
       return "INFORMACION RECIBIDA";
     case "REVISANDO_INCIDENCIAS":

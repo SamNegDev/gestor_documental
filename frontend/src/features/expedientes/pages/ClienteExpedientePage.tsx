@@ -39,6 +39,7 @@ const CLIENT_CLOSING_DOCUMENTS = [
 function clienteTone(estado: string) {
   if (estado === "FINALIZADO") return "success";
   if (estado === "INCIDENCIA" || estado === "SOLICITADA_INFORMACION_ADICIONAL" || estado === "PENDIENTE_DOCUMENTACION") return "danger";
+  if (estado === "PENDIENTE_TRAMITE_VINCULADO") return "warning";
   if (estado === "REVISANDO_INCIDENCIAS") return "warning";
   return "info";
 }
@@ -48,6 +49,7 @@ function friendlyPhase(expediente: ExpedienteCliente) {
   if (expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL") return "Informacion solicitada";
   if (expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA") return "Informacion en revision";
   if (expediente.estado === "PENDIENTE_DOCUMENTACION") return "Pendiente de documentacion";
+  if (expediente.estado === "PENDIENTE_TRAMITE_VINCULADO") return "Pendiente de tramite vinculado";
   if (expediente.estado === "INCIDENCIA") return "Pendiente de documentacion";
   if (expediente.estado === "REVISANDO_INCIDENCIAS") return "Documentacion en revision";
   if (expediente.estado === "ENVIADO_DGT") return "Enviado a DGT";
@@ -62,12 +64,13 @@ function timelineSteps(expediente: ExpedienteCliente) {
       : expediente.estado === "ENVIADO_DGT" || phase.includes("firmar") ? 2
         : expediente.estado === "INCIDENCIA" || expediente.estado === "REVISANDO_INCIDENCIAS"
           || expediente.estado === "PENDIENTE_DOCUMENTACION"
+          || expediente.estado === "PENDIENTE_TRAMITE_VINCULADO"
           || expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? 1
           : 1;
 
   return [
     { title: "Expediente abierto", description: "Hemos recibido la informacion inicial." },
-    { title: expediente.estado === "INCIDENCIA" ? "Incidencia" : expediente.estado === "REVISANDO_INCIDENCIAS" ? "Revision" : expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? "Informacion" : "Documentacion", description: expediente.estado === "REVISANDO_INCIDENCIAS" ? "Tu documento esta pendiente de revision." : expediente.estado === "PENDIENTE_DOCUMENTACION" ? "Necesitamos que aportes los documentos solicitados." : expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" ? "Necesitamos una respuesta para continuar." : expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? "Tu respuesta esta pendiente de revision." : "Revisamos o completamos la documentacion." },
+    { title: expediente.estado === "INCIDENCIA" ? "Incidencia" : expediente.estado === "REVISANDO_INCIDENCIAS" ? "Revision" : expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? "Informacion" : expediente.estado === "PENDIENTE_TRAMITE_VINCULADO" ? "Tramite vinculado" : "Documentacion", description: expediente.estado === "REVISANDO_INCIDENCIAS" ? "Tu documento esta pendiente de revision." : expediente.estado === "PENDIENTE_TRAMITE_VINCULADO" ? "Este tramite espera a que finalice un tramite previo." : expediente.estado === "PENDIENTE_DOCUMENTACION" ? "Necesitamos que aportes los documentos solicitados." : expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" ? "Necesitamos una respuesta para continuar." : expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA" ? "Tu respuesta esta pendiente de revision." : "Revisamos o completamos la documentacion." },
     { title: "Listo para firmar", description: "El tramite queda preparado para el siguiente paso." },
     { title: "Finalizado", description: "El expediente queda cerrado." },
   ].map((step, index) => ({

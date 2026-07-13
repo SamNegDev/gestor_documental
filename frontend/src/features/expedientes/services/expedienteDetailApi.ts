@@ -25,6 +25,14 @@ export function updateExpedienteInteresados(id: string | number, interesados: Ex
   return apiPutJson(`/api/expedientes/${id}/interesados`, { interesados });
 }
 
+export function linkDependentExpediente(id: string | number, origenId: string, motivo: string): Promise<void> {
+  return apiPostJson(`/api/expedientes/${id}/vinculo-tramite`, { origenId, motivo });
+}
+
+export function unlinkDependentExpediente(id: string | number): Promise<void> {
+  return apiPost(`/api/expedientes/${id}/vinculo-tramite/desvincular`);
+}
+
 export function updateExpedienteFromExistingDocuments(
   id: string | number,
   options?: { forzarRelectura?: boolean },
@@ -41,12 +49,14 @@ export function createExpedienteWithCompleteProcessing(input: {
   clienteId: number;
   tipoTramiteId: number;
   matricula: string;
+  observaciones?: string;
   archivo: File;
 }): Promise<CreacionConProcesamiento> {
   const formData = new FormData();
   formData.append("clienteId", String(input.clienteId));
   formData.append("tipoTramiteId", String(input.tipoTramiteId));
   formData.append("matricula", input.matricula);
+  if (input.observaciones?.trim()) formData.append("observaciones", input.observaciones.trim());
   formData.append("archivo", input.archivo);
   return apiPostForm<CreacionConProcesamiento>("/api/expedientes/creacion-multiple", formData);
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Download, FilePlus2, FileText, Info, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ShieldAlert, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Download, FilePlus2, FileText, Info, Link2, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ShieldAlert, ShieldCheck, Trash2, Unlink, Upload, UserRound, X } from "lucide-react";
 import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteUploadPanel";
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
 import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
@@ -26,6 +26,7 @@ import {
   finishExpediente,
   getExpedienteDetail,
   getIncidentTypes,
+  linkDependentExpediente,
   linkIncidentDocument,
   markExpedienteMessagesRead,
   openExpedienteIncident,
@@ -36,6 +37,7 @@ import {
   rollbackExpedienteFinalization,
   rollbackExpedienteMilestone,
   sendExpedienteMessage,
+  unlinkDependentExpediente,
   updateExpedienteFromExistingDocuments,
   updateExpedienteInteresados,
   uploadIncidentDocument,
@@ -181,11 +183,12 @@ function ProcessFlowPanel({ expediente }: { expediente: ExpedienteDetail }) {
   const hasIncident = expediente.estado === "INCIDENCIA" || expediente.estado === "REVISANDO_INCIDENCIAS";
   const hasAdditionalInfo = expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
   const hasPendingDocumentation = expediente.estado === "PENDIENTE_DOCUMENTACION";
+  const hasLinkedWait = expediente.estado === "PENDIENTE_TRAMITE_VINCULADO";
   const docsReady = expediente.hitos.some((hito) => hito.id === "documentacion-completa" && hito.completado);
   const managementReady = expediente.hitos.some((hito) => hito.id === "tramite-programa-gestion" && hito.completado);
   const model620Ready = expediente.hitos.some((hito) => hito.id === "modelo-620-presentado" && hito.completado);
   const sentDgt = expediente.estado === "ENVIADO_DGT" || expediente.hitos.some((hito) => hito.id === "finalizado-incidencia" && hito.titulo === "Enviado a DGT");
-  const processPaused = hasIncident || hasAdditionalInfo || hasPendingDocumentation;
+  const processPaused = hasIncident || hasAdditionalInfo || hasPendingDocumentation || hasLinkedWait;
 
   const stages = [
     {
@@ -197,8 +200,8 @@ function ProcessFlowPanel({ expediente }: { expediente: ExpedienteDetail }) {
     },
     {
       id: "preparacion",
-      title: hasIncident ? "Incidencia" : hasAdditionalInfo ? "Informacion" : hasPendingDocumentation ? "Documentacion solicitada" : docsReady ? "Documentacion comprobada" : "Comprobacion de documentacion",
-      description: hasIncident ? "Subsanacion o revision pendiente." : hasAdditionalInfo ? "Pendiente de respuesta o revision." : hasPendingDocumentation ? "Esperando los documentos requeridos." : docsReady ? "Documentacion base comprobada." : "Revisando documentos base.",
+      title: hasIncident ? "Incidencia" : hasAdditionalInfo ? "Informacion" : hasLinkedWait ? "Tramite vinculado" : hasPendingDocumentation ? "Documentacion solicitada" : docsReady ? "Documentacion comprobada" : "Comprobacion de documentacion",
+      description: hasIncident ? "Subsanacion o revision pendiente." : hasAdditionalInfo ? "Pendiente de respuesta o revision." : hasLinkedWait ? "Esperando la finalizacion del tramite origen." : hasPendingDocumentation ? "Esperando los documentos requeridos." : docsReady ? "Documentacion base comprobada." : "Revisando documentos base.",
       state: processPaused ? "Fase actual" : docsReady || isClosed ? "Completado" : "Fase actual",
       tone: processPaused ? "active" : docsReady || isClosed ? "done" : "active",
     },
@@ -779,6 +782,9 @@ export function ExpedienteDetailPage() {
   const [updatingDocuments, setUpdatingDocuments] = useState(false);
   const [iaResult, setIaResult] = useState<ActualizacionDocumentalExpediente | null>(null);
   const [iaError, setIaError] = useState<string | null>(null);
+  const [linkedSourceId, setLinkedSourceId] = useState("");
+  const [linkedReason, setLinkedReason] = useState("SEGUNDO TRAMITE A LA ESPERA DEL COMPROBANTE DGT DEL PRIMERO");
+  const [savingLinkedExpediente, setSavingLinkedExpediente] = useState(false);
   const { confirm, dialog } = useConfirmDialog();
 
   const refreshRelatedData = useCallback(async () => {
@@ -1341,6 +1347,39 @@ export function ExpedienteDetailPage() {
     }
   };
 
+  const handleLinkDependentExpediente = async () => {
+    if (!expediente || !linkedSourceId.trim()) return;
+    setSavingLinkedExpediente(true);
+    try {
+      await linkDependentExpediente(expediente.id, linkedSourceId.trim(), linkedReason.trim());
+      setLinkedSourceId("");
+      await refreshExpediente();
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo vincular el tramite." : "No se pudo vincular el tramite.");
+    } finally {
+      setSavingLinkedExpediente(false);
+    }
+  };
+
+  const handleUnlinkDependentExpediente = async () => {
+    if (!expediente) return;
+    const confirmed = await confirm({
+      title: "Desvincular tramite",
+      description: "El expediente dejara de esperar al tramite origen y retomara su estado anterior.",
+      confirmLabel: "Desvincular",
+    });
+    if (!confirmed) return;
+    setSavingLinkedExpediente(true);
+    try {
+      await unlinkDependentExpediente(expediente.id);
+      await refreshExpediente();
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo desvincular el tramite." : "No se pudo desvincular el tramite.");
+    } finally {
+      setSavingLinkedExpediente(false);
+    }
+  };
+
   const handleAcceptIncidentResolution = async (incidencia: IncidenciaExpediente) => {
     try {
       await resolveIncident(incidencia.id);
@@ -1460,6 +1499,7 @@ export function ExpedienteDetailPage() {
   const hasAdditionalInfoFlow =
     expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
   const hasDocumentationRequest = expediente.estado === "PENDIENTE_DOCUMENTACION";
+  const hasLinkedWaitRequest = expediente.estado === "PENDIENTE_TRAMITE_VINCULADO";
   const nextOperationalStep =
     hasAdditionalInfoFlow
       ? expediente.siguientePaso
@@ -1547,7 +1587,7 @@ export function ExpedienteDetailPage() {
             </button>
             <button
               className="soft-button"
-              disabled={hasActiveIncidents || hasAdditionalInfoFlow}
+              disabled={hasActiveIncidents || hasAdditionalInfoFlow || hasLinkedWaitRequest}
               onClick={() => setRequirementOpenSignal((value) => value + 1)}
               type="button"
             >
@@ -1556,13 +1596,65 @@ export function ExpedienteDetailPage() {
             </button>
             <button
               className="primary-button"
-              disabled={hasActiveIncidents || hasAdditionalInfoFlow || hasDocumentationRequest}
+              disabled={hasActiveIncidents || hasAdditionalInfoFlow || hasDocumentationRequest || hasLinkedWaitRequest}
               onClick={() => setAdditionalInfoDialogOpen(true)}
               type="button"
             >
               <MessageCircle size={16} />
               Solicitar informacion
             </button>
+          </div>
+          <div className="exp-linked-panel">
+            <div>
+              <p className="eyebrow">Tramite doble</p>
+              <strong>
+                {expediente.tramiteVinculado
+                  ? `Esperando ${expediente.tramiteVinculado.origenReferencia}`
+                  : "Vincular a un tramite previo"}
+              </strong>
+              <span>
+                {expediente.tramiteVinculado
+                  ? `Estado origen: ${expediente.tramiteVinculado.origenEstado || "sin estado"}`
+                  : "El expediente quedara pausado hasta que finalice el tramite origen."}
+              </span>
+              {expediente.tramiteVinculado?.motivoEspera ? <small>{expediente.tramiteVinculado.motivoEspera}</small> : null}
+            </div>
+            {expediente.tramiteVinculado ? (
+              <button
+                className="soft-button soft-button--compact"
+                disabled={savingLinkedExpediente}
+                onClick={handleUnlinkDependentExpediente}
+                type="button"
+              >
+                {savingLinkedExpediente ? <Loader2 className="button-spinner" size={15} /> : <Unlink size={15} />}
+                Desvincular
+              </button>
+            ) : (
+              <div className="exp-linked-panel__form">
+                <input
+                  inputMode="numeric"
+                  onChange={(event) => setLinkedSourceId(event.target.value.replace(/\D/g, ""))}
+                  placeholder="EXP origen"
+                  type="text"
+                  value={linkedSourceId}
+                />
+                <input
+                  onChange={(event) => setLinkedReason(uppercaseInput(event.target.value))}
+                  placeholder="Motivo"
+                  type="text"
+                  value={linkedReason}
+                />
+                <button
+                  className="soft-button soft-button--compact"
+                  disabled={savingLinkedExpediente || !linkedSourceId.trim()}
+                  onClick={handleLinkDependentExpediente}
+                  type="button"
+                >
+                  {savingLinkedExpediente ? <Loader2 className="button-spinner" size={15} /> : <Link2 size={15} />}
+                  Vincular
+                </button>
+              </div>
+            )}
           </div>
         </section>
       ) : null}

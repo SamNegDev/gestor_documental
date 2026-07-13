@@ -272,6 +272,7 @@ function EmptyRow({ text }: { icon: string; text: string }) {
 function statusTone(status?: string | null) {
   if (status === "FINALIZADO" || status === "CONVERTIDA") return "success";
   if (status === "INCIDENCIA" || status === "RECHAZADO" || status === "PENDIENTE_DOCUMENTACION" || status === "SOLICITADA_INFORMACION_ADICIONAL") return "danger";
+  if (status === "PENDIENTE_TRAMITE_VINCULADO") return "warning";
   if (status === "REVISANDO_INCIDENCIAS" || status === "ENVIADO_DGT" || status === "INFORMACION_ADICIONAL_RECIBIDA") return "info";
   if (status === "EN_TRAMITE" || status === "PENDIENTE_REVISION") return "warning";
   return "neutral";
@@ -468,6 +469,8 @@ function formatDashboardStatus(value?: string | null) {
       return "PENDIENTE DE RESPUESTA";
     case "PENDIENTE_DOCUMENTACION":
       return "PENDIENTE DOCUMENTACION";
+    case "PENDIENTE_TRAMITE_VINCULADO":
+      return "PENDIENTE TRAMITE";
     case "INFORMACION_ADICIONAL_RECIBIDA":
       return "INFORMACION RECIBIDA";
     case "REVISANDO_INCIDENCIAS":

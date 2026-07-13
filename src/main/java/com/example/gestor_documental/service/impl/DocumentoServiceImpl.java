@@ -126,6 +126,7 @@ public class DocumentoServiceImpl implements DocumentoService {
 
             documentoRepository.save(doc);
             registrarCargaDocumentoExpediente(expediente, doc, usuario);
+            notificarJustificanteDgtFinal(doc, usuario);
             return doc;
 
 
@@ -152,6 +153,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             documento.setExpediente(expediente);
             documentoRepository.save(documento);
             registrarCargaDocumentoExpediente(expediente, documento, usuario);
+            notificarJustificanteDgtFinal(documento, usuario);
             return documento;
         } catch (IOException exception) {
             throw new RuntimeException("No se pudo guardar el documento generado", exception);
@@ -516,6 +518,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (registrarHistorial) {
             registrarCargaDocumentoExpediente(expediente, doc, usuario);
         }
+        notificarJustificanteDgtFinal(doc, usuario);
         return doc;
     }
 
@@ -690,6 +693,7 @@ public class DocumentoServiceImpl implements DocumentoService {
 
         documentoRepository.save(documento);
         registrarCorreccionClasificacion(documento, tipoAnterior, documento.getTipoDocumento(), usuario, "EDICION_TIPO");
+        notificarJustificanteDgtFinal(documento, usuario);
     }
 
     private String extensionDe(String nombreArchivo) {
@@ -701,6 +705,20 @@ public class DocumentoServiceImpl implements DocumentoService {
             return ".pdf";
         }
         return nombreArchivo.substring(index);
+    }
+
+    private void notificarJustificanteDgtFinal(Documento documento, Usuario usuario) {
+        if (documento == null || documento.getExpediente() == null || documento.getExpediente().getId() == null) {
+            return;
+        }
+        if (documento.getTipoDocumento() != TipoDocumento.COMPROBANTE_DGT
+                && documento.getTipoDocumento() != TipoDocumento.HUELLA_TRAMITE) {
+            return;
+        }
+        if (documento.getExpediente().getEstadoExpediente() != EstadoExpediente.FINALIZADO) {
+            return;
+        }
+        expedienteService.reanudarDependientesSiListo(documento.getExpediente().getId(), usuario);
     }
 
     private String generarNombreAutomatico(Documento documento) {
@@ -946,6 +964,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             }
             documentoRepository.save(principal);
             registrarCorreccionClasificacion(principal, tipoAnterior, principal.getTipoDocumento(), usuario, "UNION_DOCUMENTOS");
+            notificarJustificanteDgtFinal(principal, usuario);
 
             for (Documento documento : documentos.subList(1, documentos.size())) {
                 reasignarRequisitos(documento, principal);

@@ -32,6 +32,7 @@ export function formatEnum(value?: string | null) { return value ? value.replace
 function statusTone(value?: string | null): "neutral" | "warning" | "success" | "danger" | "info" {
   if (value === "FINALIZADO") return "success";
   if (value === "INCIDENCIA" || value === "PENDIENTE_DOCUMENTACION" || value === "SOLICITADA_INFORMACION_ADICIONAL") return "danger";
+  if (value === "PENDIENTE_TRAMITE_VINCULADO") return "warning";
   if (value === "ENVIADO_DGT" || value === "REVISANDO_INCIDENCIAS") return "info";
   return "neutral";
 }

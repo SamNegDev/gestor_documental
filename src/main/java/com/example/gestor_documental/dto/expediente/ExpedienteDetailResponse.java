@@ -26,6 +26,7 @@ public class ExpedienteDetailResponse {
     private String fechaUltimaModificacion;
     private String observaciones;
     private Long solicitudId;
+    private ExpedienteVinculadoResponse tramiteVinculado;
     private HitoExpedienteResponse siguientePaso;
     private int mensajesNoLeidos;
 

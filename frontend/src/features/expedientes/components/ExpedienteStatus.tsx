@@ -13,6 +13,7 @@ const statusClass: Record<ExpedienteStatusType, string> = {
   ENVIADO_DGT: "exp-status--info",
   REVISANDO_INCIDENCIAS: "exp-status--warning",
   PENDIENTE_DOCUMENTACION: "exp-status--danger",
+  PENDIENTE_TRAMITE_VINCULADO: "exp-status--warning",
   SOLICITADA_INFORMACION_ADICIONAL: "exp-status--danger",
   INFORMACION_ADICIONAL_RECIBIDA: "exp-status--info",
 };
