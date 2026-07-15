@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useState, type ChangeEvent, type DragEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Download, FilePlus2, FileText, Info, Link2, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ShieldAlert, ShieldCheck, Trash2, Unlink, Upload, UserRound, X } from "lucide-react";
@@ -338,6 +338,7 @@ function ClosingDocumentsPanel({
   operationId?: number | null;
   onUploadClosingDocument: (tipoDocumento: string, archivo: File) => void;
 }) {
+  const [draggingType, setDraggingType] = useState<string | null>(null);
   const closingDocuments = CLOSING_DOCUMENTS.filter((item) => !hiddenDocumentTypes.has(item.tipo));
   const documentByType = new Map(
     closingDocuments
@@ -353,6 +354,30 @@ function ClosingDocumentsPanel({
       .filter((entry): entry is readonly [typeof CLOSING_DOCUMENTS[number]["tipo"], DocumentoExpediente] => Boolean(entry[1])),
   );
   const missingDocuments = closingDocuments.filter((item) => !documentByType.has(item.tipo) && !disabledDocumentTypes.has(item.tipo));
+  const handleDragOver = (event: DragEvent<HTMLElement>, tipoDocumento: string, enabled: boolean) => {
+    if (!enabled) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setDraggingType(tipoDocumento);
+  };
+  const handleDragLeave = (event: DragEvent<HTMLElement>, tipoDocumento: string) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setDraggingType((current) => current === tipoDocumento ? null : current);
+    }
+  };
+  const handleDrop = (event: DragEvent<HTMLElement>, tipoDocumento: string, enabled: boolean) => {
+    if (!enabled) return;
+    event.preventDefault();
+    setDraggingType(null);
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      alert("Arrastra un archivo PDF para adjuntarlo como justificante final.");
+      return;
+    }
+    onUploadClosingDocument(tipoDocumento, file);
+  };
 
   return (
     <section className="closure-docs-panel" aria-label="Documentos de cierre">
@@ -383,9 +408,17 @@ function ClosingDocumentsPanel({
           const ready = Boolean(documento?.id);
           const fileName = documento?.nombreOriginal || documento?.nombre;
           const disabled = disabledDocumentTypes.has(item.tipo);
+          const canDrop = !ready && !disabled;
 
           return (
-            <article className={`closure-doc-card ${ready ? "closure-doc-card--ready" : disabled ? "closure-doc-card--disabled" : "closure-doc-card--missing"}`} key={item.tipo}>
+            <article
+              className={`closure-doc-card ${ready ? "closure-doc-card--ready" : disabled ? "closure-doc-card--disabled" : "closure-doc-card--missing"}${draggingType === item.tipo ? " closure-doc-card--dragging" : ""}`}
+              key={item.tipo}
+              onDragEnter={(event) => handleDragOver(event, item.tipo, canDrop)}
+              onDragLeave={(event) => handleDragLeave(event, item.tipo)}
+              onDragOver={(event) => handleDragOver(event, item.tipo, canDrop)}
+              onDrop={(event) => handleDrop(event, item.tipo, canDrop)}
+            >
               <div className="closure-doc-card__identity">
                 <span className="closure-doc-card__logo">
                   <img src={item.logoSrc} alt={item.logoAlt} loading="lazy" />
@@ -406,7 +439,7 @@ function ClosingDocumentsPanel({
                 ) : disabled ? (
                   <small>Disponible cuando finalice el tramite</small>
                 ) : (
-                  <small>Pendiente de adjuntar</small>
+                  <small>Arrastra aqui el PDF o adjuntalo manualmente</small>
                 )}
               </div>
               <div className="closure-doc-card__actions">
