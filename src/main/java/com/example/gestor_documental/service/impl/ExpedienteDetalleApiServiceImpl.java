@@ -24,7 +24,6 @@ import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.enums.TipoOperacionExpediente;
-import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Cliente;
@@ -51,6 +50,7 @@ import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.HitoExpedienteService;
 import com.example.gestor_documental.service.IncidenciaService;
@@ -91,6 +91,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
     private final OperacionExpedienteService operacionExpedienteService;
     private final RequisitoDocumentalExpedienteService requisitoDocumentalService;
     private final HitoExpedienteService hitoExpedienteService;
+    private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
     private final DocumentoIdentidadLecturaRepository documentoIdentidadLecturaRepository;
     private final DocumentoRolesLecturaRepository documentoRolesLecturaRepository;
@@ -549,8 +550,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
     }
 
     private boolean requiereModelo620(Expediente expediente) {
-        TipoTramiteEnum tramite = expediente.getTipoTramite() != null ? expediente.getTipoTramite().getNombre() : null;
-        return tramite != TipoTramiteEnum.NOTIFICACION_VENTA;
+        return tipoTramitePolicyService.requiereModelo620(expediente);
     }
 
     private boolean esDocumentoFinal(TipoDocumento tipoDocumento) {

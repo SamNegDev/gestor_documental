@@ -45,6 +45,7 @@ public class ClienteExpedienteApiController {
                 .id(detalle.getId())
                 .referencia(detalle.getReferencia())
                 .matricula(detalle.getMatricula())
+                .tipoTramite(detalle.getTipoTramite())
                 .tipoTramiteDescripcion(detalle.getTipoTramiteDescripcion())
                 .estado(detalle.getEstado())
                 .faseActual(detalle.getFaseActual())

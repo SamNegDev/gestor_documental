@@ -12,6 +12,7 @@ import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
+import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
@@ -39,6 +40,7 @@ public class ExpedienteJustificanteFinalService {
     private final DocumentoRepository documentoRepository;
     private final ExpedienteRepository expedienteRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
+    private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -93,6 +95,15 @@ public class ExpedienteJustificanteFinalService {
         return justificantesPendientes(expedienteId, documentos);
     }
 
+    @Transactional(readOnly = true)
+    public List<String> justificantesFinalesPendientes(Expediente expediente, List<Documento> documentos) {
+        if (expediente == null || expediente.getEstadoExpediente() == null
+                || !"FINALIZADO".equals(expediente.getEstadoExpediente().name())) {
+            return List.of();
+        }
+        return justificantesPendientes(expediente, documentos);
+    }
+
     private List<Documento> documentosFinales(Long expedienteId) {
         return documentoRepository.findByExpedienteId(expedienteId).stream()
                 .filter(documento -> esJustificanteDgt(documento) || documento.getTipoDocumento() == TipoDocumento.MODELO_620)
@@ -110,8 +121,9 @@ public class ExpedienteJustificanteFinalService {
 
     private List<String> justificantesPendientes(ExpedienteDetailResponse detalle, List<Documento> documentos) {
         java.util.ArrayList<String> pendientes = new java.util.ArrayList<>();
+        boolean requiereModelo620 = tipoTramitePolicyService.requiereModelo620(detalle.getTipoTramite());
         List<RequisitoDocumentalResponse> requisitosFinales = detalle.getRequisitosDocumentales().stream()
-                .filter(requisito -> "MODELO_620".equals(requisito.getTipoDocumento())
+                .filter(requisito -> (requiereModelo620 && "MODELO_620".equals(requisito.getTipoDocumento()))
                         || "COMPROBANTE_DGT".equals(requisito.getTipoDocumento())
                         || "HUELLA_TRAMITE".equals(requisito.getTipoDocumento()))
                 .toList();
@@ -131,16 +143,23 @@ public class ExpedienteJustificanteFinalService {
         if (!tieneJustificanteDgt(documentos)) {
             pendientes.add("DGT");
         }
-        if (!"NOTIFICACION_VENTA".equals(detalle.getTipoTramite()) && !tieneModelo620(documentos)) {
+        if (requiereModelo620 && !tieneModelo620(documentos)) {
             pendientes.add("620");
         }
         return pendientes;
     }
 
     private List<String> justificantesPendientes(Long expedienteId, List<Documento> documentos) {
+        Expediente expediente = expedienteRepository.findById(expedienteId).orElse(null);
+        return justificantesPendientes(expediente, documentos);
+    }
+
+    private List<String> justificantesPendientes(Expediente expediente, List<Documento> documentos) {
         java.util.ArrayList<String> pendientes = new java.util.ArrayList<>();
-        List<RequisitoDocumentalExpediente> requisitosFinales = requisitoRepository.findByExpedienteIdOrderByIdAsc(expedienteId).stream()
-                .filter(requisito -> requisito.getTipoDocumento() == TipoDocumento.MODELO_620
+        boolean requiereModelo620 = tipoTramitePolicyService.requiereModelo620(expediente);
+        Long expedienteId = expediente != null ? expediente.getId() : null;
+        List<RequisitoDocumentalExpediente> requisitosFinales = expedienteId == null ? List.of() : requisitoRepository.findByExpedienteIdOrderByIdAsc(expedienteId).stream()
+                .filter(requisito -> (requiereModelo620 && requisito.getTipoDocumento() == TipoDocumento.MODELO_620)
                         || requisito.getTipoDocumento() == TipoDocumento.COMPROBANTE_DGT
                         || requisito.getTipoDocumento() == TipoDocumento.HUELLA_TRAMITE)
                 .toList();
@@ -157,15 +176,10 @@ public class ExpedienteJustificanteFinalService {
             return pendientes.stream().distinct().toList();
         }
 
-        Expediente expediente = expedienteRepository.findById(expedienteId).orElse(null);
-        boolean requiereModelo = expediente == null
-                || expediente.getTipoTramite() == null
-                || expediente.getTipoTramite().getNombre() == null
-                || !"NOTIFICACION_VENTA".equals(expediente.getTipoTramite().getNombre().name());
         if (!tieneJustificanteDgt(documentos)) {
             pendientes.add("DGT");
         }
-        if (requiereModelo && !tieneModelo620(documentos)) {
+        if (requiereModelo620 && !tieneModelo620(documentos)) {
             pendientes.add("620");
         }
         return pendientes;

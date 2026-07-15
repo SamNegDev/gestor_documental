@@ -12,6 +12,7 @@ import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.EstadoWhatsappAdjunto;
 import com.example.gestor_documental.enums.EstadoWhatsappEvento;
+import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.TipoTramite;
@@ -29,6 +30,7 @@ import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.service.AvisoAdminService;
 import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
+import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.WhatsappMediaService;
 import com.example.gestor_documental.service.WhatsappOutboundService;
@@ -83,6 +85,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
     private final ConfiguracionSeguimientoService configuracionSeguimientoService;
     private final WhatsappOutboundService whatsappOutboundService;
     private final WhatsappMediaService whatsappMediaService;
+    private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
 
     private static final DateTimeFormatter FECHA_ESTADO_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final long VENTANA_NUEVO_LOTE_DOCUMENTOS_SEGUNDOS = 180;
@@ -911,7 +914,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             return List.of();
         }
         return requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
-                .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                .filter(requisito -> requisitoPendienteAplica(expediente, requisito))
                 .map(this::descripcionRequisito)
                 .filter(StringUtils::hasText)
                 .distinct()
@@ -982,12 +985,13 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         if (!hitoExpedienteRepository.existsByExpedienteIdAndCodigo(expediente.getId(), CodigoHitoExpediente.TRAMITE_PROGRAMA_GESTION)) {
             return "Pendiente de subir a programa de gestion";
         }
-        if (!modelo620Presentado(expediente)) {
+        boolean requiereModelo620 = tipoTramitePolicyService.requiereModelo620(expediente);
+        if (requiereModelo620 && !modelo620Presentado(expediente)) {
             return "Tramite subido, a la espera de pasar el impuesto 620";
         }
         if (expediente.getEstadoExpediente() != EstadoExpediente.ENVIADO_DGT
                 && !hitoExpedienteRepository.existsByExpedienteIdAndCodigo(expediente.getId(), CodigoHitoExpediente.ENVIADO_DGT)) {
-            return "Impuesto 620 presentado, pendiente de enviar a DGT";
+            return requiereModelo620 ? "Impuesto 620 presentado, pendiente de enviar a DGT" : "Tramite subido, pendiente de enviar a DGT";
         }
         return "Tramite enviado a DGT, pendiente de cierre";
     }
@@ -1015,7 +1019,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         if (!hitoExpedienteRepository.existsByExpedienteIdAndCodigo(expediente.getId(), CodigoHitoExpediente.TRAMITE_PROGRAMA_GESTION)) {
             return "Subir el tramite al programa de gestion.";
         }
-        if (!modelo620Presentado(expediente)) {
+        if (tipoTramitePolicyService.requiereModelo620(expediente) && !modelo620Presentado(expediente)) {
             return "Presentar el impuesto 620.";
         }
         if (expediente.getEstadoExpediente() != EstadoExpediente.ENVIADO_DGT
@@ -1027,7 +1031,15 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
 
     private boolean documentacionPendiente(Expediente expediente) {
         return requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
-                .anyMatch(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO);
+                .anyMatch(requisito -> requisitoPendienteAplica(expediente, requisito));
+    }
+
+    private boolean requisitoPendienteAplica(Expediente expediente, RequisitoDocumentalExpediente requisito) {
+        if (requisito.getEstado() != EstadoRequisitoDocumental.REQUERIDO) {
+            return false;
+        }
+        return requisito.getTipoDocumento() != TipoDocumento.MODELO_620
+                || tipoTramitePolicyService.requiereModelo620(expediente);
     }
 
     private boolean modelo620Presentado(Expediente expediente) {
@@ -1422,7 +1434,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
             return;
         }
         List<String> pendientes = requisitoRepository.findByExpedienteIdOrderByIdAsc(evento.getExpediente().getId()).stream()
-                .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                .filter(requisito -> requisitoPendienteAplica(evento.getExpediente(), requisito))
                 .map(this::descripcionRequisito)
                 .filter(StringUtils::hasText)
                 .distinct()

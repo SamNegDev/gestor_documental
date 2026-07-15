@@ -22,6 +22,7 @@ import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.OperacionExpedienteRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.HitoExpedienteService;
 import com.example.gestor_documental.service.IncidenciaService;
@@ -64,6 +65,7 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
     private final ExpedienteService expedienteService;
     private final HistorialCambioService historialCambioService;
     private final IncidenciaService incidenciaService;
+    private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
 
     @Override
     public List<HitoExpediente> listarPorExpediente(Long expedienteId) {
@@ -293,8 +295,7 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
     }
 
     private boolean requiereModelo620(Expediente expediente) {
-        TipoTramiteEnum tramite = expediente.getTipoTramite() != null ? expediente.getTipoTramite().getNombre() : null;
-        return tramite != TipoTramiteEnum.NOTIFICACION_VENTA;
+        return tipoTramitePolicyService.requiereModelo620(expediente);
     }
 
     private CodigoHitoExpediente tramitePrevio(CodigoHitoExpediente codigo) {

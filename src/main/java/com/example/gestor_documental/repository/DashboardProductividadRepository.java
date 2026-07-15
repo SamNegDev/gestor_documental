@@ -164,7 +164,7 @@ public class DashboardProductividadRepository {
                             where h.expediente_id = e.id
                               and h.codigo in ('TRAMITE_PROGRAMA_GESTION', 'BATE_TRAMITE_PROGRAMA_GESTION', 'COM_TRAMITE_PROGRAMA_GESTION')
                         ) then 'COMPROBACION'
-                        when not exists (
+                        when coalesce(tt.nombre, '') not in ('NOTIFICACION_VENTA', 'HERENCIA') and not exists (
                             select 1 from hito_expediente h
                             where h.expediente_id = e.id
                               and h.codigo in ('MODELO_620_PRESENTADO', 'BATE_MODELO_620_PRESENTADO', 'COM_MODELO_620_PRESENTADO')
@@ -173,6 +173,7 @@ public class DashboardProductividadRepository {
                     end as fase,
                     timestampdiff(day, coalesce(e.fecha_ultima_modificacion, e.fecha_creacion), now()) as dias_sin_actividad
                     from expediente e
+                    left join tipo_tramite tt on tt.id = e.tipo_tramite_id
                     where e.estado_expediente not in ('FINALIZADO', 'RECHAZADO')
                 ) fases
                 group by fase

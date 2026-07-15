@@ -29,6 +29,8 @@ import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
+import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
+import com.example.gestor_documental.service.impl.ExpedienteJustificanteFinalService;
 import com.example.gestor_documental.util.MensajeAutomaticoUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -64,6 +66,8 @@ public class TareaApiController {
     private final WhatsappWebhookEventoRepository whatsappWebhookEventoRepository;
     private final CurrentUserService currentUserService;
     private final ConfiguracionSeguimientoService configuracionSeguimientoService;
+    private final ExpedienteJustificanteFinalService justificanteFinalService;
+    private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
 
     @GetMapping
     public PagedResponse<TareaResponse> listar(@RequestParam(required = false) String tipo,
@@ -359,17 +363,30 @@ public class TareaApiController {
         List<TareaResponse> tareas = new ArrayList<>();
         for (Expediente expediente : finalizados) {
             List<Documento> docs = documentosPorExpediente.getOrDefault(expediente.getId(), List.of());
-            boolean dgt = docs.stream().anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.HUELLA_TRAMITE
-                    || documento.getTipoDocumento() == TipoDocumento.COMPROBANTE_DGT);
-            boolean modelo = docs.stream().anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.MODELO_620);
-            if (!dgt || !modelo) {
-                String faltan = !dgt && !modelo ? "DGT y Modelo 620" : !dgt ? "justificante DGT" : "Modelo 620";
+            List<String> pendientes = justificanteFinalService.justificantesFinalesPendientes(expediente, docs);
+            if (!pendientes.isEmpty()) {
+                String faltan = formatoJustificantesPendientes(pendientes);
                 tareas.add(tareaExpediente(expediente, "JUSTIFICANTE_FINAL_PENDIENTE", "MEDIA",
                         "Justificante final pendiente", "Falta adjuntar " + faltan + ".",
                         "Expediente finalizado con justificantes pendientes. Falta adjuntar " + faltan + " para dejar el cierre documental completo."));
             }
         }
         return tareas;
+    }
+
+    private String formatoJustificantesPendientes(List<String> pendientes) {
+        boolean dgt = pendientes.stream().anyMatch("DGT"::equals);
+        boolean modelo620 = pendientes.stream().anyMatch("620"::equals);
+        if (dgt && modelo620) {
+            return "justificante DGT y Modelo 620";
+        }
+        if (dgt) {
+            return "justificante DGT";
+        }
+        if (modelo620) {
+            return "Modelo 620";
+        }
+        return String.join(", ", pendientes);
     }
 
     private List<TareaResponse> tareasRevisionDocumentosHabituales() {
@@ -482,12 +499,21 @@ public class TareaApiController {
     }
 
     private String contextoDocumentacion(Long expedienteId) {
+        Expediente expediente = expedienteRepository.findById(expedienteId).orElse(null);
         return limitar(requisitoRepository.findByExpedienteIdOrderByIdAsc(expedienteId).stream()
-                .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
+                .filter(requisito -> requisitoPendienteAplica(expediente, requisito))
                 .map(this::descripcionRequisito)
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(java.util.stream.Collectors.joining(" · ")));
+    }
+
+    private boolean requisitoPendienteAplica(Expediente expediente, RequisitoDocumentalExpediente requisito) {
+        if (requisito.getEstado() != EstadoRequisitoDocumental.REQUERIDO) {
+            return false;
+        }
+        return requisito.getTipoDocumento() != TipoDocumento.MODELO_620
+                || tipoTramitePolicyService.requiereModelo620(expediente);
     }
 
     private String descripcionRequisito(RequisitoDocumentalExpediente requisito) {

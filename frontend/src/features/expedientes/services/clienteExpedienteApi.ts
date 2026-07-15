@@ -20,6 +20,7 @@ export interface ExpedienteCliente {
   id: number;
   referencia: string;
   matricula?: string | null;
+  tipoTramite?: string | null;
   tipoTramiteDescripcion?: string | null;
   estado: string;
   faseActual?: string | null;

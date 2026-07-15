@@ -79,16 +79,19 @@ function timelineSteps(expediente: ExpedienteCliente) {
   }));
 }
 
-function ClientClosingDocumentsPanel({ documentos }: { documentos: DocumentoExpediente[] }) {
+function ClientClosingDocumentsPanel({ documentos, tipoTramite }: { documentos: DocumentoExpediente[]; tipoTramite?: string | null }) {
+  const closingDocuments = CLIENT_CLOSING_DOCUMENTS.filter(
+    (item) => item.tipo !== "MODELO_620" || (tipoTramite !== "NOTIFICACION_VENTA" && tipoTramite !== "HERENCIA"),
+  );
   const documentByType = new Map(
-    CLIENT_CLOSING_DOCUMENTS
+    closingDocuments
       .map((item) => [
         item.tipo,
         documentos.find((documento) => item.aliases.some((alias) => alias === documento.tipo) && documento.subido && documento.id),
       ] as const)
       .filter((entry): entry is readonly [typeof CLIENT_CLOSING_DOCUMENTS[number]["tipo"], DocumentoExpediente] => Boolean(entry[1])),
   );
-  const available = CLIENT_CLOSING_DOCUMENTS.filter((item) => documentByType.has(item.tipo)).length;
+  const available = closingDocuments.filter((item) => documentByType.has(item.tipo)).length;
 
   return (
     <section className="closure-docs-panel closure-docs-panel--client" aria-label="Documentos finales del expediente">
@@ -98,13 +101,13 @@ function ClientClosingDocumentsPanel({ documentos }: { documentos: DocumentoExpe
           <h3>Justificantes finales</h3>
           <p>Acceso directo a los comprobantes oficiales del expediente.</p>
         </div>
-        <span className={`closure-docs-status ${available === CLIENT_CLOSING_DOCUMENTS.length ? "closure-docs-status--ready" : "closure-docs-status--warning"}`}>
-          {available} de {CLIENT_CLOSING_DOCUMENTS.length} disponibles
+        <span className={`closure-docs-status ${available === closingDocuments.length ? "closure-docs-status--ready" : "closure-docs-status--warning"}`}>
+          {available} de {closingDocuments.length} disponibles
         </span>
       </div>
 
       <div className="closure-docs-grid">
-        {CLIENT_CLOSING_DOCUMENTS.map((item) => {
+        {closingDocuments.map((item) => {
           const documento = documentByType.get(item.tipo);
           const ready = Boolean(documento?.id);
           const fileName = documento?.nombreOriginal || documento?.nombre;
@@ -433,7 +436,7 @@ export function ClienteExpedientePage() {
 
       <ClientDocumentRequirementsPanel requisitos={requisitos} onUpload={handleUploadRequirement} />
 
-      {expediente.estado === "FINALIZADO" ? <ClientClosingDocumentsPanel documentos={documentos} /> : null}
+      {expediente.estado === "FINALIZADO" ? <ClientClosingDocumentsPanel documentos={documentos} tipoTramite={expediente.tipoTramite} /> : null}
 
       <section className="client-timeline-panel">
         <div className="exp-panel__heading">

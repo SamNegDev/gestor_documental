@@ -20,6 +20,7 @@ public class ExpedienteClienteResponse {
     private Long id;
     private String referencia;
     private String matricula;
+    private String tipoTramite;
     private String tipoTramiteDescripcion;
     private String estado;
     private String faseActual;

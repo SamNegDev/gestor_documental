@@ -1550,7 +1550,7 @@ export function ExpedienteDetailPage() {
     disabledClosingDocumentTypes.add("COMPROBANTE_DGT");
   }
   const hiddenClosingDocumentTypes = new Set<string>();
-  if (expediente.tipoTramite === "NOTIFICACION_VENTA") {
+  if (expediente.tipoTramite === "NOTIFICACION_VENTA" || expediente.tipoTramite === "HERENCIA") {
     hiddenClosingDocumentTypes.add("MODELO_620");
   }
   const closingOperationId = operaciones.length > 1 ? activeOperation?.id ?? null : null;

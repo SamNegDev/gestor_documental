@@ -34,6 +34,7 @@ import com.example.gestor_documental.repository.OperacionExpedienteRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
@@ -72,6 +73,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     private final OperacionExpedienteRepository operacionRepository;
     private final ExtraccionGaRevisionRepository extraccionGaRevisionRepository;
     private final HistorialCambioService historialCambioService;
+    private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -1440,8 +1442,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     }
 
     private boolean requiereModelo620(Expediente expediente) {
-        TipoTramiteEnum tramite = expediente.getTipoTramite() != null ? expediente.getTipoTramite().getNombre() : null;
-        return tramite != TipoTramiteEnum.NOTIFICACION_VENTA;
+        return tipoTramitePolicyService.requiereModelo620(expediente);
     }
 
     private void eliminarModelos620DeReglaSinResolver(Expediente expediente) {

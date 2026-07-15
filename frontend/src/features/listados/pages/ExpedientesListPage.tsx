@@ -96,12 +96,12 @@ export function ExpedientesListPage() {
   async function handleDownloadFinalDocuments() {
     const invalid = selectedExpedientes.some((expediente) => !expediente.justificantesFinalesDisponibles);
     if (invalid) {
-      alert("Todos los expedientes seleccionados deben estar finalizados y tener justificante DGT y MODELO 620.");
+      alert("Todos los expedientes seleccionados deben estar finalizados y tener los justificantes finales requeridos.");
       return;
     }
     const confirmed = await confirm({
       title: "Descargar justificantes",
-      description: `Se descargara un ZIP con justificante DGT y MODELO 620 de ${selectedExpedientes.length} expedientes.`,
+      description: `Se descargara un ZIP con los justificantes finales requeridos de ${selectedExpedientes.length} expedientes.`,
       confirmLabel: "Descargar ZIP",
       tone: "default",
     });
