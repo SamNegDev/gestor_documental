@@ -2961,7 +2961,7 @@ select {
   white-space: nowrap;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 860px) {
   .solicitud-reading-identity {
     grid-template-columns: 1fr;
   }
@@ -8037,5 +8037,41 @@ input.records-table-filter {
   .followup-row > div:nth-of-type(3),
   .whatsapp-row__message {
     display: none;
+  }
+}
+
+@media (min-width: 861px) and (max-width: 1320px) {
+  .grid--two,
+  .request-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid--wide-right {
+    grid-template-columns: minmax(240px, 0.82fr) minmax(0, 1.18fr);
+  }
+
+  .request-grid--wide {
+    grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+  }
+
+  .request-summary-strip {
+    grid-template-columns: minmax(220px, 0.68fr) minmax(0, 1.32fr);
+  }
+
+  .request-summary-block--vehicle {
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
+  }
+
+  .case-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .case-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  }
+
+  .record-grid {
+    grid-template-columns: minmax(0, 1.08fr) minmax(260px, 0.92fr);
   }
 }
