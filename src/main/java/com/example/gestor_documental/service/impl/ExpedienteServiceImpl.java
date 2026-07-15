@@ -16,6 +16,7 @@ import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRep
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
 import com.example.gestor_documental.service.TipoTramiteService;
@@ -47,6 +48,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     private final DocumentoRepository documentoRepository;
     private final HistorialCambioService historialCambioService;
     private final VehiculoService vehiculoService;
+    private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
 
     @Override
     public List<Expediente> listarTodos() {
@@ -462,6 +464,11 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     }
 
     private void reanudar(Expediente expediente, EstadoExpediente estado, Usuario usuario, String accion, String descripcion) {
+        boolean limpiaEstadoPrevio = estado != EstadoExpediente.PENDIENTE_DOCUMENTACION
+                && expediente.getEstadoPrevioPausa() != null;
+        if (expediente.getEstadoExpediente() == estado && !limpiaEstadoPrevio) {
+            return;
+        }
         expediente.setEstadoExpediente(estado);
         if (estado != EstadoExpediente.PENDIENTE_DOCUMENTACION) {
             expediente.setEstadoPrevioPausa(null);
@@ -538,8 +545,11 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     }
 
     private boolean hayRequisitosPendientes(Long expedienteId) {
+        Expediente expediente = expedienteRepository.findById(expedienteId).orElse(null);
         return requisitoDocumentalRepository.findByExpedienteIdOrderByIdAsc(expedienteId).stream()
-                .anyMatch(requisito -> requisito.getEstado() == com.example.gestor_documental.enums.EstadoRequisitoDocumental.REQUERIDO);
+                .anyMatch(requisito -> requisito.getEstado() == com.example.gestor_documental.enums.EstadoRequisitoDocumental.REQUERIDO
+                        && (requisito.getTipoDocumento() != TipoDocumento.MODELO_620
+                        || tipoTramitePolicyService.requiereModelo620(expediente)));
     }
 
     private boolean interesadoValido(InteresadoFormDto dto) {

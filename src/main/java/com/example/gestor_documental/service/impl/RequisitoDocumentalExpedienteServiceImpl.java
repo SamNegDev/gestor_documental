@@ -260,6 +260,9 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     }
 
     private void reconciliarConDocumentos(Expediente expediente, List<Documento> documentos, Usuario usuario) {
+        if (expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION) {
+            return;
+        }
         List<RequisitoDocumentalExpediente> requisitos = requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId());
         Map<String, Documento> identidadesGa = identidadesGaPorDocumento(expediente, documentos);
 
