@@ -124,6 +124,10 @@ export function answerIncident(incidenciaId: number, contenido: string): Promise
   return apiPostJson(`/api/incidencias/${incidenciaId}/respuesta`, { contenido });
 }
 
+export function notifyIncidentResolvedByClient(incidenciaId: number, comentario?: string): Promise<void> {
+  return apiPostJson(`/api/incidencias/${incidenciaId}/resuelta-cliente`, { comentario: comentario || "" });
+}
+
 export function uploadIncidentDocument(incidenciaId: number, archivo: File, tipoDocumento = "DOCUMENTO_INCIDENCIA"): Promise<void> {
   const formData = new FormData();
   formData.append("archivo", archivo);

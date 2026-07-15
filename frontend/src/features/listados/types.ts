@@ -60,6 +60,7 @@ export interface SolicitudListItem {
   expedienteId?: number | null;
   interesados: InteresadoSolicitud[];
   situacionDocumental?: string | null;
+  siguienteActuacion?: string | null;
 }
 
 export interface InteresadoSolicitud {

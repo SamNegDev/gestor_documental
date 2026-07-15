@@ -53,6 +53,18 @@ public class IncidenciaApiController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/resuelta-cliente")
+    public ResponseEntity<Void> comunicarResueltaPorCliente(
+            @PathVariable Long id,
+            @RequestParam(required = false) String comentario,
+            @RequestBody(required = false) java.util.Map<String, String> body,
+            Authentication authentication
+    ) {
+        String comentarioFinal = comentario != null ? comentario : body != null ? body.get("comentario") : null;
+        incidenciaService.comunicarIncidenciaResueltaPorCliente(id, comentarioFinal, usuario(authentication));
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/documento")
     public ResponseEntity<Void> subirDocumento(
             @PathVariable Long id,

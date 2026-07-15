@@ -311,7 +311,12 @@ export interface IncidenciaExpediente {
   fechaResolucion?: string | null;
   creadoPor?: string | null;
   resueltoPor?: string | null;
+  contadorAvisos?: number;
+  fechaUltimoAviso?: string | null;
   pendienteRevisionCliente?: boolean;
+  revisionComunicadaPorCliente?: boolean;
+  fechaRevisionComunicadaPorCliente?: string | null;
+  comentarioRevisionCliente?: string | null;
   documentosRevision?: DocumentoExpediente[];
 }
 

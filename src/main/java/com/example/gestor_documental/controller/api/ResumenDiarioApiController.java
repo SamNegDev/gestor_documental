@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -69,6 +70,20 @@ public class ResumenDiarioApiController {
         return new ResumenDiarioResponse(resultado.clientesEnviados(), resultado.cambiosIncluidos(), resultado.avisos());
     }
 
+    @PostMapping("/incidencias/seleccion/enviar")
+    public ResumenDiarioResponse enviarIncidenciasSeleccionadas(
+            @RequestBody IncidenciasSeleccionadasRequest request,
+            Authentication authentication
+    ) {
+        var admin = currentUserService.requireAdmin(authentication);
+        ResumenDiarioTramitesService.ResultadoResumenDiario resultado =
+                resumenDiarioTramitesService.enviarListadoIncidenciasSeleccionadas(
+                        request != null ? request.incidenciaIds() : List.of(),
+                        admin
+                );
+        return new ResumenDiarioResponse(resultado.clientesEnviados(), resultado.cambiosIncluidos(), resultado.avisos());
+    }
+
     private void validarClienteEnvioMasivo(Long clienteId) {
         if (clienteId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecciona un cliente antes de enviar una notificacion masiva.");
@@ -76,5 +91,8 @@ public class ResumenDiarioApiController {
     }
 
     public record ResumenDiarioResponse(int clientesEnviados, int cambiosIncluidos, List<String> avisos) {
+    }
+
+    public record IncidenciasSeleccionadasRequest(List<Long> incidenciaIds) {
     }
 }

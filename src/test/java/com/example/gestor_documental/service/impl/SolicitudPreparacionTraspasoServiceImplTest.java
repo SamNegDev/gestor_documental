@@ -17,6 +17,7 @@ import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
+import com.example.gestor_documental.service.SolicitudDocumentacionBasicaService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.validation.DniNieValidator;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,14 +55,22 @@ class SolicitudPreparacionTraspasoServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        DniNieValidator dniNieValidator = new DniNieValidator();
+        SolicitudDocumentacionBasicaService documentacionBasicaService = new SolicitudDocumentacionBasicaService(
+                documentoRepository,
+                identidadLecturaRepository,
+                clienteInteresadoRepository,
+                dniNieValidator
+        );
         service = new SolicitudPreparacionTraspasoServiceImpl(
                 solicitudRepository,
                 documentoRepository,
                 identidadLecturaRepository,
                 rolesLecturaRepository,
                 clienteInteresadoRepository,
+                documentacionBasicaService,
                 solicitudService,
-                new DniNieValidator()
+                dniNieValidator
         );
         usuario = new Usuario();
         when(solicitudService.tienePermisoSolicitud(any(Solicitud.class), any(Usuario.class))).thenReturn(true);

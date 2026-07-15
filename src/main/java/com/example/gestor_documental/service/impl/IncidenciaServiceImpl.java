@@ -297,6 +297,9 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         String nuevaObservacion = TextNormalizer.upperOrNull(observaciones) != null
                 ? TextNormalizer.upperOrNull(observaciones)
                 : "La documentacion aportada no resuelve la incidencia.";
+        incidencia.setRevisionComunicadaPorCliente(false);
+        incidencia.setFechaRevisionComunicadaPorCliente(null);
+        incidencia.setComentarioRevisionCliente(null);
         incidencia.setObservaciones((incidencia.getObservaciones() != null ? incidencia.getObservaciones() + "\n\n" : "")
                 + "Reclamacion admin: " + nuevaObservacion);
         incidenciaRepository.save(incidencia);
@@ -347,6 +350,48 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                 cliente,
                 "RESPUESTA INCIDENCIA",
                 "El cliente respondio a la solicitud de informacion."
+        );
+    }
+
+    @Override
+    @Transactional
+    public void comunicarIncidenciaResueltaPorCliente(Long incidenciaId, String comentario, Usuario cliente) {
+        Incidencia incidencia = incidenciaRepository.findById(incidenciaId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        if (incidencia.isResuelta()) {
+            throw new OperacionInvalidaException("La incidencia ya esta resuelta.");
+        }
+        Expediente expediente = incidencia.getExpediente();
+        if (expediente == null) {
+            throw new OperacionInvalidaException("Esta incidencia no pertenece a un expediente.");
+        }
+        if (!expedienteService.tienePermisoExpediente(expediente, cliente)) {
+            throw new AccesoDenegadoException("No tienes permiso para responder a esta incidencia");
+        }
+
+        String comentarioNormalizado = TextNormalizer.upperOrNull(comentario);
+        String mensaje = "El cliente comunica que ha solucionado la incidencia por su cuenta y que se puede intentar continuar el tramite.";
+        if (comentarioNormalizado != null) {
+            mensaje += "\n\nComentario del cliente: " + comentarioNormalizado;
+        }
+        mensajeService.añadirAExpediente(expediente.getId(), mensaje, cliente);
+        incidencia.setRevisionComunicadaPorCliente(true);
+        incidencia.setFechaRevisionComunicadaPorCliente(LocalDateTime.now());
+        incidencia.setComentarioRevisionCliente(comentarioNormalizado);
+        incidencia.setProximoAviso(null);
+        incidencia.setSeguimientoArchivado(false);
+        incidenciaRepository.save(incidencia);
+
+        if (expediente.getEstadoExpediente() == EstadoExpediente.INCIDENCIA
+                || expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION) {
+            expediente.setEstadoExpediente(EstadoExpediente.REVISANDO_INCIDENCIAS);
+            expedienteService.guardar(expediente);
+        }
+        historialCambioService.registrarCambioExpediente(
+                expediente,
+                cliente,
+                "INCIDENCIA COMUNICADA RESUELTA",
+                "El cliente comunico que la incidencia esta solucionada por via externa."
         );
     }
 

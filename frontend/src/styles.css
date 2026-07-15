@@ -4083,6 +4083,12 @@ input.records-table-filter {
 .task-row--client.task-row--with-context { grid-template-columns: 38px minmax(230px, 330px) minmax(240px, 1fr) minmax(120px, 150px) 72px auto; grid-template-areas: "icon main context age priority actions"; }
 .task-row--admin { grid-template-columns: 38px minmax(330px, 1fr) minmax(130px, 190px) minmax(120px, 150px) 72px auto; grid-template-areas: "icon main client age priority actions"; }
 .task-row--admin.task-row--with-context { grid-template-columns: 38px minmax(230px, 330px) minmax(220px, 1fr) minmax(130px, 190px) minmax(120px, 150px) 72px auto; grid-template-areas: "icon main context client age priority actions"; }
+.task-row--admin.task-row--selectable { grid-template-columns: 28px 38px minmax(310px, 1fr) minmax(130px, 190px) minmax(120px, 150px) 72px auto; grid-template-areas: "select icon main client age priority actions"; }
+.task-row--admin.task-row--selectable.task-row--with-context { grid-template-columns: 28px 38px minmax(210px, 310px) minmax(220px, 1fr) minmax(130px, 190px) minmax(120px, 150px) 72px auto; grid-template-areas: "select icon main context client age priority actions"; }
+.task-row.is-selected { background: oklch(97% .024 232); }
+.task-row__select { grid-area: select; display: grid; place-items: center; width: 28px; height: 34px; }
+.task-row__select input,
+.task-selection-toolbar input { width: 16px; height: 16px; accent-color: oklch(47% .14 232); }
 .task-row__icon { grid-area: icon; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 6px; background: var(--panel-soft); color: var(--muted); }
 .task-row__icon--danger { background: oklch(96% .032 28); color: oklch(49% .15 28); }
 .task-row__icon--warning { background: oklch(96% .035 82); color: oklch(51% .12 72); }
@@ -4098,6 +4104,13 @@ input.records-table-filter {
 .task-row__context p { display: -webkit-box; overflow: hidden; margin: 0; color: var(--ink); -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .task-row__context small { display: block; color: oklch(48% .06 72); font-size: .62rem; font-weight: 760; letter-spacing: 0; text-transform: uppercase; }
 .task-row__client { grid-area: client; }.task-row__age { grid-area: age; }.task-priority { grid-area: priority; }.task-row .task-row__actions { grid-area: actions; display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.task-selection-bar,
+.task-selection-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid oklch(84% .055 232); border-radius: 8px; background: oklch(97% .024 232); padding: 10px 12px; color: var(--ink-strong); font-size: .82rem; font-weight: 760; }
+.task-selection-bar { margin-bottom: 12px; }
+.task-selection-bar--blocked { border-color: oklch(78% .12 35); background: oklch(97% .032 35); color: oklch(42% .12 35); }
+.task-selection-toolbar { border-width: 0 0 1px; border-radius: 0; background: var(--panel-soft); }
+.task-selection-toolbar label { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-strong); font-size: .78rem; font-weight: 820; }
+.task-selection-toolbar small { color: var(--muted); font-size: .72rem; font-weight: 680; }
 
 .mail-dialog { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 20px; }
 .mail-dialog__backdrop { position: absolute; inset: 0; border: 0; background: rgb(20 25 31 / 58%); backdrop-filter: blur(3px); }
@@ -4117,8 +4130,8 @@ input.records-table-filter {
 .mail-dialog__actions { display: flex; justify-content: flex-end; gap: 9px; padding: 14px 20px 18px; border-top: 1px solid oklch(89% .01 90); }
 @media (max-width: 620px) { .mail-dialog { padding: 0; place-items: end center; }.mail-dialog__panel { max-height: 94vh; border-radius: 8px 8px 0 0; }.mail-dialog__route { grid-template-columns: 44px 1fr; }.mail-dialog__route small { grid-column: 2; } }
 .task-priority { border: 1px solid currentColor; border-radius: 999px; padding: 4px 7px; text-align: center; font-size: .65rem !important; font-weight: 760; }.task-priority--alta { color: oklch(49% .15 28) !important; }.task-priority--media { color: oklch(51% .12 72) !important; }
-@media (max-width: 1120px) { .task-row--admin { grid-template-columns: 38px minmax(210px, 310px) minmax(210px, 1fr) minmax(112px, 140px) 72px auto; grid-template-areas: "icon main context age priority actions"; }.task-row--admin:not(.task-row--with-context) { grid-template-columns: 38px minmax(0, 1fr) minmax(112px, 140px) 72px auto; grid-template-areas: "icon main age priority actions"; }.task-row--admin .task-row__client { display: none; } }
-@media (max-width: 850px) { .task-row, .task-row--admin, .task-row--client, .task-row--admin.task-row--with-context, .task-row--client.task-row--with-context { grid-template-columns: 38px minmax(0, 1fr) 70px 38px; grid-template-areas: "icon main priority actions"; }.task-row__context, .task-row__client, .task-row__age { display: none; } }
+@media (max-width: 1120px) { .task-row--admin { grid-template-columns: 38px minmax(210px, 310px) minmax(210px, 1fr) minmax(112px, 140px) 72px auto; grid-template-areas: "icon main context age priority actions"; }.task-row--admin:not(.task-row--with-context) { grid-template-columns: 38px minmax(0, 1fr) minmax(112px, 140px) 72px auto; grid-template-areas: "icon main age priority actions"; }.task-row--admin.task-row--selectable, .task-row--admin.task-row--selectable.task-row--with-context { grid-template-columns: 28px 38px minmax(0, 1fr) minmax(112px, 140px) 72px auto; grid-template-areas: "select icon main age priority actions"; }.task-row--admin .task-row__client { display: none; } }
+@media (max-width: 850px) { .task-row, .task-row--admin, .task-row--client, .task-row--admin.task-row--with-context, .task-row--client.task-row--with-context { grid-template-columns: 38px minmax(0, 1fr) 70px 38px; grid-template-areas: "icon main priority actions"; }.task-row--admin.task-row--selectable, .task-row--admin.task-row--selectable.task-row--with-context { grid-template-columns: 28px 38px minmax(0, 1fr) 70px 38px; grid-template-areas: "select icon main priority actions"; }.task-row__context, .task-row__client, .task-row__age { display: none; }.task-selection-bar, .task-selection-toolbar { align-items: stretch; flex-direction: column; } }
 @media (max-width: 600px) { .task-summary { grid-template-columns: 1fr; }.task-filters { flex-direction: column; }.pagination-bar { flex-wrap: wrap; } }
 .task-tabs { display: inline-flex; width: fit-content; gap: 4px; border-bottom: 1px solid oklch(85% .012 92); }
 .task-tabs button { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 10px 13px; color: var(--muted); font-weight: 680; }

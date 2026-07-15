@@ -22,9 +22,9 @@ import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
+import com.example.gestor_documental.service.SolicitudDocumentacionBasicaService;
 import com.example.gestor_documental.service.SolicitudPreparacionTraspasoService;
 import com.example.gestor_documental.service.SolicitudService;
-import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
 import com.example.gestor_documental.validation.DniNieValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,7 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -45,16 +44,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPreparacionTraspasoService {
 
-    private static final double CONFIANZA_MINIMA_IDENTIDAD = 0.80;
     private static final double CONFIANZA_MINIMA_ROLES = 0.90;
-    private static final Set<TipoDocumento> TIPOS_IDENTIDAD = EnumSet.of(TipoDocumento.DNI, TipoDocumento.CIF);
-    private static final Set<TipoDocumento> TIPOS_ROLES = EnumSet.of(TipoDocumento.CONTRATO_COMPRAVENTA, TipoDocumento.FACTURA);
+    private static final Set<TipoDocumento> TIPOS_ROLES = Set.of(TipoDocumento.CONTRATO_COMPRAVENTA, TipoDocumento.FACTURA);
 
     private final SolicitudRepository solicitudRepository;
     private final DocumentoRepository documentoRepository;
     private final DocumentoIdentidadLecturaRepository identidadLecturaRepository;
     private final DocumentoRolesLecturaRepository rolesLecturaRepository;
     private final ClienteInteresadoRepository clienteInteresadoRepository;
+    private final SolicitudDocumentacionBasicaService solicitudDocumentacionBasicaService;
     private final SolicitudService solicitudService;
     private final DniNieValidator dniNieValidator;
 
@@ -84,7 +82,10 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
         Long clienteId = solicitud.getCliente() != null ? solicitud.getCliente().getId() : null;
         List<Documento> documentosCliente = clienteId == null
                 ? List.of()
-                : documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(clienteId, TIPOS_IDENTIDAD);
+                : documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(
+                        clienteId,
+                        solicitudDocumentacionBasicaService.tiposIdentidad()
+                );
         List<Long> documentosClienteIds = documentosCliente.stream()
                 .map(Documento::getId)
                 .filter(id -> id != null)
@@ -107,7 +108,7 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                 lecturasIdentidadCliente,
                 relacionesCliente,
                 interesados(solicitud),
-                rolesEsperados(solicitud)
+                solicitudDocumentacionBasicaService.rolesEsperados(solicitud)
         );
 
         List<BloqueCalculo> bloquesCalculados = List.of(
@@ -736,102 +737,16 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
         return null;
     }
 
-    private List<RolInteresado> rolesEsperados(Solicitud solicitud) {
-        TipoTramiteEnum tramite = tipoTramite(solicitud);
-        if (tramite == TipoTramiteEnum.BATECOM) {
-            return List.of(RolInteresado.VENDEDOR, RolInteresado.COMPRAVENTA, RolInteresado.COMPRADOR);
-        }
-        if (tramite == TipoTramiteEnum.ALTA
-                || tramite == TipoTramiteEnum.BAJA
-                || tramite == TipoTramiteEnum.DUPLICADO
-                || tramite == TipoTramiteEnum.MATRICULACION) {
-            return List.of(RolInteresado.TITULAR);
-        }
-        return List.of(RolInteresado.VENDEDOR, RolInteresado.COMPRADOR);
-    }
-
     private boolean documentoIdentidadAportado(PreparacionContext context, String identificador) {
-        if (documentoIdentidadAportadoEnSolicitud(context, identificador)) {
-            return true;
-        }
-        return documentoIdentidadAportadoEnFichaCliente(context, identificador);
-    }
-
-    private boolean documentoIdentidadAportadoEnSolicitud(PreparacionContext context, String identificador) {
-        for (Documento documento : context.documentos()) {
-            if (!TIPOS_IDENTIDAD.contains(documento.getTipoDocumento())) {
-                continue;
-            }
-            DocumentoIdentidadLectura lectura = context.lecturasIdentidad().get(documento.getId());
-            if (lectura == null) {
-                continue;
-            }
-            if (lecturaIdentidadCoincide(lectura, identificador)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean documentoIdentidadAportadoEnFichaCliente(PreparacionContext context, String identificador) {
-        if (identificador == null || context.solicitud().getCliente() == null || context.solicitud().getCliente().getId() == null) {
-            return false;
-        }
-        TipoDocumento tipoEsperado = esPersonaJuridica(identificador) ? TipoDocumento.CIF : TipoDocumento.DNI;
-        String nifCliente = normalizarIdentificador(context.solicitud().getCliente().getNif());
-        if (identificador.equals(nifCliente)
-                && documentoFichaClienteCoincide(context, tipoEsperado, null, identificador)) {
-            return true;
-        }
-        return context.relacionesCliente().stream()
-                .filter(relacion -> relacion.getInteresado() != null)
-                .filter(relacion -> identificador.equals(normalizarIdentificador(relacion.getInteresado().getDni())))
-                .anyMatch(relacion -> documentoFichaClienteCoincide(
-                        context,
-                        tipoEsperado,
-                        relacion.getInteresado().getId(),
-                        identificador
-                ));
-    }
-
-    private boolean documentoFichaClienteCoincide(
-            PreparacionContext context,
-            TipoDocumento tipoEsperado,
-            Long interesadoId,
-            String identificador
-    ) {
-        return context.documentosCliente().stream()
-                .filter(documento -> documento.getTipoDocumento() == tipoEsperado)
-                .filter(documento -> interesadoId == null
-                        || (documento.getInteresado() != null && interesadoId.equals(documento.getInteresado().getId())))
-                .anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.CIF
-                        || documentoInteresadoCoincide(documento, identificador)
-                        || lecturaIdentidadCoincide(context.lecturasIdentidadCliente().get(documento.getId()), identificador));
-    }
-
-    private boolean documentoInteresadoCoincide(Documento documento, String identificador) {
-        if (documento == null || documento.getInteresado() == null) {
-            return false;
-        }
-        return identificador.equals(normalizarIdentificador(documento.getInteresado().getDni()));
-    }
-
-    private boolean esPersonaJuridica(String identificador) {
-        String normalizado = normalizarIdentificador(identificador);
-        return normalizado != null && normalizado.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
-    }
-
-    private boolean lecturaIdentidadCoincide(DocumentoIdentidadLectura lectura, String identificador) {
-        if (lectura == null || identificador == null) {
-            return false;
-        }
-        if (confianza(lectura.getConfianzaGlobal()) >= CONFIANZA_MINIMA_IDENTIDAD
-                && identificador.equals(normalizarIdentificador(lectura.getIdentificador()))) {
-            return true;
-        }
-        return DocumentoIdentidadLecturaJson.extraer(lectura).stream()
-                .filter(item -> confianza(item.confianzaGlobal()) >= CONFIANZA_MINIMA_IDENTIDAD)
-                .anyMatch(item -> identificador.equals(normalizarIdentificador(item.identificador())));
+        return solicitudDocumentacionBasicaService.documentoIdentidadAportado(
+                context.solicitud(),
+                identificador,
+                context.documentos(),
+                context.lecturasIdentidad(),
+                context.documentosCliente(),
+                context.lecturasIdentidadCliente(),
+                context.relacionesCliente()
+        );
     }
 
     private DocumentoRolesLectura mejorLecturaRoles(PreparacionContext context) {

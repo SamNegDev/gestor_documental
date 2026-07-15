@@ -1,5 +1,6 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.ConfiguracionSeguimiento;
@@ -114,6 +115,46 @@ public class ResumenDiarioTramitesService {
                 ? incidenciaRepository.findPendientesPrimerAvisoByCliente(clienteId)
                 : incidenciaRepository.findPendientesPrimerAviso();
         return enviarListadoIncidencias(rango, incidencias, admin, "No hay avisos pendientes de notificar con cliente y email configurado.", "Aviso conjunto de incidencias");
+    }
+
+    public ResultadoResumenDiario enviarListadoIncidenciasSeleccionadas(List<Long> incidenciaIds, Usuario admin) {
+        if (incidenciaIds == null || incidenciaIds.isEmpty()) {
+            throw new OperacionInvalidaException("Selecciona al menos una incidencia para crear el aviso conjunto.");
+        }
+        List<Long> ids = incidenciaIds.stream().filter(id -> id != null).distinct().toList();
+        if (ids.isEmpty()) {
+            throw new OperacionInvalidaException("Selecciona al menos una incidencia para crear el aviso conjunto.");
+        }
+
+        List<Incidencia> incidencias = incidenciaRepository.findActivasResumenByIds(ids);
+        if (incidencias.size() != ids.size()) {
+            throw new OperacionInvalidaException("Alguna incidencia seleccionada ya no esta activa o no existe.");
+        }
+
+        ConfiguracionSeguimiento config = configuracionSeguimientoService.obtener();
+        LocalDateTime ahora = LocalDateTime.now();
+        for (Incidencia incidencia : incidencias) {
+            if (incidencia.getContadorAvisos() >= config.getMaxAvisos()) {
+                throw new OperacionInvalidaException("Alguna incidencia seleccionada ya alcanzo el maximo de avisos.");
+            }
+            if (incidencia.getContadorAvisos() > 0
+                    && (incidencia.getProximoAviso() == null || incidencia.getProximoAviso().isAfter(ahora))) {
+                throw new OperacionInvalidaException("Alguna incidencia seleccionada aun no tiene el recordatorio vencido.");
+            }
+        }
+
+        List<Long> clienteIds = incidencias.stream()
+                .map(incidencia -> incidencia.getExpediente() != null ? incidencia.getExpediente().getCliente() : null)
+                .map(cliente -> cliente != null ? cliente.getId() : null)
+                .distinct()
+                .toList();
+        if (clienteIds.size() != 1 || clienteIds.get(0) == null) {
+            throw new OperacionInvalidaException("Todas las incidencias seleccionadas deben pertenecer al mismo cliente.");
+        }
+
+        return enviarListadoIncidencias(rangoDia(), incidencias, admin,
+                "No hay incidencias seleccionadas con cliente y email configurado.",
+                "Aviso conjunto de incidencias");
     }
 
     private ResultadoResumenDiario enviarListadoIncidencias(RangoDia rango, List<Incidencia> incidencias, Usuario admin,

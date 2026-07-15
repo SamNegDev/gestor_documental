@@ -12,6 +12,7 @@ export function IncidentAlertPanel({ incidencias, onCreateIncident, onResolveInc
   const activas = incidencias.filter((incidencia) => !incidencia.resuelta);
   if (activas.length === 0) return null;
   const tieneRevisionCliente = activas.some((incidencia) => incidencia.pendienteRevisionCliente);
+  const tieneComunicacionResuelta = activas.some((incidencia) => incidencia.revisionComunicadaPorCliente);
 
   return (
     <section
@@ -26,7 +27,9 @@ export function IncidentAlertPanel({ incidencias, onCreateIncident, onResolveInc
           <div>
             <p className="eyebrow">{tieneRevisionCliente ? "Revision pendiente" : "Bloqueo por incidencia"}</p>
             <h3>
-              {tieneRevisionCliente
+              {tieneComunicacionResuelta
+                ? "Incidencia comunicada como solucionada"
+                : tieneRevisionCliente
                 ? "Documento aportado por el cliente"
                 : activas.length === 1
                   ? humanizeEnum(activas[0].tipo)
@@ -46,7 +49,9 @@ export function IncidentAlertPanel({ incidencias, onCreateIncident, onResolveInc
               {incidencia.pendienteRevisionCliente ? (
                 <strong className="incident-review-note">
                   <CheckCircle2 size={16} />
-                  El cliente ha aportado documentacion para resolver esta incidencia.
+                  {incidencia.revisionComunicadaPorCliente
+                    ? "El cliente indica que ha solucionado esta incidencia por su cuenta."
+                    : "El cliente ha aportado documentacion para resolver esta incidencia."}
                 </strong>
               ) : (
                 <strong>
@@ -54,14 +59,17 @@ export function IncidentAlertPanel({ incidencias, onCreateIncident, onResolveInc
                   Pendiente de subsanacion
                 </strong>
               )}
+              <span className="incident-followup-badge">{incidentFollowupText(incidencia)}</span>
               <p>{incidencia.observaciones || "Sin observaciones"}</p>
               {incidencia.pendienteRevisionCliente ? (
                 <div className="incident-review-callout">
                   <CheckCircle2 size={17} />
                   <div>
-                    <strong>Documento pendiente de revision</strong>
+                    <strong>{incidencia.revisionComunicadaPorCliente ? "Intentar continuar el tramite" : "Documento pendiente de revision"}</strong>
                     <span>
-                      {(incidencia.documentosRevision || []).length > 0
+                      {incidencia.revisionComunicadaPorCliente
+                        ? "El cliente comunica que ya se puede intentar firmar o finalizar de nuevo."
+                        : (incidencia.documentosRevision || []).length > 0
                         ? `${(incidencia.documentosRevision || []).length} documento(s) aportado(s) por el cliente.`
                         : "El cliente ha solicitado revision de la incidencia."}
                     </span>
@@ -92,4 +100,13 @@ export function IncidentAlertPanel({ incidencias, onCreateIncident, onResolveInc
       </div>
     </section>
   );
+}
+
+function incidentFollowupText(incidencia: IncidenciaExpediente) {
+  const avisos = incidencia.contadorAvisos ?? 0;
+  const etiquetaAvisos = avisos === 1 ? "1 aviso" : `${avisos} avisos`;
+  const ultimoAviso = incidencia.fechaUltimoAviso
+    ? `ultimo aviso ${formatDateTime(incidencia.fechaUltimoAviso)}`
+    : "sin aviso enviado";
+  return `${etiquetaAvisos} · ${ultimoAviso}`;
 }

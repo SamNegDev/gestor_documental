@@ -7,4 +7,5 @@ export function getTareas(filters: { tipo?: string; prioridad?: string; ambito?:
 }
 export const getTareasResumen = () => apiGet<TareasResumen>("/api/tareas/resumen");
 export const enviarAvisosConjuntos = (clienteId?: string) => apiPostJson<ResumenDiarioResponse>(`/api/admin/resumen-diario-tramites/incidencias/pendientes-notificar/enviar-masivo${clienteId ? `?clienteId=${clienteId}` : ""}`, {});
+export const enviarAvisosSeleccionados = (incidenciaIds: number[]) => apiPostJson<ResumenDiarioResponse>("/api/admin/resumen-diario-tramites/incidencias/seleccion/enviar", { incidenciaIds });
 export const revisarTareaWhatsapp = (id: number) => apiPostJson(`/api/whatsapp/eventos/${id}/revisar`, {});

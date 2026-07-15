@@ -23,7 +23,12 @@ public class IncidenciaExpedienteResponse {
     private String fechaResolucion;
     private String creadoPor;
     private String resueltoPor;
+    private int contadorAvisos;
+    private String fechaUltimoAviso;
     private boolean pendienteRevisionCliente;
+    private boolean revisionComunicadaPorCliente;
+    private String fechaRevisionComunicadaPorCliente;
+    private String comentarioRevisionCliente;
     @Builder.Default
     private List<DocumentoExpedienteResponse> documentosRevision = new ArrayList<>();
 }

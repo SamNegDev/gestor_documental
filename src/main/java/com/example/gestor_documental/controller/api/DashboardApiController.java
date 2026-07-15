@@ -15,6 +15,7 @@ import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.SolicitudActuacionService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.impl.DashboardProductividadService;
 import java.time.LocalDate;
@@ -39,6 +40,7 @@ public class DashboardApiController {
 
     private final CurrentUserService currentUserService;
     private final ExpedienteService expedienteService;
+    private final SolicitudActuacionService solicitudActuacionService;
     private final SolicitudService solicitudService;
     private final DashboardProductividadService productividadService;
 
@@ -46,7 +48,7 @@ public class DashboardApiController {
     public DashboardResponse obtenerDashboard(Authentication authentication) {
         Usuario usuario = currentUserService.requireUser(authentication);
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
-            return adminDashboard();
+            return adminDashboard(usuario);
         }
         if (usuario.getCliente() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes un cliente asociado");
@@ -69,7 +71,7 @@ public class DashboardApiController {
         }
     }
 
-    private DashboardResponse adminDashboard() {
+    private DashboardResponse adminDashboard(Usuario usuario) {
         long enTramite = expedienteService.contarPorEstado(EstadoExpediente.EN_TRAMITE)
                 + expedienteService.contarPorEstado(EstadoExpediente.REVISANDO_INCIDENCIAS)
                 + expedienteService.contarPorEstado(EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL)
@@ -91,7 +93,7 @@ public class DashboardApiController {
                         .totalIncidencias(incidenciasExpedientes + incidenciasSolicitudes)
                         .build())
                 .ultimosExpedientes(expedienteService.listarUltimos().stream().map(this::mapExpediente).toList())
-                .ultimasSolicitudes(solicitudService.listarUltimas().stream().map(this::mapSolicitud).toList())
+                .ultimasSolicitudes(solicitudService.listarUltimas().stream().map(solicitud -> mapSolicitud(solicitud, usuario)).toList())
                 .build();
     }
 
@@ -118,7 +120,7 @@ public class DashboardApiController {
                         .totalIncidencias(incidenciasExpedientes + incidenciasSolicitudes)
                         .build())
                 .ultimosExpedientes(expedienteService.listarUltimosPorCliente(cliente).stream().map(this::mapExpediente).toList())
-                .ultimasSolicitudes(solicitudService.listarUltimasPorCliente(cliente).stream().map(this::mapSolicitud).toList())
+                .ultimasSolicitudes(solicitudService.listarUltimasPorCliente(cliente).stream().map(solicitud -> mapSolicitud(solicitud, usuario)).toList())
                 .build();
     }
 
@@ -137,7 +139,7 @@ public class DashboardApiController {
                 .build();
     }
 
-    private SolicitudListItemResponse mapSolicitud(Solicitud solicitud) {
+    private SolicitudListItemResponse mapSolicitud(Solicitud solicitud, Usuario usuario) {
         return SolicitudListItemResponse.builder()
                 .id(solicitud.getId())
                 .matricula(solicitud.getMatricula())
@@ -150,6 +152,7 @@ public class DashboardApiController {
                 .cliente(mapCliente(solicitud.getCliente()))
                 .modificadoPor(mapUsuario(solicitud.getModificadoPor()))
                 .expedienteId(solicitud.getExpediente() != null ? solicitud.getExpediente().getId() : null)
+                .siguienteActuacion(solicitudActuacionService.siguienteActuacion(solicitud, usuario))
                 .build();
     }
 

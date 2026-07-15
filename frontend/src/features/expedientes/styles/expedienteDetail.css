@@ -297,6 +297,21 @@
   font-weight: 750;
 }
 
+.incident-followup-badge {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+  border: 1px solid oklch(84% 0.055 82);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: oklch(98% 0.018 82);
+  color: oklch(42% 0.075 72);
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
 .incident-alert-item p {
   margin: 5px 0;
   color: var(--ink-strong);
@@ -2796,6 +2811,13 @@
   resize: vertical;
 }
 
+.client-incident-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .client-upload-feedback {
   display: inline-flex;
   align-items: center;
@@ -3566,6 +3588,14 @@
   }
 
   .client-incident-response {
+    width: 100%;
+  }
+
+  .client-incident-actions {
+    justify-content: stretch;
+  }
+
+  .client-incident-actions > * {
     width: 100%;
   }
 

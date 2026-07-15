@@ -133,6 +133,21 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
             """)
     List<Incidencia> findActivasResumenByCliente(@Param("clienteId") Long clienteId);
 
+    @Query("""
+            select i from Incidencia i
+            left join fetch i.expediente e
+            left join fetch e.cliente c
+            left join fetch e.tipoTramite
+            left join fetch i.tipoIncidencia
+            where i.id in :ids
+              and i.resuelta = false
+              and i.seguimientoArchivado = false
+              and i.expediente is not null
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+            order by i.fechaCreacion asc
+            """)
+    List<Incidencia> findActivasResumenByIds(@Param("ids") List<Long> ids);
+
     List<Incidencia> findByExpedienteId(Long expedienteId);
     List<Incidencia> findBySolicitudId(Long solicitudId);
     List<Incidencia> findByExpedienteIdAndResueltaFalse(Long expedienteId);

@@ -25,6 +25,7 @@ public class SolicitudListItemResponse {
     private UsuarioResumenResponse modificadoPor;
     private Long expedienteId;
     private String situacionDocumental;
+    private String siguienteActuacion;
     @Builder.Default
     private List<InteresadoSolicitudResponse> interesados = new ArrayList<>();
 }

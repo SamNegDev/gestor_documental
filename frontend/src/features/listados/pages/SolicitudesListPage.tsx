@@ -388,7 +388,7 @@ function SolicitudesTable({
                 </span>
               </td>
               <td className="records-col-next-action">
-                <span className="records-next-action">{nextSolicitudAction(solicitud, isAdmin)}</span>
+                <span className="records-next-action">{solicitud.siguienteActuacion || "Consultar solicitud"}</span>
               </td>
               <td className="records-col-status">
                 <StatusBadge tone={statusTone(solicitud.estado)}>{formatSolicitudStatus(solicitud.estado)}</StatusBadge>
@@ -511,25 +511,6 @@ function interestedRolePriority(role?: string | null) {
   if (role === "COMPRADOR" || role === "TITULAR") return 1;
   if (role === "VENDEDOR") return 2;
   return 3;
-}
-
-function nextSolicitudAction(solicitud: SolicitudListItem, isAdmin: boolean) {
-  if (solicitud.expedienteId || solicitud.estado === "CONVERTIDA") return "Sin acciones pendientes";
-  if (solicitud.situacionDocumental === "SIN DOCUMENTACION" || solicitud.situacionDocumental?.startsWith("FALTA")) {
-    return isAdmin ? "Esperar documentacion" : "Aportar documentacion";
-  }
-  switch (solicitud.estado) {
-    case "PENDIENTE_DOCUMENTACION":
-      return isAdmin ? "Esperar documentacion" : "Aportar documentacion";
-    case "REVISANDO_INCIDENCIAS":
-      return isAdmin ? "Revisar documentacion" : "Documentacion en revision";
-    case "PENDIENTE_REVISION":
-      return isAdmin ? "Revisar solicitud" : "Esperar revision";
-    case "RECHAZADO":
-      return "Consultar resolucion";
-    default:
-      return "Consultar solicitud";
-  }
 }
 
 function documentStatusTone(value?: string | null) {

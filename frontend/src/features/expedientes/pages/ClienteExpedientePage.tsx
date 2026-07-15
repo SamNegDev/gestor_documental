@@ -4,7 +4,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import { Link, useParams } from "react-router-dom";
 import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, Download, Eye, FileText, History, Loader2, MessageCircle, Upload } from "lucide-react";
 import { answerAdditionalInfo, getClienteExpediente, markClienteExpedienteMessagesRead, sendClienteExpedienteMessage, type ExpedienteCliente } from "../services/clienteExpedienteApi";
-import { uploadIncidentDocument } from "../services/expedienteDetailApi";
+import { notifyIncidentResolvedByClient, uploadIncidentDocument } from "../services/expedienteDetailApi";
 import { uploadExpedienteDocument } from "../services/documentosApi";
 import { uploadRequirementDocument } from "../services/requisitosApi";
 import { DocumentUploadDialog, type DocumentUploadSubmit } from "../components/DocumentUploadDialog";
@@ -208,6 +208,7 @@ export function ClienteExpedientePage() {
   const [message, setMessage] = useState("");
   const [additionalInfoResponse, setAdditionalInfoResponse] = useState("");
   const [uploadedIncidentIds, setUploadedIncidentIds] = useState<Set<number>>(new Set());
+  const [communicatingIncidentIds, setCommunicatingIncidentIds] = useState<Set<number>>(new Set());
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadingStandaloneDocument, setUploadingStandaloneDocument] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -257,6 +258,25 @@ export function ClienteExpedientePage() {
       await refreshRelatedData();
     } catch {
       alert("No se pudo subir el documento.");
+    }
+  };
+
+  const handleNotifyIncidentResolved = async (incidencia: IncidenciaExpediente) => {
+    const confirmed = window.confirm("Confirmas que la incidencia ya esta solucionada por tu parte y que podemos intentar continuar el tramite?");
+    if (!confirmed) return;
+    setCommunicatingIncidentIds((current) => new Set(current).add(incidencia.id));
+    try {
+      await notifyIncidentResolvedByClient(incidencia.id);
+      await load();
+      await refreshRelatedData();
+    } catch {
+      alert("No se pudo comunicar la resolucion de la incidencia.");
+    } finally {
+      setCommunicatingIncidentIds((current) => {
+        const next = new Set(current);
+        next.delete(incidencia.id);
+        return next;
+      });
     }
   };
 
@@ -493,25 +513,36 @@ export function ClienteExpedientePage() {
                 {expediente.estado === "REVISANDO_INCIDENCIAS" || uploadedIncidentIds.has(incidencia.id) || incidencia.pendienteRevisionCliente ? (
                   <small className="client-upload-feedback">
                     <CheckCircle2 size={15} />
-                    Respuesta recibida. Lo estamos revisando.
+                    {incidencia.revisionComunicadaPorCliente ? "Aviso recibido. Intentaremos continuar el tramite." : "Respuesta recibida. Lo estamos revisando."}
                   </small>
                 ) : null}
               </div>
               {expediente.estado === "REVISANDO_INCIDENCIAS" || uploadedIncidentIds.has(incidencia.id) || incidencia.pendienteRevisionCliente ? null : (
-                <label className="primary-button primary-button--danger">
-                  <Upload size={16} />
-                  Responder incidencia
-                  <input
-                    hidden
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(event) => {
-                      const file = event.currentTarget.files?.[0];
-                      event.currentTarget.value = "";
-                      if (file) void handleUploadIncidentDocument(incidencia, file);
-                    }}
-                  />
-                </label>
+                <div className="client-incident-actions">
+                  <label className="primary-button primary-button--danger">
+                    <Upload size={16} />
+                    Responder incidencia
+                    <input
+                      hidden
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0];
+                        event.currentTarget.value = "";
+                        if (file) void handleUploadIncidentDocument(incidencia, file);
+                      }}
+                    />
+                  </label>
+                  <button
+                    className="soft-button"
+                    disabled={communicatingIncidentIds.has(incidencia.id)}
+                    onClick={() => void handleNotifyIncidentResolved(incidencia)}
+                    type="button"
+                  >
+                    <CheckCircle2 size={16} />
+                    Ya esta solucionada
+                  </button>
+                </div>
               )}
             </article>
           ))}

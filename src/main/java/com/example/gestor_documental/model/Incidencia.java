@@ -70,6 +70,14 @@ public class Incidencia {
 
     private LocalDateTime fechaArchivoSeguimiento;
 
+    @Column(nullable = false)
+    private boolean revisionComunicadaPorCliente = false;
+
+    private LocalDateTime fechaRevisionComunicadaPorCliente;
+
+    @Column(length = 500)
+    private String comentarioRevisionCliente;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "seguimiento_archivado_por_usuario_id")
     private Usuario seguimientoArchivadoPor;
