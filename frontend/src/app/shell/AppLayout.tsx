@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { BellRing, CarFront, DatabaseSearch, Download, FolderOpen, FolderPlus, Inbox, LayoutDashboard, LogOut, MessageCircle, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
+import { BellRing, CarFront, DatabaseSearch, FolderOpen, FolderPlus, Inbox, LayoutDashboard, LogOut, MessageCircle, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
 import { SidebarLink } from "./SidebarLink";
 import { Tooltip } from "../../shared/ui/Tooltip";
 import { getSessionUser, type SessionUser } from "../../shared/api/sessionApi";
@@ -24,8 +24,6 @@ function pageTitle(pathname: string) {
   if (pathname === "/admin/seguimiento-config") return "Periodos de seguimiento";
   if (pathname === "/admin/whatsapp") return "WhatsApp";
   if (pathname === "/admin/catalogos-gestion") return "Catalogos Gestion Trafico";
-  if (pathname === "/admin/extraccion-ga") return "Extraccion GA";
-  if (pathname === "/admin/extraccion-ga/preparadas") return "Exportacion GA";
   if (pathname === "/cliente/tareas") return "Mis tareas";
   if (pathname === "/admin/clientes") return "Clientes";
   if (pathname.includes("/admin/clientes/nuevo")) return "Nuevo cliente";
@@ -43,7 +41,6 @@ function pageTitle(pathname: string) {
   if (pathname.includes("/cliente/solicitudes/nuevo")) return "Nueva solicitud";
   if (pathname.includes("/solicitudes/")) return "Detalle de solicitud";
   if (pathname.includes("/cliente/expedientes/")) return "Estado del expediente";
-  if (pathname.includes("/extraccion-ga")) return "Extraccion IA";
   if (pathname.endsWith("/editar")) return "Editar expediente";
   if (pathname.endsWith("/nuevo")) return "Nuevo expediente";
   return "Detalle de expediente";
@@ -62,7 +59,6 @@ const adminMenuItems: MenuItemConfig[] = [
   { id: "tareas", to: "/admin/tareas", icon: Inbox, label: "Tareas" },
   { id: "seguimiento", to: "/admin/seguimiento-clientes", icon: BellRing, label: "Seguimiento clientes" },
   { id: "whatsapp", to: "/admin/whatsapp", icon: MessageCircle, label: "WhatsApp" },
-  { id: "ga-export", to: "/admin/extraccion-ga", icon: Download, label: "Extraccion GA" },
   { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Expedientes" },
   { id: "expedientes-bulk", to: "/expedientes/creacion-multiple", icon: FolderPlus, label: "Creacion multiple" },
   { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },

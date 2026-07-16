@@ -190,7 +190,7 @@ public class ExpedienteDocumentacionActualizacionService {
                 String interesadosDespues = resumenInteresados(expedienteId);
                 if (consolidacion.datosAplicados() || !Objects.equals(interesadosAntes, interesadosDespues)) {
                     datosAplicados++;
-                    detalles.add(nombreDocumento(documento) + ": interesados aplicados desde contrato/factura.");
+                    detalles.add(nombreDocumento(documento) + ": datos aplicados desde contrato/factura.");
                 } else {
                     detalles.add(nombreDocumento(documento) + ": interesados ya estaban aplicados; se comprobaron sin cambios.");
                 }
@@ -356,6 +356,7 @@ public class ExpedienteDocumentacionActualizacionService {
         actualizado |= aplicarRelacion(expediente, interesadoComprador, rolComprador(documento));
         actualizado |= vincularIdentidadLeida(expediente, interesadoVendedor, identidades.get(vendedor.identificador()));
         actualizado |= vincularIdentidadLeida(expediente, interesadoComprador, identidades.get(comprador.identificador()));
+        actualizado |= aplicarVehiculoSiProcede(expediente, lectura, avisos);
 
         lectura.setVendedorInteresado(interesadoVendedor);
         lectura.setCompradorInteresado(interesadoComprador);
@@ -789,6 +790,54 @@ public class ExpedienteDocumentacionActualizacionService {
                     .filter(valor -> valor != null && !valor.isBlank())
                     .collect(java.util.stream.Collectors.joining(" / "))
                     + ".");
+        } else if (vehiculoVinculado) {
+            detalles.add("Vehiculo vinculado al expediente por matricula " + vehiculo.getMatricula() + ".");
+        }
+        return actualizado;
+    }
+
+    private boolean aplicarVehiculoSiProcede(Expediente expediente, DocumentoRolesLectura lectura, List<String> detalles) {
+        if (lectura == null) {
+            return false;
+        }
+        boolean actualizado = false;
+        String matriculaLeida = normalizarMatricula(lectura.getMatricula());
+        String matriculaExpediente = normalizarMatricula(expediente.getMatricula());
+        if (matriculaLeida != null && matriculaExpediente == null) {
+            expediente.setMatricula(matriculaLeida);
+            matriculaExpediente = matriculaLeida;
+            actualizado = true;
+            detalles.add("Matricula detectada en contrato/factura y guardada en el expediente: " + matriculaLeida + ".");
+        } else if (matriculaLeida != null && !matriculaExpediente.equals(matriculaLeida)) {
+            detalles.add("La matricula de contrato/factura (" + matriculaLeida + ") no coincide con el expediente (" + matriculaExpediente + ").");
+            return actualizado;
+        }
+
+        String bastidorLeido = normalizarIdentificador(lectura.getBastidor());
+        boolean vehiculoVinculado = false;
+        Vehiculo vehiculo = expediente.getVehiculo();
+        if (vehiculo == null && matriculaExpediente != null) {
+            vehiculo = vehiculoService.obtenerOCrearPorMatricula(matriculaExpediente);
+            expediente.setVehiculo(vehiculo);
+            vehiculoVinculado = vehiculo != null;
+            actualizado = true;
+        }
+        if (vehiculo == null) {
+            return actualizado;
+        }
+
+        boolean bastidorActualizado = false;
+        String bastidorVehiculo = normalizarIdentificador(vehiculo.getBastidor());
+        if (bastidorLeido != null && bastidorLeido.length() >= 6 && bastidorVehiculo == null) {
+            vehiculo.setBastidor(bastidorLeido);
+            bastidorActualizado = true;
+        } else if (bastidorLeido != null && bastidorLeido.length() >= 6 && !bastidorVehiculo.equals(bastidorLeido)) {
+            detalles.add("El bastidor de contrato/factura (" + bastidorLeido + ") no coincide con el vehiculo guardado (" + bastidorVehiculo + ").");
+        }
+        if (bastidorActualizado) {
+            vehiculoRepository.save(vehiculo);
+            actualizado = true;
+            detalles.add("Bastidor actualizado desde contrato/factura: " + bastidorLeido + ".");
         } else if (vehiculoVinculado) {
             detalles.add("Vehiculo vinculado al expediente por matricula " + vehiculo.getMatricula() + ".");
         }

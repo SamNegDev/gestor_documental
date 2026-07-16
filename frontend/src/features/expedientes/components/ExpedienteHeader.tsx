@@ -1,4 +1,4 @@
-import { ArrowLeft, Building2, CalendarDays, CarFront, Eye, FileSearch, FileText, Pencil, UserRound } from "lucide-react";
+import { ArrowLeft, Building2, CalendarDays, CarFront, Eye, FileText, Pencil, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { ExpedienteDetail } from "../types/expedienteDetail.types";
 import { formatDateTime, humanizeEnum } from "../utils/formatters";
@@ -76,10 +76,6 @@ export function ExpedienteHeader({ expediente }: Props) {
         <Link className="soft-button soft-button--compact" to={`/expedientes/${expediente.id}/editar`}>
           <Pencil size={15} />
           Editar expediente
-        </Link>
-        <Link className="soft-button soft-button--compact" to={`/expedientes/${expediente.id}/extraccion-ga`}>
-          <FileSearch size={15} />
-          Extraccion IA
         </Link>
         {expediente.solicitudId ? (
           <Link className="soft-button soft-button--compact" to={`/solicitudes/${expediente.solicitudId}`}>

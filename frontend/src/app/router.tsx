@@ -12,9 +12,6 @@ import { ExpedienteCreatePage } from "../features/expedientes/pages/ExpedienteCr
 import { ExpedienteBulkCreatePage } from "../features/expedientes/pages/ExpedienteBulkCreatePage";
 import { ExpedienteDetailPage } from "../features/expedientes/pages/ExpedienteDetailPage";
 import { ExpedienteEditPage } from "../features/expedientes/pages/ExpedienteEditPage";
-import { ExtraccionGaExportQueuePage } from "../features/ia/pages/ExtraccionGaExportQueuePage";
-import { ExtraccionGaReviewPage } from "../features/ia/pages/ExtraccionGaReviewPage";
-import { ExtraccionGaWorkspacePage } from "../features/ia/pages/ExtraccionGaWorkspacePage";
 import { ExpedientesListPage } from "../features/listados/pages/ExpedientesListPage";
 import { SolicitudDetailPage } from "../features/listados/pages/SolicitudDetailPage";
 import { SolicitudBulkCreatePage } from "../features/listados/pages/SolicitudBulkCreatePage";
@@ -49,8 +46,6 @@ export const router = createBrowserRouter([
       { path: "admin/seguimiento-config", element: <RequireRole allow={["ADMIN"]}><SeguimientoConfigPage /></RequireRole> },
       { path: "admin/whatsapp", element: <RequireRole allow={["ADMIN"]}><WhatsappInboxPage /></RequireRole> },
       { path: "admin/catalogos-gestion", element: <RequireRole allow={["ADMIN"]}><CatalogosGestionPage /></RequireRole> },
-      { path: "admin/extraccion-ga", element: <RequireRole allow={["ADMIN"]}><ExtraccionGaWorkspacePage /></RequireRole> },
-      { path: "admin/extraccion-ga/preparadas", element: <RequireRole allow={["ADMIN"]}><ExtraccionGaExportQueuePage /></RequireRole> },
       { path: "cliente/tareas", element: <RequireRole allow={["CLIENTE"]}><TareasPage /></RequireRole> },
       { path: "admin/clientes", element: <RequireRole allow={["ADMIN"]}><ClientesListPage /></RequireRole> },
       { path: "admin/clientes/nuevo", element: <RequireRole allow={["ADMIN"]}><ClienteFormPage /></RequireRole> },
@@ -64,7 +59,6 @@ export const router = createBrowserRouter([
       { path: "expedientes/creacion-multiple", element: <RequireRole allow={["ADMIN"]}><ExpedienteBulkCreatePage /></RequireRole> },
       { path: "expedientes/:id", element: <RequireRole allow={["ADMIN"]}><ExpedienteDetailPage /></RequireRole> },
       { path: "expedientes/:id/editar", element: <RequireRole allow={["ADMIN"]}><ExpedienteEditPage /></RequireRole> },
-      { path: "expedientes/:id/extraccion-ga", element: <RequireRole allow={["ADMIN"]}><ExtraccionGaReviewPage /></RequireRole> },
       { path: "expedientes/:id/proceso", element: <RequireRole allow={["ADMIN"]}><ExpedienteDetailPage /></RequireRole> },
       { path: "cliente/expedientes/:id", element: <RequireRole allow={["CLIENTE"]}><ClienteExpedientePage /></RequireRole> },
       { path: "solicitudes", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><SolicitudesListPage /></RequireRole> },
