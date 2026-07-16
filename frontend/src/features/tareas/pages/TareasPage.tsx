@@ -274,7 +274,7 @@ function TaskRow({
     <article className={`task-row task-row--${showClient ? "admin" : "client"} task-row--${tarea.prioridad.toLowerCase()}${tarea.contexto ? " task-row--with-context" : ""}${selectable ? " task-row--selectable" : ""}${selected ? " is-selected" : ""}`}>
       {selectable ? (
         <label className="task-row__select" title="Seleccionar para aviso conjunto">
-          <input checked={selected} type="checkbox" onChange={(event) => onSelect(tarea, event.target.checked)} />
+          <input aria-label={`Seleccionar ${tarea.titulo}`} checked={selected} type="checkbox" onChange={(event) => onSelect(tarea, event.target.checked)} />
         </label>
       ) : null}
       <span className={`task-row__icon task-row__icon--${actionKind?.tone ?? "neutral"}`}>{taskIcon(tarea.tipo)}</span>
@@ -311,28 +311,28 @@ function TaskRow({
       <div className="task-row__actions">
         {canNotifyTask(tarea) ? (
           <>
-            <button className="icon-button" onClick={() => onNotify(tarea, "email")} title="Enviar correo" type="button">
+            <button aria-label="Enviar correo" className="icon-button" onClick={() => onNotify(tarea, "email")} title="Enviar correo" type="button">
               <Mail size={16} />
             </button>
-            <button className="soft-button soft-button--compact" onClick={() => onNotify(tarea, "whatsapp")} type="button">
+            <button aria-label="Enviar por WhatsApp" className="soft-button soft-button--compact" onClick={() => onNotify(tarea, "whatsapp")} title="Enviar por WhatsApp" type="button">
               <MessageCircle size={15} />
               WhatsApp
             </button>
           </>
         ) : null}
         {tarea.tipo === "INCIDENCIA_PENDIENTE_ARCHIVAR" ? (
-          <button className="soft-button soft-button--compact" disabled={archivePending} onClick={() => onArchive(tarea.entidadId)} type="button">
+          <button aria-label="Archivar incidencia" className="soft-button soft-button--compact" disabled={archivePending} onClick={() => onArchive(tarea.entidadId)} title="Archivar incidencia" type="button">
             <Archive size={15} />
             Archivar
           </button>
         ) : null}
         {tarea.tipo.startsWith("WHATSAPP_") ? (
-          <button className="soft-button soft-button--compact" onClick={() => onWhatsappReview(tarea.entidadId)} type="button">
+          <button aria-label="Marcar realizada" className="soft-button soft-button--compact" onClick={() => onWhatsappReview(tarea.entidadId)} title="Marcar realizada" type="button">
             <CheckSquare2 size={15} />
             Realizada
           </button>
         ) : null}
-        <Link className="icon-button" title="Abrir" to={tarea.enlace}><ArrowRight size={17} /></Link>
+        <Link aria-label={`Abrir ${tarea.titulo}`} className="icon-button" title="Abrir" to={tarea.enlace}><ArrowRight size={17} /></Link>
       </div>
     </article>
   );

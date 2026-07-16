@@ -2750,6 +2750,11 @@ select {
   min-width: 0;
 }
 
+.document-table__main strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .document-table__row strong,
 .document-table__row span {
   display: block;
@@ -3995,6 +4000,9 @@ input.records-table-filter {
 }
 
 .registry-period-filter select {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
   border: 0;
   outline: 0;
   background: transparent;
@@ -4095,10 +4103,10 @@ input.records-table-filter {
 .task-row__icon--info { background: oklch(96% .028 232); color: oklch(45% .105 232); }
 .task-row__icon--success { background: oklch(96% .03 154); color: oklch(43% .1 154); }
 .task-row__icon--neutral { background: oklch(97% .006 90); color: oklch(45% .012 90); }
-.task-row__main, .task-row > div { display: grid; min-width: 0; gap: 3px; }.task-row strong { font-size: .85rem; }.task-row span, .task-row small { color: var(--muted); font-size: .75rem; }
+.task-row__main, .task-row__client, .task-row__age { display: grid; min-width: 0; gap: 3px; }.task-row strong { font-size: .85rem; }.task-row span, .task-row small { color: var(--muted); font-size: .75rem; }
 .task-row__main { grid-area: main; }
-.task-row__headline { display: flex; min-width: 0; align-items: center; gap: 8px; margin-bottom: 2px; }
-.task-row__kind { display: flex; min-width: 0; }.task-row__kind .status-badge { width: fit-content; min-height: 23px; border: 1px solid currentColor; padding: 3px 7px; font-size: .67rem; font-weight: 720; line-height: 1.15; text-align: center; white-space: normal; }
+.task-row__headline { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 2px; }
+.task-row__kind { display: flex; flex: 0 0 auto; min-width: 0; max-width: 100%; }.task-row__kind .status-badge { flex-shrink: 0; width: fit-content; max-width: 100%; min-height: 23px; border: 1px solid currentColor; padding: 3px 7px; font-size: .67rem; font-weight: 720; line-height: 1.15; text-align: center; white-space: normal; }
 .task-row__plate { display: inline-flex; flex: 0 0 auto; width: fit-content; max-width: 100%; align-items: center; border: 1px solid oklch(76% .018 90); border-radius: 4px; padding: 2px 7px; background: oklch(99% .004 92); color: var(--ink-strong); font-size: .92rem !important; font-variant-numeric: tabular-nums; font-weight: 860; letter-spacing: .035em; line-height: 1.2; }
 .task-row__context { grid-area: context; display: grid; min-width: 0; gap: 3px; border-left: 2px solid oklch(66% .09 72); padding: 4px 0 4px 9px; color: var(--ink); font-size: .78rem; line-height: 1.35; }
 .task-row__context p { display: -webkit-box; overflow: hidden; margin: 0; color: var(--ink); -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
@@ -4131,7 +4139,7 @@ input.records-table-filter {
 @media (max-width: 620px) { .mail-dialog { padding: 0; place-items: end center; }.mail-dialog__panel { max-height: 94vh; border-radius: 8px 8px 0 0; }.mail-dialog__route { grid-template-columns: 44px 1fr; }.mail-dialog__route small { grid-column: 2; } }
 .task-priority { border: 1px solid currentColor; border-radius: 999px; padding: 4px 7px; text-align: center; font-size: .65rem !important; font-weight: 760; }.task-priority--alta { color: oklch(49% .15 28) !important; }.task-priority--media { color: oklch(51% .12 72) !important; }
 @media (max-width: 1120px) { .task-row--admin { grid-template-columns: 38px minmax(210px, 310px) minmax(210px, 1fr) minmax(112px, 140px) 72px auto; grid-template-areas: "icon main context age priority actions"; }.task-row--admin:not(.task-row--with-context) { grid-template-columns: 38px minmax(0, 1fr) minmax(112px, 140px) 72px auto; grid-template-areas: "icon main age priority actions"; }.task-row--admin.task-row--selectable, .task-row--admin.task-row--selectable.task-row--with-context { grid-template-columns: 28px 38px minmax(0, 1fr) minmax(112px, 140px) 72px auto; grid-template-areas: "select icon main age priority actions"; }.task-row--admin .task-row__client { display: none; } }
-@media (max-width: 850px) { .task-row, .task-row--admin, .task-row--client, .task-row--admin.task-row--with-context, .task-row--client.task-row--with-context { grid-template-columns: 38px minmax(0, 1fr) 70px 38px; grid-template-areas: "icon main priority actions"; }.task-row--admin.task-row--selectable, .task-row--admin.task-row--selectable.task-row--with-context { grid-template-columns: 28px 38px minmax(0, 1fr) 70px 38px; grid-template-areas: "select icon main priority actions"; }.task-row__context, .task-row__client, .task-row__age { display: none; }.task-selection-bar, .task-selection-toolbar { align-items: stretch; flex-direction: column; } }
+@media (max-width: 850px) { .task-row, .task-row--admin, .task-row--client, .task-row--admin.task-row--with-context, .task-row--client.task-row--with-context { grid-template-columns: 34px minmax(0, 1fr) auto; grid-template-areas: "icon main actions" "icon priority actions"; }.task-row--admin.task-row--selectable, .task-row--admin.task-row--selectable.task-row--with-context { grid-template-columns: 24px 34px minmax(0, 1fr) auto; grid-template-areas: "select icon main actions" "select icon priority actions"; }.task-row .task-row__context, .task-row .task-row__client, .task-row .task-row__age { display: none; }.task-selection-bar, .task-selection-toolbar { align-items: stretch; flex-direction: column; } }
 @media (max-width: 600px) { .task-summary { grid-template-columns: 1fr; }.task-filters { flex-direction: column; }.pagination-bar { flex-wrap: wrap; } }
 .task-tabs { display: inline-flex; width: fit-content; gap: 4px; border-bottom: 1px solid oklch(85% .012 92); }
 .task-tabs button { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 10px 13px; color: var(--muted); font-weight: 680; }
@@ -4156,6 +4164,14 @@ input.records-table-filter {
 @media(max-width:720px){.followup-row{grid-template-columns:38px minmax(0,1fr) auto}.followup-row__detail,.followup-row>div:nth-of-type(3),.followup-row>div:nth-of-type(4){display:none}.followup-row__actions .soft-button{font-size:0}.followup-row__actions .soft-button svg{margin:0}}
 
 .whatsapp-list { display: grid; }
+.whatsapp-page { min-width: 0; max-width: 100%; }
+.whatsapp-page .task-tabs { display: flex; width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.whatsapp-page .task-tabs button { flex: 0 0 auto; }
+.whatsapp-page .task-filters { min-width: 0; flex-wrap: wrap; }
+.whatsapp-page .task-filters label { flex: 1 1 260px; min-width: 0; max-width: 420px; }
+.filter-input { display: flex; min-width: 0; min-height: 38px; align-items: center; gap: 8px; border: 1px solid oklch(87% .012 92); border-radius: 7px; background: var(--panel); padding: 0 10px; color: var(--muted); }
+.filter-input input { width: 100%; min-width: 0; min-height: 36px; border: 0; outline: 0; background: transparent; color: var(--ink-strong); font: inherit; }
+.filter-input:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px oklch(69% 0.124 232 / 0.14); }
 .whatsapp-row { display: grid; grid-template-columns: 38px minmax(235px, .95fr) minmax(260px, 1.45fr) minmax(160px, .7fr) auto; align-items: center; gap: 14px; min-height: 88px; border-bottom: 1px solid oklch(90% .009 92); padding: 12px 13px; box-shadow: inset 3px 0 0 transparent; }
 .whatsapp-row--pending { box-shadow: inset 3px 0 0 oklch(70% .13 78); }
 .whatsapp-row--linked { box-shadow: inset 3px 0 0 oklch(66% .13 154); }
@@ -4211,6 +4227,8 @@ input.records-table-filter {
 
 .registry-search input {
   width: 100%;
+  min-width: 0;
+  min-height: 40px;
   border: 0;
   outline: 0;
   background: transparent;
@@ -7781,6 +7799,11 @@ input.records-table-filter {
     grid-column: 2;
   }
 
+  .document-table__row > a {
+    grid-column: 2;
+    justify-self: start;
+  }
+
   .plate--large strong {
     min-width: 0;
   }
@@ -7978,7 +8001,7 @@ input.records-table-filter {
     grid-template-columns: 38px minmax(0, 1fr) minmax(150px, auto) auto;
   }
 
-  .followup-row__detail,
+  .followup-row .followup-row__detail,
   .followup-row > div:nth-of-type(4) {
     display: none;
   }
@@ -7987,7 +8010,7 @@ input.records-table-filter {
     grid-template-columns: 38px minmax(0, 1fr) minmax(180px, 1fr) auto;
   }
 
-  .whatsapp-row__links {
+  .whatsapp-row .whatsapp-row__links {
     display: none;
   }
 
@@ -8017,15 +8040,35 @@ input.records-table-filter {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .task-row,
-  .task-row--admin,
-  .task-row--client,
-  .task-row--admin.task-row--with-context,
-  .task-row--client.task-row--with-context,
   .followup-row,
   .whatsapp-row,
   .whatsapp-attachment-row {
     grid-template-columns: 34px minmax(0, 1fr) auto;
+  }
+
+  .task-list .task-row,
+  .task-list .task-row--admin,
+  .task-list .task-row--client,
+  .task-list .task-row--admin.task-row--with-context,
+  .task-list .task-row--client.task-row--with-context {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "icon main actions"
+      "icon priority actions";
+  }
+
+  .task-list .task-row--admin.task-row--selectable,
+  .task-list .task-row--admin.task-row--selectable.task-row--with-context {
+    grid-template-columns: 24px 34px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "select icon main actions"
+      "select icon priority actions";
+  }
+
+  .task-row .task-row__context,
+  .task-row .task-row__client,
+  .task-row .task-row__age {
+    display: none;
   }
 
   .task-row__actions,
@@ -8034,15 +8077,41 @@ input.records-table-filter {
     align-self: start;
   }
 
+  .task-row .task-priority {
+    width: fit-content;
+    justify-self: start;
+  }
+
+  .task-row .task-row__actions {
+    flex-wrap: wrap;
+    max-width: min(132px, 34vw);
+  }
+
   .followup-row > div:nth-of-type(3),
-  .whatsapp-row__message {
+  .whatsapp-row .whatsapp-row__message {
     display: none;
   }
 }
 
+@media (max-width: 600px) {
+  .task-row .task-row__actions {
+    max-width: 80px;
+  }
+
+  .task-row__actions .soft-button {
+    width: 36px;
+    min-height: 36px;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .task-row__actions .soft-button svg {
+    margin: 0;
+  }
+}
+
 @media (min-width: 861px) and (max-width: 1320px) {
-  .grid--two,
-  .request-grid {
+  .grid--two {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -8073,5 +8142,11 @@ input.records-table-filter {
 
   .record-grid {
     grid-template-columns: minmax(0, 1.08fr) minmax(260px, 0.92fr);
+  }
+}
+
+@media (min-width: 1181px) and (max-width: 1320px) {
+  .request-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
