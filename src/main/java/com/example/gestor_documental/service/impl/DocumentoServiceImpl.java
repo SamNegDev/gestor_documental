@@ -945,19 +945,18 @@ public class DocumentoServiceImpl implements DocumentoService {
                 contenidos.add(Files.readAllBytes(ruta));
             }
 
-            Path rutaPrincipal = obtenerCarpetaUploads().resolve(principal.getNombreArchivo()).normalize();
-            Files.write(rutaPrincipal, pdfSplitService.unirDocumentos(contenidos));
+            byte[] contenidoUnido = pdfSplitService.unirDocumentos(contenidos);
+            escribirDocumentoUnido(principal, contenidoUnido);
 
             if (tipoDocumento != null) {
                 principal.setTipoDocumento(tipoDocumento);
             }
             if (nombreArchivo != null && !nombreArchivo.isBlank()) {
-                String nombreSanitizado = sanitizarNombreArchivo(TextNormalizer.upperOrNull(nombreArchivo));
-                if (!nombreSanitizado.contains(".")) {
-                    nombreSanitizado = nombreSanitizado + extensionDe(principal.getNombreArchivoOriginal());
-                }
+                String nombreSanitizado = asegurarExtensionPdf(nombreArchivo);
                 validarExtensionPermitida(nombreSanitizado);
                 principal.setNombreArchivoOriginal(nombreSanitizado);
+            } else {
+                principal.setNombreArchivoOriginal(asegurarExtensionPdf(principal.getNombreArchivoOriginal()));
             }
             if (principal.getExpediente() != null) {
                 principal.setOperacion(resolverOperacionExpediente(principal.getExpediente(), operacionId));
@@ -973,6 +972,35 @@ public class DocumentoServiceImpl implements DocumentoService {
         } catch (IOException e) {
             throw new RuntimeException("Error al unir documentos", e);
         }
+    }
+
+    private void escribirDocumentoUnido(Documento principal, byte[] contenidoUnido) throws IOException {
+        Path carpetaUploads = obtenerCarpetaUploads();
+        Path rutaActual = carpetaUploads.resolve(principal.getNombreArchivo()).normalize();
+        if ("pdf".equals(obtenerExtension(principal.getNombreArchivo()))) {
+            Files.write(rutaActual, contenidoUnido);
+            return;
+        }
+
+        String nombreFisicoPdf = UUID.randomUUID() + "_" + asegurarExtensionPdf(principal.getNombreArchivoOriginal());
+        Path rutaNueva = carpetaUploads.resolve(nombreFisicoPdf).normalize();
+        if (!rutaNueva.startsWith(carpetaUploads.normalize())) {
+            throw new IOException("Ruta de documento no valida");
+        }
+
+        Files.write(rutaNueva, contenidoUnido);
+        Files.deleteIfExists(rutaActual);
+        principal.setNombreArchivo(nombreFisicoPdf);
+    }
+
+    private String asegurarExtensionPdf(String nombreArchivo) {
+        String nombreSanitizado = sanitizarNombreArchivo(TextNormalizer.upperOrNull(nombreArchivo));
+        int punto = nombreSanitizado.lastIndexOf('.');
+        String base = punto >= 0 ? nombreSanitizado.substring(0, punto) : nombreSanitizado;
+        if (base.isBlank()) {
+            base = "DOCUMENTO_UNIDO";
+        }
+        return base + ".PDF";
     }
 
     private void validarMismoContenedor(Documento principal, Documento documento) {

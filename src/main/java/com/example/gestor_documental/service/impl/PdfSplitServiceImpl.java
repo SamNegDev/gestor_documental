@@ -3,8 +3,18 @@ package com.example.gestor_documental.service.impl;
 import com.example.gestor_documental.service.PdfSplitService;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.multipdf.PDFMergerUtility;
+import org.apache.pdfbox.io.MemoryUsageSetting;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.image.JPEGFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.springframework.stereotype.Service;
 
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -68,12 +78,79 @@ public class PdfSplitServiceImpl implements PdfSplitService {
                 if (contenido == null || contenido.length == 0) {
                     continue;
                 }
-                merger.addSource(new ByteArrayInputStream(contenido));
+                merger.addSource(new ByteArrayInputStream(normalizarParaUnion(contenido)));
             }
-            merger.mergeDocuments(org.apache.pdfbox.io.MemoryUsageSetting.setupMainMemoryOnly());
+            merger.mergeDocuments(MemoryUsageSetting.setupMainMemoryOnly());
             return baos.toByteArray();
         } catch (IOException e) {
-            throw new RuntimeException("Error al unir documentos PDF", e);
+            throw new RuntimeException("Error al unir documentos PDF o imagenes", e);
+        }
+    }
+
+    private byte[] normalizarParaUnion(byte[] contenido) throws IOException {
+        if (esPdf(contenido)) {
+            return contenido;
+        }
+        return imagenComoPdf(contenido);
+    }
+
+    private boolean esPdf(byte[] contenido) {
+        return contenido.length >= 5
+                && contenido[0] == '%'
+                && contenido[1] == 'P'
+                && contenido[2] == 'D'
+                && contenido[3] == 'F'
+                && contenido[4] == '-';
+    }
+
+    private byte[] imagenComoPdf(byte[] contenido) throws IOException {
+        BufferedImage imagen = ImageIO.read(new ByteArrayInputStream(contenido));
+        if (imagen == null) {
+            throw new IOException("El documento no es un PDF ni una imagen valida para unir");
+        }
+
+        BufferedImage imagenRgb = convertirARgb(imagen);
+        PDRectangle tamanoPagina = imagenRgb.getWidth() > imagenRgb.getHeight()
+                ? new PDRectangle(PDRectangle.A4.getHeight(), PDRectangle.A4.getWidth())
+                : PDRectangle.A4;
+
+        try (PDDocument documento = new PDDocument();
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            PDPage pagina = new PDPage(tamanoPagina);
+            documento.addPage(pagina);
+
+            PDImageXObject imagenPdf = JPEGFactory.createFromImage(documento, imagenRgb, 0.9f);
+            float margen = 24f;
+            float anchoDisponible = tamanoPagina.getWidth() - margen * 2;
+            float altoDisponible = tamanoPagina.getHeight() - margen * 2;
+            float escala = Math.min(anchoDisponible / imagenRgb.getWidth(), altoDisponible / imagenRgb.getHeight());
+            float ancho = imagenRgb.getWidth() * escala;
+            float alto = imagenRgb.getHeight() * escala;
+            float x = (tamanoPagina.getWidth() - ancho) / 2f;
+            float y = (tamanoPagina.getHeight() - alto) / 2f;
+
+            try (PDPageContentStream contenidoPagina = new PDPageContentStream(documento, pagina)) {
+                contenidoPagina.drawImage(imagenPdf, x, y, ancho, alto);
+            }
+
+            documento.save(baos);
+            return baos.toByteArray();
+        }
+    }
+
+    private BufferedImage convertirARgb(BufferedImage imagen) {
+        if (imagen.getType() == BufferedImage.TYPE_INT_RGB) {
+            return imagen;
+        }
+        BufferedImage imagenRgb = new BufferedImage(imagen.getWidth(), imagen.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = imagenRgb.createGraphics();
+        try {
+            graphics.setColor(Color.WHITE);
+            graphics.fillRect(0, 0, imagen.getWidth(), imagen.getHeight());
+            graphics.drawImage(imagen, 0, 0, null);
+            return imagenRgb;
+        } finally {
+            graphics.dispose();
         }
     }
 
