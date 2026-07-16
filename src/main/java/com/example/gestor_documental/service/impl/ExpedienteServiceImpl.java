@@ -14,6 +14,7 @@ import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.service.AvisoAdminService;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
@@ -49,6 +50,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     private final HistorialCambioService historialCambioService;
     private final VehiculoService vehiculoService;
     private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
+    private final AvisoAdminService avisoAdminService;
 
     @Override
     public List<Expediente> listarTodos() {
@@ -504,11 +506,11 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         documentoDgtFinal(origen).ifPresent(documentoOrigen -> {
             Documento documento = new Documento();
             documento.setExpediente(dependiente);
-            documento.setTipoDocumento(documentoOrigen.getTipoDocumento());
+            documento.setTipoDocumento(TipoDocumento.PERMISO_CIRCULACION);
             documento.setNombreArchivo(documentoOrigen.getNombreArchivo());
             documento.setNombreArchivoOriginal(documentoOrigen.getNombreArchivoOriginal());
-            documento.setDescripcionArchivo("Vinculado automaticamente desde EXP-" + origen.getId());
-            documento.setCliente(documentoOrigen.getCliente());
+            documento.setDescripcionArchivo("Permiso de circulacion incorporado desde la huella final de EXP-" + origen.getId());
+            documento.setCliente(dependiente.getCliente());
             documento.setSubidoPor(usuario);
             documentoRepository.save(documento);
         });
@@ -521,7 +523,15 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 dependiente,
                 usuario,
                 "TRAMITE VINCULADO LISTO",
-                "EXP-" + origen.getId() + " finalizo; se vinculo el justificante DGT disponible y el expediente retoma su tramitacion.");
+                "EXP-" + origen.getId() + " finalizo; su justificante DGT se adjunto como permiso de circulacion y el expediente retoma su tramitacion.");
+        avisoAdminService.crear(
+                "TRAMITE_VINCULADO_LISTO",
+                "Tramite vinculado listo",
+                "EXP-" + dependiente.getId() + " ya puede continuar porque EXP-" + origen.getId()
+                        + " finalizo. La huella anterior se adjunto como permiso de circulacion.",
+                "TRAMITE_VINCULADO",
+                dependiente,
+                dependiente.getCliente());
     }
 
     private Optional<Documento> documentoDgtFinal(Expediente origen) {

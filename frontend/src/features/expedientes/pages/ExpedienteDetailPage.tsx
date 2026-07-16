@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type DragEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Download, FilePlus2, FileText, Info, Link2, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ShieldAlert, ShieldCheck, Trash2, Unlink, Upload, UserRound, X } from "lucide-react";
 import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteUploadPanel";
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
@@ -158,6 +158,11 @@ function formatShortDate(value?: string | null) {
     month: "short",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function formatExpedienteStatus(value?: string | null) {
+  if (!value) return "sin estado";
+  return value.toLowerCase().replace(/_/g, " ");
 }
 
 function hasClosingDocuments(documentos: DocumentoExpediente[]) {
@@ -1563,6 +1568,7 @@ export function ExpedienteDetailPage() {
     }
     return result;
   }, []);
+  const linkedExpediente = expediente.tramiteVinculado;
 
   return (
     <main className="exp-detail-page">
@@ -1653,30 +1659,45 @@ export function ExpedienteDetailPage() {
             </button>
           </div>
           <div className="exp-linked-panel">
-            <div>
+            <div className="exp-linked-panel__summary">
               <p className="eyebrow">Tramite doble</p>
               <strong>
-                {expediente.tramiteVinculado
-                  ? `Esperando ${expediente.tramiteVinculado.origenReferencia}`
+                {linkedExpediente
+                  ? linkedExpediente.esperandoFinalizacion
+                    ? `Esperando ${linkedExpediente.origenReferencia}`
+                    : `${linkedExpediente.origenReferencia} finalizado`
                   : "Vincular a un tramite previo"}
               </strong>
+              {linkedExpediente ? (
+                <span className={`exp-linked-panel__status ${linkedExpediente.esperandoFinalizacion ? "exp-linked-panel__status--waiting" : "exp-linked-panel__status--ready"}`}>
+                  {linkedExpediente.esperandoFinalizacion ? "A la espera del origen" : "Origen finalizado"}
+                </span>
+              ) : null}
               <span>
-                {expediente.tramiteVinculado
-                  ? `Estado origen: ${expediente.tramiteVinculado.origenEstado || "sin estado"}`
+                {linkedExpediente
+                  ? linkedExpediente.esperandoFinalizacion
+                    ? `Estado origen: ${formatExpedienteStatus(linkedExpediente.origenEstado)}. El expediente seguira pausado hasta que finalice.`
+                    : `Estado origen: ${formatExpedienteStatus(linkedExpediente.origenEstado)}. Ya puedes continuar este tramite.`
                   : "El expediente quedara pausado hasta que finalice el tramite origen."}
               </span>
-              {expediente.tramiteVinculado?.motivoEspera ? <small>{expediente.tramiteVinculado.motivoEspera}</small> : null}
+              {linkedExpediente?.motivoEspera ? <small>{linkedExpediente.motivoEspera}</small> : null}
             </div>
-            {expediente.tramiteVinculado ? (
-              <button
-                className="soft-button soft-button--compact"
-                disabled={savingLinkedExpediente}
-                onClick={handleUnlinkDependentExpediente}
-                type="button"
-              >
-                {savingLinkedExpediente ? <Loader2 className="button-spinner" size={15} /> : <Unlink size={15} />}
-                Desvincular
-              </button>
+            {linkedExpediente ? (
+              <div className="exp-linked-panel__actions">
+                <Link className="soft-button soft-button--compact" to={`/expedientes/${linkedExpediente.origenId}`}>
+                  <Link2 size={15} />
+                  Ver expediente previo
+                </Link>
+                <button
+                  className="soft-button soft-button--compact"
+                  disabled={savingLinkedExpediente}
+                  onClick={handleUnlinkDependentExpediente}
+                  type="button"
+                >
+                  {savingLinkedExpediente ? <Loader2 className="button-spinner" size={15} /> : <Unlink size={15} />}
+                  Desvincular
+                </button>
+              </div>
             ) : (
               <div className="exp-linked-panel__form">
                 <input
