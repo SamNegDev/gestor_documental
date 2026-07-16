@@ -813,6 +813,7 @@ export function ExpedienteDetailPage() {
   const [activeOperationId, setActiveOperationId] = useState<number | null>(null);
   const [editingDocument, setEditingDocument] = useState<DocumentoExpediente | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadDialogInitialFile, setUploadDialogInitialFile] = useState<File | null>(null);
   const [uploadingStandaloneDocument, setUploadingStandaloneDocument] = useState(false);
   const [readingIdentityId, setReadingIdentityId] = useState<number | null>(null);
   const [addingIdentityDocumentId, setAddingIdentityDocumentId] = useState<number | null>(null);
@@ -978,12 +979,24 @@ export function ExpedienteDetailPage() {
     try {
       await uploadExpedienteDocument(expediente.id, input.tipoDocumento, input.archivo, input.operacionId);
       setUploadDialogOpen(false);
+      setUploadDialogInitialFile(null);
       await refreshExpediente();
     } catch (cause) {
       alert(cause instanceof ApiError ? cause.details || "No se pudo subir el documento." : "No se pudo subir el documento.");
     } finally {
       setUploadingStandaloneDocument(false);
     }
+  };
+
+  const openStandaloneUploadDialog = (archivo?: File | null) => {
+    setUploadDialogInitialFile(archivo ?? null);
+    setUploadDialogOpen(true);
+  };
+
+  const closeStandaloneUploadDialog = () => {
+    if (uploadingStandaloneDocument) return;
+    setUploadDialogOpen(false);
+    setUploadDialogInitialFile(null);
   };
 
   const handleUploadRequirement = async (requisito: RequisitoDocumental, archivo: File) => {
@@ -1775,7 +1788,8 @@ export function ExpedienteDetailPage() {
             onEditDocument={setEditingDocument}
             onOpenReview={handleOpenDocumentReview}
             onOpenTemplates={() => setTemplateDialogOpen(true)}
-            onOpenUpload={() => setUploadDialogOpen(true)}
+            onOpenUpload={() => openStandaloneUploadDialog()}
+            onDropStandaloneDocument={openStandaloneUploadDialog}
             onReadIdentity={handleReadDocumentIdentity}
             onReadRoles={handleReadDocumentRoles}
             onUseDetectedIdentity={handleUseDetectedIdentity}
@@ -1852,10 +1866,11 @@ export function ExpedienteDetailPage() {
       />
       <DocumentUploadDialog
         activeOperationId={activeOperation?.id ?? null}
+        initialFile={uploadDialogInitialFile}
         operaciones={operaciones}
         open={uploadDialogOpen}
         saving={uploadingStandaloneDocument}
-        onClose={() => setUploadDialogOpen(false)}
+        onClose={closeStandaloneUploadDialog}
         onSubmit={handleUploadStandaloneDocument}
       />
       {dialog}

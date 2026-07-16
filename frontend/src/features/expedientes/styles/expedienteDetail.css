@@ -519,6 +519,7 @@
 }
 
 .closure-doc-card {
+  position: relative;
   display: grid;
   grid-template-columns: 136px minmax(0, 1fr);
   gap: 12px;
@@ -527,6 +528,7 @@
   border: 1px solid var(--line);
   border-radius: 13px;
   background: var(--panel);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
 }
 
 .closure-doc-card--ready {
@@ -539,9 +541,28 @@
 }
 
 .closure-doc-card--dragging {
-  border-color: var(--brand);
-  background: oklch(96% 0.028 232);
-  box-shadow: 0 0 0 3px oklch(69% 0.124 232 / 0.16);
+  border-color: oklch(58% 0.16 232);
+  background:
+    linear-gradient(135deg, oklch(98% 0.03 232), oklch(99% 0.018 154)),
+    var(--panel);
+  box-shadow:
+    0 0 0 4px oklch(69% 0.124 232 / 0.2),
+    0 18px 38px oklch(36% 0.08 232 / 0.18);
+  transform: translateY(-2px);
+}
+
+.closure-doc-card--dragging::after {
+  content: "Soltar aqui";
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: oklch(58% 0.16 232);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .closure-doc-card--disabled {
@@ -2104,6 +2125,39 @@
   background: oklch(96% 0.06 87);
   color: oklch(35% 0.09 75);
   font-weight: 800;
+}
+
+.exp-panel--documents-drop {
+  position: relative;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.exp-panel--documents-drop.is-dragging-document {
+  border-color: oklch(58% 0.16 232);
+  background:
+    linear-gradient(135deg, oklch(98% 0.025 232), oklch(100% 0 0) 56%),
+    var(--panel);
+  box-shadow:
+    0 0 0 4px oklch(69% 0.124 232 / 0.16),
+    0 18px 42px oklch(36% 0.08 232 / 0.14);
+}
+
+.documents-drop-hint {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: 12px;
+  border: 1px dashed oklch(62% 0.15 232);
+  border-radius: 13px;
+  background: oklch(97% 0.03 232);
+  color: oklch(36% 0.12 232);
+  font-weight: 900;
+}
+
+.is-dragging-document .documents-drop-hint {
+  display: flex;
 }
 
 .document-row,

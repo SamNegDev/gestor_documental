@@ -1,4 +1,5 @@
 import { Eye, FilePlus2, FileText, IdCard, Loader2, Pencil, Scissors, Trash2, Upload, UsersRound } from "lucide-react";
+import { useState, type DragEvent } from "react";
 import { DocumentReadingPanel, type DocumentReadingExistingIdentity } from "./DocumentReadingPanel";
 import type { DocumentoExpediente, DocumentoIdentidadDetectada } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
@@ -8,6 +9,7 @@ type Props = {
   onOpenReview: () => void;
   onOpenTemplates: () => void;
   onOpenUpload: () => void;
+  onDropStandaloneDocument?: (archivo: File) => void;
   onUploadDocument: (documento: DocumentoExpediente, archivo: File) => void;
   onEditDocument: (documento: DocumentoExpediente) => void;
   onDeleteDocument: (documento: DocumentoExpediente) => void;
@@ -25,6 +27,7 @@ export function DocumentsPanel({
   onOpenReview,
   onOpenTemplates,
   onOpenUpload,
+  onDropStandaloneDocument,
   onUploadDocument,
   onEditDocument,
   onDeleteDocument,
@@ -36,11 +39,49 @@ export function DocumentsPanel({
   readingIdentityId,
   readingRolesId,
 }: Props) {
+  const [draggingStandalone, setDraggingStandalone] = useState(false);
   const pendientesActuales = documentos.filter((documento) => documento.estado === "PENDIENTE" && documento.requeridoAhora);
   const hasEditableDocuments = documentos.some((documento) => documento.id);
+  const canDropStandalone = Boolean(onDropStandaloneDocument);
+
+  const handleDragOver = (event: DragEvent<HTMLElement>) => {
+    if (!canDropStandalone || !event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setDraggingStandalone(true);
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setDraggingStandalone(false);
+    }
+  };
+
+  const handleDrop = (event: DragEvent<HTMLElement>) => {
+    if (!canDropStandalone) return;
+    event.preventDefault();
+    setDraggingStandalone(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    const allowed = file.type === "application/pdf"
+      || file.type === "image/jpeg"
+      || file.type === "image/png"
+      || /\.(pdf|jpe?g|png)$/i.test(file.name);
+    if (!allowed) {
+      alert("Arrastra un archivo PDF, JPG o PNG para subirlo al expediente.");
+      return;
+    }
+    onDropStandaloneDocument?.(file);
+  };
 
   return (
-    <section className="exp-panel">
+    <section
+      className={`exp-panel exp-panel--documents-drop${draggingStandalone ? " is-dragging-document" : ""}`}
+      onDragEnter={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <div className="exp-panel__heading">
         <div>
           <p className="eyebrow">Documentación</p>
@@ -67,6 +108,11 @@ export function DocumentsPanel({
           Faltan {pendientesActuales.length} documento(s) requerido(s) para completar la fase actual.
         </div>
       ) : null}
+
+      <div className="documents-drop-hint" aria-hidden={!draggingStandalone}>
+        <Upload size={18} />
+        <span>Suelta el archivo para elegir el tipo documental</span>
+      </div>
 
       <div className="documents-list">
         {documentos.map((documento, index) => {

@@ -12,6 +12,7 @@ export type DocumentUploadSubmit = {
 
 type Props = {
   activeOperationId?: number | null;
+  initialFile?: File | null;
   operaciones?: OperacionExpediente[];
   open: boolean;
   saving?: boolean;
@@ -21,6 +22,7 @@ type Props = {
 
 export function DocumentUploadDialog({
   activeOperationId = null,
+  initialFile = null,
   operaciones = [],
   open,
   saving = false,
@@ -35,8 +37,8 @@ export function DocumentUploadDialog({
     if (!open) return;
     setTipoDocumento("OTROS");
     setOperacionId(activeOperationId ? String(activeOperationId) : "");
-    setArchivo(null);
-  }, [activeOperationId, open]);
+    setArchivo(initialFile);
+  }, [activeOperationId, initialFile, open]);
 
   if (!open) return null;
 
