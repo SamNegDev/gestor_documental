@@ -824,7 +824,7 @@ export function ExpedienteDetailPage() {
   const [iaResult, setIaResult] = useState<ActualizacionDocumentalExpediente | null>(null);
   const [iaError, setIaError] = useState<string | null>(null);
   const [linkedSourceId, setLinkedSourceId] = useState("");
-  const [linkedReason, setLinkedReason] = useState("SEGUNDO TRAMITE A LA ESPERA DEL COMPROBANTE DGT DEL PRIMERO");
+  const [linkedReason, setLinkedReason] = useState("");
   const [savingLinkedExpediente, setSavingLinkedExpediente] = useState(false);
   const [cancellingExpediente, setCancellingExpediente] = useState(false);
   const { confirm, dialog } = useConfirmDialog();
@@ -1427,6 +1427,7 @@ export function ExpedienteDetailPage() {
     try {
       await linkDependentExpediente(expediente.id, linkedSourceId.trim(), linkedReason.trim());
       setLinkedSourceId("");
+      setLinkedReason("");
       await refreshExpediente();
     } catch (cause) {
       alert(cause instanceof ApiError ? cause.details || "No se pudo vincular el tramite." : "No se pudo vincular el tramite.");
@@ -1750,7 +1751,6 @@ export function ExpedienteDetailPage() {
                   <input
                     inputMode="numeric"
                     onChange={(event) => setLinkedSourceId(event.target.value.replace(/\D/g, ""))}
-                    placeholder="Ej. 327"
                     type="text"
                     value={linkedSourceId}
                   />
@@ -1759,9 +1759,7 @@ export function ExpedienteDetailPage() {
                   <span>Motivo de espera</span>
                   <textarea
                     onChange={(event) => setLinkedReason(uppercaseInput(event.target.value))}
-                    placeholder="Motivo de la vinculacion"
                     rows={2}
-                    title={linkedReason}
                     value={linkedReason}
                   />
                 </label>
