@@ -1629,7 +1629,7 @@ export function ExpedienteDetailPage() {
         />
       ) : null}
       <section className="exp-quick-actions exp-quick-actions--ia" aria-label="Lectura IA del expediente">
-        <div>
+        <div className="exp-quick-actions__copy">
           <p className="eyebrow">Lectura IA</p>
           <strong>Leer expediente con IA</strong>
           <span>
@@ -1665,8 +1665,8 @@ export function ExpedienteDetailPage() {
         onResolveIncident={setResolvingIncident}
       />
       {canRequestAdditionalInfo ? (
-        <section className="exp-quick-actions" aria-label="Acciones rapidas del expediente">
-          <div>
+        <section className="exp-quick-actions exp-quick-actions--workflow" aria-label="Acciones rapidas del expediente">
+          <div className="exp-quick-actions__copy">
             <p className="eyebrow">Acciones del expediente</p>
             <strong>Actualizar datos, incidencias o solicitudes</strong>
             <span>Las incidencias pueden acumularse y el expediente seguira bloqueado hasta resolverlas todas.</span>
@@ -1745,19 +1745,26 @@ export function ExpedienteDetailPage() {
               </div>
             ) : (
               <div className="exp-linked-panel__form">
-                <input
-                  inputMode="numeric"
-                  onChange={(event) => setLinkedSourceId(event.target.value.replace(/\D/g, ""))}
-                  placeholder="EXP origen"
-                  type="text"
-                  value={linkedSourceId}
-                />
-                <input
-                  onChange={(event) => setLinkedReason(uppercaseInput(event.target.value))}
-                  placeholder="Motivo"
-                  type="text"
-                  value={linkedReason}
-                />
+                <label className="exp-linked-panel__field exp-linked-panel__field--source">
+                  <span>Expediente origen</span>
+                  <input
+                    inputMode="numeric"
+                    onChange={(event) => setLinkedSourceId(event.target.value.replace(/\D/g, ""))}
+                    placeholder="Ej. 327"
+                    type="text"
+                    value={linkedSourceId}
+                  />
+                </label>
+                <label className="exp-linked-panel__field">
+                  <span>Motivo de espera</span>
+                  <textarea
+                    onChange={(event) => setLinkedReason(uppercaseInput(event.target.value))}
+                    placeholder="Motivo de la vinculacion"
+                    rows={2}
+                    title={linkedReason}
+                    value={linkedReason}
+                  />
+                </label>
                 <button
                   className="soft-button soft-button--compact"
                   disabled={savingLinkedExpediente || !linkedSourceId.trim()}
