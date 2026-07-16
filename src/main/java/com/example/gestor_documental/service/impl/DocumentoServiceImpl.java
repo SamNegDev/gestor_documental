@@ -71,6 +71,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     private final OcrPdfService ocrPdfService;
     private final PdfSplitService pdfSplitService;
     private final HistorialCambioService historialCambioService;
+    private final TransactionalFileService transactionalFileService;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -593,6 +594,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     }
 
     @Override
+    @Transactional
     public Long eliminar(Long id) {
         Documento documento = documentoRepository.findByIdConRelaciones(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Documento no encontrado"));
@@ -603,20 +605,16 @@ public class DocumentoServiceImpl implements DocumentoService {
 
         Path rutaArchivo = obtenerCarpetaUploads().resolve(documento.getNombreArchivo()).normalize();
 
-        try {
-            Path carpetaUploads = obtenerCarpetaUploads();
-            if (!rutaArchivo.startsWith(carpetaUploads)) {
-                throw new OperacionInvalidaException("Ruta de archivo no permitida");
-            }
-            if (Files.exists(rutaArchivo)) {
-                Files.delete(rutaArchivo);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException("Error al borrar el archivo físico", e);
+        Path carpetaUploads = obtenerCarpetaUploads();
+        if (!rutaArchivo.startsWith(carpetaUploads)) {
+            throw new OperacionInvalidaException("Ruta de archivo no permitida");
         }
 
         desvincularRequisitos(documento);
+        correccionClasificacionDocumentoRepository.desvincularDocumento(documento.getId());
         documentoRepository.delete(documento);
+        documentoRepository.flush();
+        transactionalFileService.eliminarTrasCommit(List.of(rutaArchivo));
 
         return entidadId;
     }
@@ -774,8 +772,17 @@ public class DocumentoServiceImpl implements DocumentoService {
         Documento documento = obtenerDocumentoConPermiso(id, usuario);
         Path ruta = obtenerCarpetaUploads().resolve(documento.getNombreArchivo()).normalize();
 
+        if (esImagen(documento.getNombreArchivo())) {
+            if (!Files.exists(ruta)) {
+                throw new RecursoNoEncontradoException("El archivo fisico del documento no existe");
+            }
+            return 1;
+        }
+
         try (org.apache.pdfbox.pdmodel.PDDocument pdfDoc = org.apache.pdfbox.pdmodel.PDDocument.load(Files.readAllBytes(ruta))) {
             return pdfDoc.getNumberOfPages();
+        } catch (java.nio.file.NoSuchFileException exception) {
+            throw new RecursoNoEncontradoException("El archivo fisico del documento no existe");
         } catch (IOException e) {
             throw new RuntimeException("Error al contar paginas del documento", e);
         }
@@ -787,6 +794,24 @@ public class DocumentoServiceImpl implements DocumentoService {
         Documento documento = obtenerDocumentoConPermiso(id, usuario);
         Path ruta = obtenerCarpetaUploads().resolve(documento.getNombreArchivo()).normalize();
 
+        if (esImagen(documento.getNombreArchivo())) {
+            if (pagina != 1) {
+                throw new OperacionInvalidaException("Pagina fuera de rango");
+            }
+            try (InputStream input = Files.newInputStream(ruta); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(input);
+                if (image == null) {
+                    throw new IOException("Formato de imagen no reconocido");
+                }
+                javax.imageio.ImageIO.write(image, "png", baos);
+                return baos.toByteArray();
+            } catch (java.nio.file.NoSuchFileException exception) {
+                throw new RecursoNoEncontradoException("El archivo fisico del documento no existe");
+            } catch (IOException exception) {
+                throw new RuntimeException("Error al renderizar pagina del documento", exception);
+            }
+        }
+
         try (org.apache.pdfbox.pdmodel.PDDocument pdfDoc = org.apache.pdfbox.pdmodel.PDDocument.load(Files.readAllBytes(ruta));
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             if (pagina < 1 || pagina > pdfDoc.getNumberOfPages()) {
@@ -796,6 +821,8 @@ public class DocumentoServiceImpl implements DocumentoService {
             java.awt.image.BufferedImage image = renderer.renderImageWithDPI(pagina - 1, 105, org.apache.pdfbox.rendering.ImageType.RGB);
             javax.imageio.ImageIO.write(image, "png", baos);
             return baos.toByteArray();
+        } catch (java.nio.file.NoSuchFileException exception) {
+            throw new RecursoNoEncontradoException("El archivo fisico del documento no existe");
         } catch (IOException e) {
             throw new RuntimeException("Error al renderizar pagina del documento", e);
         }
@@ -872,7 +899,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                 registrarCorreccionClasificacion(generado, documentoOriginal.getTipoDocumento(), nuevoTipo, usuario, "EXTRACCION_PAGINAS");
             }
 
-            Files.write(rutaOriginal, pdfRestante);
+            reemplazarContenidoDocumento(documentoOriginal, pdfRestante);
 
         } catch (IOException e) {
             throw new RuntimeException("Error al leer o sobrescribir el archivo original físico al extraer páginas.",
@@ -906,7 +933,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                 throw new OperacionInvalidaException("No se pueden eliminar todas las paginas del documento");
             }
 
-            Files.write(ruta, pdfSplitService.eliminarPaginas(bytesOriginales, paginasEliminar));
+            reemplazarContenidoDocumento(documento, pdfSplitService.eliminarPaginas(bytesOriginales, paginasEliminar));
         } catch (IOException e) {
             throw new RuntimeException("Error al eliminar paginas del documento", e);
         }
@@ -942,16 +969,18 @@ public class DocumentoServiceImpl implements DocumentoService {
             }
 
             List<byte[]> contenidos = new java.util.ArrayList<>();
+            List<Path> rutasOriginales = new java.util.ArrayList<>();
             for (Documento documento : documentos) {
                 Path ruta = obtenerCarpetaUploads().resolve(documento.getNombreArchivo()).normalize();
                 if (!Files.exists(ruta)) {
                     throw new RecursoNoEncontradoException("El archivo fisico del documento no existe");
                 }
+                rutasOriginales.add(ruta);
                 contenidos.add(Files.readAllBytes(ruta));
             }
 
             byte[] contenidoUnido = pdfSplitService.unirDocumentos(contenidos);
-            escribirDocumentoUnido(principal, contenidoUnido);
+            reemplazarContenidoDocumento(principal, contenidoUnido);
 
             if (tipoDocumento != null) {
                 principal.setTipoDocumento(tipoDocumento);
@@ -974,28 +1003,26 @@ public class DocumentoServiceImpl implements DocumentoService {
                 reasignarRequisitos(documento, principal);
                 eliminarDocumentoFusionado(documento);
             }
+            documentoRepository.flush();
+            transactionalFileService.eliminarTrasCommit(rutasOriginales.subList(1, rutasOriginales.size()));
         } catch (IOException e) {
             throw new RuntimeException("Error al unir documentos", e);
         }
     }
 
-    private void escribirDocumentoUnido(Documento principal, byte[] contenidoUnido) throws IOException {
+    private void reemplazarContenidoDocumento(Documento documento, byte[] contenido) throws IOException {
         Path carpetaUploads = obtenerCarpetaUploads();
-        Path rutaActual = carpetaUploads.resolve(principal.getNombreArchivo()).normalize();
-        if ("pdf".equals(obtenerExtension(principal.getNombreArchivo()))) {
-            Files.write(rutaActual, contenidoUnido);
-            return;
-        }
-
-        String nombreFisicoPdf = UUID.randomUUID() + "_" + asegurarExtensionPdf(principal.getNombreArchivoOriginal());
+        Path rutaActual = carpetaUploads.resolve(documento.getNombreArchivo()).normalize();
+        String nombreFisicoPdf = UUID.randomUUID() + "_" + asegurarExtensionPdf(documento.getNombreArchivoOriginal());
         Path rutaNueva = carpetaUploads.resolve(nombreFisicoPdf).normalize();
         if (!rutaNueva.startsWith(carpetaUploads.normalize())) {
             throw new IOException("Ruta de documento no valida");
         }
 
-        Files.write(rutaNueva, contenidoUnido);
-        Files.deleteIfExists(rutaActual);
-        principal.setNombreArchivo(nombreFisicoPdf);
+        transactionalFileService.escribirNuevoConLimpiezaEnRollback(rutaNueva, contenido);
+        documento.setNombreArchivo(nombreFisicoPdf);
+        documentoRepository.save(documento);
+        transactionalFileService.eliminarTrasCommit(List.of(rutaActual));
     }
 
     private String asegurarExtensionPdf(String nombreArchivo) {
@@ -1171,13 +1198,13 @@ public class DocumentoServiceImpl implements DocumentoService {
     }
 
     private void eliminarDocumentoFusionado(Documento documento) throws IOException {
-        Path ruta = obtenerCarpetaUploads().resolve(documento.getNombreArchivo()).normalize();
-        Path carpetaUploads = obtenerCarpetaUploads();
-        if (!ruta.startsWith(carpetaUploads)) {
-            throw new OperacionInvalidaException("Ruta de archivo no permitida");
-        }
-        Files.deleteIfExists(ruta);
+        correccionClasificacionDocumentoRepository.desvincularDocumento(documento.getId());
         documentoRepository.delete(documento);
+    }
+
+    private boolean esImagen(String nombreArchivo) {
+        String extension = obtenerExtension(nombreArchivo);
+        return "jpg".equals(extension) || "jpeg".equals(extension) || "png".equals(extension);
     }
 
     private Path obtenerCarpetaUploads() {

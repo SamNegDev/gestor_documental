@@ -1,5 +1,7 @@
 package com.example.gestor_documental.controller;
 
+import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.service.DocumentoService;
@@ -40,11 +42,11 @@ public class DocumentoController {
         Path rutaArchivo = rutaBase.resolve(documento.getNombreArchivo()).normalize();
 
         if (!rutaArchivo.startsWith(rutaBase)) {
-            throw new RuntimeException("Acceso denegado: Ruta de archivo no permitida");
+            throw new AccesoDenegadoException("Ruta de archivo no permitida");
         }
 
         if (!Files.exists(rutaArchivo)) {
-            throw new RuntimeException("El archivo no existe en disco");
+            throw new RecursoNoEncontradoException("El archivo no existe en disco");
         }
 
         response.setContentType("application/octet-stream");
@@ -67,11 +69,11 @@ public class DocumentoController {
         Path rutaArchivo = rutaBase.resolve(documento.getNombreArchivo()).normalize();
 
         if (!rutaArchivo.startsWith(rutaBase)) {
-            throw new RuntimeException("Acceso denegado: Ruta de archivo no permitida");
+            throw new AccesoDenegadoException("Ruta de archivo no permitida");
         }
 
         if (!Files.exists(rutaArchivo)) {
-            throw new RuntimeException("El archivo no existe en disco");
+            throw new RecursoNoEncontradoException("El archivo no existe en disco");
         }
 
         response.setContentType(obtenerContentType(documento.getNombreArchivoOriginal()));

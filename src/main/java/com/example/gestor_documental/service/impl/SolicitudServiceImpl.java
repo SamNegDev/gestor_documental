@@ -16,6 +16,7 @@ import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
+import com.example.gestor_documental.repository.CorreccionClasificacionDocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
@@ -48,8 +49,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
@@ -74,6 +73,8 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final InteresadoService interesadoService;
     private final ClienteInteresadoRepository clienteInteresadoRepository;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final CorreccionClasificacionDocumentoRepository correccionClasificacionDocumentoRepository;
+    private final TransactionalFileService transactionalFileService;
     private final OperacionExpedienteService operacionExpedienteService;
     private final VehiculoService vehiculoService;
     private final ObjectProvider<RequisitoDocumentalExpedienteService> requisitoDocumentalExpedienteService;
@@ -1644,6 +1645,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         for (Incidencia incidencia : incidenciaRepository.findBySolicitudId(id)) {
             documentoIds.addAll(documentoRepository.findByIncidenciaId(incidencia.getId()).stream().map(Documento::getId).toList());
         }
+        correccionClasificacionDocumentoRepository.eliminarPorSolicitud(id);
         for (Long documentoId : documentoIds.stream().distinct().toList()) {
             eliminarDocumentoSolicitud(documentoId);
         }
@@ -1652,6 +1654,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         mensajeRepository.deleteBySolicitudId(id);
         historialCambioRepository.deleteBySolicitudId(id);
         solicitudRepository.delete(solicitud);
+        solicitudRepository.flush();
     }
 
     private void eliminarDocumentoSolicitud(Long documentoId) {
@@ -1662,14 +1665,9 @@ public class SolicitudServiceImpl implements SolicitudService {
         if (!rutaArchivo.startsWith(carpetaUploads)) {
             throw new OperacionInvalidaException("Ruta de archivo no permitida");
         }
-        try {
-            if (Files.exists(rutaArchivo)) {
-                Files.delete(rutaArchivo);
-            }
-        } catch (IOException exception) {
-            throw new RuntimeException("Error al borrar el archivo fisico", exception);
-        }
+        correccionClasificacionDocumentoRepository.desvincularDocumento(documentoId);
         documentoRepository.delete(documento);
+        transactionalFileService.eliminarTrasCommit(List.of(rutaArchivo));
     }
 
     private void normalizarSolicitud(Solicitud solicitud) {
