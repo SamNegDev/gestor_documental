@@ -38,6 +38,7 @@ const CLIENT_CLOSING_DOCUMENTS = [
 
 function clienteTone(estado: string) {
   if (estado === "FINALIZADO") return "success";
+  if (estado === "CANCELADO") return "danger";
   if (estado === "INCIDENCIA" || estado === "SOLICITADA_INFORMACION_ADICIONAL" || estado === "PENDIENTE_DOCUMENTACION") return "danger";
   if (estado === "PENDIENTE_TRAMITE_VINCULADO") return "warning";
   if (estado === "REVISANDO_INCIDENCIAS") return "warning";
@@ -46,6 +47,7 @@ function clienteTone(estado: string) {
 
 function friendlyPhase(expediente: ExpedienteCliente) {
   if (expediente.estado === "FINALIZADO") return "Expediente finalizado";
+  if (expediente.estado === "CANCELADO") return "Tramite cancelado por el cliente";
   if (expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL") return "Informacion solicitada";
   if (expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA") return "Informacion en revision";
   if (expediente.estado === "PENDIENTE_DOCUMENTACION") return "Pendiente de documentacion";
@@ -59,6 +61,12 @@ function friendlyPhase(expediente: ExpedienteCliente) {
 
 function timelineSteps(expediente: ExpedienteCliente) {
   const phase = friendlyPhase(expediente);
+  if (expediente.estado === "CANCELADO") {
+    return [
+      { title: "Expediente abierto", description: "Hemos recibido la informacion inicial.", state: "done" },
+      { title: "Tramite cancelado", description: "El cliente cancelo el tramite antes de completarlo.", state: "current" },
+    ];
+  }
   const currentIndex =
     expediente.estado === "FINALIZADO" ? 4
       : expediente.estado === "ENVIADO_DGT" || phase.includes("firmar") ? 2
@@ -155,9 +163,11 @@ function ClientClosingDocumentsPanel({ documentos, tipoTramite }: { documentos: 
 function ClientDocumentRequirementsPanel({
   requisitos,
   onUpload,
+  readOnly = false,
 }: {
   requisitos: RequisitoDocumental[];
-  onUpload: (requisito: RequisitoDocumental, archivo: File) => void;
+  onUpload?: (requisito: RequisitoDocumental, archivo: File) => void;
+  readOnly?: boolean;
 }) {
   if (requisitos.length === 0) return null;
 
@@ -165,8 +175,8 @@ function ClientDocumentRequirementsPanel({
     <section className="client-requirements-panel" aria-label="Documentacion solicitada">
       <div className="exp-panel__heading">
         <div>
-          <p className="eyebrow">Accion requerida</p>
-          <h3>Documentacion pendiente</h3>
+          <p className="eyebrow">{readOnly ? "Documentacion" : "Accion requerida"}</p>
+          <h3>{readOnly ? "Pendiente al cancelar" : "Documentacion pendiente"}</h3>
         </div>
         <span className="exp-panel__counter">{requisitos.length}</span>
       </div>
@@ -183,20 +193,22 @@ function ClientDocumentRequirementsPanel({
                 {requisito.interesadoNombre ? ` · ${requisito.interesadoNombre}` : ""}
               </small>
             </div>
-            <label className="primary-button primary-button--compact">
-              <Upload size={15} />
-              Aportar solicitado
-              <input
-                hidden
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(event) => {
-                  const file = event.currentTarget.files?.[0];
-                  event.currentTarget.value = "";
-                  if (file) onUpload(requisito, file);
-                }}
-              />
-            </label>
+            {onUpload ? (
+              <label className="primary-button primary-button--compact">
+                <Upload size={15} />
+                Aportar solicitado
+                <input
+                  hidden
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = "";
+                    if (file) onUpload(requisito, file);
+                  }}
+                />
+              </label>
+            ) : null}
           </article>
         ))}
       </div>
@@ -389,7 +401,8 @@ export function ClienteExpedientePage() {
   const informationRequested = expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL";
   const informationReceived = expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
   const latestAdminMessage = [...mensajes].reverse().find((mensaje) => mensaje.rolAutor === "ADMIN");
-  const canUploadStandaloneDocument = expediente.estado !== "FINALIZADO" && expediente.estado !== "RECHAZADO";
+  const canUploadStandaloneDocument = expediente.estado !== "FINALIZADO" && expediente.estado !== "CANCELADO" && expediente.estado !== "RECHAZADO";
+  const expedienteCancelado = expediente.estado === "CANCELADO";
 
   return (
     <main className="client-expediente-page">
@@ -434,7 +447,11 @@ export function ClienteExpedientePage() {
         <span>Inicio: {formatDateTime(expediente.fechaInicio)}</span>
       </section>
 
-      <ClientDocumentRequirementsPanel requisitos={requisitos} onUpload={handleUploadRequirement} />
+      <ClientDocumentRequirementsPanel
+        readOnly={expedienteCancelado}
+        requisitos={requisitos}
+        onUpload={expedienteCancelado ? undefined : handleUploadRequirement}
+      />
 
       {expediente.estado === "FINALIZADO" ? <ClientClosingDocumentsPanel documentos={documentos} tipoTramite={expediente.tipoTramite} /> : null}
 
@@ -504,8 +521,8 @@ export function ClienteExpedientePage() {
         <section className="client-incident-panel">
           <div className="exp-panel__heading">
             <div>
-              <p className="eyebrow">Accion requerida</p>
-              <h3>Incidencia pendiente</h3>
+              <p className="eyebrow">{expedienteCancelado ? "Historial" : "Accion requerida"}</p>
+              <h3>{expedienteCancelado ? "Incidencias al cancelar" : "Incidencia pendiente"}</h3>
             </div>
           </div>
           {incidenciasActivas.map((incidencia) => (
@@ -520,7 +537,7 @@ export function ClienteExpedientePage() {
                   </small>
                 ) : null}
               </div>
-              {expediente.estado === "REVISANDO_INCIDENCIAS" || uploadedIncidentIds.has(incidencia.id) || incidencia.pendienteRevisionCliente ? null : (
+              {expedienteCancelado || expediente.estado === "REVISANDO_INCIDENCIAS" || uploadedIncidentIds.has(incidencia.id) || incidencia.pendienteRevisionCliente ? null : (
                 <div className="client-incident-actions">
                   <label className="primary-button primary-button--danger">
                     <Upload size={16} />

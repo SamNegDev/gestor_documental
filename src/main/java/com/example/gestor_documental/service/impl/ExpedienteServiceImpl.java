@@ -248,8 +248,8 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         if (usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN) {
             throw new AccesoDenegadoException("Solo el administrador puede cambiar el estado del expediente.");
         }
-        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
-            throw new OperacionInvalidaException("No se puede modificar un expediente finalizado");
+        if (expediente.getEstadoExpediente().esCerrado()) {
+            throw new OperacionInvalidaException("No se puede modificar un expediente cerrado");
         }
 
         if (nuevoEstado == EstadoExpediente.EN_TRAMITE || nuevoEstado == EstadoExpediente.FINALIZADO) {
@@ -279,6 +279,8 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 "El estado cambió de '" + estadoAnterior.name() + "' a '" + nuevoEstado.name() + "'");
         if (nuevoEstado == EstadoExpediente.FINALIZADO) {
             reanudarTramitesDependientes(expediente, usuarioLogueado);
+        } else if (nuevoEstado == EstadoExpediente.CANCELADO) {
+            avisarDependientesPorCancelacion(expediente);
         }
     }
 
@@ -302,8 +304,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 && expediente.getId().equals(origen.getExpedienteVinculadoOrigen().getId())) {
             throw new OperacionInvalidaException("No se puede crear un vinculo circular entre tramites.");
         }
-        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
-                || expediente.getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
+        if (expediente.getEstadoExpediente().esCerrado()) {
             throw new OperacionInvalidaException("No se puede pausar un expediente cerrado.");
         }
 
@@ -445,10 +446,22 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     }
 
     private void validarExpedienteAbierto(Expediente expediente) {
-        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
-                || expediente.getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
+        if (expediente.getEstadoExpediente().esCerrado()) {
             throw new OperacionInvalidaException("No se puede pausar un expediente cerrado");
         }
+    }
+
+    private void avisarDependientesPorCancelacion(Expediente origen) {
+        expedienteRepository.findByExpedienteVinculadoOrigenIdAndEstadoExpediente(
+                        origen.getId(), EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO)
+                .forEach(dependiente -> avisoAdminService.crear(
+                        "TRAMITE_VINCULADO_ORIGEN_CANCELADO",
+                        "Tramite vinculado con origen cancelado",
+                        "EXP-" + dependiente.getId() + " sigue en espera, pero su expediente previo EXP-"
+                                + origen.getId() + " fue cancelado por el cliente. Revisa si debe desvincularse o cancelarse.",
+                        "TRAMITE_VINCULADO",
+                        dependiente,
+                        dependiente.getCliente()));
     }
 
     private void pausar(Expediente expediente, EstadoExpediente estadoPausa, Usuario usuario, String accion, String descripcion) {
@@ -714,8 +727,9 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
         }
 
-        if (expedienteBase.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
-            throw new OperacionInvalidaException("No se puede editar un expediente finalizado");
+        if (expedienteBase.getEstadoExpediente() == EstadoExpediente.FINALIZADO
+                || expedienteBase.getEstadoExpediente() == EstadoExpediente.CANCELADO) {
+            throw new OperacionInvalidaException("No se puede editar un expediente cerrado");
         }
 
         validarInteresados(interesados);

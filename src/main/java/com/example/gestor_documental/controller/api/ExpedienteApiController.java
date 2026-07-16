@@ -157,6 +157,13 @@ public class ExpedienteApiController {
         return expedienteDetalleApiService.obtenerDetalle(id, usuarioLogueado);
     }
 
+    @PostMapping("/{id}/cancelar")
+    public ResponseEntity<Void> cancelar(@PathVariable Long id, Authentication authentication) {
+        Usuario usuarioLogueado = requireAdmin(authentication);
+        expedienteService.cambiarEstado(id, EstadoExpediente.CANCELADO, usuarioLogueado);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/catalogos-edicion")
     public ExpedienteEditCatalogsResponse obtenerCatalogosEdicion(Authentication authentication) {
         requireAdmin(authentication);

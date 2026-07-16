@@ -58,6 +58,7 @@ public class SeguimientoClienteApiController {
         List<SeguimientoIncidenciaResponse> items = incidenciaRepository.findAllWithDetails().stream()
                 .filter(incidencia -> !incidencia.isResuelta() && incidencia.getExpediente() != null)
                 .filter(incidencia -> incidencia.getExpediente().getEstadoExpediente() != EstadoExpediente.FINALIZADO
+                        && incidencia.getExpediente().getEstadoExpediente() != EstadoExpediente.CANCELADO
                         && incidencia.getExpediente().getEstadoExpediente() != EstadoExpediente.RECHAZADO)
                 .filter(incidencia -> incidencia.isSeguimientoArchivado() == archivadas)
                 .filter(incidencia -> archivadas || estaEnSeguimiento(incidencia))

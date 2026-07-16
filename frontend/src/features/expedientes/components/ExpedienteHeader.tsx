@@ -1,4 +1,4 @@
-import { ArrowLeft, Building2, CalendarDays, CarFront, Eye, FileText, Pencil, UserRound } from "lucide-react";
+import { ArrowLeft, Ban, Building2, CalendarDays, CarFront, Eye, FileText, Loader2, Pencil, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { ExpedienteDetail } from "../types/expedienteDetail.types";
 import { formatDateTime, humanizeEnum } from "../utils/formatters";
@@ -8,9 +8,11 @@ import { clientInitials } from "../../../shared/utils/clientBranding";
 
 type Props = {
   expediente: ExpedienteDetail;
+  cancelling?: boolean;
+  onCancel?: () => void;
 };
 
-export function ExpedienteHeader({ expediente }: Props) {
+export function ExpedienteHeader({ expediente, cancelling = false, onCancel }: Props) {
   const comprador = expediente.interesados.find((interesado) => interesado.rol === "COMPRADOR");
   const titular = expediente.interesados.find((interesado) => interesado.rol === "TITULAR");
   const interesadoPrincipal = comprador || titular || expediente.interesados[0];
@@ -87,6 +89,12 @@ export function ExpedienteHeader({ expediente }: Props) {
           <Eye size={15} />
           Vista cliente
         </Link>
+        {onCancel ? (
+          <button className="soft-button soft-button--compact soft-button--danger" disabled={cancelling} onClick={onCancel} type="button">
+            {cancelling ? <Loader2 className="button-spinner" size={15} /> : <Ban size={15} />}
+            {cancelling ? "Cancelando" : "Cancelar por el cliente"}
+          </button>
+        ) : null}
       </div>
     </section>
   );

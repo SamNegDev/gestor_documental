@@ -113,6 +113,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             if (!expedienteService.tienePermisoExpediente(expediente, usuario)) {
                 throw new AccesoDenegadoException("No tienes permiso para subir documentos a este expediente");
             }
+            validarExpedienteNoCancelado(expediente);
             OperacionExpediente operacion = resolverOperacionExpediente(expediente, operacionId);
 
             if (TipoDocumento.EXPEDIENTE_COMPLETO.equals(tipoDocumento)) {
@@ -147,6 +148,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (!expedienteService.tienePermisoExpediente(expediente, usuario)) {
             throw new AccesoDenegadoException("No tienes permiso para generar documentos en este expediente");
         }
+        validarExpedienteNoCancelado(expediente);
         try {
             Documento documento = construirDocumentoBase(contenido, nombreArchivoOriginal, tipoDocumento, usuario);
             documento.setDescripcionArchivo(descripcion);
@@ -198,6 +200,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             if (!expedienteService.tienePermisoExpediente(expediente, usuario)) {
                 throw new AccesoDenegadoException("No tienes permiso para subir documentos a este expediente");
             }
+            validarExpedienteNoCancelado(expediente);
             OperacionExpediente operacion = resolverOperacionExpediente(expediente, operacionId);
 
             Documento docOriginal = construirDocumentoBase(archivo, TipoDocumento.EXPEDIENTE_COMPLETO, usuario);
@@ -217,6 +220,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (docOriginal.getExpediente() == null) {
             throw new OperacionInvalidaException("El documento no pertenece a un expediente");
         }
+        validarExpedienteNoCancelado(docOriginal.getExpediente());
         if (docOriginal.getTipoDocumento() != TipoDocumento.EXPEDIENTE_COMPLETO) {
             throw new OperacionInvalidaException("El documento no es un expediente completo");
         }
@@ -303,6 +307,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             if (!expedienteService.tienePermisoExpediente(expediente, usuario)) {
                 throw new AccesoDenegadoException("No tienes permiso para aportar documentos a esta incidencia");
             }
+            validarExpedienteNoCancelado(expediente);
 
             Documento documento = construirDocumentoBase(archivo, tipoDocumento != null ? tipoDocumento : TipoDocumento.DOCUMENTO_INCIDENCIA, usuario);
             documento.setExpediente(expediente);
@@ -1125,6 +1130,12 @@ public class DocumentoServiceImpl implements DocumentoService {
     private void validarTransformacionExpedienteOSolicitud(Documento documento) {
         if (documento.getCliente() != null) {
             throw new OperacionInvalidaException("Los documentos del cliente no admiten esta operacion");
+        }
+    }
+
+    private void validarExpedienteNoCancelado(Expediente expediente) {
+        if (expediente != null && expediente.getEstadoExpediente() == EstadoExpediente.CANCELADO) {
+            throw new OperacionInvalidaException("No se pueden incorporar documentos a un expediente cancelado");
         }
     }
 

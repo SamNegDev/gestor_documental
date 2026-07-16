@@ -20,7 +20,7 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
             where i.resuelta = false
               and i.seguimientoArchivado = false
               and i.expediente is not null
-              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.CANCELADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
               and (i.contadorAvisos = 0 or (i.proximoAviso is not null and i.proximoAviso <= :ahora))
             """)
     List<Incidencia> findSeguimientoPendiente(@Param("ahora") LocalDateTime ahora);
@@ -34,7 +34,7 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
               and i.seguimientoArchivado = false
               and i.expediente is not null
               and c.id = :clienteId
-              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.CANCELADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
               and (i.contadorAvisos = 0 or (i.proximoAviso is not null and i.proximoAviso <= :ahora))
             order by i.fechaCreacion asc
             """)
@@ -50,7 +50,7 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
               and i.seguimientoArchivado = false
               and i.expediente is not null
               and i.contadorAvisos = 0
-              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.CANCELADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
             order by c.nombre asc, i.fechaCreacion asc
             """)
     List<Incidencia> findPendientesPrimerAviso();
@@ -65,7 +65,7 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
               and i.expediente is not null
               and c.id = :clienteId
               and i.contadorAvisos = 0
-              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.CANCELADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
             order by i.fechaCreacion asc
             """)
     List<Incidencia> findPendientesPrimerAvisoByCliente(@Param("clienteId") Long clienteId);
@@ -81,7 +81,7 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
               and i.contadorAvisos > 0
               and i.proximoAviso is not null
               and i.proximoAviso <= :ahora
-              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.CANCELADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
             order by c.nombre asc, i.proximoAviso asc
             """)
     List<Incidencia> findRecordatoriosPendientes(@Param("ahora") LocalDateTime ahora);
@@ -98,7 +98,7 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
               and i.contadorAvisos > 0
               and i.proximoAviso is not null
               and i.proximoAviso <= :ahora
-              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.CANCELADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
             order by i.proximoAviso asc
             """)
     List<Incidencia> findRecordatoriosPendientesByCliente(@Param("clienteId") Long clienteId,
@@ -113,7 +113,7 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
             where i.resuelta = false
               and i.seguimientoArchivado = false
               and i.expediente is not null
-              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.CANCELADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
             order by c.nombre asc, i.fechaCreacion asc
             """)
     List<Incidencia> findActivasResumen();
@@ -128,7 +128,7 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
               and i.seguimientoArchivado = false
               and i.expediente is not null
               and c.id = :clienteId
-              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.CANCELADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
             order by i.fechaCreacion asc
             """)
     List<Incidencia> findActivasResumenByCliente(@Param("clienteId") Long clienteId);
@@ -143,7 +143,7 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
               and i.resuelta = false
               and i.seguimientoArchivado = false
               and i.expediente is not null
-              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
+              and e.estadoExpediente not in (com.example.gestor_documental.enums.EstadoExpediente.FINALIZADO, com.example.gestor_documental.enums.EstadoExpediente.CANCELADO, com.example.gestor_documental.enums.EstadoExpediente.RECHAZADO)
             order by i.fechaCreacion asc
             """)
     List<Incidencia> findActivasResumenByIds(@Param("ids") List<Long> ids);

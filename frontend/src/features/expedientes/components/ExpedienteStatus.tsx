@@ -9,6 +9,7 @@ const statusClass: Record<ExpedienteStatusType, string> = {
   EN_TRAMITE: "exp-status--info",
   INCIDENCIA: "exp-status--warning",
   FINALIZADO: "exp-status--success",
+  CANCELADO: "exp-status--danger",
   RECHAZADO: "exp-status--danger",
   ENVIADO_DGT: "exp-status--info",
   REVISANDO_INCIDENCIAS: "exp-status--warning",

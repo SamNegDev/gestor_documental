@@ -158,6 +158,7 @@ public class TareaApiController {
                             EstadoExpediente.INCIDENCIA,
                             EstadoExpediente.PENDIENTE_DOCUMENTACION,
                             EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL,
+                            EstadoExpediente.CANCELADO,
                             EstadoExpediente.FINALIZADO
                     ))
                     .forEach(expediente -> tareas.add(tareaExpediente(expediente, "EXPEDIENTE_ESTANCADO", "MEDIA",

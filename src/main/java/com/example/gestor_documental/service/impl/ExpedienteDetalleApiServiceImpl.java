@@ -190,6 +190,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .noneMatch(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO);
         boolean expedienteCompletoSubido = tiposSubidos.contains(TipoDocumento.EXPEDIENTE_COMPLETO);
         boolean finalizado = estadoOperativo == EstadoExpediente.FINALIZADO;
+        boolean cancelado = estadoOperativo == EstadoExpediente.CANCELADO;
         boolean conIncidencia = estadoOperativo == EstadoExpediente.INCIDENCIA
                 || estadoOperativo == EstadoExpediente.REVISANDO_INCIDENCIAS;
         boolean documentacionSolicitada = estadoOperativo == EstadoExpediente.PENDIENTE_DOCUMENTACION
@@ -206,13 +207,14 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 || estadoOperativo == EstadoExpediente.ENVIADO_DGT
                 || hitosPersistidos.containsKey(CodigoHitoExpediente.ENVIADO_DGT);
         return new EstadoDetalle(tiposSubidos, documentacionBaseCompleta, expedienteCompletoSubido, modelo620Subido,
-                requisitosInicialesPendientes, finalizado, conIncidencia, documentacionSolicitada, informacionSolicitada, informacionRecibida,
+                requisitosInicialesPendientes, finalizado, cancelado, conIncidencia, documentacionSolicitada, informacionSolicitada, informacionRecibida,
                 tramiteSubido, enviadoDgt, hitosPersistidos, requisitos);
     }
 
     private EstadoExpediente calcularEstadoOperativo(Expediente expediente, List<Incidencia> incidencias) {
         EstadoExpediente estado = expediente.getEstadoExpediente();
         if (estado == EstadoExpediente.FINALIZADO
+                || estado == EstadoExpediente.CANCELADO
                 || estado == EstadoExpediente.RECHAZADO
                 || estado == EstadoExpediente.PENDIENTE_DOCUMENTACION
                 || estado == EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO
@@ -237,6 +239,9 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
     private String calcularFaseActual(EstadoExpediente estadoOperativo, EstadoDetalle estadoDetalle) {
         if (estadoOperativo == EstadoExpediente.FINALIZADO) {
             return "Finalizado";
+        }
+        if (estadoOperativo == EstadoExpediente.CANCELADO) {
+            return "Cancelado por el cliente";
         }
         if (estadoOperativo == EstadoExpediente.INCIDENCIA
                 || estadoOperativo == EstadoExpediente.REVISANDO_INCIDENCIAS) {
@@ -661,6 +666,18 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
     }
 
     private HitoExpedienteResponse calcularSiguientePaso(EstadoDetalle estadoDetalle, List<HitoExpedienteResponse> hitos) {
+        if (estadoDetalle.cancelado()) {
+            return HitoExpedienteResponse.builder()
+                    .id("expediente-cancelado")
+                    .titulo("Expediente cancelado")
+                    .descripcion("El cliente cancelo el tramite y no se realizara.")
+                    .estado("COMPLETADO")
+                    .tipo("ESTADO")
+                    .nota("No hay acciones operativas pendientes.")
+                    .completado(true)
+                    .bloqueado(false)
+                    .build();
+        }
         if (estadoDetalle.finalizado()) {
             return HitoExpedienteResponse.builder()
                     .id("expediente-finalizado")
@@ -1188,6 +1205,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
             boolean modelo620Subido,
             boolean requisitosInicialesPendientes,
             boolean finalizado,
+            boolean cancelado,
             boolean conIncidencia,
             boolean documentacionSolicitada,
             boolean informacionSolicitada,

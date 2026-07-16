@@ -751,6 +751,8 @@ function NextStepSummary({ expediente }: { expediente: ExpedienteListItem }) {
     label = expediente.justificantesFinalesPendientes?.length
       ? "Adjuntar justificantes"
       : "Sin acciones pendientes";
+  } else if (expediente.estado === "CANCELADO") {
+    label = "Sin acciones pendientes";
   } else if (expediente.estado === "PENDIENTE_DOCUMENTACION") {
     label = "Esperar documentacion";
   } else if (expediente.estado === "PENDIENTE_TRAMITE_VINCULADO") {
@@ -838,7 +840,7 @@ function ListSkeleton() {
 
 function statusTone(status?: string | null) {
   if (status === "FINALIZADO" || status === "CONVERTIDA") return "success";
-  if (status === "INCIDENCIA") return "danger";
+  if (status === "INCIDENCIA" || status === "CANCELADO") return "danger";
   if (status === "PENDIENTE_DOCUMENTACION" || status === "PENDIENTE_TRAMITE_VINCULADO") return "warning";
   if (status === "REVISANDO_INCIDENCIAS" || status === "ENVIADO_DGT" || status === "INFORMACION_ADICIONAL_RECIBIDA") return "info";
   if (status === "SOLICITADA_INFORMACION_ADICIONAL") return "info";
@@ -872,6 +874,8 @@ function formatStatusLabel(value?: string | null) {
       return "ENVIADO DGT";
     case "FINALIZADO":
       return "FINALIZADO";
+    case "CANCELADO":
+      return "CANCELADO";
     default:
       return formatEnum(value);
   }

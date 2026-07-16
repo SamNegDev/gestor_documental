@@ -23,6 +23,7 @@ import { SecondaryExpedienteTabs } from "../components/SecondaryExpedienteTabs";
 import { deleteDocument, deleteDocumentPages, extractDocumentPages, getCompleteExpedienteProcessing, mergeDocuments, readDocumentIdentity, readDocumentRoles, startCompleteExpedienteProcessing, updateDocument, uploadExpedienteDocument } from "../services/documentosApi";
 import {
   completeExpedienteMilestone,
+  cancelExpediente,
   finishExpediente,
   getExpedienteDetail,
   getIncidentTypes,
@@ -183,7 +184,8 @@ function getPhaseSummary(expediente: ExpedienteDetail) {
 }
 
 function ProcessFlowPanel({ expediente }: { expediente: ExpedienteDetail }) {
-  const isClosed = expediente.estado === "FINALIZADO" || expediente.estado === "RECHAZADO";
+  const isClosed = expediente.estado === "FINALIZADO" || expediente.estado === "CANCELADO" || expediente.estado === "RECHAZADO";
+  const isFinalized = expediente.estado === "FINALIZADO";
   const closingDocumentsReady = hasClosingDocuments(expediente.documentos);
   const hasIncident = expediente.estado === "INCIDENCIA" || expediente.estado === "REVISANDO_INCIDENCIAS";
   const hasAdditionalInfo = expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
@@ -207,36 +209,36 @@ function ProcessFlowPanel({ expediente }: { expediente: ExpedienteDetail }) {
       id: "preparacion",
       title: hasIncident ? "Incidencia" : hasAdditionalInfo ? "Informacion" : hasLinkedWait ? "Tramite vinculado" : hasPendingDocumentation ? "Documentacion solicitada" : docsReady ? "Documentacion comprobada" : "Comprobacion de documentacion",
       description: hasIncident ? "Subsanacion o revision pendiente." : hasAdditionalInfo ? "Pendiente de respuesta o revision." : hasLinkedWait ? "Esperando la finalizacion del tramite origen." : hasPendingDocumentation ? "Esperando los documentos requeridos." : docsReady ? "Documentacion base comprobada." : "Revisando documentos base.",
-      state: processPaused ? "Fase actual" : docsReady || isClosed ? "Completado" : "Fase actual",
-      tone: processPaused ? "active" : docsReady || isClosed ? "done" : "active",
+      state: processPaused ? "Fase actual" : docsReady || isFinalized ? "Completado" : "Fase actual",
+      tone: processPaused ? "active" : docsReady || isFinalized ? "done" : "active",
     },
     {
       id: "programa-gestion",
       title: managementReady ? "Tramite subido" : "Pendiente de subir",
       description: managementReady ? "Cargado en el programa de gestion." : "Pendiente de subir al programa de gestion.",
-      state: managementReady || isClosed ? "Completado" : docsReady && !processPaused ? "Fase actual" : "Pendiente",
-      tone: managementReady || isClosed ? "done" : docsReady && !processPaused ? "active" : "pending",
+      state: managementReady || isFinalized ? "Completado" : docsReady && !processPaused ? "Fase actual" : "Pendiente",
+      tone: managementReady || isFinalized ? "done" : docsReady && !processPaused ? "active" : "pending",
     },
     {
       id: "impuesto-620",
       title: model620Ready ? "Impuesto 620 presentado" : "Pendiente de pasar impuesto 620",
       description: model620Ready ? "Presentacion fiscal completada." : "A la espera de pasar el impuesto 620.",
-      state: model620Ready || isClosed ? "Completado" : managementReady && !processPaused ? "Fase actual" : "Pendiente",
-      tone: model620Ready || isClosed ? "done" : managementReady && !processPaused ? "active" : "pending",
+      state: model620Ready || isFinalized ? "Completado" : managementReady && !processPaused ? "Fase actual" : "Pendiente",
+      tone: model620Ready || isFinalized ? "done" : managementReady && !processPaused ? "active" : "pending",
     },
     {
       id: "envio-dgt",
       title: sentDgt ? "Tramite enviado a DGT" : "Pendiente de enviar a DGT",
       description: sentDgt ? "Envio a la DGT completado." : "El envio se habilita al tener el tramite subido.",
-      state: sentDgt || isClosed ? "Completado" : managementReady && !processPaused ? "Fase actual" : "Pendiente",
-      tone: sentDgt || isClosed ? "done" : managementReady && !processPaused ? "active" : "pending",
+      state: sentDgt || isFinalized ? "Completado" : managementReady && !processPaused ? "Fase actual" : "Pendiente",
+      tone: sentDgt || isFinalized ? "done" : managementReady && !processPaused ? "active" : "pending",
     },
     {
       id: "cierre",
-      title: isClosed ? "Tramite finalizado" : "Pendiente de cierre",
-      description: isClosed && !closingDocumentsReady ? "Pendiente de comprobantes finales." : "Cierre administrativo del tramite.",
-      state: isClosed ? (closingDocumentsReady ? "Completado" : "Pendiente comprobantes") : sentDgt && !processPaused ? "Fase actual" : "Pendiente",
-      tone: isClosed ? (closingDocumentsReady ? "done" : "active") : sentDgt && !processPaused ? "active" : "pending",
+      title: expediente.estado === "CANCELADO" ? "Tramite cancelado" : isClosed ? "Tramite finalizado" : "Pendiente de cierre",
+      description: expediente.estado === "CANCELADO" ? "El cliente cancelo el tramite antes de completarlo." : isClosed && !closingDocumentsReady ? "Pendiente de comprobantes finales." : "Cierre administrativo del tramite.",
+      state: expediente.estado === "CANCELADO" ? "Cancelado" : isClosed ? (closingDocumentsReady ? "Completado" : "Pendiente comprobantes") : sentDgt && !processPaused ? "Fase actual" : "Pendiente",
+      tone: expediente.estado === "CANCELADO" ? "active" : isClosed ? (closingDocumentsReady ? "done" : "active") : sentDgt && !processPaused ? "active" : "pending",
     },
   ];
 
@@ -824,6 +826,7 @@ export function ExpedienteDetailPage() {
   const [linkedSourceId, setLinkedSourceId] = useState("");
   const [linkedReason, setLinkedReason] = useState("SEGUNDO TRAMITE A LA ESPERA DEL COMPROBANTE DGT DEL PRIMERO");
   const [savingLinkedExpediente, setSavingLinkedExpediente] = useState(false);
+  const [cancellingExpediente, setCancellingExpediente] = useState(false);
   const { confirm, dialog } = useConfirmDialog();
 
   const refreshRelatedData = useCallback(async () => {
@@ -1398,6 +1401,26 @@ export function ExpedienteDetailPage() {
     }
   };
 
+  const handleCancelExpediente = async () => {
+    if (!expediente || cancellingExpediente) return;
+    const confirmed = await confirm({
+      title: "Cancelar expediente por el cliente",
+      description: "El tramite quedara cerrado como cancelado, dejaran de generarse tareas y avisos por sus incidencias y no se podra continuar su tramitacion.",
+      confirmLabel: "Cancelar expediente",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setCancellingExpediente(true);
+    try {
+      await cancelExpediente(expediente.id);
+      await refreshExpediente();
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo cancelar el expediente." : "No se pudo cancelar el expediente.");
+    } finally {
+      setCancellingExpediente(false);
+    }
+  };
+
   const handleLinkDependentExpediente = async () => {
     if (!expediente || !linkedSourceId.trim()) return;
     setSavingLinkedExpediente(true);
@@ -1551,14 +1574,14 @@ export function ExpedienteDetailPage() {
     expediente.estado === "SOLICITADA_INFORMACION_ADICIONAL" || expediente.estado === "INFORMACION_ADICIONAL_RECIBIDA";
   const hasDocumentationRequest = expediente.estado === "PENDIENTE_DOCUMENTACION";
   const hasLinkedWaitRequest = expediente.estado === "PENDIENTE_TRAMITE_VINCULADO";
+  const expedienteCerrado = expediente.estado === "FINALIZADO" || expediente.estado === "CANCELADO" || expediente.estado === "RECHAZADO";
   const nextOperationalStep =
-    hasAdditionalInfoFlow
+    expedienteCerrado || hasAdditionalInfoFlow
       ? expediente.siguientePaso
       : operationalHitos.find((hito) => hito.accion && !hito.completado && !hito.bloqueado) ?? expediente.siguientePaso;
   const hasActiveIncidents = expediente.incidencias.some((incidencia) => !incidencia.resuelta);
-  const canRequestAdditionalInfo = expediente.estado !== "FINALIZADO" && expediente.estado !== "RECHAZADO";
-  const canOpenIncident = expediente.estado !== "FINALIZADO" && expediente.estado !== "RECHAZADO";
-  const expedienteCerrado = expediente.estado === "FINALIZADO" || expediente.estado === "RECHAZADO";
+  const canRequestAdditionalInfo = expediente.estado !== "FINALIZADO" && expediente.estado !== "CANCELADO" && expediente.estado !== "RECHAZADO";
+  const canOpenIncident = expediente.estado !== "FINALIZADO" && expediente.estado !== "CANCELADO" && expediente.estado !== "RECHAZADO";
   const hasExpedienteDocuments = expediente.documentos.some((documento) => documento.subido && documento.id);
   const model620PhaseCompleted = operationalHitos.some((hito) => hito.id.toLowerCase().includes("modelo-620") && hito.completado);
   const showClosingDocumentsPanel = expediente.estado === "FINALIZADO" || model620PhaseCompleted;
@@ -1582,10 +1605,15 @@ export function ExpedienteDetailPage() {
     return result;
   }, []);
   const linkedExpediente = expediente.tramiteVinculado;
+  const linkedOriginCanceled = linkedExpediente?.origenEstado === "CANCELADO";
 
   return (
     <main className="exp-detail-page">
-      <ExpedienteHeader expediente={expediente} />
+      <ExpedienteHeader
+        cancelling={cancellingExpediente}
+        expediente={expediente}
+        onCancel={expedienteCerrado ? undefined : handleCancelExpediente}
+      />
       <OperationTabs
         activeOperationId={activeOperation?.id ?? null}
         operaciones={operaciones}
@@ -1676,19 +1704,23 @@ export function ExpedienteDetailPage() {
               <p className="eyebrow">Tramite doble</p>
               <strong>
                 {linkedExpediente
-                  ? linkedExpediente.esperandoFinalizacion
+                  ? linkedOriginCanceled
+                    ? `${linkedExpediente.origenReferencia} cancelado`
+                    : linkedExpediente.esperandoFinalizacion
                     ? `Esperando ${linkedExpediente.origenReferencia}`
                     : `${linkedExpediente.origenReferencia} finalizado`
                   : "Vincular a un tramite previo"}
               </strong>
               {linkedExpediente ? (
-                <span className={`exp-linked-panel__status ${linkedExpediente.esperandoFinalizacion ? "exp-linked-panel__status--waiting" : "exp-linked-panel__status--ready"}`}>
-                  {linkedExpediente.esperandoFinalizacion ? "A la espera del origen" : "Origen finalizado"}
+                <span className={`exp-linked-panel__status ${linkedOriginCanceled ? "exp-linked-panel__status--blocked" : linkedExpediente.esperandoFinalizacion ? "exp-linked-panel__status--waiting" : "exp-linked-panel__status--ready"}`}>
+                  {linkedOriginCanceled ? "Revisar vinculo" : linkedExpediente.esperandoFinalizacion ? "A la espera del origen" : "Origen finalizado"}
                 </span>
               ) : null}
               <span>
                 {linkedExpediente
-                  ? linkedExpediente.esperandoFinalizacion
+                  ? linkedOriginCanceled
+                    ? `Estado origen: ${formatExpedienteStatus(linkedExpediente.origenEstado)}. Este expediente no se reanudara automaticamente.`
+                    : linkedExpediente.esperandoFinalizacion
                     ? `Estado origen: ${formatExpedienteStatus(linkedExpediente.origenEstado)}. El expediente seguira pausado hasta que finalice.`
                     : `Estado origen: ${formatExpedienteStatus(linkedExpediente.origenEstado)}. Ya puedes continuar este tramite.`
                   : "El expediente quedara pausado hasta que finalice el tramite origen."}
@@ -1756,6 +1788,7 @@ export function ExpedienteDetailPage() {
           <PhaseMilestonesPanel
             closingDocumentsReady={operaciones.length <= 1 ? hasClosingDocuments(expediente.documentos) : undefined}
             expedienteEstado={operaciones.length <= 1 ? expediente.estado : undefined}
+            readOnly={expedienteCerrado}
             hitos={operationalHitos}
             rollbackLocked={expediente.estado === "FINALIZADO" && hasClosingDocuments(expediente.documentos)}
             onRunMilestoneAction={handleRunMilestoneAction}

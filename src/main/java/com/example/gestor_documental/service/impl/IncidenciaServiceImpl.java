@@ -81,8 +81,8 @@ public class IncidenciaServiceImpl implements IncidenciaService {
             throw new AccesoDenegadoException("Solo el administrador puede crear incidencias en expedientes.");
         }
 
-        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
-            throw new OperacionInvalidaException("No se puede abrir una incidencia en un expediente finalizado");
+        if (expediente.getEstadoExpediente().esCerrado()) {
+            throw new OperacionInvalidaException("No se puede abrir una incidencia en un expediente cerrado");
         }
 
         TipoIncidencia tipo = tipoIncidenciaService.buscarPorId(tipoIncidenciaId)
@@ -115,8 +115,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         if (!expedienteService.tienePermisoExpediente(expediente, admin)) {
             throw new AccesoDenegadoException("No tienes permiso para acceder a este expediente");
         }
-        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
-                || expediente.getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
+        if (expediente.getEstadoExpediente().esCerrado()) {
             throw new OperacionInvalidaException("El expediente ya no admite notificaciones al cliente");
         }
 
@@ -573,8 +572,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
 
     private void validarSeguimiento(Incidencia incidencia) {
         if (incidencia.isResuelta() || incidencia.getExpediente() == null
-                || incidencia.getExpediente().getEstadoExpediente() == EstadoExpediente.FINALIZADO
-                || incidencia.getExpediente().getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
+                || incidencia.getExpediente().getEstadoExpediente().esCerrado()) {
             throw new OperacionInvalidaException("La incidencia ya no admite seguimiento");
         }
     }

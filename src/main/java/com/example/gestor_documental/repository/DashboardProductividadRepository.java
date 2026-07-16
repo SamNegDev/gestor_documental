@@ -64,14 +64,16 @@ public class DashboardProductividadRepository {
     public long contarEnCurso() {
         return number(entityManager.createNativeQuery("""
                 select count(*) from expediente
-                where estado_expediente not in ('FINALIZADO', 'RECHAZADO')
+                where estado_expediente not in ('FINALIZADO', 'CANCELADO', 'RECHAZADO')
                 """).getSingleResult()).longValue();
     }
 
     public long contarIncidenciasActivas() {
         return number(entityManager.createNativeQuery("""
-                select count(*) from incidencia
-                where resuelta = false and expediente_id is not null
+                select count(*) from incidencia i
+                join expediente e on e.id = i.expediente_id
+                where i.resuelta = false
+                  and e.estado_expediente not in ('FINALIZADO', 'CANCELADO', 'RECHAZADO')
                 """).getSingleResult()).longValue();
     }
 
@@ -174,7 +176,7 @@ public class DashboardProductividadRepository {
                     timestampdiff(day, coalesce(e.fecha_ultima_modificacion, e.fecha_creacion), now()) as dias_sin_actividad
                     from expediente e
                     left join tipo_tramite tt on tt.id = e.tipo_tramite_id
-                    where e.estado_expediente not in ('FINALIZADO', 'RECHAZADO')
+                    where e.estado_expediente not in ('FINALIZADO', 'CANCELADO', 'RECHAZADO')
                 ) fases
                 group by fase
                 order by count(*) desc, avg(dias_sin_actividad) desc

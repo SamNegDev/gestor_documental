@@ -206,9 +206,8 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("Expediente no encontrado"));
 
         validarPermiso(expediente, usuario);
-        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
-                || expediente.getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
-            throw new OperacionInvalidaException("No se puede abrir una incidencia en un expediente finalizado o rechazado");
+        if (expediente.getEstadoExpediente().esCerrado()) {
+            throw new OperacionInvalidaException("No se puede abrir una incidencia en un expediente cerrado");
         }
 
         incidenciaService.crearIncidenciaExpediente(
@@ -229,8 +228,8 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
     }
 
     private void validarPuedeAvanzar(Expediente expediente) {
-        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
-            throw new OperacionInvalidaException("No se puede modificar un expediente finalizado");
+        if (expediente.getEstadoExpediente().esCerrado()) {
+            throw new OperacionInvalidaException("No se puede modificar un expediente cerrado");
         }
         if (expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
                 || expediente.getEstadoExpediente() == EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA) {
@@ -346,6 +345,9 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
     }
 
     private void validarRetrocesoPermitido(Expediente expediente) {
+        if (expediente.getEstadoExpediente() == EstadoExpediente.CANCELADO) {
+            throw new OperacionInvalidaException("No se puede modificar un expediente cancelado.");
+        }
         if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO && tieneJustificantesFinales(expediente)) {
             throw new OperacionInvalidaException("No se puede retroceder un expediente finalizado con todos los justificantes finales.");
         }

@@ -4,6 +4,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
@@ -11,6 +12,7 @@ import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
+import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
@@ -164,6 +166,41 @@ class ExpedienteServiceImplTest {
                 "TRAMITE_VINCULADO",
                 dependiente,
                 clienteDependiente);
+    }
+
+    @Test
+    void cancelaExpedienteConIncidenciasActivasYAvisaSiTieneDependiente() {
+        Expediente origen = expediente(EstadoExpediente.INCIDENCIA, TipoTramiteEnum.TRASPASO);
+        origen.setId(10L);
+        Expediente dependiente = expediente(EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO, TipoTramiteEnum.TRASPASO);
+        dependiente.setId(20L);
+
+        when(expedienteRepository.findById(10L)).thenReturn(Optional.of(origen));
+        when(expedienteRepository.findByExpedienteVinculadoOrigenIdAndEstadoExpediente(
+                10L, EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO)).thenReturn(List.of(dependiente));
+
+        service.cambiarEstado(10L, EstadoExpediente.CANCELADO, admin);
+
+        assertEquals(EstadoExpediente.CANCELADO, origen.getEstadoExpediente());
+        assertEquals(EstadoExpediente.PENDIENTE_TRAMITE_VINCULADO, dependiente.getEstadoExpediente());
+        verify(avisoAdminService).crear(
+                "TRAMITE_VINCULADO_ORIGEN_CANCELADO",
+                "Tramite vinculado con origen cancelado",
+                "EXP-20 sigue en espera, pero su expediente previo EXP-10 fue cancelado por el cliente. Revisa si debe desvincularse o cancelarse.",
+                "TRAMITE_VINCULADO",
+                dependiente,
+                null);
+    }
+
+    @Test
+    void noPermiteReabrirUnExpedienteCancelado() {
+        Expediente expediente = expediente(EstadoExpediente.CANCELADO, TipoTramiteEnum.TRASPASO);
+        when(expedienteRepository.findById(1L)).thenReturn(Optional.of(expediente));
+
+        assertThrows(OperacionInvalidaException.class,
+                () -> service.cambiarEstado(1L, EstadoExpediente.EN_TRAMITE, admin));
+
+        verify(expedienteRepository, never()).save(expediente);
     }
 
     private Expediente expediente(EstadoExpediente estado, TipoTramiteEnum tramiteEnum) {

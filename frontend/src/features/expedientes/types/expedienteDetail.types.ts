@@ -2,6 +2,7 @@ export type ExpedienteStatus =
   | "EN_TRAMITE"
   | "INCIDENCIA"
   | "FINALIZADO"
+  | "CANCELADO"
   | "RECHAZADO"
   | "ENVIADO_DGT"
   | "REVISANDO_INCIDENCIAS"

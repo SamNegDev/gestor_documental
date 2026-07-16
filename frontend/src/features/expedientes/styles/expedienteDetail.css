@@ -408,6 +408,12 @@
   color: oklch(42% 0.1 64);
 }
 
+.exp-linked-panel__status--blocked {
+  border-color: oklch(72% 0.14 28);
+  background: oklch(97% 0.035 28);
+  color: oklch(44% 0.15 28);
+}
+
 .exp-linked-panel__actions {
   display: flex;
   align-items: center;

@@ -963,6 +963,9 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
             return "Finalizado";
         }
+        if (expediente.getEstadoExpediente() == EstadoExpediente.CANCELADO) {
+            return "Cancelado por el cliente";
+        }
         if (expediente.getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
             return "Rechazado";
         }
@@ -999,6 +1002,9 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
     private String siguientePasoWhatsapp(Expediente expediente) {
         if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO) {
             return "El expediente ya esta cerrado.";
+        }
+        if (expediente.getEstadoExpediente() == EstadoExpediente.CANCELADO) {
+            return "El tramite fue cancelado por el cliente.";
         }
         if (expediente.getEstadoExpediente() == EstadoExpediente.RECHAZADO) {
             return "Contactar con la gestoria si necesitas mas informacion.";

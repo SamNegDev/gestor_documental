@@ -87,6 +87,10 @@ export function finishExpediente(expedienteId: string | number): Promise<void> {
   return apiPost(`/api/expedientes/${expedienteId}/finalizar`);
 }
 
+export function cancelExpediente(expedienteId: string | number): Promise<void> {
+  return apiPost(`/api/expedientes/${expedienteId}/cancelar`);
+}
+
 export function rollbackExpedienteFinalization(expedienteId: string | number): Promise<void> {
   return apiPost(`/api/expedientes/${expedienteId}/finalizar/retroceder`);
 }

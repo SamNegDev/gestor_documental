@@ -117,6 +117,9 @@ public class ClienteExpedienteApiController {
         if ("FINALIZADO".equals(detalle.getEstado())) {
             return "El expediente esta finalizado.";
         }
+        if ("CANCELADO".equals(detalle.getEstado())) {
+            return "El tramite fue cancelado por el cliente y el expediente esta cerrado.";
+        }
         if ("SOLICITADA_INFORMACION_ADICIONAL".equals(detalle.getEstado())) {
             return "Necesitamos que respondas a la informacion solicitada para continuar.";
         }
