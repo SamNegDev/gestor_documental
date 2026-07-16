@@ -20,6 +20,7 @@ import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
+import com.example.gestor_documental.service.OperacionExpedienteService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.VehiculoService;
 import com.example.gestor_documental.util.DireccionFormatter;
@@ -51,6 +52,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     private final VehiculoService vehiculoService;
     private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
     private final AvisoAdminService avisoAdminService;
+    private final OperacionExpedienteService operacionExpedienteService;
 
     @Override
     public List<Expediente> listarTodos() {
@@ -759,6 +761,10 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         Expediente expedienteGuardado = expedienteRepository.save(expedienteBase);
 
         interesados.forEach(interesado -> guardarInteresadoSiValido(expedienteGuardado, interesado));
+
+        if (!java.util.Objects.equals(tipoTramiteAnterior, tipoTramite.getId())) {
+            operacionExpedienteService.sincronizarYListar(expedienteGuardado);
+        }
 
         java.util.List<String> cambios = new java.util.ArrayList<>();
         if (!java.util.Objects.equals(matriculaAnterior, expedienteActualizado.getMatricula())) {

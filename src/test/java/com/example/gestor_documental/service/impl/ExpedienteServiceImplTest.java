@@ -31,6 +31,7 @@ import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
+import com.example.gestor_documental.service.OperacionExpedienteService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.VehiculoService;
 import java.util.List;
@@ -56,6 +57,7 @@ class ExpedienteServiceImplTest {
     @Mock private HistorialCambioService historialCambioService;
     @Mock private VehiculoService vehiculoService;
     @Mock private AvisoAdminService avisoAdminService;
+    @Mock private OperacionExpedienteService operacionExpedienteService;
 
     private ExpedienteServiceImpl service;
     private Usuario admin;
@@ -74,7 +76,8 @@ class ExpedienteServiceImplTest {
                 historialCambioService,
                 vehiculoService,
                 new ExpedienteTipoTramitePolicyService(),
-                avisoAdminService);
+                avisoAdminService,
+                operacionExpedienteService);
         admin = new Usuario("Admin", "Test", "admin@test.local", "secret", RolUsuario.ADMIN, true);
     }
 
@@ -201,6 +204,32 @@ class ExpedienteServiceImplTest {
                 () -> service.cambiarEstado(1L, EstadoExpediente.EN_TRAMITE, admin));
 
         verify(expedienteRepository, never()).save(expediente);
+    }
+
+    @Test
+    void sincronizaOperacionesAlCambiarElTipoDeTramite() {
+        Expediente expediente = expediente(EstadoExpediente.EN_TRAMITE, TipoTramiteEnum.TRASPASO);
+        expediente.getTipoTramite().setId(1L);
+        Cliente cliente = new Cliente();
+        cliente.setId(5L);
+        TipoTramite batecom = new TipoTramite();
+        batecom.setId(6L);
+        batecom.setNombre(TipoTramiteEnum.BATECOM);
+
+        when(expedienteRepository.findById(1L)).thenReturn(Optional.of(expediente));
+        when(clienteService.buscarPorId(5L)).thenReturn(Optional.of(cliente));
+        when(tipoTramiteService.buscarPorId(6L)).thenReturn(Optional.of(batecom));
+        when(expedienteRepository.save(expediente)).thenReturn(expediente);
+
+        service.actualizarExpediente(
+                1L,
+                new Expediente(),
+                admin,
+                5L,
+                6L,
+                List.of());
+
+        verify(operacionExpedienteService).sincronizarYListar(expediente);
     }
 
     private Expediente expediente(EstadoExpediente estado, TipoTramiteEnum tramiteEnum) {
