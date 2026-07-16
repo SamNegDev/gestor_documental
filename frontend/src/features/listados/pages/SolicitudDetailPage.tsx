@@ -12,6 +12,7 @@ import { DocumentUploadDialog, type DocumentUploadSubmit } from "../../expedient
 import { DocumentReadingPanel, identityDisplayName, normalizeIdentityIdentifier, type DocumentReadingExistingIdentity } from "../../expedientes/components/DocumentReadingPanel";
 import { DocumentTemplateDialog } from "../../expedientes/components/DocumentTemplateDialog";
 import { OcrReviewDialog } from "../../expedientes/components/OcrReviewDialog";
+import { useDocumentDropZone } from "../../expedientes/components/useDocumentDropZone";
 import {
   deleteDocument,
   deleteDocumentPages,
@@ -73,6 +74,7 @@ export function SolicitudDetailPage() {
   const [iaError, setIaError] = useState<string | null>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadDialogInitialFile, setUploadDialogInitialFile] = useState<File | null>(null);
   const [uploadingStandaloneDocument, setUploadingStandaloneDocument] = useState(false);
   const [habitualModalOpen, setHabitualModalOpen] = useState(false);
   const [habitualSearch, setHabitualSearch] = useState("");
@@ -288,12 +290,24 @@ export function SolicitudDetailPage() {
     try {
       await uploadSolicitudDocument(solicitud.id, input.tipoDocumento, input.archivo);
       setUploadDialogOpen(false);
+      setUploadDialogInitialFile(null);
       await refreshSolicitud();
     } catch (cause) {
       alert(cause instanceof ApiError ? cause.details || "No se pudo subir el documento." : "No se pudo subir el documento.");
     } finally {
       setUploadingStandaloneDocument(false);
     }
+  };
+
+  const openStandaloneUploadDialog = (archivo?: File | null) => {
+    setUploadDialogInitialFile(archivo ?? null);
+    setUploadDialogOpen(true);
+  };
+
+  const closeStandaloneUploadDialog = () => {
+    if (uploadingStandaloneDocument) return;
+    setUploadDialogOpen(false);
+    setUploadDialogInitialFile(null);
   };
 
   const handleDeleteDocument = async (documento: DocumentoExpediente) => {
@@ -565,6 +579,13 @@ export function SolicitudDetailPage() {
     }
   };
 
+  const solicitudForDrop = solicitudQuery.data;
+  const solicitudDropClosed = solicitudForDrop?.estado === "CONVERTIDA" || solicitudForDrop?.estado === "RECHAZADO";
+  const { draggingDocument: draggingSolicitudDocument, dropZoneHandlers: solicitudDocumentDropHandlers } = useDocumentDropZone({
+    enabled: Boolean(solicitudForDrop && !solicitudDropClosed),
+    onDropFile: openStandaloneUploadDialog,
+  });
+
   if (solicitudQuery.isLoading) {
     return <div className="records-empty">Cargando solicitud...</div>;
   }
@@ -790,14 +811,18 @@ export function SolicitudDetailPage() {
       ) : null}
 
       <div className="request-grid request-grid--single">
-        <section className="panel" id="solicitud-documentos">
+        <section
+          className={`panel exp-panel--documents-drop${draggingSolicitudDocument ? " is-dragging-document" : ""}`}
+          id="solicitud-documentos"
+          {...solicitudDocumentDropHandlers}
+        >
           <div className="panel-heading">
             <h2>Documentos</h2>
             <div className="button-group">
               {!isClosed ? (
                 <button
                   className="soft-button soft-button--compact"
-                  onClick={() => setUploadDialogOpen(true)}
+                  onClick={() => openStandaloneUploadDialog()}
                   type="button"
                 >
                   <FileUp size={16} />
@@ -815,6 +840,12 @@ export function SolicitudDetailPage() {
               </button>
             </div>
           </div>
+          {!isClosed ? (
+            <div className="documents-drop-hint" aria-hidden={!draggingSolicitudDocument}>
+              <FileUp size={18} />
+              <span>Suelta el archivo para elegir el tipo documental</span>
+            </div>
+          ) : null}
           <div className="document-table">
             {solicitud.documentos.length === 0 ? <div className="document-table__empty">No hay documentos asociados.</div> : null}
             {solicitud.documentos.map((documento) => (
@@ -933,9 +964,10 @@ export function SolicitudDetailPage() {
         open={ocrReviewOpen}
       />
       <DocumentUploadDialog
+        initialFile={uploadDialogInitialFile}
         open={uploadDialogOpen}
         saving={uploadingStandaloneDocument}
-        onClose={() => setUploadDialogOpen(false)}
+        onClose={closeStandaloneUploadDialog}
         onSubmit={handleUploadStandaloneDocument}
       />
       <DocumentTemplateDialog

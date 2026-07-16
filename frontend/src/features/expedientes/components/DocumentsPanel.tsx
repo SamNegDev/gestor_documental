@@ -1,6 +1,6 @@
 import { Eye, FilePlus2, FileText, IdCard, Loader2, Pencil, Scissors, Trash2, Upload, UsersRound } from "lucide-react";
-import { useState, type DragEvent } from "react";
 import { DocumentReadingPanel, type DocumentReadingExistingIdentity } from "./DocumentReadingPanel";
+import { useDocumentDropZone } from "./useDocumentDropZone";
 import type { DocumentoExpediente, DocumentoIdentidadDetectada } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 
@@ -39,48 +39,17 @@ export function DocumentsPanel({
   readingIdentityId,
   readingRolesId,
 }: Props) {
-  const [draggingStandalone, setDraggingStandalone] = useState(false);
   const pendientesActuales = documentos.filter((documento) => documento.estado === "PENDIENTE" && documento.requeridoAhora);
   const hasEditableDocuments = documentos.some((documento) => documento.id);
-  const canDropStandalone = Boolean(onDropStandaloneDocument);
-
-  const handleDragOver = (event: DragEvent<HTMLElement>) => {
-    if (!canDropStandalone || !event.dataTransfer.types.includes("Files")) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-    setDraggingStandalone(true);
-  };
-
-  const handleDragLeave = (event: DragEvent<HTMLElement>) => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-      setDraggingStandalone(false);
-    }
-  };
-
-  const handleDrop = (event: DragEvent<HTMLElement>) => {
-    if (!canDropStandalone) return;
-    event.preventDefault();
-    setDraggingStandalone(false);
-    const file = event.dataTransfer.files?.[0];
-    if (!file) return;
-    const allowed = file.type === "application/pdf"
-      || file.type === "image/jpeg"
-      || file.type === "image/png"
-      || /\.(pdf|jpe?g|png)$/i.test(file.name);
-    if (!allowed) {
-      alert("Arrastra un archivo PDF, JPG o PNG para subirlo al expediente.");
-      return;
-    }
-    onDropStandaloneDocument?.(file);
-  };
+  const { draggingDocument, dropZoneHandlers } = useDocumentDropZone({
+    enabled: Boolean(onDropStandaloneDocument),
+    onDropFile: (archivo) => onDropStandaloneDocument?.(archivo),
+  });
 
   return (
     <section
-      className={`exp-panel exp-panel--documents-drop${draggingStandalone ? " is-dragging-document" : ""}`}
-      onDragEnter={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
+      className={`exp-panel exp-panel--documents-drop${draggingDocument ? " is-dragging-document" : ""}`}
+      {...dropZoneHandlers}
     >
       <div className="exp-panel__heading">
         <div>
@@ -109,7 +78,7 @@ export function DocumentsPanel({
         </div>
       ) : null}
 
-      <div className="documents-drop-hint" aria-hidden={!draggingStandalone}>
+      <div className="documents-drop-hint" aria-hidden={!draggingDocument}>
         <Upload size={18} />
         <span>Suelta el archivo para elegir el tipo documental</span>
       </div>
