@@ -1540,6 +1540,8 @@ export function ExpedienteDetailPage() {
   const hasActiveIncidents = expediente.incidencias.some((incidencia) => !incidencia.resuelta);
   const canRequestAdditionalInfo = expediente.estado !== "FINALIZADO" && expediente.estado !== "RECHAZADO";
   const canOpenIncident = expediente.estado !== "FINALIZADO" && expediente.estado !== "RECHAZADO";
+  const expedienteCerrado = expediente.estado === "FINALIZADO" || expediente.estado === "RECHAZADO";
+  const hasExpedienteDocuments = expediente.documentos.some((documento) => documento.subido && documento.id);
   const model620PhaseCompleted = operationalHitos.some((hito) => hito.id.toLowerCase().includes("modelo-620") && hito.completado);
   const showClosingDocumentsPanel = expediente.estado === "FINALIZADO" || model620PhaseCompleted;
   const disabledClosingDocumentTypes = new Set<string>();
@@ -1579,6 +1581,37 @@ export function ExpedienteDetailPage() {
           onUploadClosingDocument={handleUploadClosingDocument}
         />
       ) : null}
+      <section className="exp-quick-actions exp-quick-actions--ia" aria-label="Lectura IA del expediente">
+        <div>
+          <p className="eyebrow">Lectura IA</p>
+          <strong>Leer expediente con IA</strong>
+          <span>
+            {expedienteCerrado
+              ? "El expediente esta cerrado."
+              : "Lee DNI/CIF, documentacion de vehiculo y contrato/factura para actualizar datos seguros."}
+          </span>
+        </div>
+        <div className="exp-quick-actions__buttons">
+          <button
+            className="primary-button"
+            disabled={updatingDocuments || !hasExpedienteDocuments || expedienteCerrado}
+            onClick={() => handleUpdateFromExistingDocuments()}
+            type="button"
+          >
+            {updatingDocuments ? <Loader2 className="button-spinner" size={16} /> : <FileText size={16} />}
+            {updatingDocuments ? "Leyendo IA" : "Leer expediente con IA"}
+          </button>
+          <button
+            className="soft-button"
+            disabled={updatingDocuments || !hasExpedienteDocuments || expedienteCerrado}
+            onClick={() => handleUpdateFromExistingDocuments({ forzarRelectura: true })}
+            type="button"
+          >
+            {updatingDocuments ? <Loader2 className="button-spinner" size={16} /> : <RefreshCw size={16} />}
+            Releer expediente con IA
+          </button>
+        </div>
+      </section>
       <IncidentAlertPanel
         incidencias={expediente.incidencias}
         onCreateIncident={canOpenIncident ? openIncidentDialog : undefined}
@@ -1592,24 +1625,6 @@ export function ExpedienteDetailPage() {
             <span>Las incidencias pueden acumularse y el expediente seguira bloqueado hasta resolverlas todas.</span>
           </div>
           <div className="exp-quick-actions__buttons">
-            <button
-              className="soft-button"
-              disabled={updatingDocuments}
-              onClick={() => handleUpdateFromExistingDocuments()}
-              type="button"
-            >
-              {updatingDocuments ? <Loader2 className="button-spinner" size={16} /> : <RefreshCw size={16} />}
-              Actualizar expediente con IA
-            </button>
-            <button
-              className="soft-button"
-              disabled={updatingDocuments}
-              onClick={() => handleUpdateFromExistingDocuments({ forzarRelectura: true })}
-              type="button"
-            >
-              {updatingDocuments ? <Loader2 className="button-spinner" size={16} /> : <RefreshCw size={16} />}
-              Releer expediente con IA
-            </button>
             <button
               className="soft-button milestone-action--warning"
               onClick={openIncidentDialog}
