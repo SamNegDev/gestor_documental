@@ -309,7 +309,7 @@ function TaskRow({
       </div>
       <span className={`task-priority task-priority--${tarea.prioridad.toLowerCase()}`}>{tarea.prioridad}</span>
       <div className="task-row__actions">
-        {isSelectableNotificationTask(tarea) ? (
+        {canNotifyTask(tarea) ? (
           <>
             <button className="icon-button" onClick={() => onNotify(tarea, "email")} title="Enviar correo" type="button">
               <Mail size={16} />
@@ -340,6 +340,11 @@ function TaskRow({
 
 function isSelectableNotificationTask(tarea: Tarea) {
   return tarea.entidad === "INCIDENCIA"
+    && (tarea.tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR" || tarea.tipo === "INCIDENCIA_RECORDATORIO_PENDIENTE");
+}
+
+function canNotifyTask(tarea: Tarea) {
+  return (tarea.entidad === "INCIDENCIA" || tarea.entidad === "EXPEDIENTE")
     && (tarea.tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR" || tarea.tipo === "INCIDENCIA_RECORDATORIO_PENDIENTE");
 }
 

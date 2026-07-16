@@ -109,8 +109,7 @@ public class TareaApiController {
             LocalDateTime ahora = LocalDateTime.now();
             List<Incidencia> incidenciasPrimerAviso = incidenciaRepository.findPendientesPrimerAviso();
             List<Incidencia> recordatoriosPendientes = incidenciaRepository.findRecordatoriosPendientes(ahora);
-            incidenciasPrimerAviso.forEach(i -> tareas.add(tareaSeguimientoIncidencia(i)));
-            recordatoriosPendientes.forEach(i -> tareas.add(tareaSeguimientoIncidencia(i)));
+            tareas.addAll(tareasSeguimientoIncidencias(incidenciasPrimerAviso, recordatoriosPendientes));
             whatsappWebhookEventoRepository.findByEstadoWithExpediente(EstadoWhatsappEvento.PENDIENTE)
                     .forEach(evento -> tareas.add(tareaWhatsapp(evento)));
             whatsappWebhookEventoRepository.findByEstadoWithClienteWithoutExpediente(EstadoWhatsappEvento.PENDIENTE)
@@ -193,21 +192,93 @@ public class TareaApiController {
         return tareas;
     }
 
-    private TareaResponse tareaSeguimientoIncidencia(Incidencia incidencia) {
-        LocalDateTime fecha = incidencia.getProximoAviso() != null ? incidencia.getProximoAviso() : incidencia.getFechaCreacion();
+    private List<TareaResponse> tareasSeguimientoIncidencias(List<Incidencia> incidenciasPrimerAviso,
+                                                             List<Incidencia> recordatoriosPendientes) {
+        List<Incidencia> incidencias = new ArrayList<>();
+        incidencias.addAll(incidenciasPrimerAviso);
+        incidencias.addAll(recordatoriosPendientes);
+        Map<Long, List<Incidencia>> pendientesPorExpediente = incidencias.stream()
+                .filter(incidencia -> incidencia.getExpediente() != null && incidencia.getExpediente().getId() != null)
+                .collect(Collectors.groupingBy(incidencia -> incidencia.getExpediente().getId()));
+        List<TareaResponse> tareas = new ArrayList<>();
         int maxAvisos = configuracionSeguimientoService.obtener().getMaxAvisos();
-        String tipo = incidencia.getContadorAvisos() >= maxAvisos
-                ? "INCIDENCIA_PENDIENTE_ARCHIVAR"
-                : incidencia.getContadorAvisos() == 0 ? "INCIDENCIA_PENDIENTE_NOTIFICAR" : "INCIDENCIA_RECORDATORIO_PENDIENTE";
-        return TareaResponse.builder().id("INC-" + incidencia.getId() + "-SEGUIMIENTO").tipo(tipo).ambito("GESTION")
-                .prioridad("ALTA").titulo(incidencia.getContadorAvisos() >= maxAvisos ? "Seguimiento pendiente de archivar" : incidencia.getContadorAvisos() == 0 ? "Solicitud al cliente pendiente de aviso" : "Recordatorio de solicitud vencido")
-                .detalle(incidencia.getContadorAvisos() >= maxAvisos ? "Se ha completado el ciclo de avisos sin respuesta." : incidencia.getContadorAvisos() == 0 ? "Debe enviarse la primera notificacion al cliente antes de pasarla a seguimiento." : "Debe renovarse la notificacion al cliente.")
-                .contexto(contextoIncidencia(incidencia))
-                .entidad("INCIDENCIA").entidadId(incidencia.getId()).matricula(incidencia.getExpediente().getMatricula())
-                .clienteId(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getId() : null)
-                .cliente(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getNombre() : null)
+        for (List<Incidencia> grupo : pendientesPorExpediente.values()) {
+            if (grupo.stream().allMatch(incidencia -> incidencia.getContadorAvisos() >= maxAvisos)) {
+                grupo.forEach(incidencia -> tareas.add(tareaArchivoIncidencia(incidencia)));
+            } else {
+                TareaResponse tarea = tareaSeguimientoIncidenciasExpediente(grupo);
+                if (tarea != null) {
+                    tareas.add(tarea);
+                }
+            }
+        }
+        return tareas;
+    }
+
+    private TareaResponse tareaSeguimientoIncidenciasExpediente(List<Incidencia> incidencias) {
+        if (incidencias == null || incidencias.isEmpty()) {
+            return null;
+        }
+        Incidencia incidencia = incidenciaRepresentativa(incidencias);
+        Expediente expediente = incidencia.getExpediente();
+        LocalDateTime fecha = incidencias.stream()
+                .map(item -> item.getProximoAviso() != null ? item.getProximoAviso() : item.getFechaCreacion())
+                .filter(Objects::nonNull)
+                .min(LocalDateTime::compareTo)
+                .orElse(fechaReferencia(expediente));
+        int maxAvisos = configuracionSeguimientoService.obtener().getMaxAvisos();
+        boolean primerAviso = incidencias.stream().anyMatch(item -> item.getContadorAvisos() == 0);
+        long totalActivas = incidenciaRepository.findByExpedienteIdAndResueltaFalse(expediente.getId()).stream()
+                .filter(item -> !item.isSeguimientoArchivado())
+                .count();
+        String tipo = primerAviso ? "INCIDENCIA_PENDIENTE_NOTIFICAR" : "INCIDENCIA_RECORDATORIO_PENDIENTE";
+        String titulo = primerAviso ? tituloIncidencias(totalActivas, "pendiente de aviso", "pendientes de aviso") : tituloIncidencias(totalActivas, "con recordatorio vencido", "con recordatorio vencido");
+        String detalle = primerAviso ? "Debe enviarse una unica notificacion al cliente con todas las incidencias abiertas del expediente." : "Debe renovarse la notificacion al cliente agrupando todas las incidencias abiertas del expediente.";
+        return TareaResponse.builder().id("EXP-" + expediente.getId() + "-" + tipo).tipo(tipo).ambito("GESTION")
+                .prioridad("ALTA").titulo(titulo)
+                .detalle(detalle)
+                .contexto(contextoIncidenciasExpediente(expediente.getId()))
+                .entidad("EXPEDIENTE").entidadId(expediente.getId()).matricula(expediente.getMatricula())
+                .clienteId(expediente.getCliente() != null ? expediente.getCliente().getId() : null)
+                .cliente(expediente.getCliente() != null ? expediente.getCliente().getNombre() : null)
                 .fechaReferencia(format(fecha)).diasPendiente(dias(fecha))
-                .enlace("/expedientes/" + incidencia.getExpediente().getId()).build();
+                .enlace("/expedientes/" + expediente.getId()).build();
+    }
+
+    private TareaResponse tareaArchivoIncidencia(Incidencia incidencia) {
+        LocalDateTime fecha = incidencia.getProximoAviso() != null ? incidencia.getProximoAviso() : incidencia.getFechaCreacion();
+        Expediente expediente = incidencia.getExpediente();
+        return TareaResponse.builder().id("INC-" + incidencia.getId() + "-SEGUIMIENTO").tipo("INCIDENCIA_PENDIENTE_ARCHIVAR").ambito("GESTION")
+                .prioridad("ALTA").titulo("Seguimiento pendiente de archivar")
+                .detalle("Se ha completado el ciclo de avisos sin respuesta.")
+                .contexto(contextoIncidencia(incidencia))
+                .entidad("INCIDENCIA").entidadId(incidencia.getId()).matricula(expediente.getMatricula())
+                .clienteId(expediente.getCliente() != null ? expediente.getCliente().getId() : null)
+                .cliente(expediente.getCliente() != null ? expediente.getCliente().getNombre() : null)
+                .fechaReferencia(format(fecha)).diasPendiente(dias(fecha))
+                .enlace("/expedientes/" + expediente.getId()).build();
+    }
+
+    private Incidencia incidenciaRepresentativa(List<Incidencia> incidencias) {
+        int maxAvisos = configuracionSeguimientoService.obtener().getMaxAvisos();
+        return incidencias.stream()
+                .max(Comparator.comparingInt((Incidencia incidencia) -> prioridadSeguimiento(incidencia, maxAvisos))
+                        .thenComparing(incidencia -> incidencia.getProximoAviso() != null ? incidencia.getProximoAviso() : incidencia.getFechaCreacion(), Comparator.nullsLast(Comparator.reverseOrder())))
+                .orElse(incidencias.get(0));
+    }
+
+    private int prioridadSeguimiento(Incidencia incidencia, int maxAvisos) {
+        if (incidencia.getContadorAvisos() >= maxAvisos) {
+            return 3;
+        }
+        if (incidencia.getContadorAvisos() == 0) {
+            return 2;
+        }
+        return 1;
+    }
+
+    private String tituloIncidencias(long total, String singular, String plural) {
+        return total == 1 ? "Incidencia " + singular : total + " incidencias " + plural;
     }
 
     private TareaResponse tareaAvisoPendienteExpediente(Expediente expediente) {
