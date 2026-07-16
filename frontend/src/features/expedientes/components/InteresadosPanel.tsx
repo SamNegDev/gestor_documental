@@ -32,12 +32,14 @@ export function InteresadosPanel({ interesados, onEditInteresados }: Props) {
         <div className="interesados-grid">
           {interesados.map((interesado) => (
             <article className="interesado-card" key={interesado.id}>
-              <div className="interesado-card__avatar">
-                <UserRound size={22} />
-              </div>
-              <div>
-                <strong>{interesado.nombre}</strong>
-                <span>{humanizeEnum(interesado.rol)}</span>
+              <div className="interesado-card__identity">
+                <div className="interesado-card__avatar">
+                  <UserRound size={22} />
+                </div>
+                <div>
+                  <strong>{interesado.nombre}</strong>
+                  <span>{humanizeEnum(interesado.rol)}</span>
+                </div>
               </div>
               <dl>
                 <div>

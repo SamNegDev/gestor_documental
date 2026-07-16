@@ -72,29 +72,33 @@ export function ExpedienteHeader({ expediente, cancelling = false, onCancel }: P
       </div>
 
       <div className="exp-header__status">
-        <span>Estado actual</span>
-        <ExpedienteStatus status={expediente.estado} />
-        <small>{expediente.faseActual || "Fase sin definir"}</small>
-        <Link className="soft-button soft-button--compact" to={`/expedientes/${expediente.id}/editar`}>
-          <Pencil size={15} />
-          Editar expediente
-        </Link>
-        {expediente.solicitudId ? (
-          <Link className="soft-button soft-button--compact" to={`/solicitudes/${expediente.solicitudId}`}>
-            <FileText size={15} />
-            Solicitud de origen
+        <div className="exp-header__status-summary">
+          <span>Estado actual</span>
+          <ExpedienteStatus status={expediente.estado} />
+          <small>{expediente.faseActual || "Fase sin definir"}</small>
+        </div>
+        <div className="exp-header__actions">
+          <Link className="soft-button soft-button--compact" to={`/expedientes/${expediente.id}/editar`}>
+            <Pencil size={15} />
+            Editar expediente
           </Link>
-        ) : null}
-        <Link className="soft-button soft-button--compact" to={`/cliente/expedientes/${expediente.id}`}>
-          <Eye size={15} />
-          Vista cliente
-        </Link>
-        {onCancel ? (
-          <button className="soft-button soft-button--compact soft-button--danger" disabled={cancelling} onClick={onCancel} type="button">
-            {cancelling ? <Loader2 className="button-spinner" size={15} /> : <Ban size={15} />}
-            {cancelling ? "Cancelando" : "Cancelar por el cliente"}
-          </button>
-        ) : null}
+          {expediente.solicitudId ? (
+            <Link className="soft-button soft-button--compact" to={`/solicitudes/${expediente.solicitudId}`}>
+              <FileText size={15} />
+              Solicitud de origen
+            </Link>
+          ) : null}
+          <Link className="soft-button soft-button--compact" to={`/cliente/expedientes/${expediente.id}`}>
+            <Eye size={15} />
+            Vista cliente
+          </Link>
+          {onCancel ? (
+            <button className="soft-button soft-button--compact soft-button--danger" disabled={cancelling} onClick={onCancel} type="button">
+              {cancelling ? <Loader2 className="button-spinner" size={15} /> : <Ban size={15} />}
+              {cancelling ? "Cancelando" : "Cancelar por el cliente"}
+            </button>
+          ) : null}
+        </div>
       </div>
     </section>
   );

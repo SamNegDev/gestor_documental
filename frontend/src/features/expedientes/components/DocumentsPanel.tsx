@@ -98,7 +98,10 @@ export function DocumentsPanel({
               </div>
 
               <div className="document-row__body">
-                <strong>{documento.nombreOriginal || documento.nombre}</strong>
+                <div className="document-row__heading">
+                  <strong>{documento.nombreOriginal || documento.nombre}</strong>
+                  <span className="document-state">{humanizeEnum(documento.estado)}</span>
+                </div>
                 <span>
                   {formatDocumentType(documento.tipo)}
                   {documento.operacionLabel ? ` · ${documento.operacionLabel}` : ""}
@@ -119,8 +122,6 @@ export function DocumentsPanel({
                   onRereadIdentity={onReadIdentity}
                 />
               </div>
-
-              <span className="document-state">{humanizeEnum(documento.estado)}</span>
 
               <div className="document-row__actions">
                 <button

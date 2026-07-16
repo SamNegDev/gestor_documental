@@ -1,4 +1,6 @@
 .exp-detail-page {
+  container-name: expediente-detail;
+  container-type: inline-size;
   display: grid;
   gap: 18px;
 }
@@ -813,15 +815,16 @@
 }
 
 .exp-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 410px);
+  align-items: start;
   gap: 22px;
   padding: 18px;
 }
 
 .exp-header__main {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
   min-width: 0;
   align-items: center;
   gap: 18px;
@@ -921,25 +924,46 @@
 
 .exp-header__status {
   display: grid;
-  min-width: 190px;
-  justify-items: end;
-  gap: 6px;
+  min-width: 0;
+  justify-items: stretch;
+  gap: 10px;
 }
 
-.exp-header__status > span {
+.exp-header__status-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px 9px;
+}
+
+.exp-header__status-summary > span {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
 }
 
-.exp-header__status small {
+.exp-header__status-summary small {
+  flex-basis: 100%;
   color: var(--muted);
   font-weight: 700;
+  text-align: right;
 }
 
-.exp-header__status .soft-button {
-  margin-top: 4px;
+.exp-header__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.exp-header__actions .soft-button {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+  margin: 0;
+  white-space: normal;
 }
 
 .license-plate {
@@ -1595,20 +1619,32 @@
 }
 
 .interesados-grid {
+  container-name: interesados-panel;
+  container-type: inline-size;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
   gap: 12px;
 }
 
 .interesado-card {
   display: grid;
+  grid-template-columns: minmax(180px, 0.75fr) minmax(0, 1.25fr);
+  align-items: start;
   overflow: hidden;
   min-width: 0;
-  gap: 12px;
+  gap: 16px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 8px;
   background: oklch(99% 0.004 92);
+}
+
+.interesado-card__identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
 }
 
 .interesado-card__avatar {
@@ -1645,6 +1681,15 @@
   gap: 9px;
   min-width: 0;
   margin: 0;
+}
+
+.interesado-card dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.interesado-card dl > div:last-child {
+  grid-column: 1 / -1;
 }
 
 .interesado-card dl > div,
@@ -1768,6 +1813,11 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.documents-list {
+  container-name: documents-list;
+  container-type: inline-size;
 }
 
 .requirements-list {
@@ -2236,7 +2286,7 @@
 .document-row,
 .checklist-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(86px, auto) minmax(0, auto);
+  grid-template-columns: auto minmax(0, 1fr) 78px;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -2264,6 +2314,26 @@
 .document-row__body {
   min-width: 0;
   overflow: hidden;
+}
+
+.document-row__heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.document-row__heading > strong {
+  flex: 1 1 auto;
+}
+
+.document-row__heading .document-state {
+  width: fit-content;
+  max-width: 45%;
+  flex: 0 0 auto;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .document-row__body strong {
@@ -2310,9 +2380,10 @@
 }
 
 .document-row__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: repeat(2, 36px);
+  align-content: start;
+  justify-content: end;
   gap: 6px;
 }
 
@@ -4100,5 +4171,121 @@
 
   .exp-modal__footer > * {
     width: 100%;
+  }
+}
+
+/* Component widths, rather than viewport widths, control the dense expediente
+   surfaces because the process rail can substantially narrow their content. */
+@container expediente-detail (max-width: 980px) {
+  .exp-header {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+    align-items: start;
+    gap: 16px;
+  }
+
+  .exp-header__main {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+  }
+
+  .exp-header__back {
+    grid-row: 1 / span 2;
+  }
+
+  .exp-header__vehicle,
+  .exp-header__title {
+    grid-column: 2;
+  }
+}
+
+@container expediente-detail (max-width: 720px) {
+  .exp-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .exp-header__status {
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .exp-header__status-summary {
+    justify-content: flex-start;
+  }
+
+  .exp-header__status-summary small {
+    flex-basis: auto;
+    text-align: left;
+  }
+
+  .exp-header__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container expediente-detail (max-width: 430px) {
+  .exp-header__main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .exp-header__back,
+  .exp-header__vehicle,
+  .exp-header__title {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .exp-header__actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container interesados-panel (max-width: 520px) {
+  .interesado-card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+@container interesados-panel (max-width: 360px) {
+  .interesado-card dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .interesado-card dl > div:last-child {
+    grid-column: auto;
+  }
+}
+
+.document-row {
+  grid-template-columns: auto minmax(0, 1fr) 78px;
+}
+
+.document-row__actions {
+  grid-column: auto;
+  justify-content: end;
+}
+
+@container documents-list (max-width: 700px) {
+  .document-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .document-row__actions {
+    grid-column: 2;
+    justify-content: start;
+  }
+}
+
+@container documents-list (max-width: 420px) {
+  .document-row__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .document-row__heading .document-state {
+    max-width: 100%;
   }
 }
