@@ -6,7 +6,6 @@ type Props = {
   closingDocumentsReady?: boolean;
   expedienteEstado?: string;
   hitos: HitoExpediente[];
-  rollbackLocked?: boolean;
   readOnly?: boolean;
   onRunMilestoneAction: (hito: HitoExpediente, accion?: HitoAccion) => void;
 };
@@ -33,11 +32,7 @@ function getDisplayHito(hito: HitoExpediente, index: number, total: number, expe
   } satisfies HitoExpediente;
 }
 
-function isRollbackAction(accion: HitoAccion) {
-  return accion.tipo === "RETROCEDER_HITO" || accion.tipo === "RETROCEDER_FINALIZACION";
-}
-
-export function PhaseMilestonesPanel({ closingDocumentsReady, expedienteEstado, hitos, readOnly = false, rollbackLocked, onRunMilestoneAction }: Props) {
+export function PhaseMilestonesPanel({ closingDocumentsReady, expedienteEstado, hitos, readOnly = false, onRunMilestoneAction }: Props) {
   const displayHitos = hitos.map((hito, index) => getDisplayHito(hito, index, hitos.length, expedienteEstado, closingDocumentsReady));
 
   return (
@@ -55,8 +50,10 @@ export function PhaseMilestonesPanel({ closingDocumentsReady, expedienteEstado, 
       <ol className="milestones-list milestones-list--compact">
         {displayHitos.map((hito, index) => {
           const waitingForClosingDocs = expedienteEstado === "FINALIZADO" && isClosingMilestone(hito, index, displayHitos.length) && !closingDocumentsReady;
-          const acciones = (hito.acciones || []).filter((accion) => !(rollbackLocked && isRollbackAction(accion)));
-          const showActions = !readOnly && hito.estado === "ACTUAL" && !hito.bloqueado && (acciones.length > 0 || (!hito.completado && hito.accion));
+          const acciones = hito.acciones || [];
+          const canActOnCompletedClosure = acciones.some((accion) => accion.tipo === "RETROCEDER_FINALIZACION");
+          const actionableState = hito.estado === "ACTUAL" || canActOnCompletedClosure;
+          const showActions = !readOnly && actionableState && !hito.bloqueado && (acciones.length > 0 || (!hito.completado && hito.accion));
 
           return (
           <li className={`milestone milestone--${hito.estado.toLowerCase()}`} key={hito.id}>

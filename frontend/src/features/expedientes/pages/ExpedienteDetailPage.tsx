@@ -1793,9 +1793,8 @@ export function ExpedienteDetailPage() {
           <PhaseMilestonesPanel
             closingDocumentsReady={operaciones.length <= 1 ? hasClosingDocuments(expediente.documentos) : undefined}
             expedienteEstado={operaciones.length <= 1 ? expediente.estado : undefined}
-            readOnly={expedienteCerrado}
+            readOnly={expediente.estado === "CANCELADO" || expediente.estado === "RECHAZADO"}
             hitos={operationalHitos}
-            rollbackLocked={expediente.estado === "FINALIZADO" && hasClosingDocuments(expediente.documentos)}
             onRunMilestoneAction={handleRunMilestoneAction}
           />
           <CompleteExpedienteUploadPanel

@@ -13,9 +13,7 @@ import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.HitoExpediente;
-import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Usuario;
-import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.HitoExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
@@ -58,7 +56,6 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
 
     private final HitoExpedienteRepository hitoExpedienteRepository;
     private final ExpedienteRepository expedienteRepository;
-    private final DocumentoRepository documentoRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final IncidenciaRepository incidenciaRepository;
     private final OperacionExpedienteRepository operacionRepository;
@@ -348,35 +345,6 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
         if (expediente.getEstadoExpediente() == EstadoExpediente.CANCELADO) {
             throw new OperacionInvalidaException("No se puede modificar un expediente cancelado.");
         }
-        if (expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO && tieneJustificantesFinales(expediente)) {
-            throw new OperacionInvalidaException("No se puede retroceder un expediente finalizado con todos los justificantes finales.");
-        }
-    }
-
-    private boolean tieneJustificantesFinales(Expediente expediente) {
-        List<Documento> documentos = documentoRepository.findByExpedienteId(expediente.getId());
-        List<com.example.gestor_documental.model.RequisitoDocumentalExpediente> requisitosFinales = requisitoRepository
-                .findByExpedienteIdOrderByIdAsc(expediente.getId())
-                .stream()
-                .filter(requisito -> requisito.getTipoDocumento() == TipoDocumento.MODELO_620
-                        || requisito.getTipoDocumento() == TipoDocumento.COMPROBANTE_DGT
-                        || requisito.getTipoDocumento() == TipoDocumento.HUELLA_TRAMITE)
-                .toList();
-
-        if (!requisitosFinales.isEmpty()) {
-            return requisitosFinales.stream()
-                    .allMatch(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.APORTADO
-                            || requisito.getEstado() == EstadoRequisitoDocumental.OMITIDO);
-        }
-
-        boolean tieneJustificanteDgt = documentos.stream().anyMatch(this::esJustificanteDgt);
-        boolean tieneModelo620 = documentos.stream().anyMatch(documento -> documento.getTipoDocumento() == TipoDocumento.MODELO_620);
-        return tieneJustificanteDgt && (!requiereModelo620(expediente) || tieneModelo620);
-    }
-
-    private boolean esJustificanteDgt(Documento documento) {
-        return documento.getTipoDocumento() == TipoDocumento.HUELLA_TRAMITE
-                || documento.getTipoDocumento() == TipoDocumento.COMPROBANTE_DGT;
     }
 
     private void actualizarOperacionesTrasRetroceso(Long expedienteId, Set<CodigoHitoExpediente> hitosRestantes) {
