@@ -4310,22 +4310,25 @@
   }
 }
 
-.document-row {
+.exp-panel--documents-drop .document-row {
+  display: grid;
+  width: 100%;
   grid-template-columns: auto minmax(0, 1fr) 78px;
+  align-items: start;
 }
 
-.document-row__actions {
+.exp-panel--documents-drop .document-row__actions {
   grid-column: auto;
   justify-content: end;
 }
 
 @container documents-list (max-width: 700px) {
-  .document-row {
+  .exp-panel--documents-drop .document-row {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
   }
 
-  .document-row__actions {
+  .exp-panel--documents-drop .document-row__actions {
     grid-column: 2;
     justify-content: start;
   }
