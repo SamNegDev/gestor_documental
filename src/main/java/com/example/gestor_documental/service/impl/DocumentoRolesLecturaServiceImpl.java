@@ -12,6 +12,7 @@ import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.Interesado;
+import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
@@ -199,6 +200,9 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
                 Tipo documental esperado: %s.
                 %s
                 En contrato: vendedor/transmitente/propietario es VENDEDOR; comprador/adquirente es COMPRADOR.
+                Determina los roles por las clausulas operativas (quien transmite/vende y quien adquiere/compra), no por el orden de aparicion, la posicion de las firmas ni el orden de los anexos o documentos de identidad.
+                Frases como "vende y transmite a", "entrega a" o "transfiere a" situan al sujeto antes del verbo como VENDEDOR y a la persona introducida por "a" como COMPRADOR. Frases como "compra/adquiere de" situan al sujeto como COMPRADOR y a la persona introducida por "de" como VENDEDOR.
+                Si las etiquetas, las clausulas y las firmas se contradicen, prioriza la clausula que describe expresamente la transmision y marca requiereRevision true.
                 En factura: emisor/proveedor/vendedor es VENDEDOR; cliente/receptor/comprador es COMPRADOR.
                 Ignora gestoria, asesor, mandatario, tramitador, datos bancarios, pie legal y cualquier tercero que no sea parte de la compraventa.
                 Si aparece una empresa vendedora, usa su CIF/razon social; no confundas su representante o administrador con el comprador.
@@ -283,6 +287,7 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
     }
 
     private JsonNode corregirRolesBatecomPorOperacion(Documento documento, JsonNode resultado) {
+        resultado = corregirRolesConInteresadosConfirmados(documento, resultado);
         if (!(resultado instanceof ObjectNode objectNode)
                 || documento.getOperacion() == null
                 || documento.getOperacion().getTipo() == null
@@ -308,6 +313,55 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
             objectNode.put("observaciones", "Roles intercambiados automaticamente: en COM la compraventa debe figurar como vendedor.");
         }
         return objectNode;
+    }
+
+    private JsonNode corregirRolesConInteresadosConfirmados(Documento documento, JsonNode resultado) {
+        if (!(resultado instanceof ObjectNode objectNode)) {
+            return resultado;
+        }
+        String vendedor = normalizarIdentificador(texto(resultado, "vendedorIdentificador"));
+        String comprador = normalizarIdentificador(texto(resultado, "compradorIdentificador"));
+        if (vendedor == null || comprador == null || vendedor.equals(comprador)) {
+            return resultado;
+        }
+
+        RolInteresado rolVendedorDetectado = rolConfirmado(documento, vendedor);
+        RolInteresado rolCompradorDetectado = rolConfirmado(documento, comprador);
+        boolean invertidos = rolVendedorDetectado == RolInteresado.COMPRADOR
+                || rolCompradorDetectado == RolInteresado.VENDEDOR;
+        boolean coherentes = rolVendedorDetectado == RolInteresado.VENDEDOR
+                || rolCompradorDetectado == RolInteresado.COMPRADOR;
+        if (invertidos && !coherentes) {
+            intercambiarCompradorVendedor(objectNode);
+            objectNode.put("requiereRevision", true);
+            objectNode.put("observaciones", "Roles corregidos con los interesados confirmados; revisar la contradiccion antes de aplicar la lectura.");
+        }
+        return objectNode;
+    }
+
+    private RolInteresado rolConfirmado(Documento documento, String identificador) {
+        if (documento.getSolicitud() != null) {
+            Solicitud solicitud = documento.getSolicitud();
+            RolInteresado rol = rolSolicitud(solicitud, identificador);
+            if (rol != null) return rol;
+        }
+        if (documento.getExpediente() == null || documento.getExpediente().getId() == null) {
+            return null;
+        }
+        return expedienteInteresadoRepository.findByExpedienteId(documento.getExpediente().getId()).stream()
+                .filter(relacion -> relacion.getInteresado() != null)
+                .filter(relacion -> identificador.equals(normalizarIdentificador(relacion.getInteresado().getDni())))
+                .map(ExpedienteInteresado::getRol)
+                .filter(rol -> rol == RolInteresado.VENDEDOR || rol == RolInteresado.COMPRADOR)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private RolInteresado rolSolicitud(Solicitud solicitud, String identificador) {
+        if (identificador.equals(normalizarIdentificador(solicitud.getInteresado1Dni()))) return solicitud.getInteresado1Rol();
+        if (identificador.equals(normalizarIdentificador(solicitud.getInteresado2Dni()))) return solicitud.getInteresado2Rol();
+        if (identificador.equals(normalizarIdentificador(solicitud.getInteresado3Dni()))) return solicitud.getInteresado3Rol();
+        return null;
     }
 
     private boolean lecturaBatecomInvertidaEnBate(Documento documento, String vendedor, String comprador) {

@@ -480,11 +480,10 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                     nueva.setInteresado(interesadoFinal);
                     return nueva;
                 });
-        boolean representanteLegal = esRepresentanteLegalCliente(cliente, identificador, tipoDetectado);
-        if (representanteLegal && !Boolean.TRUE.equals(relacion.getRepresentanteLegal())) {
-            relacion.setRepresentanteLegal(true);
-        }
-        if (relacion.getId() == null || representanteLegal) {
+        // Un DNI aportado por un cliente empresa no demuestra por si solo que su titular
+        // sea el representante legal. Puede pertenecer a la otra parte de la operacion.
+        // La representacion solo se confirma desde catalogo o mediante validacion explicita.
+        if (relacion.getId() == null) {
             clienteInteresadoRepository.save(relacion);
         }
         return interesado;
@@ -552,14 +551,6 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             return TipoPersona.EMPRESA;
         }
         return TipoPersona.PARTICULAR;
-    }
-
-    private boolean esRepresentanteLegalCliente(Cliente cliente, String identificador, TipoDocumento tipoDetectado) {
-        String nifCliente = normalizarIdentificador(cliente.getNif());
-        return tipoDetectado == TipoDocumento.DNI
-                && nifCliente != null
-                && !nifCliente.equals(identificador)
-                && nifCliente.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
     }
 
     private boolean coincideIdentificador(Interesado interesado, String identificador) {

@@ -12,7 +12,11 @@ export interface ClienteAdmin {
   logoPrincipalUrl?: string | null;
   logoCompactoUrl?: string | null;
   documentos?: DocumentoExpediente[];
+  administradores?: AdministradorCliente[];
 }
+
+export interface AdministradorCliente { id: number; dni: string; nombre: string; telefono?: string | null; direccion?: string | null; }
+export type AdministradorClienteInput = Omit<AdministradorCliente, "id">;
 
 export interface ClienteInput {
   nif: string;

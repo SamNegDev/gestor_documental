@@ -50,6 +50,11 @@ type IdentityReviewDraft = {
   provincia: string;
 };
 
+type SelectedRolesState = {
+  values: Record<string, string>;
+  inferredFrom: Record<string, string>;
+};
+
 export function DocumentReadingPanel({
   documento,
   canAddIdentity = false,
@@ -61,7 +66,7 @@ export function DocumentReadingPanel({
   onAddIdentity,
   onRereadIdentity,
 }: Props) {
-  const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
+  const [selectedRoles, setSelectedRoles] = useState<SelectedRolesState>({ values: {}, inferredFrom: {} });
   const [identifiers, setIdentifiers] = useState<Record<string, string>>({});
   const [reviewing, setReviewing] = useState<IdentityReviewState | null>(null);
   const identidad = documento.lecturaIdentidad;
@@ -103,7 +108,7 @@ export function DocumentReadingPanel({
             const matchedExisting = normalizedEditedId
               ? existingIdentities.find((existing) => existing.identificador === normalizedEditedId)
               : null;
-            const selectedRole = matchedExisting?.rol || selectedRoles[key] || "";
+            const selectedRole = matchedExisting?.rol || selectedRoles.values[key] || "";
             const roleLocked = Boolean(matchedExisting?.rol);
             const submitLabel = matchedExisting ? "Asignar" : "Anadir";
             return (
@@ -141,7 +146,13 @@ export function DocumentReadingPanel({
                     <select
                       aria-label="Rol del interesado"
                       disabled={addingIdentity || roleLocked}
-                      onChange={(event) => setSelectedRoles((current) => ({ ...current, [key]: event.target.value }))}
+                      onChange={(event) => setSelectedRoles((current) => inferComplementaryRole(
+                        current,
+                        detectadas,
+                        existingIdentities,
+                        key,
+                        event.target.value,
+                      ))}
                       value={selectedRole}
                     >
                       <option value="">Rol</option>
@@ -203,6 +214,44 @@ export function DocumentReadingPanel({
       <em>{confidenceLabel(vehiculo.confianzaGlobal)} / {vehiculo.mensaje || "Lectura registrada"}</em>
     </div>
   ) : null;
+}
+
+function inferComplementaryRole(
+  current: SelectedRolesState,
+  identities: DocumentoIdentidadDetectada[],
+  existingIdentities: DocumentReadingExistingIdentity[],
+  changedKey: string,
+  role: string,
+) {
+  const next: SelectedRolesState = {
+    values: { ...current.values, [changedKey]: role },
+    inferredFrom: { ...current.inferredFrom },
+  };
+  delete next.inferredFrom[changedKey];
+  if (identities.length !== 2 || (role !== "VENDEDOR" && role !== "COMPRADOR")) {
+    Object.entries(current.inferredFrom)
+      .filter(([, sourceKey]) => sourceKey === changedKey)
+      .forEach(([inferredKey]) => {
+        delete next.values[inferredKey];
+        delete next.inferredFrom[inferredKey];
+      });
+    return next;
+  }
+
+  const otherIndex = identities.findIndex((item, index) => identityKey(item, index) !== changedKey);
+  if (otherIndex < 0) return next;
+  const other = identities[otherIndex];
+  const otherKey = identityKey(other, otherIndex);
+  const otherIdentifier = normalizeIdentityIdentifier(other.identificador);
+  const otherAlreadyConfirmed = otherIdentifier
+    ? existingIdentities.some((existing) => existing.identificador === otherIdentifier && existing.rol)
+    : false;
+  const otherWasInferredFromChanged = current.inferredFrom[otherKey] === changedKey;
+  if (!otherAlreadyConfirmed && (!current.values[otherKey] || otherWasInferredFromChanged)) {
+    next.values[otherKey] = role === "VENDEDOR" ? "COMPRADOR" : "VENDEDOR";
+    next.inferredFrom[otherKey] = changedKey;
+  }
+  return next;
 }
 
 function IdentityReviewDialog({

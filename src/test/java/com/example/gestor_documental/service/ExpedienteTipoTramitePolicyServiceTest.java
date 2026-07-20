@@ -11,9 +11,10 @@ class ExpedienteTipoTramitePolicyServiceTest {
     private final ExpedienteTipoTramitePolicyService service = new ExpedienteTipoTramitePolicyService();
 
     @Test
-    void notificacionVentaYHerenciaNoRequierenModelo620() {
+    void notificacionVentaHerenciaYCuestionesVariasNoRequierenModelo620() {
         assertFalse(service.requiereModelo620(TipoTramiteEnum.NOTIFICACION_VENTA));
         assertFalse(service.requiereModelo620(TipoTramiteEnum.HERENCIA));
+        assertFalse(service.requiereModelo620(TipoTramiteEnum.CUESTIONES_VARIAS));
     }
 
     @Test

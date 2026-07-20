@@ -1166,8 +1166,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         if (tipoDetectado != null && !tipoDocumentoCubreRequisito(tipoDetectado, requisito.getTipoDocumento())) {
             return false;
         }
-        return catalogoRepresentante(requisito.getInteresadoRepresentado(), lectura.getIdentificador()).isPresent()
-                || documentoClientePuedeSerRepresentante(requisito, documento, lectura);
+        return catalogoRepresentante(requisito.getInteresadoRepresentado(), lectura.getIdentificador()).isPresent();
     }
 
     private void vincularDocumentoRepresentanteEmpresa(Documento documento, RequisitoDocumentalExpediente requisito) {
@@ -1179,7 +1178,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                 requisito.getInteresadoRepresentado(),
                 lectura.getIdentificador()
         ).orElse(null);
-        if (catalogo == null && !documentoClientePuedeSerRepresentante(requisito, documento, lectura)) {
+        if (catalogo == null) {
             return;
         }
         Interesado representante = obtenerOCrearRepresentante(lectura, catalogo);
@@ -1225,31 +1224,6 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                 requisito.getExpediente().getCliente().getId(),
                 representante.getId()
         );
-    }
-
-    private boolean documentoClientePuedeSerRepresentante(
-            RequisitoDocumentalExpediente requisito,
-            Documento documento,
-            DocumentoIdentidadLectura lectura
-    ) {
-        if (requisito.getExpediente() == null
-                || requisito.getExpediente().getCliente() == null
-                || requisito.getInteresadoRepresentado() == null
-                || documento.getCliente() == null
-                || lectura == null) {
-            return false;
-        }
-        String clienteNif = normalizarIdentificador(requisito.getExpediente().getCliente().getNif());
-        String documentoClienteNif = normalizarIdentificador(documento.getCliente().getNif());
-        String empresaNif = normalizarIdentificador(requisito.getInteresadoRepresentado().getDni());
-        String representanteNif = normalizarIdentificador(lectura.getIdentificador());
-        TipoDocumento tipoDetectado = lectura.getTipoDocumentoDetectado();
-        return !clienteNif.isBlank()
-                && clienteNif.equals(documentoClienteNif)
-                && clienteNif.equals(empresaNif)
-                && !clienteNif.equals(representanteNif)
-                && representanteNif.matches("([0-9]{8}[A-Z]|[XYZ][0-9]{7}[A-Z])")
-                && (tipoDetectado == null || tipoDocumentoCubreRequisito(tipoDetectado, TipoDocumento.DNI));
     }
 
     private Interesado obtenerOCrearRepresentante(

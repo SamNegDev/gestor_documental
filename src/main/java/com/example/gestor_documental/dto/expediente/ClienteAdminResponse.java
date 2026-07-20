@@ -25,4 +25,6 @@ public class ClienteAdminResponse {
     private String logoCompactoUrl;
     @Builder.Default
     private List<DocumentoExpedienteResponse> documentos = new ArrayList<>();
+    @Builder.Default
+    private List<AdministradorClienteResponse> administradores = new ArrayList<>();
 }

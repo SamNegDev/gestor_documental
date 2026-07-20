@@ -1,6 +1,8 @@
 package com.example.gestor_documental.controller.api;
 
 import com.example.gestor_documental.dto.expediente.ClienteAdminResponse;
+import com.example.gestor_documental.dto.expediente.AdministradorClienteRequest;
+import com.example.gestor_documental.dto.expediente.AdministradorClienteResponse;
 import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.ClienteUpsertRequest;
 import com.example.gestor_documental.dto.expediente.DocumentoExpedienteResponse;
@@ -12,7 +14,9 @@ import com.example.gestor_documental.enums.PreferenciaCanalCliente;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.model.Cliente;
+import com.example.gestor_documental.model.ClienteInteresado;
 import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ClienteLogoService;
@@ -20,6 +24,8 @@ import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.UsuarioService;
 import com.example.gestor_documental.service.WhatsappOutboundService;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
+import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.util.ClienteBrandingUrls;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
@@ -55,6 +61,8 @@ public class AdminManagementApiController {
     private final UsuarioService usuarioService;
     private final CurrentUserService currentUserService;
     private final WhatsappOutboundService whatsappOutboundService;
+    private final ClienteInteresadoRepository clienteInteresadoRepository;
+    private final InteresadoRepository interesadoRepository;
 
     @GetMapping("/clientes")
     public List<ClienteAdminResponse> listarClientes(Authentication authentication) {
@@ -103,6 +111,68 @@ public class AdminManagementApiController {
         clienteService.eliminar(id);
         clienteLogoService.eliminarArchivos(cliente);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/clientes/{clienteId}/administradores")
+    public ClienteAdminResponse guardarAdministrador(@PathVariable Long clienteId,
+                                                      @RequestBody AdministradorClienteRequest request,
+                                                      Authentication authentication) {
+        requireAdmin(authentication);
+        Cliente cliente = clienteService.buscarPorId(clienteId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
+        String dni = TextNormalizer.upperOrNull(request.dni());
+        if (isBlank(dni) || isBlank(request.nombre())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "DNI/NIE y nombre son obligatorios");
+        }
+        Interesado interesado = interesadoRepository.findByDni(dni).orElseGet(Interesado::new);
+        interesado.setDni(dni);
+        interesado.setNombre(NombrePersonaNormalizer.normalizar(request.nombre()));
+        interesado.setTelefono(TextNormalizer.upperOrNull(request.telefono()));
+        interesado.setDireccion(TextNormalizer.upperOrNull(request.direccion()));
+        interesado = interesadoRepository.save(interesado);
+        ClienteInteresado relacion = clienteInteresadoRepository.findByClienteIdAndInteresadoId(clienteId, interesado.getId())
+                .orElseGet(ClienteInteresado::new);
+        relacion.setCliente(cliente);
+        relacion.setInteresado(interesado);
+        relacion.setRepresentanteLegal(true);
+        clienteInteresadoRepository.save(relacion);
+        return mapClienteAdmin(cliente);
+    }
+
+    @PutMapping("/clientes/{clienteId}/administradores/{interesadoId}")
+    public ClienteAdminResponse actualizarAdministrador(@PathVariable Long clienteId, @PathVariable Long interesadoId,
+                                                         @RequestBody AdministradorClienteRequest request,
+                                                         Authentication authentication) {
+        requireAdmin(authentication);
+        ClienteInteresado relacion = administrador(clienteId, interesadoId);
+        Interesado interesado = relacion.getInteresado();
+        String dni = TextNormalizer.upperOrNull(request.dni());
+        if (isBlank(dni) || isBlank(request.nombre())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "DNI/NIE y nombre son obligatorios");
+        interesadoRepository.findByDni(dni).filter(otro -> !otro.getId().equals(interesadoId))
+                .ifPresent(otro -> { throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe otro interesado con ese DNI/NIE"); });
+        interesado.setDni(dni);
+        interesado.setNombre(NombrePersonaNormalizer.normalizar(request.nombre()));
+        interesado.setTelefono(TextNormalizer.upperOrNull(request.telefono()));
+        interesado.setDireccion(TextNormalizer.upperOrNull(request.direccion()));
+        interesadoRepository.save(interesado);
+        return mapClienteAdmin(relacion.getCliente());
+    }
+
+    @DeleteMapping("/clientes/{clienteId}/administradores/{interesadoId}")
+    public ClienteAdminResponse desvincularAdministrador(@PathVariable Long clienteId, @PathVariable Long interesadoId,
+                                                          Authentication authentication) {
+        requireAdmin(authentication);
+        ClienteInteresado relacion = administrador(clienteId, interesadoId);
+        relacion.setRepresentanteLegal(false);
+        if (!Boolean.TRUE.equals(relacion.getHabitual())) clienteInteresadoRepository.delete(relacion);
+        else clienteInteresadoRepository.save(relacion);
+        return mapClienteAdmin(relacion.getCliente());
+    }
+
+    private ClienteInteresado administrador(Long clienteId, Long interesadoId) {
+        return clienteInteresadoRepository.findByClienteIdAndInteresadoId(clienteId, interesadoId)
+                .filter(relacion -> Boolean.TRUE.equals(relacion.getRepresentanteLegal()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Administrador no encontrado"));
     }
 
     @PostMapping(value = "/clientes/{id}/logos/{tipo}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -287,6 +357,10 @@ public class AdminManagementApiController {
                 .logoPrincipalUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.PRINCIPAL))
                 .logoCompactoUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.COMPACTO))
                 .documentos(documentoService.listarPorCliente(cliente.getId()).stream().map(this::mapDocumento).toList())
+                .administradores(clienteInteresadoRepository.findByClienteIdAndRepresentanteLegalTrueOrderByInteresadoNombreAsc(cliente.getId()).stream()
+                        .map(ClienteInteresado::getInteresado)
+                        .map(i -> new AdministradorClienteResponse(i.getId(), i.getDni(), i.getNombre(), i.getTelefono(), i.getDireccion()))
+                        .toList())
                 .build();
     }
 

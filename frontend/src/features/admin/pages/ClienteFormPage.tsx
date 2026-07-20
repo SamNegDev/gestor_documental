@@ -1,19 +1,22 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Building2, ExternalLink, FileText, Image, Mail, MessageCircle, Save, Trash2, Upload, UserRound } from "lucide-react";
+import { ArrowLeft, Building2, ExternalLink, FileText, Image, Mail, MessageCircle, Pencil, Plus, Save, Trash2, Upload, UserRound, X } from "lucide-react";
 import {
   createCliente,
+  createAdministradorCliente,
+  deleteAdministradorCliente,
   deleteClienteDocumento,
   deleteClienteLogo,
   enviarResumenDiarioCliente,
   getCliente,
   iniciarWhatsappCliente,
   updateCliente,
+  updateAdministradorCliente,
   uploadClienteDocumento,
   uploadClienteLogo,
 } from "../services/adminApi";
-import type { ClienteInput } from "../types";
+import type { AdministradorCliente, AdministradorClienteInput, ClienteInput } from "../types";
 import type { DocumentoExpediente } from "../../expedientes/types/expedienteDetail.types";
 import { readDocumentIdentity } from "../../expedientes/services/documentosApi";
 import { cleanLowerText, cleanUpperText, uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
@@ -349,6 +352,8 @@ export function ClienteFormPage() {
           </div>
         </section>
 
+        {isEdit ? <AdministradoresPanel clienteId={id!} items={clienteQuery.data?.administradores || []} onChanged={() => clienteQuery.refetch()} /> : null}
+
         <section className="client-branding-panel" aria-labelledby="client-branding-title">
           <div className="client-branding-panel__heading">
             <div className="row-icon"><Image size={18} /></div>
@@ -480,6 +485,25 @@ export function ClienteFormPage() {
       {dialog}
     </main>
   );
+}
+
+const emptyAdministrador = (): AdministradorClienteInput => ({ dni: "", nombre: "", telefono: "", direccion: "" });
+
+function AdministradoresPanel({ clienteId, items, onChanged }: { clienteId: string; items: AdministradorCliente[]; onChanged: () => Promise<unknown> }) {
+  const [editing, setEditing] = useState<AdministradorCliente | null>(null);
+  const [draft, setDraft] = useState<AdministradorClienteInput>(emptyAdministrador);
+  const [open, setOpen] = useState(false);
+  const mutation = useMutation({
+    mutationFn: async () => { if (editing) await updateAdministradorCliente(clienteId, editing.id, draft); else await createAdministradorCliente(clienteId, draft); },
+    onSuccess: async () => { setOpen(false); setEditing(null); setDraft(emptyAdministrador()); await onChanged(); },
+  });
+  const removeMutation = useMutation({ mutationFn: (id: number) => deleteAdministradorCliente(clienteId, id), onSuccess: onChanged });
+  const begin = (item?: AdministradorCliente) => { setEditing(item || null); setDraft(item ? { dni: item.dni, nombre: item.nombre, telefono: item.telefono || "", direccion: item.direccion || "" } : emptyAdministrador()); setOpen(true); };
+  return <section className="client-branding-panel">
+    <div className="client-branding-panel__heading"><div className="row-icon"><UserRound size={18} /></div><div><p className="eyebrow">Empresa</p><h3>Administradores</h3><p>Personas autorizadas para representar a este cliente.</p></div><button className="soft-button soft-button--compact" type="button" onClick={() => begin()}><Plus size={15} />Añadir</button></div>
+    {open ? <div className="edit-form-grid"><label>DNI / NIE<input value={draft.dni} onChange={(e) => setDraft({ ...draft, dni: uppercaseInput(e.target.value) })} /></label><label>Nombre completo<input value={draft.nombre} onChange={(e) => setDraft({ ...draft, nombre: uppercaseInput(e.target.value) })} /></label><label>Teléfono<input value={draft.telefono || ""} onChange={(e) => setDraft({ ...draft, telefono: e.target.value })} /></label><label className="edit-form-grid__wide">Dirección<input value={draft.direccion || ""} onChange={(e) => setDraft({ ...draft, direccion: uppercaseInput(e.target.value) })} /></label><div className="request-form-actions"><button className="soft-button" type="button" onClick={() => setOpen(false)}><X size={15} />Cancelar</button><button className="primary-button" disabled={!draft.dni || !draft.nombre || mutation.isPending} type="button" onClick={() => mutation.mutate()}><Save size={15} />Guardar administrador</button></div></div> : null}
+    <div className="client-documents-list">{items.length ? items.map((item) => <article className="client-document-row" key={item.id}><div className="client-document-row__icon"><UserRound size={17} /></div><div className="client-document-row__main"><strong>{item.nombre}</strong><span>{item.dni}{item.telefono ? ` · ${item.telefono}` : ""}</span>{item.direccion ? <span>{item.direccion}</span> : null}</div><div className="client-document-row__actions"><button className="icon-button" type="button" title="Editar administrador" onClick={() => begin(item)}><Pencil size={15} /></button><button className="icon-button icon-button--danger" disabled={removeMutation.isPending} type="button" title="Desvincular administrador" onClick={() => removeMutation.mutate(item.id)}><Trash2 size={15} /></button></div></article>) : <div className="client-documents-empty"><UserRound size={18} /><span>No hay administradores registrados.</span></div>}</div>
+  </section>;
 }
 
 function LogoEditor({

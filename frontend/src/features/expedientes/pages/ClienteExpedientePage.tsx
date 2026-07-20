@@ -89,7 +89,7 @@ function timelineSteps(expediente: ExpedienteCliente) {
 
 function ClientClosingDocumentsPanel({ documentos, tipoTramite }: { documentos: DocumentoExpediente[]; tipoTramite?: string | null }) {
   const closingDocuments = CLIENT_CLOSING_DOCUMENTS.filter(
-    (item) => item.tipo !== "MODELO_620" || (tipoTramite !== "NOTIFICACION_VENTA" && tipoTramite !== "HERENCIA"),
+    (item) => item.tipo !== "MODELO_620" || !["NOTIFICACION_VENTA", "HERENCIA", "CUESTIONES_VARIAS"].includes(tipoTramite || ""),
   );
   const documentByType = new Map(
     closingDocuments

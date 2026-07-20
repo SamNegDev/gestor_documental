@@ -27,6 +27,7 @@ public class ExpedienteTipoTramitePolicyService {
 
     public boolean requiereModelo620(TipoTramiteEnum tramite) {
         return tramite != TipoTramiteEnum.NOTIFICACION_VENTA
-                && tramite != TipoTramiteEnum.HERENCIA;
+                && tramite != TipoTramiteEnum.HERENCIA
+                && tramite != TipoTramiteEnum.CUESTIONES_VARIAS;
     }
 }
