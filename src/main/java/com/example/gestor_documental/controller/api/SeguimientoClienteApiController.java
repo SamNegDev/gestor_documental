@@ -6,7 +6,6 @@ import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaPrevi
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaRequest;
 import com.example.gestor_documental.dto.seguimiento.NotificacionIncidenciaResponse;
 import com.example.gestor_documental.dto.seguimiento.PosponerSeguimientoRequest;
-import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
@@ -24,15 +23,17 @@ import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
 import com.example.gestor_documental.service.IncidenciaService;
 import com.example.gestor_documental.util.MensajeAutomaticoUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
 import java.util.List;
-
+import java.util.Map;
+import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/seguimiento-clientes")
 @RequiredArgsConstructor
@@ -53,22 +54,37 @@ public class SeguimientoClienteApiController {
             @RequestParam(defaultValue = "0") int pagina, @RequestParam(defaultValue = "25") int tamanio,
             Authentication authentication) {
         requireAdmin(authentication);
+        if (!"PENDIENTES".equals(vista) && !"ARCHIVADAS".equals(vista)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vista de seguimiento no valida");
+        }
+        if (accion != null && !accion.isBlank() && !"TODAS".equals(accion) && !"RECORDATORIO_VENCIDO".equals(accion)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Filtro de accion no valido");
+        }
         boolean archivadas = "ARCHIVADAS".equals(vista);
         LocalDateTime ahora = LocalDateTime.now();
-        List<SeguimientoIncidenciaResponse> items = incidenciaRepository.findAllWithDetails().stream()
-                .filter(incidencia -> !incidencia.isResuelta() && incidencia.getExpediente() != null)
-                .filter(incidencia -> incidencia.getExpediente().getEstadoExpediente() != EstadoExpediente.FINALIZADO
-                        && incidencia.getExpediente().getEstadoExpediente() != EstadoExpediente.CANCELADO
-                        && incidencia.getExpediente().getEstadoExpediente() != EstadoExpediente.RECHAZADO)
-                .filter(incidencia -> incidencia.isSeguimientoArchivado() == archivadas)
-                .filter(incidencia -> archivadas || estaEnSeguimiento(incidencia))
-                .filter(incidencia -> filtraAccion(incidencia, accion, ahora))
-                .filter(incidencia -> clienteId == null || incidencia.getExpediente().getCliente() != null && clienteId.equals(incidencia.getExpediente().getCliente().getId()))
-                .filter(incidencia -> anio == null || incidencia.getExpediente().getFechaCreacion() != null && incidencia.getExpediente().getFechaCreacion().getYear() == anio)
-                .map(this::map)
-                .sorted(Comparator.comparing(SeguimientoIncidenciaResponse::getProximoAviso, Comparator.nullsFirst(String::compareTo)))
-                .toList();
-        return PagedResponse.of(items, pagina, tamanio);
+        Page<Incidencia> incidencias = incidenciaRepository.findPaginaSeguimiento(
+                archivadas, clienteId, anio, "RECORDATORIO_VENCIDO".equals(accion), ahora,
+                PageRequest.of(Math.max(0, pagina), Math.max(1, Math.min(tamanio, 100))));
+        List<Long> incidenciaIds = incidencias.getContent().stream().map(Incidencia::getId).toList();
+        List<Long> expedienteIds = incidencias.getContent().stream().map(item -> item.getExpediente().getId()).distinct().toList();
+        Map<Long, List<AvisoIncidencia>> avisos = incidenciaIds.isEmpty() ? Map.of()
+                : avisoRepository.findByIncidenciaIdInOrderByFechaEnvioAsc(incidenciaIds).stream()
+                .collect(Collectors.groupingBy(item -> item.getIncidencia().getId()));
+        Map<Long, List<RequisitoDocumentalExpediente>> requisitos = expedienteIds.isEmpty() ? Map.of()
+                : requisitoRepository.findByExpedienteIdInOrderByIdAsc(expedienteIds).stream()
+                .collect(Collectors.groupingBy(item -> item.getExpediente().getId()));
+        Map<Long, List<Mensaje>> mensajes = expedienteIds.isEmpty() ? Map.of()
+                : mensajeRepository.findByExpedienteIdInOrderByFechaCreacionAsc(expedienteIds).stream()
+                .collect(Collectors.groupingBy(item -> item.getExpediente().getId()));
+        int maxAvisos = configuracionSeguimientoService.obtener().getMaxAvisos();
+        Page<SeguimientoIncidenciaResponse> respuesta = incidencias.map(incidencia -> map(
+                incidencia,
+                avisos.getOrDefault(incidencia.getId(), List.of()),
+                requisitos.getOrDefault(incidencia.getExpediente().getId(), List.of()),
+                mensajes.getOrDefault(incidencia.getExpediente().getId(), List.of()),
+                maxAvisos,
+                ahora));
+        return PagedResponse.of(respuesta);
     }
 
     @GetMapping("/{id}/notificacion-preview")
@@ -104,42 +120,39 @@ public class SeguimientoClienteApiController {
     @PostMapping("/{id}/archivar") public void archivar(@PathVariable Long id, Authentication authentication) { incidenciaService.archivarSeguimiento(id, requireAdmin(authentication)); }
     @PostMapping("/{id}/reactivar") public void reactivar(@PathVariable Long id, Authentication authentication) { incidenciaService.reactivarSeguimiento(id, requireAdmin(authentication)); }
 
-    private SeguimientoIncidenciaResponse map(Incidencia incidencia) {
-        List<AvisoIncidencia> avisos = avisoRepository.findByIncidenciaIdOrderByFechaEnvioAsc(incidencia.getId());
+    private SeguimientoIncidenciaResponse map(Incidencia incidencia,
+                                               List<AvisoIncidencia> avisos,
+                                               List<RequisitoDocumentalExpediente> requisitos,
+                                               List<Mensaje> mensajes,
+                                               int maxAvisos,
+                                               LocalDateTime ahora) {
         return SeguimientoIncidenciaResponse.builder().incidenciaId(incidencia.getId()).expedienteId(incidencia.getExpediente().getId())
                 .matricula(incidencia.getExpediente().getMatricula()).clienteId(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getId() : null)
                 .cliente(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getNombre() : null)
                 .tipoIncidencia(tipoIncidencia(incidencia))
-                .observaciones(observacionesSeguimiento(incidencia)).avisosEnviados(incidencia.getContadorAvisos())
-                .maxAvisos(configuracionSeguimientoService.obtener().getMaxAvisos())
+                .observaciones(observacionesSeguimiento(incidencia, requisitos, mensajes)).avisosEnviados(incidencia.getContadorAvisos())
+                .maxAvisos(maxAvisos)
                 .fechaPrimerAviso(avisos.isEmpty() ? null : format(avisos.get(0).getFechaEnvio())).fechaUltimoAviso(format(incidencia.getFechaUltimoAviso()))
-                .proximoAviso(format(incidencia.getProximoAviso())).pendienteNotificacion(incidencia.getContadorAvisos() == 0 || incidencia.getProximoAviso() != null && !incidencia.getProximoAviso().isAfter(LocalDateTime.now()))
+                .proximoAviso(format(incidencia.getProximoAviso())).pendienteNotificacion(incidencia.getContadorAvisos() == 0 || incidencia.getProximoAviso() != null && !incidencia.getProximoAviso().isAfter(ahora))
                 .archivada(incidencia.isSeguimientoArchivado()).fechaArchivo(format(incidencia.getFechaArchivoSeguimiento()))
                 .anioExpediente(incidencia.getExpediente().getFechaCreacion() != null ? incidencia.getExpediente().getFechaCreacion().getYear() : 0).build();
     }
-    private boolean estaEnSeguimiento(Incidencia incidencia) {
-        return incidencia.getContadorAvisos() > 0;
-    }
-    private boolean filtraAccion(Incidencia incidencia, String accion, LocalDateTime ahora) {
-        if (accion == null || accion.isBlank() || "TODAS".equals(accion) || incidencia.isSeguimientoArchivado()) return true;
-        if ("RECORDATORIO_VENCIDO".equals(accion)) return incidencia.getContadorAvisos() > 0
-                && incidencia.getProximoAviso() != null && !incidencia.getProximoAviso().isAfter(ahora);
-        return true;
-    }
 
-    private String observacionesSeguimiento(Incidencia incidencia) {
+    private String observacionesSeguimiento(Incidencia incidencia,
+                                             List<RequisitoDocumentalExpediente> requisitos,
+                                             List<Mensaje> mensajes) {
         TipoIncidenciaEnum tipo = incidencia.getTipoIncidencia() != null ? incidencia.getTipoIncidencia().getNombre() : null;
         if (tipo == TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION) {
-            String requisitos = requisitoRepository.findByExpedienteIdOrderByIdAsc(incidencia.getExpediente().getId()).stream()
+            String detalleRequisitos = requisitos.stream()
                     .filter(requisito -> requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO)
                     .map(this::descripcionRequisito)
                     .filter(valor -> valor != null && !valor.isBlank())
                     .distinct()
-                    .collect(java.util.stream.Collectors.joining(" - "));
-            return !requisitos.isBlank() ? requisitos : incidencia.getObservaciones();
+                    .collect(Collectors.joining(" - "));
+            return !detalleRequisitos.isBlank() ? detalleRequisitos : incidencia.getObservaciones();
         }
         if (tipo == TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL) {
-            String mensaje = ultimoMensajeAdmin(incidencia.getExpediente().getId());
+            String mensaje = ultimoMensajeAdmin(mensajes);
             if (mensaje != null) {
                 return mensaje;
             }
@@ -157,8 +170,7 @@ public class SeguimientoClienteApiController {
         return requisito.getTipoDocumento() != null ? requisito.getTipoDocumento().name().replace('_', ' ') : null;
     }
 
-    private String ultimoMensajeAdmin(Long expedienteId) {
-        List<Mensaje> mensajes = mensajeRepository.findByExpedienteIdOrderByFechaCreacionAsc(expedienteId);
+    private String ultimoMensajeAdmin(List<Mensaje> mensajes) {
         for (int index = mensajes.size() - 1; index >= 0; index--) {
             Mensaje mensaje = mensajes.get(index);
             if (mensaje.getAutor() != null && mensaje.getAutor().getRolUsuario() == RolUsuario.ADMIN
@@ -169,7 +181,6 @@ public class SeguimientoClienteApiController {
         }
         return null;
     }
-
     private String tipoIncidencia(Incidencia incidencia) {
         return incidencia.getTipoIncidencia() != null && incidencia.getTipoIncidencia().getNombre() != null
                 ? incidencia.getTipoIncidencia().getNombre().name()

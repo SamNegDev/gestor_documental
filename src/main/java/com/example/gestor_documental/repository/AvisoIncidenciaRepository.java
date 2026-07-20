@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface AvisoIncidenciaRepository extends JpaRepository<AvisoIncidencia, Long> {
     List<AvisoIncidencia> findByIncidenciaIdOrderByFechaEnvioAsc(Long incidenciaId);
+    List<AvisoIncidencia> findByIncidenciaIdInOrderByFechaEnvioAsc(List<Long> incidenciaIds);
 }

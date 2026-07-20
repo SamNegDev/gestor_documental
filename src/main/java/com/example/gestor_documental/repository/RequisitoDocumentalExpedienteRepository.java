@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface RequisitoDocumentalExpedienteRepository extends JpaRepository<RequisitoDocumentalExpediente, Long> {
     List<RequisitoDocumentalExpediente> findByExpedienteIdOrderByIdAsc(Long expedienteId);
 
+    List<RequisitoDocumentalExpediente> findByExpedienteIdInOrderByIdAsc(List<Long> expedienteIds);
+
     List<RequisitoDocumentalExpediente> findByDocumentoId(Long documentoId);
 
     Optional<RequisitoDocumentalExpediente> findFirstByExpedienteIdAndTipoDocumentoAndInteresadoIdAndRolInteresadoOrderByIdAsc(

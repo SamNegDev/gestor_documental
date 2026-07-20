@@ -1,5 +1,7 @@
 package com.example.gestor_documental.dto.tarea;
 
+import java.util.List;
+
 import lombok.Builder;
 import lombok.Getter;
 
@@ -21,4 +23,6 @@ public class TareaResponse {
     private String fechaReferencia;
     private long diasPendiente;
     private String enlace;
+    private List<Long> incidenciaIdsAvisoConjunto;
+    private String motivoAvisoConjuntoNoDisponible;
 }

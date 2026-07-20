@@ -7,5 +7,12 @@ public record ConfiguracionSeguimientoRequest(
         int diasAviso4,
         int diasAviso5,
         int maxAvisos,
-        int diasExpedienteEstancado
+        int diasExpedienteEstancado,
+        int diasPrimerAviso,
+        boolean automatizacionActiva,
+        boolean modoSupervisado,
+        String diasEnvio,
+        int horaEnvio,
+        int tamanioLote,
+        String canalAutomatico
 ) {}

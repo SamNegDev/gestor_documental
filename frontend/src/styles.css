@@ -4141,6 +4141,8 @@ input.records-table-filter {
 .task-row__select { grid-area: select; display: grid; place-items: center; width: 28px; height: 34px; }
 .task-row__select input,
 .task-selection-toolbar input { width: 16px; height: 16px; accent-color: oklch(47% .14 232); }
+.task-row__select input:disabled { cursor: not-allowed; opacity: .38; }
+.task-row__select:has(input:disabled) { cursor: help; }
 .task-row__icon { grid-area: icon; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 6px; background: var(--panel-soft); color: var(--muted); }
 .task-row__icon--danger { background: oklch(96% .032 28); color: oklch(49% .15 28); }
 .task-row__icon--warning { background: oklch(96% .035 82); color: oklch(51% .12 72); }
@@ -8193,4 +8195,53 @@ input.records-table-filter {
   .request-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+/* Seguimiento y bandeja: controles, estados y detalle responsive */
+.followup-config__field select {
+  width: 100%;
+  border: 1px solid oklch(84% .014 90);
+  border-radius: 5px;
+  background: white;
+  color: var(--ink-strong);
+  font: inherit;
+  font-weight: 700;
+  padding: 9px 10px;
+}
+.mail-dialog__panel { overscroll-behavior: contain; }
+.mail-dialog__simulation,
+.mail-dialog__delivery { display: grid; gap: 3px; }
+.mail-dialog__simulation strong,
+.mail-dialog__delivery strong { color: currentColor; font-size: .78rem; }
+.mail-dialog__simulation span,
+.mail-dialog__delivery span { color: currentColor; font-size: .78rem; line-height: 1.45; }
+.mail-dialog__counter { justify-self: end; color: var(--muted); font-variant-numeric: tabular-nums; font-size: .72rem; }
+.mail-dialog__panel:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+
+@media (max-width: 860px) {
+  .task-list .task-row,
+  .task-list .task-row--admin,
+  .task-list .task-row--client,
+  .task-list .task-row--admin.task-row--with-context,
+  .task-list .task-row--client.task-row--with-context {
+    grid-template-areas:
+      "icon main actions"
+      "icon context actions"
+      "icon age priority";
+  }
+
+  .task-list .task-row--admin.task-row--selectable,
+  .task-list .task-row--admin.task-row--selectable.task-row--with-context {
+    grid-template-areas:
+      "select icon main actions"
+      "select icon context actions"
+      "select icon age priority";
+  }
+
+  .task-row .task-row__context,
+  .task-row .task-row__age { display: grid; }
+  .task-row .task-row__client { display: none; }
+  .task-row .task-row__context { margin-top: 4px; }
+  .task-row .task-row__context p { -webkit-line-clamp: 2; }
+  .task-row .task-row__age { grid-auto-flow: column; justify-content: start; align-items: baseline; gap: 7px; }
+  .task-row .task-row__age span { font-variant-numeric: tabular-nums; }
 }

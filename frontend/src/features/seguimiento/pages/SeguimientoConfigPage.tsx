@@ -13,6 +13,13 @@ const DEFAULT_CONFIG: SeguimientoConfig = {
   diasAviso5: 60,
   maxAvisos: 5,
   diasExpedienteEstancado: 7,
+  diasPrimerAviso: 2,
+  automatizacionActiva: false,
+  modoSupervisado: true,
+  diasEnvio: "LABORABLES",
+  horaEnvio: 9,
+  tamanioLote: 50,
+  canalAutomatico: "EMAIL",
 };
 
 export function SeguimientoConfigPage() {
@@ -62,6 +69,7 @@ export function SeguimientoConfigPage() {
 
         <form className="followup-config__form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(form); }}>
           <div className="followup-config__grid">
+            <NumberField label="Antes del primer aviso" min={0} value={form.diasPrimerAviso} onChange={(value) => update("diasPrimerAviso", value)} />
             <NumberField label="Tras aviso 1" value={form.diasAviso1} onChange={(value) => update("diasAviso1", value)} />
             <NumberField label="Tras aviso 2" value={form.diasAviso2} onChange={(value) => update("diasAviso2", value)} />
             <NumberField label="Tras aviso 3" value={form.diasAviso3} onChange={(value) => update("diasAviso3", value)} />
@@ -69,10 +77,14 @@ export function SeguimientoConfigPage() {
             <NumberField label="Tras aviso 5" value={form.diasAviso5} onChange={(value) => update("diasAviso5", value)} />
             <NumberField label="Máximo avisos" max={5} value={form.maxAvisos} onChange={(value) => update("maxAvisos", value)} />
             <NumberField label="Expediente estancado" value={form.diasExpedienteEstancado} onChange={(value) => update("diasExpedienteEstancado", value)} />
+            <NumberField label="Hora prevista" max={23} min={0} value={form.horaEnvio} onChange={(value) => update("horaEnvio", value)} />
+            <NumberField label="Tamaño máximo del lote" max={500} value={form.tamanioLote} onChange={(value) => update("tamanioLote", value)} />
+            <SelectField label="Días permitidos" value={form.diasEnvio} onChange={(value) => setForm((current) => ({ ...current, diasEnvio: value as SeguimientoConfig["diasEnvio"] }))} options={[{ value: "LABORABLES", label: "Lunes a viernes" }, { value: "TODOS", label: "Todos los días" }]} />
+            <SelectField label="Canal previsto" value={form.canalAutomatico} onChange={(value) => setForm((current) => ({ ...current, canalAutomatico: value as SeguimientoConfig["canalAutomatico"] }))} options={[{ value: "EMAIL", label: "Correo" }, { value: "WHATSAPP", label: "WhatsApp" }]} />
           </div>
 
           {error ? <div className="mail-dialog__error followup-config__error">{error}</div> : null}
-          {mutation.isSuccess ? <div className="followup-config__success">Configuración guardada.</div> : null}
+          {mutation.isSuccess ? <div aria-live="polite" className="followup-config__success">Configuración guardada.</div> : null}
 
           <footer className="followup-config__actions">
             <button className="soft-button" type="button" onClick={() => setForm(DEFAULT_CONFIG)}>
@@ -90,12 +102,23 @@ export function SeguimientoConfigPage() {
   );
 }
 
-function NumberField({ label, value, onChange, max = 365 }: { label: string; value: number; onChange: (value: string) => void; max?: number }) {
+function NumberField({ label, value, onChange, max = 365, min = 1 }: { label: string; value: number; onChange: (value: string) => void; max?: number; min?: number }) {
   return (
     <label className="followup-config__field">
       <span>{label}</span>
-      <input min={1} max={max} type="number" value={Number.isFinite(value) ? value : ""} onChange={(event) => onChange(event.target.value)} />
+      <input min={min} max={max} name={label.toLowerCase().replaceAll(" ", "-")} type="number" value={Number.isFinite(value) ? value : ""} onChange={(event) => onChange(event.target.value)} />
       <small>{label === "Máximo avisos" ? "avisos" : "días"}</small>
+    </label>
+  );
+}
+function SelectField({ label, value, options, onChange }: { label: string; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
+  return (
+    <label className="followup-config__field">
+      <span>{label}</span>
+      <select name={label.toLowerCase().replaceAll(" ", "-")} value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+      <small>Se aplicará al motor automático cuando se active.</small>
     </label>
   );
 }

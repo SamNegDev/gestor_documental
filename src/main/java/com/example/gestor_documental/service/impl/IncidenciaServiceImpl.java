@@ -438,7 +438,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
     @Transactional
     public NotificacionIncidenciaResponse notificarCliente(Long incidenciaId, String asunto, String mensaje, Usuario admin) {
         validarAdmin(admin);
-        Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        Incidencia incidencia = incidenciaRepository.findByIdForUpdate(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
         validarSeguimiento(incidencia);
         int numero = incidencia.getContadorAvisos() + 1;
         var config = configuracionSeguimientoService.obtener();
@@ -463,7 +463,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
     @Transactional
     public NotificacionIncidenciaResponse notificarClienteWhatsapp(Long incidenciaId, String mensaje, Usuario admin) {
         validarAdmin(admin);
-        Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        Incidencia incidencia = incidenciaRepository.findByIdForUpdate(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
         validarSeguimiento(incidencia);
         int numero = incidencia.getContadorAvisos() + 1;
         var config = configuracionSeguimientoService.obtener();
@@ -472,12 +472,13 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         String texto = mensaje != null && !mensaje.isBlank() ? mensaje.trim() : mensajeWhatsappPorDefecto(incidencia, numero);
         String destinatario = telefonoCliente(incidencia);
         WhatsappOutboundService.ResultadoWhatsapp resultado = whatsappOutboundService.enviarAvisoSeguimiento(destinatario, texto);
-        if (!resultado.exito()) return new NotificacionIncidenciaResponse(false, false, resultado.error());
         AvisoIncidencia aviso = new AvisoIncidencia();
         aviso.setIncidencia(incidencia); aviso.setNumeroAviso(numero); aviso.setEnviadoPor(admin); aviso.setMensaje(texto);
         aviso.setDestinatario(destinatario); aviso.setAsunto("WhatsApp seguimiento"); aviso.setCanal("WHATSAPP");
-        aviso.setEstadoEnvio(resultado.simulado() ? "SIMULADO" : "ENVIADO");
+        aviso.setEstadoEnvio(resultado.exito() ? resultado.simulado() ? "SIMULADO" : "ENVIADO" : "ERROR");
+        aviso.setErrorEnvio(resultado.error());
         avisoIncidenciaRepository.save(aviso);
+        if (!resultado.exito()) return new NotificacionIncidenciaResponse(false, false, resultado.error());
         registrarAvisoCorrecto(incidencia, numero, texto, config, admin, resultado.simulado(), "WHATSAPP");
         return new NotificacionIncidenciaResponse(true, resultado.simulado(),
                 resultado.simulado()
@@ -507,7 +508,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         validarAdmin(admin);
         if (proximoAviso == null) throw new OperacionInvalidaException("Indica la nueva fecha del recordatorio.");
         if (proximoAviso.isBefore(LocalDateTime.now())) throw new OperacionInvalidaException("La fecha de recordatorio no puede estar en el pasado.");
-        Incidencia incidencia = incidenciaRepository.findById(incidenciaId)
+        Incidencia incidencia = incidenciaRepository.findByIdForUpdate(incidenciaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
         validarSeguimiento(incidencia);
         if (incidencia.isSeguimientoArchivado()) throw new OperacionInvalidaException("No se puede posponer un seguimiento archivado.");
@@ -524,17 +525,26 @@ public class IncidenciaServiceImpl implements IncidenciaService {
 
     @Override @Transactional
     public void archivarSeguimiento(Long incidenciaId, Usuario admin) {
-        validarAdmin(admin); Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        validarAdmin(admin); Incidencia incidencia = incidenciaRepository.findByIdForUpdate(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
         if (incidencia.isResuelta()) throw new OperacionInvalidaException("La incidencia ya esta resuelta");
         incidencia.setSeguimientoArchivado(true); incidencia.setFechaArchivoSeguimiento(LocalDateTime.now()); incidencia.setSeguimientoArchivadoPor(admin); incidencia.setProximoAviso(null); incidenciaRepository.save(incidencia);
     }
 
     @Override @Transactional
     public void reactivarSeguimiento(Long incidenciaId, Usuario admin) {
-        validarAdmin(admin); Incidencia incidencia = incidenciaRepository.findById(incidenciaId).orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
-        incidencia.setSeguimientoArchivado(false); incidencia.setFechaArchivoSeguimiento(null); incidencia.setSeguimientoArchivadoPor(null); incidencia.setProximoAviso(LocalDateTime.now()); incidenciaRepository.save(incidencia);
+        validarAdmin(admin);
+        Incidencia incidencia = incidenciaRepository.findByIdForUpdate(incidenciaId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+        validarSeguimiento(incidencia);
+        if (!incidencia.isSeguimientoArchivado()) {
+            throw new OperacionInvalidaException("El seguimiento ya esta activo");
+        }
+        incidencia.setSeguimientoArchivado(false);
+        incidencia.setFechaArchivoSeguimiento(null);
+        incidencia.setSeguimientoArchivadoPor(null);
+        incidencia.setProximoAviso(LocalDateTime.now());
+        incidenciaRepository.save(incidencia);
     }
-
     private LocalDateTime siguienteVencimiento(LocalDateTime fecha, int numeroAviso, ConfiguracionSeguimiento config) {
         int dias = switch (numeroAviso) {
             case 1 -> config.getDiasAviso1();

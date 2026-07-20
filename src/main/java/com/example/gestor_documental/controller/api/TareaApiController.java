@@ -9,6 +9,7 @@ import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.EstadoWhatsappAdjunto;
 import com.example.gestor_documental.enums.EstadoWhatsappEvento;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.enums.PreferenciaCanalCliente;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
@@ -107,7 +108,8 @@ public class TareaApiController {
                 : usuario.getCliente().getId();
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
             LocalDateTime ahora = LocalDateTime.now();
-            List<Incidencia> incidenciasPrimerAviso = incidenciaRepository.findPendientesPrimerAviso();
+            int diasPrimerAviso = configuracionSeguimientoService.obtener().getDiasPrimerAviso();
+            List<Incidencia> incidenciasPrimerAviso = incidenciaRepository.findPendientesPrimerAviso(ahora.minusDays(diasPrimerAviso));
             List<Incidencia> recordatoriosPendientes = incidenciaRepository.findRecordatoriosPendientes(ahora);
             tareas.addAll(tareasSeguimientoIncidencias(incidenciasPrimerAviso, recordatoriosPendientes));
             whatsappWebhookEventoRepository.findByEstadoWithExpediente(EstadoWhatsappEvento.PENDIENTE)
@@ -235,6 +237,16 @@ public class TareaApiController {
         String tipo = primerAviso ? "INCIDENCIA_PENDIENTE_NOTIFICAR" : "INCIDENCIA_RECORDATORIO_PENDIENTE";
         String titulo = primerAviso ? tituloIncidencias(totalActivas, "pendiente de aviso", "pendientes de aviso") : tituloIncidencias(totalActivas, "con recordatorio vencido", "con recordatorio vencido");
         String detalle = primerAviso ? "Debe enviarse una unica notificacion al cliente con todas las incidencias abiertas del expediente." : "Debe renovarse la notificacion al cliente agrupando todas las incidencias abiertas del expediente.";
+        List<Long> incidenciaIdsAvisoConjunto = incidencias.stream()
+                .filter(item -> item.getContadorAvisos() < maxAvisos)
+                .map(Incidencia::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        String motivoNoDisponible = motivoAvisoConjuntoNoDisponible(expediente, incidenciaIdsAvisoConjunto);
+        if (motivoNoDisponible != null) {
+            incidenciaIdsAvisoConjunto = List.of();
+        }
         return TareaResponse.builder().id("EXP-" + expediente.getId() + "-" + tipo).tipo(tipo).ambito("GESTION")
                 .prioridad("ALTA").titulo(titulo)
                 .detalle(detalle)
@@ -243,9 +255,30 @@ public class TareaApiController {
                 .clienteId(expediente.getCliente() != null ? expediente.getCliente().getId() : null)
                 .cliente(expediente.getCliente() != null ? expediente.getCliente().getNombre() : null)
                 .fechaReferencia(format(fecha)).diasPendiente(dias(fecha))
+                .incidenciaIdsAvisoConjunto(incidenciaIdsAvisoConjunto)
+                .motivoAvisoConjuntoNoDisponible(motivoNoDisponible)
                 .enlace("/expedientes/" + expediente.getId()).build();
     }
 
+    private String motivoAvisoConjuntoNoDisponible(Expediente expediente, List<Long> incidenciaIds) {
+        if (incidenciaIds.isEmpty()) {
+            return "No quedan incidencias notificables en este expediente.";
+        }
+        if (expediente.getCliente() == null) {
+            return "El expediente no tiene cliente asociado.";
+        }
+        PreferenciaCanalCliente preferencia = expediente.getCliente().getPreferenciaCanal();
+        if (preferencia == PreferenciaCanalCliente.SIN_AVISOS) {
+            return "El cliente tiene desactivados los avisos.";
+        }
+        if (preferencia == PreferenciaCanalCliente.WHATSAPP) {
+            return "El cliente solo admite avisos por WhatsApp.";
+        }
+        if (expediente.getCliente().getEmail() == null || expediente.getCliente().getEmail().isBlank()) {
+            return "El cliente no tiene un correo configurado.";
+        }
+        return null;
+    }
     private TareaResponse tareaArchivoIncidencia(Incidencia incidencia) {
         LocalDateTime fecha = incidencia.getProximoAviso() != null ? incidencia.getProximoAviso() : incidencia.getFechaCreacion();
         Expediente expediente = incidencia.getExpediente();

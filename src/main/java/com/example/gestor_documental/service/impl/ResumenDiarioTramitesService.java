@@ -9,6 +9,7 @@ import com.example.gestor_documental.model.HistorialCambio;
 import com.example.gestor_documental.model.Incidencia;
 import com.example.gestor_documental.model.AvisoIncidencia;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.enums.PreferenciaCanalCliente;
 import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.HistorialCambioRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -86,8 +88,8 @@ public class ResumenDiarioTramitesService {
         List<HistorialCambio> finalizaciones = historialCambioRepository.findFinalizacionesExpedienteClienteEntre(clienteId, rango.desde(), rango.hasta());
         List<Incidencia> incidencias = incidenciaRepository.findActivasResumenByCliente(clienteId);
 
-        if (!StringUtils.hasText(cliente.getEmail())) {
-            return new ResultadoResumenDiario(0, totalElementos(finalizaciones, incidencias), List.of("El cliente no tiene email configurado."));
+        if (!permiteAvisoPorEmail(cliente)) {
+            return new ResultadoResumenDiario(0, totalElementos(finalizaciones, incidencias), List.of(motivoClienteSinAvisoEmail(cliente)));
         }
         if (finalizaciones.isEmpty() && incidencias.isEmpty() && !incluirClienteSinCambios) {
             return new ResultadoResumenDiario(0, 0, List.of("El cliente no tiene tramites finalizados ni incidencias activas."));
@@ -111,12 +113,15 @@ public class ResumenDiarioTramitesService {
 
     public ResultadoResumenDiario enviarListadoIncidenciasPendientesNotificar(Long clienteId, Usuario admin) {
         RangoDia rango = rangoDia();
+        LocalDateTime limitePrimerAviso = LocalDateTime.now(ZoneId.of(zone))
+                .minusDays(configuracionSeguimientoService.obtener().getDiasPrimerAviso());
         List<Incidencia> incidencias = clienteId != null
-                ? incidenciaRepository.findPendientesPrimerAvisoByCliente(clienteId)
-                : incidenciaRepository.findPendientesPrimerAviso();
+                ? incidenciaRepository.findPendientesPrimerAvisoByCliente(clienteId, limitePrimerAviso)
+                : incidenciaRepository.findPendientesPrimerAviso(limitePrimerAviso);
         return enviarListadoIncidencias(rango, incidencias, admin, "No hay avisos pendientes de notificar con cliente y email configurado.", "Aviso conjunto de incidencias");
     }
 
+    @Transactional
     public ResultadoResumenDiario enviarListadoIncidenciasSeleccionadas(List<Long> incidenciaIds, Usuario admin) {
         if (incidenciaIds == null || incidenciaIds.isEmpty()) {
             throw new OperacionInvalidaException("Selecciona al menos una incidencia para crear el aviso conjunto.");
@@ -133,6 +138,7 @@ public class ResumenDiarioTramitesService {
 
         ConfiguracionSeguimiento config = configuracionSeguimientoService.obtener();
         LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime limitePrimerAviso = ahora.minusDays(config.getDiasPrimerAviso());
         for (Incidencia incidencia : incidencias) {
             if (incidencia.getContadorAvisos() >= config.getMaxAvisos()) {
                 throw new OperacionInvalidaException("Alguna incidencia seleccionada ya alcanzo el maximo de avisos.");
@@ -140,6 +146,10 @@ public class ResumenDiarioTramitesService {
             if (incidencia.getContadorAvisos() > 0
                     && (incidencia.getProximoAviso() == null || incidencia.getProximoAviso().isAfter(ahora))) {
                 throw new OperacionInvalidaException("Alguna incidencia seleccionada aun no tiene el recordatorio vencido.");
+            }
+            if (incidencia.getContadorAvisos() == 0
+                    && (incidencia.getFechaCreacion() == null || incidencia.getFechaCreacion().isAfter(limitePrimerAviso))) {
+                throw new OperacionInvalidaException("Alguna incidencia seleccionada aun no ha cumplido el plazo del primer aviso.");
             }
         }
 
@@ -151,6 +161,7 @@ public class ResumenDiarioTramitesService {
         if (clienteIds.size() != 1 || clienteIds.get(0) == null) {
             throw new OperacionInvalidaException("Todas las incidencias seleccionadas deben pertenecer al mismo cliente.");
         }
+        validarClienteAvisoEmail(incidencias.get(0).getExpediente().getCliente());
 
         return enviarListadoIncidencias(rangoDia(), incidencias, admin,
                 "No hay incidencias seleccionadas con cliente y email configurado.",
@@ -160,7 +171,9 @@ public class ResumenDiarioTramitesService {
     private ResultadoResumenDiario enviarListadoIncidencias(RangoDia rango, List<Incidencia> incidencias, Usuario admin,
                                                             String mensajeSinDestinatarios, String asuntoAviso) {
         Map<Long, List<Incidencia>> incidenciasPorCliente = incidenciasPorCliente(incidencias);
-        List<Cliente> clientes = clientesDestinatarios(false, Map.of(), incidenciasPorCliente);
+        List<Cliente> clientes = clientesDestinatarios(false, Map.of(), incidenciasPorCliente).stream()
+                .filter(this::permiteAvisoPorEmail)
+                .toList();
         if (clientes.isEmpty()) {
             return new ResultadoResumenDiario(0, incidencias.size(), List.of(mensajeSinDestinatarios));
         }
@@ -191,7 +204,9 @@ public class ResumenDiarioTramitesService {
         Map<Long, List<HistorialCambio>> finalizacionesPorCliente = finalizacionesPorCliente(finalizaciones);
         Map<Long, List<Incidencia>> incidenciasPorCliente = incidenciasPorCliente(incidencias);
 
-        List<Cliente> clientes = clientesDestinatarios(incluirClientesSinCambios, finalizacionesPorCliente, incidenciasPorCliente);
+        List<Cliente> clientes = clientesDestinatarios(incluirClientesSinCambios, finalizacionesPorCliente, incidenciasPorCliente).stream()
+                .filter(this::permiteAvisoPorEmail)
+                .toList();
         if (clientes.isEmpty()) {
             return new ResultadoResumenDiario(0, totalElementos(finalizaciones, incidencias), List.of("No hay clientes destinatarios para el resumen diario."));
         }
@@ -544,6 +559,49 @@ public class ResumenDiarioTramitesService {
                 .filter(cliente -> cliente != null && StringUtils.hasText(cliente.getEmail()))
                 .forEach(clientes::add);
         return List.copyOf(clientes);
+    }
+
+    private void validarClienteAvisoEmail(Cliente cliente) {
+        if (cliente == null) {
+            throw new OperacionInvalidaException("Las incidencias seleccionadas no tienen cliente asociado.");
+        }
+        if (!StringUtils.hasText(cliente.getEmail())) {
+            throw new OperacionInvalidaException("El cliente no tiene un correo configurado.");
+        }
+        PreferenciaCanalCliente preferencia = cliente.getPreferenciaCanal() != null
+                ? cliente.getPreferenciaCanal()
+                : PreferenciaCanalCliente.AMBOS;
+        if (preferencia == PreferenciaCanalCliente.SIN_AVISOS) {
+            throw new OperacionInvalidaException("El cliente tiene desactivados los avisos.");
+        }
+        if (preferencia == PreferenciaCanalCliente.WHATSAPP) {
+            throw new OperacionInvalidaException("El cliente solo admite avisos por WhatsApp.");
+        }
+    }
+
+    private boolean permiteAvisoPorEmail(Cliente cliente) {
+        if (cliente == null || !StringUtils.hasText(cliente.getEmail())) {
+            return false;
+        }
+        PreferenciaCanalCliente preferencia = cliente.getPreferenciaCanal() != null
+                ? cliente.getPreferenciaCanal()
+                : PreferenciaCanalCliente.AMBOS;
+        return preferencia == PreferenciaCanalCliente.EMAIL || preferencia == PreferenciaCanalCliente.AMBOS;
+    }
+    private String motivoClienteSinAvisoEmail(Cliente cliente) {
+        if (cliente == null || !StringUtils.hasText(cliente.getEmail())) {
+            return "El cliente no tiene email configurado.";
+        }
+        PreferenciaCanalCliente preferencia = cliente.getPreferenciaCanal() != null
+                ? cliente.getPreferenciaCanal()
+                : PreferenciaCanalCliente.AMBOS;
+        if (preferencia == PreferenciaCanalCliente.SIN_AVISOS) {
+            return "El cliente tiene desactivados los avisos.";
+        }
+        if (preferencia == PreferenciaCanalCliente.WHATSAPP) {
+            return "El cliente solo admite avisos por WhatsApp.";
+        }
+        return "El cliente no admite avisos por correo.";
     }
 
     private RangoDia rangoDia() {

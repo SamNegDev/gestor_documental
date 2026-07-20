@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Archive, ArrowRight, CheckSquare2, ClipboardList, Clock3, FileWarning, Inbox, Mail, MessageCircle, SearchCheck, Send } from "lucide-react";
 import { Link, useOutletContext } from "react-router-dom";
 import type { AppOutletContext } from "../../../app/shell/AppLayout";
 import { ApiError } from "../../../shared/api/http";
+import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { PaginationBar } from "../../listados/components/PaginationBar";
 import { getExpedienteListCatalogs } from "../../listados/services/listadosApi";
@@ -16,6 +17,7 @@ export function TareasPage() {
   const { user } = useOutletContext<AppOutletContext>();
   const isAdmin = user?.rol === "ADMIN";
   const queryClient = useQueryClient();
+  const { confirm, dialog } = useConfirmDialog();
   const ambito = isAdmin ? "GESTION" : "CLIENTE";
   const [tipo, setTipo] = useState("");
   const [prioridad, setPrioridad] = useState("");
@@ -37,6 +39,25 @@ export function TareasPage() {
   };
   const archiveMutation = useMutation({ mutationFn: archivarSeguimiento, onSuccess: refresh });
   const whatsappReviewMutation = useMutation({ mutationFn: revisarTareaWhatsapp, onSuccess: refresh });
+
+  async function archiveFollowup(id: number) {
+    const accepted = await confirm({
+      title: "Archivar seguimiento",
+      description: "Dejará de generar recordatorios mientras la incidencia siga abierta. Podrás reactivarlo desde Seguimiento de clientes.",
+      confirmLabel: "Archivar seguimiento",
+      tone: "danger",
+    });
+    if (accepted) archiveMutation.mutate(id);
+  }
+
+  async function markWhatsappReviewed(id: number) {
+    const accepted = await confirm({
+      title: "Marcar tarea como realizada",
+      description: "La tarea desaparecerá de la bandeja. Confirma que ya has revisado y gestionado el mensaje.",
+      confirmLabel: "Marcar realizada",
+    });
+    if (accepted) whatsappReviewMutation.mutate(id);
+  }
   const bulkNotify = useMutation({
     mutationFn: () => enviarAvisosConjuntos(clienteId),
     onSuccess: (result) => {
@@ -49,7 +70,7 @@ export function TareasPage() {
     },
   });
   const selectedNotify = useMutation({
-    mutationFn: () => enviarAvisosSeleccionados(Object.values(selectedTasks).map((tarea) => tarea.entidadId)),
+    mutationFn: () => enviarAvisosSeleccionados(Array.from(new Set(Object.values(selectedTasks).flatMap((tarea) => tarea.incidenciaIdsAvisoConjunto ?? [])))),
     onSuccess: (result) => {
       setBulkFeedback(`${result.clientesEnviados} cliente avisado · ${result.cambiosIncluidos} avisos incluidos${result.avisos.length ? ` · ${result.avisos[0]}` : ""}`);
       setSelectedTasks({});
@@ -69,17 +90,42 @@ export function TareasPage() {
       const preview = await prepararNotificacionExpediente(tarea.entidadId);
       setNotificacion({ incidenciaId: preview.incidenciaId, canal });
       refresh();
-    } catch {
-      alert("No se pudo preparar la notificacion.");
+    } catch (error) {
+      const message = error instanceof ApiError ? error.details || error.message : "No se pudo preparar la notificación. Revisa el expediente e inténtalo de nuevo.";
+      setBulkFeedback(message);
     }
   }
+  useEffect(() => {
+    setSelectedTasks({});
+  }, [ambito, tipo, prioridad, clienteId, pagina, tamanio]);
   const data = query.data;
-  const selectableVisibleTasks = data?.contenido.filter(isSelectableNotificationTask) ?? [];
+  async function sendSelectedNotifications() {
+    const accepted = await confirm({
+      title: "Enviar aviso conjunto",
+      description: `Se enviará un único aviso con ${selectedIncidentIds.length} ${selectedIncidentIds.length === 1 ? "incidencia" : "incidencias"} de ${selectedList.length} ${selectedList.length === 1 ? "expediente" : "expedientes"} a ${selectedClientName || "este cliente"}.`,
+      confirmLabel: "Enviar aviso",
+    });
+    if (accepted) selectedNotify.mutate();
+  }
+
+  async function sendFilteredNotifications() {
+    const clientName = catalogs.data?.clientes.find((cliente) => String(cliente.id) === clienteId)?.nombre || "el cliente seleccionado";
+    const accepted = await confirm({
+      title: "Enviar pendientes del cliente",
+      description: `Se agruparán y enviarán todos los avisos pendientes de ${clientName}.`,
+      confirmLabel: "Enviar pendientes",
+    });
+    if (accepted) bulkNotify.mutate();
+  }
   const selectedList = Object.values(selectedTasks);
   const selectedClienteIds = Array.from(new Set(selectedList.map((tarea) => tarea.clienteId).filter((id): id is number => typeof id === "number")));
+  const activeSelectionClientId = selectedClienteIds.length === 1 ? selectedClienteIds[0] : null;
+  const selectableVisibleTasks = data?.contenido.filter((tarea) => isSelectableNotificationTask(tarea)
+    && (activeSelectionClientId === null || tarea.clienteId === activeSelectionClientId)) ?? [];
+  const selectedIncidentIds = Array.from(new Set(selectedList.flatMap((tarea) => tarea.incidenciaIdsAvisoConjunto ?? [])));
   const selectedWithoutClient = selectedList.some((tarea) => !tarea.clienteId);
   const selectedMixedClients = selectedClienteIds.length > 1;
-  const selectedCanNotify = selectedList.length > 0 && selectedClienteIds.length === 1 && !selectedWithoutClient;
+  const selectedCanNotify = selectedList.length > 0 && selectedIncidentIds.length > 0 && selectedClienteIds.length === 1 && !selectedWithoutClient;
   const selectedClientName = selectedList.find((tarea) => tarea.clienteId === selectedClienteIds[0])?.cliente;
   const allVisibleSelected = selectableVisibleTasks.length > 0 && selectableVisibleTasks.every((tarea) => Boolean(selectedTasks[tarea.id]));
   const toggleTaskSelection = (tarea: Tarea, checked: boolean) => {
@@ -118,15 +164,15 @@ export function TareasPage() {
             <button
               className="primary-button"
               disabled={selectedNotify.isPending || !selectedCanNotify}
-              onClick={() => selectedNotify.mutate()}
+              onClick={sendSelectedNotifications}
               type="button"
             >
               <Send size={16} />
-              {selectedNotify.isPending ? "Creando..." : selectedList.length ? `Crear aviso (${selectedList.length})` : "Selecciona avisos"}
+              {selectedNotify.isPending ? "Creando..." : selectedList.length ? `Enviar selección (${selectedList.length})` : "Selecciona avisos"}
             </button>
-            <button className="soft-button" disabled={bulkNotify.isPending || !clienteId} onClick={() => bulkNotify.mutate()} type="button">
+            <button className="soft-button" disabled={bulkNotify.isPending || !clienteId} onClick={sendFilteredNotifications} type="button">
               <Send size={16} />
-              {bulkNotify.isPending ? "Enviando..." : clienteId ? "Aviso cliente filtrado" : "Selecciona cliente"}
+              {bulkNotify.isPending ? "Enviando..." : clienteId ? "Enviar pendientes del cliente" : "Selecciona cliente"}
             </button>
             <span className="records-count">{data?.totalElementos ?? 0} pendientes</span>
           </div>
@@ -135,7 +181,7 @@ export function TareasPage() {
         )}
       </header>
 
-      {bulkFeedback ? <div className="form-feedback">{bulkFeedback}</div> : null}
+      {bulkFeedback ? <div aria-live="polite" className="form-feedback" role="status">{bulkFeedback}</div> : null}
       {isAdmin && selectedList.length > 0 ? (
         <div className={`task-selection-bar${selectedCanNotify ? "" : " task-selection-bar--blocked"}`}>
           <span>
@@ -221,13 +267,16 @@ export function TareasPage() {
             <TaskRow
               archivePending={archiveMutation.isPending}
               key={tarea.id}
-              onArchive={(id) => archiveMutation.mutate(id)}
-              onWhatsappReview={(id) => whatsappReviewMutation.mutate(id)}
+              onArchive={archiveFollowup}
+              onWhatsappReview={markWhatsappReviewed}
               onNotify={notify}
               onSelect={toggleTaskSelection}
               selectable={isAdmin && isSelectableNotificationTask(tarea)}
               selected={Boolean(selectedTasks[tarea.id])}
+              selectionDisabled={isAdmin && isSelectableNotificationTask(tarea) && activeSelectionClientId !== null && tarea.clienteId !== activeSelectionClientId && !selectedTasks[tarea.id]}
+              selectionDisabledReason={tarea.motivoAvisoConjuntoNoDisponible || (activeSelectionClientId !== null && tarea.clienteId !== activeSelectionClientId ? "Selecciona únicamente avisos del mismo cliente." : null)}
               showClient={isAdmin}
+              showSelection={isAdmin && isNotificationTask(tarea)}
               tarea={tarea}
             />
           ))}
@@ -243,6 +292,7 @@ export function TareasPage() {
       </section>
 
       <NotificationEmailDialog canal={notificacion?.canal} incidenciaId={notificacion?.incidenciaId ?? null} onClose={() => setNotificacion(null)} onSent={refresh} />
+      {dialog}
     </main>
   );
 }
@@ -256,7 +306,10 @@ function TaskRow({
   onSelect,
   selectable,
   selected,
+  selectionDisabled,
+  selectionDisabledReason,
   showClient,
+  showSelection,
 }: {
   tarea: Tarea;
   archivePending: boolean;
@@ -266,15 +319,24 @@ function TaskRow({
   onSelect: (tarea: Tarea, checked: boolean) => void;
   selectable: boolean;
   selected: boolean;
+  selectionDisabled: boolean;
+  selectionDisabledReason: string | null;
   showClient: boolean;
+  showSelection: boolean;
 }) {
   const actionKind = taskActionKind(tarea.tipo);
 
   return (
-    <article className={`task-row task-row--${showClient ? "admin" : "client"} task-row--${tarea.prioridad.toLowerCase()}${tarea.contexto ? " task-row--with-context" : ""}${selectable ? " task-row--selectable" : ""}${selected ? " is-selected" : ""}`}>
-      {selectable ? (
-        <label className="task-row__select" title="Seleccionar para aviso conjunto">
-          <input aria-label={`Seleccionar ${tarea.titulo}`} checked={selected} type="checkbox" onChange={(event) => onSelect(tarea, event.target.checked)} />
+    <article className={`task-row task-row--${showClient ? "admin" : "client"} task-row--${tarea.prioridad.toLowerCase()}${tarea.contexto ? " task-row--with-context" : ""}${showSelection ? " task-row--selectable" : ""}${selected ? " is-selected" : ""}`}>
+      {showSelection ? (
+        <label className="task-row__select" title={selectionDisabledReason || "Seleccionar para aviso conjunto"}>
+          <input
+            aria-label={selectionDisabledReason ? `${tarea.titulo}: ${selectionDisabledReason}` : `Seleccionar ${tarea.titulo}`}
+            checked={selected}
+            disabled={!selectable || selectionDisabled}
+            type="checkbox"
+            onChange={(event) => onSelect(tarea, event.target.checked)}
+          />
         </label>
       ) : null}
       <span className={`task-row__icon task-row__icon--${actionKind?.tone ?? "neutral"}`}>{taskIcon(tarea.tipo)}</span>
@@ -338,9 +400,12 @@ function TaskRow({
   );
 }
 
+function isNotificationTask(tarea: Tarea) {
+  return tarea.tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR" || tarea.tipo === "INCIDENCIA_RECORDATORIO_PENDIENTE";
+}
+
 function isSelectableNotificationTask(tarea: Tarea) {
-  return tarea.entidad === "INCIDENCIA"
-    && (tarea.tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR" || tarea.tipo === "INCIDENCIA_RECORDATORIO_PENDIENTE");
+  return isNotificationTask(tarea) && Boolean(tarea.incidenciaIdsAvisoConjunto?.length);
 }
 
 function canNotifyTask(tarea: Tarea) {
@@ -349,7 +414,7 @@ function canNotifyTask(tarea: Tarea) {
 }
 
 function Summary({ icon: Icon, label, value, tone = "default" }: { icon: typeof Inbox; label: string; value: number; tone?: string }) {
-  return <div className={`task-summary__item task-summary__item--${tone}`}><Icon size={19} /><span><small>{label}</small><strong>{value}</strong></span></div>;
+  return <div className={`task-summary__item task-summary__item--${tone}`}><Icon aria-hidden="true" size={19} /><span><small>{label}</small><strong>{value}</strong></span></div>;
 }
 
 function taskIcon(tipo: string) {
