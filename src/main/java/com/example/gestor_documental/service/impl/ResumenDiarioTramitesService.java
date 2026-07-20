@@ -52,6 +52,12 @@ public class ResumenDiarioTramitesService {
             "casado-negrin-logo.png"
     );
 
+    private static final CorreoService.ImagenInline LOGO_SIMBOLO_INLINE = new CorreoService.ImagenInline(
+            LOGO_CID,
+            "static/assets/logos/casado-negrin-symbol.jpg",
+            "image/jpeg",
+            "casado-negrin-symbol.jpg"
+    );
     private final HistorialCambioRepository historialCambioRepository;
     private final IncidenciaRepository incidenciaRepository;
     private final ClienteRepository clienteRepository;
@@ -68,6 +74,12 @@ public class ResumenDiarioTramitesService {
 
     @Value("${app.daily-summary.zone:Atlantic/Canary}")
     private String zone;
+
+    @Value("${app.mail.enabled:false}")
+    private boolean mailEnabled;
+
+    @Value("${app.public-url:}")
+    private String appPublicUrl;
 
     @Scheduled(cron = "${app.daily-summary.cron:0 0 17 * * *}", zone = "${app.daily-summary.zone:Atlantic/Canary}")
     public void enviarResumenDiarioProgramado() {
@@ -113,7 +125,7 @@ public class ResumenDiarioTramitesService {
 
     public ResultadoResumenDiario enviarListadoIncidenciasPendientesNotificar(Long clienteId, Usuario admin) {
         RangoDia rango = rangoDia();
-        LocalDateTime limitePrimerAviso = LocalDateTime.now(ZoneId.of(zone))
+        LocalDateTime limitePrimerAviso = LocalDateTime.now(zona())
                 .minusDays(configuracionSeguimientoService.obtener().getDiasPrimerAviso());
         List<Incidencia> incidencias = clienteId != null
                 ? incidenciaRepository.findPendientesPrimerAvisoByCliente(clienteId, limitePrimerAviso)
@@ -122,52 +134,59 @@ public class ResumenDiarioTramitesService {
     }
 
     @Transactional
+    public PrevisualizacionAvisoConjunto previsualizarListadoIncidenciasSeleccionadas(List<Long> incidenciaIds) {
+        return crearAvisoSeleccionado(cargarYValidarSeleccion(incidenciaIds));
+    }
+
+    @Transactional
     public ResultadoResumenDiario enviarListadoIncidenciasSeleccionadas(List<Long> incidenciaIds, Usuario admin) {
-        if (incidenciaIds == null || incidenciaIds.isEmpty()) {
-            throw new OperacionInvalidaException("Selecciona al menos una incidencia para crear el aviso conjunto.");
+        List<Incidencia> incidencias = cargarYValidarSeleccion(incidenciaIds);
+        PrevisualizacionAvisoConjunto aviso = crearAvisoSeleccionado(incidencias);
+        CorreoService.ResultadoCorreo resultado = correoService.enviarHtml(aviso.destinatario(), aviso.asunto(),
+                aviso.htmlEnvio(), aviso.texto(), copiasOcultas(aviso.destinatario()), LOGO_SIMBOLO_INLINE);
+        if (!resultado.exito()) {
+            return new ResultadoResumenDiario(0, incidencias.size(), List.of("No se pudo enviar a " + aviso.destinatario() + ": " + resultado.error()));
         }
-        List<Long> ids = incidenciaIds.stream().filter(id -> id != null).distinct().toList();
-        if (ids.isEmpty()) {
-            throw new OperacionInvalidaException("Selecciona al menos una incidencia para crear el aviso conjunto.");
-        }
+        registrarSeguimientoIncidencias(incidencias, admin, resultado.simulado(), aviso.texto(), aviso.asunto());
+        return new ResultadoResumenDiario(1, incidencias.size(), List.of());
+    }
 
+    private List<Incidencia> cargarYValidarSeleccion(List<Long> incidenciaIds) {
+        if (incidenciaIds == null || incidenciaIds.isEmpty()) throw new OperacionInvalidaException("Selecciona al menos una incidencia.");
+        List<Long> ids = incidenciaIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) throw new OperacionInvalidaException("Selecciona al menos una incidencia.");
         List<Incidencia> incidencias = incidenciaRepository.findActivasResumenByIds(ids);
-        if (incidencias.size() != ids.size()) {
-            throw new OperacionInvalidaException("Alguna incidencia seleccionada ya no esta activa o no existe.");
-        }
-
+        if (incidencias.size() != ids.size()) throw new OperacionInvalidaException("Alguna incidencia seleccionada ya no esta activa o no existe.");
         ConfiguracionSeguimiento config = configuracionSeguimientoService.obtener();
-        LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime ahora = LocalDateTime.now(zona());
         LocalDateTime limitePrimerAviso = ahora.minusDays(config.getDiasPrimerAviso());
         for (Incidencia incidencia : incidencias) {
-            if (incidencia.getContadorAvisos() >= config.getMaxAvisos()) {
-                throw new OperacionInvalidaException("Alguna incidencia seleccionada ya alcanzo el maximo de avisos.");
-            }
-            if (incidencia.getContadorAvisos() > 0
-                    && (incidencia.getProximoAviso() == null || incidencia.getProximoAviso().isAfter(ahora))) {
+            if (incidencia.getContadorAvisos() >= config.getMaxAvisos()) throw new OperacionInvalidaException("Alguna incidencia seleccionada ya alcanzo el maximo de avisos.");
+            if (incidencia.getContadorAvisos() > 0 && (incidencia.getProximoAviso() == null || incidencia.getProximoAviso().isAfter(ahora))) {
                 throw new OperacionInvalidaException("Alguna incidencia seleccionada aun no tiene el recordatorio vencido.");
             }
-            if (incidencia.getContadorAvisos() == 0
-                    && (incidencia.getFechaCreacion() == null || incidencia.getFechaCreacion().isAfter(limitePrimerAviso))) {
+            if (incidencia.getContadorAvisos() == 0 && (incidencia.getFechaCreacion() == null || incidencia.getFechaCreacion().isAfter(limitePrimerAviso))) {
                 throw new OperacionInvalidaException("Alguna incidencia seleccionada aun no ha cumplido el plazo del primer aviso.");
             }
         }
-
-        List<Long> clienteIds = incidencias.stream()
-                .map(incidencia -> incidencia.getExpediente() != null ? incidencia.getExpediente().getCliente() : null)
-                .map(cliente -> cliente != null ? cliente.getId() : null)
-                .distinct()
-                .toList();
-        if (clienteIds.size() != 1 || clienteIds.get(0) == null) {
-            throw new OperacionInvalidaException("Todas las incidencias seleccionadas deben pertenecer al mismo cliente.");
-        }
+        List<Long> clientes = incidencias.stream().map(i -> i.getExpediente() == null ? null : i.getExpediente().getCliente())
+                .map(c -> c == null ? null : c.getId()).distinct().toList();
+        if (clientes.size() != 1 || clientes.get(0) == null) throw new OperacionInvalidaException("Todas las incidencias seleccionadas deben pertenecer al mismo cliente.");
         validarClienteAvisoEmail(incidencias.get(0).getExpediente().getCliente());
-
-        return enviarListadoIncidencias(rangoDia(), incidencias, admin,
-                "No hay incidencias seleccionadas con cliente y email configurado.",
-                "Aviso conjunto de incidencias");
+        return incidencias;
     }
 
+    private PrevisualizacionAvisoConjunto crearAvisoSeleccionado(List<Incidencia> incidencias) {
+        Cliente cliente = incidencias.get(0).getExpediente().getCliente();
+        Map<Long, List<Incidencia>> grupos = incidencias.stream().collect(java.util.stream.Collectors.groupingBy(
+                i -> i.getExpediente().getId(), LinkedHashMap::new, java.util.stream.Collectors.toList()));
+        String asunto = "Acción requerida en tus trámites (" + incidencias.size() + (incidencias.size() == 1 ? " pendiente)" : " pendientes)");
+        String texto = textoAvisoSeleccionado(cliente, grupos);
+        String htmlEnvio = htmlAvisoSeleccionado(cliente, grupos);
+        return new PrevisualizacionAvisoConjunto(cliente.getEmail(), asunto, texto,
+                htmlEnvio.replace("cid:" + LOGO_CID, "/assets/logos/casado-negrin-symbol.jpg"),
+                htmlEnvio, incidencias.size(), grupos.size(), mailEnabled);
+    }
     private ResultadoResumenDiario enviarListadoIncidencias(RangoDia rango, List<Incidencia> incidencias, Usuario admin,
                                                             String mensajeSinDestinatarios, String asuntoAviso) {
         Map<Long, List<Incidencia>> incidenciasPorCliente = incidenciasPorCliente(incidencias);
@@ -244,6 +263,89 @@ public class ResumenDiarioTramitesService {
         return resultado;
     }
 
+    private String textoAvisoSeleccionado(Cliente cliente, Map<Long, List<Incidencia>> grupos) {
+        String salto = System.lineSeparator();
+        StringBuilder texto = new StringBuilder("Hola");
+        if (StringUtils.hasText(cliente.getNombre())) texto.append(" ").append(cliente.getNombre());
+        texto.append(",").append(salto).append(salto)
+                .append("Necesitamos tu ayuda para continuar con ")
+                .append(grupos.size() == 1 ? "tu trámite." : grupos.size() + " trámites.")
+                .append(salto).append(salto);
+        grupos.values().forEach(grupo -> {
+            Expediente e = grupo.get(0).getExpediente();
+            texto.append("Expediente ").append(e.getId()).append(" - ").append(matriculaAviso(e))
+                    .append(" - ").append(tipoTramite(e)).append(salto);
+            grupo.forEach(i -> texto.append(" - ").append(descripcionAviso(i)).append(salto));
+            texto.append(salto);
+        });
+        if (StringUtils.hasText(appPublicUrl)) {
+            texto.append("Revisar: ").append(appPublicUrl.replaceAll("/+$", "")).append("/tareas")
+                    .append(salto).append(salto);
+        }
+        return texto.append("Si ya lo has enviado, puedes ignorar este aviso.").append(salto).append(salto)
+                .append("Gestoria Casado Negrin").toString();
+    }
+
+    private String htmlAvisoSeleccionado(Cliente cliente, Map<Long, List<Incidencia>> grupos) {
+        StringBuilder filas = new StringBuilder();
+        grupos.values().forEach(grupo -> {
+            Expediente e = grupo.get(0).getExpediente();
+            StringBuilder pendientes = new StringBuilder();
+            grupo.forEach(i -> pendientes.append("""
+                    <tr><td style="padding:8px 0 8px 14px;border-left:3px solid #f8c91c;color:#172033;font-size:15px;line-height:22px;">%s</td></tr>
+                    """.formatted(escapeHtml(descripcionAviso(i)))));
+            filas.append("""
+                    <tr><td style="padding:22px 0;border-bottom:1px solid #dfe5ec;">
+                      <table role="presentation" width="100%%" cellspacing="0" cellpadding="0"><tr>
+                        <td valign="top" width="38%%" style="padding-right:22px;">
+                          <p style="margin:0 0 7px;color:#1685bd;font-size:15px;font-weight:bold;">Expediente %d</p>
+                          <p style="margin:0 0 4px;color:#667085;font-size:13px;">Matricula</p>
+                          <p style="margin:0 0 5px;color:#172033;font-size:25px;font-weight:bold;">%s</p>
+                          <p style="margin:0;color:#475467;font-size:14px;">%s</p>
+                        </td>
+                        <td valign="top" style="padding-left:22px;border-left:1px solid #dfe5ec;">
+                          <p style="margin:0 0 9px;color:#172033;font-size:14px;font-weight:bold;">Documentación o acciones pendientes</p>
+                          <table role="presentation" width="100%%">%s</table>
+                        </td>
+                      </tr></table>
+                    </td></tr>
+                    """.formatted(e.getId(), escapeHtml(matriculaAviso(e)), escapeHtml(tipoTramite(e)), pendientes));
+        });
+        String url = StringUtils.hasText(appPublicUrl) ? appPublicUrl.replaceAll("/+$", "") + "/tareas" : "";
+        String boton = StringUtils.hasText(url) ? """
+                <tr><td align="center" style="padding:26px 0 10px;">
+                  <a href="%s" style="display:inline-block;background:#f8c91c;color:#172033;text-decoration:none;font-size:16px;font-weight:bold;padding:15px 28px;border-radius:5px;">Revisar y aportar documentación</a>
+                </td></tr>
+                """.formatted(escapeHtml(url)) : "";
+        int total = grupos.values().stream().mapToInt(List::size).sum();
+        String fecha = LocalDate.now(zona()).format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", new java.util.Locale("es", "ES")));
+        return """
+                <!doctype html><html lang="es">
+                <body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;">
+                <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" bgcolor="#f4f6f8"><tr><td align="center" style="padding:24px 10px;">
+                  <table role="presentation" width="640" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="width:640px;max-width:100%%;background:#fff;border:1px solid #d9e0ea;">
+                    <tr><td bgcolor="#172033" style="padding:20px 28px;"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td><img src="cid:%s" width="52" alt="" style="display:block;width:52px;height:52px;border:0;"></td><td style="padding-left:14px;color:#ffffff;font-size:20px;line-height:24px;font-weight:bold;">Gestoría<br>Casado Negrín</td></tr></table></td></tr>
+                    <tr><td style="padding:30px 28px 8px;"><h1 style="margin:0 0 8px;color:#172033;font-size:27px;line-height:34px;">Acción requerida en tus trámites</h1><p style="margin:0;color:#1685bd;font-size:14px;font-weight:bold;">%s</p></td></tr>
+                    <tr><td style="padding:12px 28px 4px;"><p style="margin:0 0 10px;color:#172033;font-size:17px;font-weight:bold;">Hola%s,</p><p style="margin:0;color:#475467;font-size:15px;line-height:23px;">Necesitamos tu ayuda para continuar con %s.</p></td></tr>
+                    <tr><td style="padding:18px 28px 0;"><table role="presentation" width="100%%" bgcolor="#eef7fc" style="background:#eef7fc;border:1px solid #cce4f1;"><tr><td align="center" style="padding:13px;color:#1685bd;font-size:17px;font-weight:bold;">%s &middot; %s</td></tr></table></td></tr>
+                    <tr><td style="padding:4px 28px 0;"><table role="presentation" width="100%%">%s</table>%s</td></tr>
+                    <tr><td style="padding:8px 28px 24px;color:#475467;font-size:14px;">Si ya lo has enviado, puedes ignorar este aviso.</td></tr>
+                    <tr><td style="padding:20px 28px 24px;border-top:2px solid #1685bd;color:#667085;font-size:13px;"><strong style="color:#172033;">Gestoria Casado Negrin</strong><br>Gestión documental y trámites de vehículos. Estamos aquí para ayudarte.</td></tr>
+                  </table>
+                </td></tr></table></body></html>
+                """.formatted(LOGO_CID, fecha, saludoNombre(cliente),
+                grupos.size() == 1 ? "tu trámite" : grupos.size() + " trámites",
+                total + (total == 1 ? " incidencia" : " incidencias"), grupos.size() + (grupos.size() == 1 ? " expediente" : " expedientes"), filas, boton);
+    }
+
+    private String matriculaAviso(Expediente e) {
+        return StringUtils.hasText(e.getMatricula()) ? e.getMatricula() : "Sin matricula";
+    }
+
+    private String descripcionAviso(Incidencia i) {
+        String valor = tipoIncidencia(i);
+        return StringUtils.hasText(i.getObservaciones()) ? valor + ": " + limpiar(i.getObservaciones()) : valor;
+    }
     private String construirTexto(ResumenCliente resumen, RangoDia rango) {
         StringBuilder mensaje = new StringBuilder();
         mensaje.append("Hola");
@@ -604,8 +706,12 @@ public class ResumenDiarioTramitesService {
         return "El cliente no admite avisos por correo.";
     }
 
+    private ZoneId zona() {
+        return StringUtils.hasText(zone) ? ZoneId.of(zone) : ZoneId.systemDefault();
+    }
+
     private RangoDia rangoDia() {
-        ZoneId zoneId = ZoneId.of(zone);
+        ZoneId zoneId = zona();
         LocalDate hoy = LocalDate.now(zoneId);
         return new RangoDia(hoy, hoy.atStartOfDay(), LocalDateTime.now(zoneId).withNano(0));
     }
@@ -735,6 +841,10 @@ public class ResumenDiarioTramitesService {
     }
 
     private record ResumenCliente(Cliente cliente, List<HistorialCambio> finalizaciones, List<Incidencia> incidencias) {
+    }
+
+    public record PrevisualizacionAvisoConjunto(String destinatario, String asunto, String texto, String html,
+                                                String htmlEnvio, int incidencias, int expedientes, boolean envioReal) {
     }
 
     public record ResultadoResumenDiario(int clientesEnviados, int cambiosIncluidos, List<String> avisos) {

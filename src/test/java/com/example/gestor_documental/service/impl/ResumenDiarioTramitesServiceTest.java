@@ -27,6 +27,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -70,6 +71,35 @@ class ResumenDiarioTramitesServiceTest {
         verify(correoService, never()).enviarHtml(any(), any(), any(), any(), any(), any());
     }
 
+    @Test
+    void previsualizaElHtmlRealSinEnviarCorreo() {
+        Cliente cliente = new Cliente();
+        cliente.setId(10L);
+        cliente.setNombre("Maria");
+        cliente.setEmail("cliente@example.com");
+        cliente.setPreferenciaCanal(PreferenciaCanalCliente.EMAIL);
+        Expediente expediente = new Expediente();
+        expediente.setId(20L);
+        expediente.setMatricula("1234 MBC");
+        expediente.setCliente(cliente);
+        Incidencia incidencia = new Incidencia();
+        incidencia.setId(1L);
+        incidencia.setExpediente(expediente);
+        incidencia.setFechaCreacion(LocalDateTime.now().minusDays(3));
+        ConfiguracionSeguimiento config = new ConfiguracionSeguimiento();
+        config.setDiasPrimerAviso(2);
+        when(incidenciaRepository.findActivasResumenByIds(List.of(1L))).thenReturn(List.of(incidencia));
+        when(configuracionSeguimientoService.obtener()).thenReturn(config);
+
+        var preview = service.previsualizarListadoIncidenciasSeleccionadas(List.of(1L));
+
+        assertEquals("cliente@example.com", preview.destinatario());
+        assertEquals(1, preview.incidencias());
+        assertEquals(1, preview.expedientes());
+        assertTrue(preview.html().contains("1234 MBC"));
+        assertTrue(preview.html().contains("Acción requerida"));
+        verify(correoService, never()).enviarHtml(any(), any(), any(), any(), any(), any());
+    }
     @ParameterizedTest
     @EnumSource(value = PreferenciaCanalCliente.class, names = {"WHATSAPP", "SIN_AVISOS"})
     void bloqueaAvisoConjuntoPorEmailCuandoLaPreferenciaNoLoPermite(PreferenciaCanalCliente preferencia) {

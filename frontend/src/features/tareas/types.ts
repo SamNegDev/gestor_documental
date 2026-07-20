@@ -10,3 +10,7 @@ export interface Tarea {
 export type TareasPage = PagedResponse<Tarea>;
 export interface TareasResumen { total: number; urgentes: number; estancados: number; }
 export interface ResumenDiarioResponse { clientesEnviados: number; cambiosIncluidos: number; avisos: string[]; }
+export interface AvisoSeleccionadoPreview {
+  destinatario: string; asunto: string; texto: string; html: string;
+  incidencias: number; expedientes: number; envioReal: boolean;
+}

@@ -10,7 +10,8 @@ import { PaginationBar } from "../../listados/components/PaginationBar";
 import { getExpedienteListCatalogs } from "../../listados/services/listadosApi";
 import { archivarSeguimiento, prepararNotificacionExpediente } from "../../seguimiento/services/seguimientoApi";
 import { NotificationEmailDialog } from "../components/NotificationEmailDialog";
-import { enviarAvisosConjuntos, enviarAvisosSeleccionados, getTareas, getTareasResumen, revisarTareaWhatsapp } from "../services/tareasApi";
+import { SelectedEmailPreviewDialog } from "../components/SelectedEmailPreviewDialog";
+import { enviarAvisosConjuntos, getTareas, getTareasResumen, revisarTareaWhatsapp } from "../services/tareasApi";
 import type { Tarea } from "../types";
 
 export function TareasPage() {
@@ -27,6 +28,7 @@ export function TareasPage() {
   const [bulkFeedback, setBulkFeedback] = useState<string | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<Record<string, Tarea>>({});
   const [notificacion, setNotificacion] = useState<{ incidenciaId: number; canal: "email" | "whatsapp" } | null>(null);
+  const [selectedPreviewOpen, setSelectedPreviewOpen] = useState(false);
   const query = useQuery({
     queryKey: ["tareas", ambito, tipo, prioridad, clienteId, pagina, tamanio],
     queryFn: () => getTareas({ ambito, tipo, prioridad, clienteId: isAdmin ? clienteId : "", pagina, tamanio }),
@@ -69,18 +71,6 @@ export function TareasPage() {
       setBulkFeedback(message);
     },
   });
-  const selectedNotify = useMutation({
-    mutationFn: () => enviarAvisosSeleccionados(Array.from(new Set(Object.values(selectedTasks).flatMap((tarea) => tarea.incidenciaIdsAvisoConjunto ?? [])))),
-    onSuccess: (result) => {
-      setBulkFeedback(`${result.clientesEnviados} cliente avisado · ${result.cambiosIncluidos} avisos incluidos${result.avisos.length ? ` · ${result.avisos[0]}` : ""}`);
-      setSelectedTasks({});
-      refresh();
-    },
-    onError: (error) => {
-      const message = error instanceof ApiError ? error.details || error.message : "No se pudo crear el aviso conjunto seleccionado.";
-      setBulkFeedback(message);
-    },
-  });
   async function notify(tarea: Tarea, canal: "email" | "whatsapp") {
     if (tarea.entidad === "INCIDENCIA") {
       setNotificacion({ incidenciaId: tarea.entidadId, canal });
@@ -99,15 +89,16 @@ export function TareasPage() {
     setSelectedTasks({});
   }, [ambito, tipo, prioridad, clienteId, pagina, tamanio]);
   const data = query.data;
-  async function sendSelectedNotifications() {
-    const accepted = await confirm({
-      title: "Enviar aviso conjunto",
-      description: `Se enviará un único aviso con ${selectedIncidentIds.length} ${selectedIncidentIds.length === 1 ? "incidencia" : "incidencias"} de ${selectedList.length} ${selectedList.length === 1 ? "expediente" : "expedientes"} a ${selectedClientName || "este cliente"}.`,
-      confirmLabel: "Enviar aviso",
-    });
-    if (accepted) selectedNotify.mutate();
+  function previewSelectedNotifications() {
+    setSelectedPreviewOpen(true);
   }
 
+  function completeSelectedSend(result: import("../types").ResumenDiarioResponse) {
+    setBulkFeedback(`${result.clientesEnviados} cliente avisado · ${result.cambiosIncluidos} avisos incluidos${result.avisos.length ? ` · ${result.avisos[0]}` : ""}`);
+    setSelectedTasks({});
+    setSelectedPreviewOpen(false);
+    refresh();
+  }
   async function sendFilteredNotifications() {
     const clientName = catalogs.data?.clientes.find((cliente) => String(cliente.id) === clienteId)?.nombre || "el cliente seleccionado";
     const accepted = await confirm({
@@ -163,12 +154,12 @@ export function TareasPage() {
           <div className="records-header__actions">
             <button
               className="primary-button"
-              disabled={selectedNotify.isPending || !selectedCanNotify}
-              onClick={sendSelectedNotifications}
+              disabled={!selectedCanNotify}
+              onClick={previewSelectedNotifications}
               type="button"
             >
               <Send size={16} />
-              {selectedNotify.isPending ? "Creando..." : selectedList.length ? `Enviar selección (${selectedList.length})` : "Selecciona avisos"}
+              {selectedList.length ? `Previsualizar selección (${selectedList.length})` : "Selecciona avisos"}
             </button>
             <button className="soft-button" disabled={bulkNotify.isPending || !clienteId} onClick={sendFilteredNotifications} type="button">
               <Send size={16} />
@@ -292,6 +283,7 @@ export function TareasPage() {
       </section>
 
       <NotificationEmailDialog canal={notificacion?.canal} incidenciaId={notificacion?.incidenciaId ?? null} onClose={() => setNotificacion(null)} onSent={refresh} />
+      <SelectedEmailPreviewDialog incidenciaIds={selectedIncidentIds} onClose={() => setSelectedPreviewOpen(false)} onSent={completeSelectedSend} open={selectedPreviewOpen} />
       {dialog}
     </main>
   );
