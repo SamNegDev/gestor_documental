@@ -275,7 +275,12 @@ public class ResumenDiarioTramitesService {
             Expediente e = grupo.get(0).getExpediente();
             texto.append("Expediente ").append(e.getId()).append(" - ").append(matriculaAviso(e))
                     .append(" - ").append(tipoTramite(e)).append(salto);
-            grupo.forEach(i -> texto.append(" - ").append(descripcionAviso(i)).append(salto));
+            grupo.forEach(i -> {
+                texto.append(" - ").append(tituloIncidencia(i))
+                        .append(" [").append(estadoAvisoIncidencia(i)).append("]").append(salto);
+                String aclaracion = aclaracionIncidencia(i);
+                if (StringUtils.hasText(aclaracion)) texto.append("   ").append(aclaracion).append(salto);
+            });
             texto.append(salto);
         });
         if (StringUtils.hasText(appPublicUrl)) {
@@ -291,9 +296,24 @@ public class ResumenDiarioTramitesService {
         grupos.values().forEach(grupo -> {
             Expediente e = grupo.get(0).getExpediente();
             StringBuilder pendientes = new StringBuilder();
-            grupo.forEach(i -> pendientes.append("""
-                    <tr><td style="padding:8px 0 8px 14px;border-left:3px solid #f8c91c;color:#172033;font-size:15px;line-height:22px;">%s</td></tr>
-                    """.formatted(escapeHtml(descripcionAviso(i)))));
+            grupo.forEach(i -> {
+                String aclaracion = aclaracionIncidencia(i);
+                boolean recordatorio = i.getContadorAvisos() > 0;
+                pendientes.append("""
+                        <tr><td style="padding:11px 13px;border:1px solid #e4d390;background:#fffaf0;">
+                          <p style="margin:0 0 6px;color:%s;font-size:11px;line-height:15px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;">%s</p>
+                          <p style="margin:0;color:#172033;font-size:17px;line-height:22px;font-weight:bold;">%s</p>
+                          %s
+                        </td></tr>
+                        <tr><td height="8" style="height:8px;line-height:8px;font-size:0;">&nbsp;</td></tr>
+                        """.formatted(
+                        recordatorio ? "#9a5b00" : "#1685bd",
+                        escapeHtml(estadoAvisoIncidencia(i)),
+                        escapeHtml(tituloIncidencia(i)),
+                        StringUtils.hasText(aclaracion)
+                                ? "<p style=\"margin:5px 0 0;color:#667085;font-size:13px;line-height:19px;font-weight:normal;\">" + escapeHtml(aclaracion) + "</p>"
+                                : ""));
+            });
             filas.append("""
                     <tr><td style="padding:22px 0;border-bottom:1px solid #dfe5ec;">
                       <table role="presentation" width="100%%" cellspacing="0" cellpadding="0"><tr>
@@ -342,9 +362,38 @@ public class ResumenDiarioTramitesService {
         return StringUtils.hasText(e.getMatricula()) ? e.getMatricula() : "Sin matricula";
     }
 
-    private String descripcionAviso(Incidencia i) {
-        String valor = tipoIncidencia(i);
-        return StringUtils.hasText(i.getObservaciones()) ? valor + ": " + limpiar(i.getObservaciones()) : valor;
+    private String tituloIncidencia(Incidencia incidencia) {
+        if (incidencia == null || incidencia.getTipoIncidencia() == null || incidencia.getTipoIncidencia().getNombre() == null) {
+            return "Incidencia";
+        }
+        return switch (incidencia.getTipoIncidencia().getNombre()) {
+            case RODAJE -> "Rodaje";
+            case RESERVA -> "Reserva de dominio";
+            case EMBARGO -> "Embargo";
+            case NOTIFICADO -> "Venta notificada";
+            case DENEGATORIA -> "Denegatoria";
+            case RECHAZADO_DGT -> "Rechazado por la DGT";
+            case PENDIENTE_DOCUMENTACION -> "Pendiente de documentación";
+            case SOLICITADA_INFORMACION_ADICIONAL -> "Información adicional solicitada";
+        };
+    }
+
+    private String aclaracionIncidencia(Incidencia incidencia) {
+        if (incidencia == null) return "";
+        if (StringUtils.hasText(incidencia.getObservaciones())) return limpiar(incidencia.getObservaciones());
+        return incidencia.getTipoIncidencia() != null && StringUtils.hasText(incidencia.getTipoIncidencia().getDescripcion())
+                ? limpiar(incidencia.getTipoIncidencia().getDescripcion())
+                : "";
+    }
+
+    private String estadoAvisoIncidencia(Incidencia incidencia) {
+        String fecha = incidencia != null && incidencia.getFechaCreacion() != null
+                ? incidencia.getFechaCreacion().toLocalDate().format(
+                        DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", new java.util.Locale("es", "ES")))
+                : "fecha no disponible";
+        return incidencia != null && incidencia.getContadorAvisos() > 0
+                ? "Recordatorio · Pendiente desde " + fecha
+                : "Nueva incidencia · Detectada el " + fecha;
     }
     private String construirTexto(ResumenCliente resumen, RangoDia rango) {
         StringBuilder mensaje = new StringBuilder();

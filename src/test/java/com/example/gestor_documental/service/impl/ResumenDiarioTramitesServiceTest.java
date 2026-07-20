@@ -1,11 +1,13 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.enums.PreferenciaCanalCliente;
+import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.ConfiguracionSeguimiento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Incidencia;
+import com.example.gestor_documental.model.TipoIncidencia;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.AvisoIncidenciaRepository;
 import com.example.gestor_documental.repository.ClienteRepository;
@@ -86,6 +88,11 @@ class ResumenDiarioTramitesServiceTest {
         incidencia.setId(1L);
         incidencia.setExpediente(expediente);
         incidencia.setFechaCreacion(LocalDateTime.now().minusDays(3));
+        incidencia.setTipoIncidencia(new TipoIncidencia(TipoIncidenciaEnum.RESERVA,
+                "El vehículo posee una reserva de dominio activa.", true));
+        incidencia.setObservaciones("Aportar carta de cancelación de la financiera.");
+        incidencia.setContadorAvisos(1);
+        incidencia.setProximoAviso(LocalDateTime.now().minusHours(1));
         ConfiguracionSeguimiento config = new ConfiguracionSeguimiento();
         config.setDiasPrimerAviso(2);
         when(incidenciaRepository.findActivasResumenByIds(List.of(1L))).thenReturn(List.of(incidencia));
@@ -98,6 +105,11 @@ class ResumenDiarioTramitesServiceTest {
         assertEquals(1, preview.expedientes());
         assertTrue(preview.html().contains("1234 MBC"));
         assertTrue(preview.html().contains("Acción requerida"));
+        assertTrue(preview.html().contains("Reserva de dominio"));
+        assertTrue(preview.html().contains("font-size:17px"));
+        assertTrue(preview.html().contains("Aportar carta de cancelación de la financiera."));
+        assertTrue(preview.html().contains("Recordatorio · Pendiente desde"));
+        assertTrue(preview.html().indexOf("Reserva de dominio") < preview.html().indexOf("Aportar carta"));
         verify(correoService, never()).enviarHtml(any(), any(), any(), any(), any(), any());
     }
     @ParameterizedTest
