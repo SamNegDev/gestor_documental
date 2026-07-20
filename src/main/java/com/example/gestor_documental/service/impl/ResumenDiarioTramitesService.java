@@ -401,10 +401,9 @@ public class ResumenDiarioTramitesService {
     }
 
     private String observacionIncidenciaVisible(Incidencia incidencia) {
-        if (incidencia == null || MensajeAutomaticoUtils.esObservacionTecnicaIncidencia(incidencia.getObservaciones())) {
-            return null;
-        }
-        return normalizarTextoCliente(incidencia.getObservaciones());
+        if (incidencia == null) return null;
+        String observacion = MensajeAutomaticoUtils.observacionClienteActual(incidencia.getObservaciones());
+        return observacion != null ? normalizarTextoCliente(observacion) : null;
     }
 
     private String normalizarTextoCliente(String valor) {

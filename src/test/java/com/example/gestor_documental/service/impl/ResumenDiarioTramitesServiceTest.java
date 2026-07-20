@@ -99,7 +99,7 @@ class ResumenDiarioTramitesServiceTest {
         incidenciaMayusculas.setFechaCreacion(LocalDateTime.now().minusDays(4));
         incidenciaMayusculas.setTipoIncidencia(new TipoIncidencia(TipoIncidenciaEnum.EMBARGO,
                 "El vehículo tiene un embargo.", true));
-        incidenciaMayusculas.setObservaciones("APORTAR DOCUMENTO DE LA DGT.");
+        incidenciaMayusculas.setObservaciones("DNI DE LA COMPRADORA.\\n\\nReclamacion admin: QUEDAMOS A LA ESPERA DEL PERMISO DE LA DGT.");
         incidenciaMayusculas.setContadorAvisos(1);
         incidenciaMayusculas.setProximoAviso(LocalDateTime.now().minusHours(1));
         ConfiguracionSeguimiento config = new ConfiguracionSeguimiento();
@@ -119,8 +119,9 @@ class ResumenDiarioTramitesServiceTest {
         assertTrue(preview.html().contains("El vehículo tiene una reserva de dominio que impide la transmisión."));
         assertTrue(!preview.html().contains("reserva de dominio activa"));
         assertTrue(!preview.html().contains("INCIDENCIA ABIERTA DESDE EL CIERRE DEL EXPEDIENTE"));
-        assertTrue(preview.html().contains("Aportar documento de la DGT."));
-        assertTrue(!preview.html().contains("APORTAR DOCUMENTO DE LA DGT."));
+        assertTrue(preview.html().contains("Quedamos a la espera del permiso de la DGT."));
+        assertTrue(!preview.html().contains("Reclamacion admin"));
+        assertTrue(!preview.html().contains("DNI DE LA COMPRADORA"));
         assertTrue(preview.html().contains("Recordatorio · Pendiente desde"));
         assertTrue(preview.html().indexOf("Reserva de dominio") < preview.html().indexOf("El vehículo tiene"));
         verify(correoService, never()).enviarHtml(any(), any(), any(), any(), any(), any());

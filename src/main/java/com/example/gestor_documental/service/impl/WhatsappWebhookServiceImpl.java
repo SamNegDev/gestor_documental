@@ -937,9 +937,9 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
     }
 
     private String detalleIncidenciaWhatsapp(Incidencia incidencia) {
-        if (StringUtils.hasText(incidencia.getObservaciones())
-                && !MensajeAutomaticoUtils.esObservacionTecnicaIncidencia(incidencia.getObservaciones())) {
-            return limitarTextoWhatsapp(incidencia.getObservaciones().trim(), 350);
+        String observacion = MensajeAutomaticoUtils.observacionClienteActual(incidencia.getObservaciones());
+        if (StringUtils.hasText(observacion)) {
+            return limitarTextoWhatsapp(observacion, 350);
         }
         TipoIncidenciaEnum tipo = incidencia.getTipoIncidencia() != null ? incidencia.getTipoIncidencia().getNombre() : null;
         if (tipo == TipoIncidenciaEnum.PENDIENTE_DOCUMENTACION && incidencia.getExpediente() != null) {

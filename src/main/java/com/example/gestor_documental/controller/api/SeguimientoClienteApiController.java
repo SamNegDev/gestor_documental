@@ -156,17 +156,14 @@ public class SeguimientoClienteApiController {
             if (mensaje != null) {
                 return mensaje;
             }
-            return MensajeAutomaticoUtils.esMensajeAutomaticoSeguimiento(incidencia.getObservaciones())
-                    ? "RESPONDER A LA INFORMACION SOLICITADA"
-                    : incidencia.getObservaciones();
+            String observacion = observacionVisible(incidencia);
+            return observacion != null ? observacion : "RESPONDER A LA INFORMACION SOLICITADA";
         }
         return observacionVisible(incidencia);
     }
 
     private String observacionVisible(Incidencia incidencia) {
-        return MensajeAutomaticoUtils.esObservacionTecnicaIncidencia(incidencia.getObservaciones())
-                ? null
-                : incidencia.getObservaciones();
+        return MensajeAutomaticoUtils.observacionClienteActual(incidencia.getObservaciones());
     }
 
     private String descripcionRequisito(RequisitoDocumentalExpediente requisito) {

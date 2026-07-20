@@ -593,7 +593,7 @@ public class TareaApiController {
         String tipo = incidencia.getTipoIncidencia() != null && incidencia.getTipoIncidencia().getNombre() != null
                 ? incidencia.getTipoIncidencia().getNombre().name().replace('_', ' ')
                 : "INCIDENCIA";
-        String observaciones = limpiar(incidencia.getObservaciones());
+        String observaciones = limpiar(MensajeAutomaticoUtils.observacionClienteActual(incidencia.getObservaciones()));
         if (MensajeAutomaticoUtils.esMensajeAutomaticoSeguimiento(observaciones)) {
             observaciones = incidencia.getTipoIncidencia() != null
                     && incidencia.getTipoIncidencia().getNombre() == com.example.gestor_documental.enums.TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL

@@ -299,8 +299,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         incidencia.setRevisionComunicadaPorCliente(false);
         incidencia.setFechaRevisionComunicadaPorCliente(null);
         incidencia.setComentarioRevisionCliente(null);
-        incidencia.setObservaciones((incidencia.getObservaciones() != null ? incidencia.getObservaciones() + "\n\n" : "")
-                + "Reclamacion admin: " + nuevaObservacion);
+        incidencia.setObservaciones(nuevaObservacion);
         incidenciaRepository.save(incidencia);
 
         expedienteService.cambiarEstado(
@@ -681,10 +680,8 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                 || tipo == TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL)) {
             return detallePendienteCliente(incidencia.getExpediente(), tipo);
         }
-        return incidencia.getObservaciones() != null && !incidencia.getObservaciones().isBlank()
-                && !MensajeAutomaticoUtils.esObservacionTecnicaIncidencia(incidencia.getObservaciones())
-                ? incidencia.getObservaciones()
-                : "Consulta el detalle en el portal.";
+        String observacion = MensajeAutomaticoUtils.observacionClienteActual(incidencia.getObservaciones());
+        return observacion != null ? observacion : "Consulta el detalle en el portal.";
     }
 
     private EstadoExpediente estadoParaTipo(TipoIncidencia tipo) {
