@@ -90,26 +90,39 @@ class ResumenDiarioTramitesServiceTest {
         incidencia.setFechaCreacion(LocalDateTime.now().minusDays(3));
         incidencia.setTipoIncidencia(new TipoIncidencia(TipoIncidenciaEnum.RESERVA,
                 "El vehículo posee una reserva de dominio activa.", true));
-        incidencia.setObservaciones("Aportar carta de cancelación de la financiera.");
+        incidencia.setObservaciones("INCIDENCIA ABIERTA DESDE EL CIERRE DEL EXPEDIENTE.");
         incidencia.setContadorAvisos(1);
         incidencia.setProximoAviso(LocalDateTime.now().minusHours(1));
+        Incidencia incidenciaMayusculas = new Incidencia();
+        incidenciaMayusculas.setId(2L);
+        incidenciaMayusculas.setExpediente(expediente);
+        incidenciaMayusculas.setFechaCreacion(LocalDateTime.now().minusDays(4));
+        incidenciaMayusculas.setTipoIncidencia(new TipoIncidencia(TipoIncidenciaEnum.EMBARGO,
+                "El vehículo tiene un embargo.", true));
+        incidenciaMayusculas.setObservaciones("APORTAR DOCUMENTO DE LA DGT.");
+        incidenciaMayusculas.setContadorAvisos(1);
+        incidenciaMayusculas.setProximoAviso(LocalDateTime.now().minusHours(1));
         ConfiguracionSeguimiento config = new ConfiguracionSeguimiento();
         config.setDiasPrimerAviso(2);
-        when(incidenciaRepository.findActivasResumenByIds(List.of(1L))).thenReturn(List.of(incidencia));
+        when(incidenciaRepository.findActivasResumenByIds(List.of(1L, 2L))).thenReturn(List.of(incidencia, incidenciaMayusculas));
         when(configuracionSeguimientoService.obtener()).thenReturn(config);
 
-        var preview = service.previsualizarListadoIncidenciasSeleccionadas(List.of(1L));
+        var preview = service.previsualizarListadoIncidenciasSeleccionadas(List.of(1L, 2L));
 
         assertEquals("cliente@example.com", preview.destinatario());
-        assertEquals(1, preview.incidencias());
+        assertEquals(2, preview.incidencias());
         assertEquals(1, preview.expedientes());
         assertTrue(preview.html().contains("1234 MBC"));
         assertTrue(preview.html().contains("Acción requerida"));
         assertTrue(preview.html().contains("Reserva de dominio"));
         assertTrue(preview.html().contains("font-size:17px"));
-        assertTrue(preview.html().contains("Aportar carta de cancelación de la financiera."));
+        assertTrue(preview.html().contains("El vehículo tiene una reserva de dominio que impide la transmisión."));
+        assertTrue(!preview.html().contains("reserva de dominio activa"));
+        assertTrue(!preview.html().contains("INCIDENCIA ABIERTA DESDE EL CIERRE DEL EXPEDIENTE"));
+        assertTrue(preview.html().contains("Aportar documento de la DGT."));
+        assertTrue(!preview.html().contains("APORTAR DOCUMENTO DE LA DGT."));
         assertTrue(preview.html().contains("Recordatorio · Pendiente desde"));
-        assertTrue(preview.html().indexOf("Reserva de dominio") < preview.html().indexOf("Aportar carta"));
+        assertTrue(preview.html().indexOf("Reserva de dominio") < preview.html().indexOf("El vehículo tiene"));
         verify(correoService, never()).enviarHtml(any(), any(), any(), any(), any(), any());
     }
     @ParameterizedTest

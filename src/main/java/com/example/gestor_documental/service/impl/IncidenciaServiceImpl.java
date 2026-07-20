@@ -682,6 +682,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
             return detallePendienteCliente(incidencia.getExpediente(), tipo);
         }
         return incidencia.getObservaciones() != null && !incidencia.getObservaciones().isBlank()
+                && !MensajeAutomaticoUtils.esObservacionTecnicaIncidencia(incidencia.getObservaciones())
                 ? incidencia.getObservaciones()
                 : "Consulta el detalle en el portal.";
     }

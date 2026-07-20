@@ -149,7 +149,7 @@ public class SeguimientoClienteApiController {
                     .filter(valor -> valor != null && !valor.isBlank())
                     .distinct()
                     .collect(Collectors.joining(" - "));
-            return !detalleRequisitos.isBlank() ? detalleRequisitos : incidencia.getObservaciones();
+            return !detalleRequisitos.isBlank() ? detalleRequisitos : observacionVisible(incidencia);
         }
         if (tipo == TipoIncidenciaEnum.SOLICITADA_INFORMACION_ADICIONAL) {
             String mensaje = ultimoMensajeAdmin(mensajes);
@@ -160,7 +160,13 @@ public class SeguimientoClienteApiController {
                     ? "RESPONDER A LA INFORMACION SOLICITADA"
                     : incidencia.getObservaciones();
         }
-        return incidencia.getObservaciones();
+        return observacionVisible(incidencia);
+    }
+
+    private String observacionVisible(Incidencia incidencia) {
+        return MensajeAutomaticoUtils.esObservacionTecnicaIncidencia(incidencia.getObservaciones())
+                ? null
+                : incidencia.getObservaciones();
     }
 
     private String descripcionRequisito(RequisitoDocumentalExpediente requisito) {

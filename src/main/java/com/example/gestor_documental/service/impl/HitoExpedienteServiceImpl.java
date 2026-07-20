@@ -210,7 +210,7 @@ public class HitoExpedienteServiceImpl implements HitoExpedienteService {
         incidenciaService.crearIncidenciaExpediente(
                 expedienteId,
                 tipoIncidenciaId,
-                observaciones != null && !observaciones.isBlank() ? observaciones : "Incidencia abierta desde el cierre del expediente.",
+                observaciones != null && !observaciones.isBlank() ? observaciones : null,
                 usuario
         );
     }

@@ -28,6 +28,13 @@ public final class MensajeAutomaticoUtils {
     }
 
     public static boolean esMensajeAutomaticoSeguimiento(String contenido) {
-        return esResumenAutomatico(contenido) || esAvisoSeguimientoAutomatico(contenido);
+        return esResumenAutomatico(contenido)
+                || esAvisoSeguimientoAutomatico(contenido)
+                || esObservacionTecnicaIncidencia(contenido);
+    }
+
+    public static boolean esObservacionTecnicaIncidencia(String contenido) {
+        return contenido != null
+                && contenido.trim().equalsIgnoreCase("Incidencia abierta desde el cierre del expediente.");
     }
 }

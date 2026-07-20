@@ -33,6 +33,7 @@ import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
 import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.WhatsappMediaService;
+import com.example.gestor_documental.util.MensajeAutomaticoUtils;
 import com.example.gestor_documental.service.WhatsappOutboundService;
 import com.example.gestor_documental.service.WhatsappWebhookService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -936,7 +937,8 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
     }
 
     private String detalleIncidenciaWhatsapp(Incidencia incidencia) {
-        if (StringUtils.hasText(incidencia.getObservaciones())) {
+        if (StringUtils.hasText(incidencia.getObservaciones())
+                && !MensajeAutomaticoUtils.esObservacionTecnicaIncidencia(incidencia.getObservaciones())) {
             return limitarTextoWhatsapp(incidencia.getObservaciones().trim(), 350);
         }
         TipoIncidenciaEnum tipo = incidencia.getTipoIncidencia() != null ? incidencia.getTipoIncidencia().getNombre() : null;

@@ -17,6 +17,7 @@ import com.example.gestor_documental.repository.AvisoIncidenciaRepository;
 import com.example.gestor_documental.service.ConfiguracionSeguimientoService;
 import com.example.gestor_documental.service.CorreoService;
 import com.example.gestor_documental.service.HistorialCambioService;
+import com.example.gestor_documental.util.MensajeAutomaticoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -370,7 +371,7 @@ public class ResumenDiarioTramitesService {
             case RODAJE -> "Rodaje";
             case RESERVA -> "Reserva de dominio";
             case EMBARGO -> "Embargo";
-            case NOTIFICADO -> "Venta notificada";
+            case NOTIFICADO -> "Vehículo notificado";
             case DENEGATORIA -> "Denegatoria";
             case RECHAZADO_DGT -> "Rechazado por la DGT";
             case PENDIENTE_DOCUMENTACION -> "Pendiente de documentación";
@@ -380,10 +381,56 @@ public class ResumenDiarioTramitesService {
 
     private String aclaracionIncidencia(Incidencia incidencia) {
         if (incidencia == null) return "";
-        if (StringUtils.hasText(incidencia.getObservaciones())) return limpiar(incidencia.getObservaciones());
-        return incidencia.getTipoIncidencia() != null && StringUtils.hasText(incidencia.getTipoIncidencia().getDescripcion())
-                ? limpiar(incidencia.getTipoIncidencia().getDescripcion())
-                : "";
+        String observacion = observacionIncidenciaVisible(incidencia);
+        if (StringUtils.hasText(observacion)) return limpiar(observacion);
+        return aclaracionPredeterminadaIncidencia(incidencia);
+    }
+
+    private String aclaracionPredeterminadaIncidencia(Incidencia incidencia) {
+        if (incidencia.getTipoIncidencia() == null || incidencia.getTipoIncidencia().getNombre() == null) return "";
+        return switch (incidencia.getTipoIncidencia().getNombre()) {
+            case RODAJE -> "Falta el pago del impuesto de rodaje o de otro impuesto local.";
+            case RESERVA -> "El vehículo tiene una reserva de dominio que impide la transmisión.";
+            case EMBARGO -> "El vehículo tiene un embargo. Es necesario aceptación de embargo o hacer el levantamiento.";
+            case NOTIFICADO -> "El vehículo consta como notificado en tráfico, es necesario finalizar la transmisión previa para poder realizar el traspaso";
+            case DENEGATORIA -> "El vehículo tiene anotada una denegatoria en la DGT.";
+            case RECHAZADO_DGT -> "La DGT ha rechazado el trámite presentado";
+            case PENDIENTE_DOCUMENTACION -> "Falta documentación necesaria para continuar el trámite.";
+            case SOLICITADA_INFORMACION_ADICIONAL -> "Necesitamos una respuesta o aclaración adicional para continuar.";
+        };
+    }
+
+    private String observacionIncidenciaVisible(Incidencia incidencia) {
+        if (incidencia == null || MensajeAutomaticoUtils.esObservacionTecnicaIncidencia(incidencia.getObservaciones())) {
+            return null;
+        }
+        return normalizarTextoCliente(incidencia.getObservaciones());
+    }
+
+    private String normalizarTextoCliente(String valor) {
+        String texto = limpiar(valor);
+        boolean tieneMayusculas = texto.chars().anyMatch(Character::isUpperCase);
+        boolean tieneMinusculas = texto.chars().anyMatch(Character::isLowerCase);
+        if (!tieneMayusculas || tieneMinusculas) return texto;
+
+        String minusculas = texto.toLowerCase(new java.util.Locale("es", "ES"));
+        StringBuilder resultado = new StringBuilder(minusculas.length());
+        boolean capitalizar = true;
+        for (int i = 0; i < minusculas.length(); i++) {
+            char caracter = minusculas.charAt(i);
+            if (capitalizar && Character.isLetter(caracter)) {
+                resultado.append(Character.toUpperCase(caracter));
+                capitalizar = false;
+            } else {
+                resultado.append(caracter);
+            }
+            if (caracter == '.' || caracter == '!' || caracter == '?') capitalizar = true;
+        }
+        String normalizado = resultado.toString();
+        for (String sigla : List.of("DGT", "DNI", "NIE", "ITV", "PDF", "IVA", "ITP", "BATECOM")) {
+            normalizado = normalizado.replaceAll("(?i)\\b" + sigla + "\\b", sigla);
+        }
+        return normalizado;
     }
 
     private String estadoAvisoIncidencia(Incidencia incidencia) {
@@ -534,12 +581,14 @@ public class ResumenDiarioTramitesService {
             return;
         }
         mensaje.append("\n").append(titulo).append(": ").append(incidencias.size()).append("\n");
-        incidencias.forEach(incidencia ->
-                mensaje.append(" - ").append(tituloExpediente(incidencia.getExpediente()))
-                        .append(": ").append(tipoIncidencia(incidencia))
-                        .append(" (").append(detalleSeguimiento(incidencia, rango)).append(")")
-                        .append(StringUtils.hasText(incidencia.getObservaciones()) ? " - " + limpiar(incidencia.getObservaciones()) : "")
-                        .append("\n"));
+        incidencias.forEach(incidencia -> {
+            String observacion = observacionIncidenciaVisible(incidencia);
+            mensaje.append(" - ").append(tituloExpediente(incidencia.getExpediente()))
+                    .append(": ").append(tipoIncidencia(incidencia))
+                    .append(" (").append(detalleSeguimiento(incidencia, rango)).append(")")
+                    .append(StringUtils.hasText(observacion) ? " - " + limpiar(observacion) : "")
+                    .append("\n");
+        });
     }
 
     private String bloquesIncidencias(List<Incidencia> incidencias, RangoDia rango) {
@@ -570,6 +619,7 @@ public class ResumenDiarioTramitesService {
     private String bloqueIncidencias(String titulo, List<Incidencia> incidencias, RangoDia rango) {
         StringBuilder filas = new StringBuilder();
         for (Incidencia incidencia : incidencias) {
+            String observacion = observacionIncidenciaVisible(incidencia);
             filas.append("""
                     <tr>
                       <td style="padding:12px 0;border-bottom:1px solid #edf1f5;">
@@ -582,7 +632,7 @@ public class ResumenDiarioTramitesService {
                     escapeHtml(tituloExpediente(incidencia.getExpediente())),
                     escapeHtml(tipoIncidencia(incidencia)),
                     escapeHtml(detalleSeguimiento(incidencia, rango)),
-                    StringUtils.hasText(incidencia.getObservaciones()) ? " - " + escapeHtml(limpiar(incidencia.getObservaciones())) : ""
+                    StringUtils.hasText(observacion) ? " - " + escapeHtml(limpiar(observacion)) : ""
             ));
         }
         return bloqueTabla(titulo, filas.toString());
