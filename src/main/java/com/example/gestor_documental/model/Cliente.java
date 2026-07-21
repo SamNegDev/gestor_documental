@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,6 +42,24 @@ public class Cliente {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30, columnDefinition = "varchar(30) default 'AMBOS'")
     private PreferenciaCanalCliente preferenciaCanal = PreferenciaCanalCliente.AMBOS;
+
+    @Column(name = "aviso_incidencias_activo", nullable = false, columnDefinition = "boolean default true")
+    private boolean avisoIncidenciasActivo = true;
+
+    @Column(name = "hora_aviso_incidencias", nullable = false, columnDefinition = "time default '17:00:00'")
+    private LocalTime horaAvisoIncidencias = LocalTime.of(17, 0);
+
+    @Column(name = "ultimo_aviso_incidencias")
+    private LocalDate ultimoAvisoIncidencias;
+
+    @Column(name = "aviso_finalizados_activo", nullable = false, columnDefinition = "boolean default true")
+    private boolean avisoFinalizadosActivo = true;
+
+    @Column(name = "hora_aviso_finalizados", nullable = false, columnDefinition = "time default '17:00:00'")
+    private LocalTime horaAvisoFinalizados = LocalTime.of(17, 0);
+
+    @Column(name = "ultimo_aviso_finalizados")
+    private LocalDate ultimoAvisoFinalizados;
 
     @Column(name = "logo_principal_path", length = 500)
     private String logoPrincipalPath;

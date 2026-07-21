@@ -9,6 +9,10 @@ export interface ClienteAdmin {
   direccion?: string | null;
   telefono?: string | null;
   preferenciaCanal?: "EMAIL" | "WHATSAPP" | "AMBOS" | "SIN_AVISOS" | null;
+  avisoIncidenciasActivo: boolean;
+  horaAvisoIncidencias: string;
+  avisoFinalizadosActivo: boolean;
+  horaAvisoFinalizados: string;
   logoPrincipalUrl?: string | null;
   logoCompactoUrl?: string | null;
   documentos?: DocumentoExpediente[];
@@ -25,6 +29,10 @@ export interface ClienteInput {
   direccion?: string | null;
   telefono?: string | null;
   preferenciaCanal?: "EMAIL" | "WHATSAPP" | "AMBOS" | "SIN_AVISOS" | null;
+  avisoIncidenciasActivo: boolean;
+  horaAvisoIncidencias: string;
+  avisoFinalizadosActivo: boolean;
+  horaAvisoFinalizados: string;
 }
 
 export interface ResumenDiarioResponse {

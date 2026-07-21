@@ -124,6 +124,19 @@ public class ResumenDiarioTramitesService {
         return enviarListadoIncidencias(rango, incidencias, admin, "No hay incidencias activas con cliente y email configurado.", "Listado diario de incidencias");
     }
 
+    public ResultadoResumenDiario enviarListadoIncidenciasAutomaticoCliente(Long clienteId) {
+        RangoDia rango = rangoDia();
+        ConfiguracionSeguimiento config = configuracionSeguimientoService.obtener();
+        LocalDateTime ahora = LocalDateTime.now(zona());
+        LocalDateTime limitePrimerAviso = ahora.minusDays(config.getDiasPrimerAviso());
+        List<Incidencia> incidencias = incidenciaRepository.findSeguimientoPendienteByCliente(clienteId, ahora).stream()
+                .filter(i -> i.getContadorAvisos() > 0
+                        || (i.getFechaCreacion() != null && !i.getFechaCreacion().isAfter(limitePrimerAviso)))
+                .toList();
+        return enviarListadoIncidencias(rango, incidencias, null,
+                "No hay incidencias pendientes de aviso para este cliente.", "Aviso automatico de incidencias");
+    }
+
     public ResultadoResumenDiario enviarListadoIncidenciasPendientesNotificar(Long clienteId, Usuario admin) {
         RangoDia rango = rangoDia();
         LocalDateTime limitePrimerAviso = LocalDateTime.now(zona())

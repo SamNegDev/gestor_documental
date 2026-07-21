@@ -12,4 +12,8 @@ public class ClienteUpsertRequest {
     private String direccion;
     private String telefono;
     private String preferenciaCanal;
+    private boolean avisoIncidenciasActivo = true;
+    private String horaAvisoIncidencias = "17:00";
+    private boolean avisoFinalizadosActivo = true;
+    private String horaAvisoFinalizados = "17:00";
 }

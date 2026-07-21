@@ -21,6 +21,10 @@ public class ClienteAdminResponse {
     private String direccion;
     private String telefono;
     private String preferenciaCanal;
+    private boolean avisoIncidenciasActivo;
+    private String horaAvisoIncidencias;
+    private boolean avisoFinalizadosActivo;
+    private String horaAvisoFinalizados;
     private String logoPrincipalUrl;
     private String logoCompactoUrl;
     @Builder.Default

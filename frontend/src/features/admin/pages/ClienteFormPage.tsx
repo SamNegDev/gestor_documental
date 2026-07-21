@@ -43,7 +43,7 @@ const CLIENT_DOCUMENT_TYPES = [
 ];
 
 function emptyCliente(): ClienteInput {
-  return { nif: "", nombre: "", email: "", telefono: "", direccion: "", preferenciaCanal: "AMBOS" };
+  return { nif: "", nombre: "", email: "", telefono: "", direccion: "", preferenciaCanal: "AMBOS", avisoIncidenciasActivo: true, horaAvisoIncidencias: "17:00", avisoFinalizadosActivo: true, horaAvisoFinalizados: "17:00" };
 }
 
 function clean(input: ClienteInput): ClienteInput {
@@ -54,6 +54,10 @@ function clean(input: ClienteInput): ClienteInput {
     telefono: cleanUpperText(input.telefono),
     direccion: cleanUpperText(input.direccion),
     preferenciaCanal: input.preferenciaCanal || "AMBOS",
+    avisoIncidenciasActivo: input.avisoIncidenciasActivo,
+    horaAvisoIncidencias: input.horaAvisoIncidencias || "17:00",
+    avisoFinalizadosActivo: input.avisoFinalizadosActivo,
+    horaAvisoFinalizados: input.horaAvisoFinalizados || "17:00",
   };
 }
 
@@ -87,6 +91,10 @@ export function ClienteFormPage() {
         telefono: uppercaseInput(clienteQuery.data.telefono || ""),
         direccion: uppercaseInput(clienteQuery.data.direccion || ""),
         preferenciaCanal: clienteQuery.data.preferenciaCanal || "AMBOS",
+        avisoIncidenciasActivo: clienteQuery.data.avisoIncidenciasActivo,
+        horaAvisoIncidencias: clienteQuery.data.horaAvisoIncidencias || "17:00",
+        avisoFinalizadosActivo: clienteQuery.data.avisoFinalizadosActivo,
+        horaAvisoFinalizados: clienteQuery.data.horaAvisoFinalizados || "17:00",
       });
       setBranding({
         principal: clienteQuery.data.logoPrincipalUrl || null,
@@ -345,6 +353,23 @@ export function ClienteFormPage() {
                 <option value="SIN_AVISOS">Sin avisos automaticos</option>
               </select>
             </label>
+            <div className="notification-schedule edit-form-grid__wide">
+              <div className="notification-schedule__heading">
+                <div><strong>Avisos automáticos</strong><span>Configura cada envío de forma independiente.</span></div>
+              </div>
+              <div className="notification-schedule__items">
+                <label className="notification-schedule__item">
+                  <input type="checkbox" checked={form.avisoIncidenciasActivo} onChange={(event) => setForm({ ...form, avisoIncidenciasActivo: event.target.checked })} />
+                  <span><strong>Incidencias</strong><small>Documentación o respuesta pendiente</small></span>
+                  <input aria-label="Hora del aviso de incidencias" type="time" value={form.horaAvisoIncidencias} disabled={!form.avisoIncidenciasActivo} onChange={(event) => setForm({ ...form, horaAvisoIncidencias: event.target.value })} />
+                </label>
+                <label className="notification-schedule__item">
+                  <input type="checkbox" checked={form.avisoFinalizadosActivo} onChange={(event) => setForm({ ...form, avisoFinalizadosActivo: event.target.checked })} />
+                  <span><strong>Trámites finalizados</strong><small>Resumen de los finalizados en el día</small></span>
+                  <input aria-label="Hora del aviso de trámites finalizados" type="time" value={form.horaAvisoFinalizados} disabled={!form.avisoFinalizadosActivo} onChange={(event) => setForm({ ...form, horaAvisoFinalizados: event.target.value })} />
+                </label>
+              </div>
+            </div>
             <label className="edit-form-grid__wide">
               Direccion
               <input value={form.direccion || ""} maxLength={200} onChange={(event) => updateUpperField("direccion", event)} />

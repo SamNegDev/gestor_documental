@@ -30,6 +30,8 @@ import com.example.gestor_documental.util.ClienteBrandingUrls;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
 import java.net.URI;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -333,6 +335,10 @@ public class AdminManagementApiController {
         cliente.setDireccion(TextNormalizer.upperOrNull(request.getDireccion()));
         cliente.setTelefono(TextNormalizer.upperOrNull(request.getTelefono()));
         cliente.setPreferenciaCanal(preferenciaCanal(request.getPreferenciaCanal()));
+        cliente.setAvisoIncidenciasActivo(request.isAvisoIncidenciasActivo());
+        cliente.setHoraAvisoIncidencias(horaAviso(request.getHoraAvisoIncidencias(), "incidencias"));
+        cliente.setAvisoFinalizadosActivo(request.isAvisoFinalizadosActivo());
+        cliente.setHoraAvisoFinalizados(horaAviso(request.getHoraAvisoFinalizados(), "finalizados"));
         return cliente;
     }
 
@@ -347,23 +353,21 @@ public class AdminManagementApiController {
 
     private ClienteAdminResponse mapClienteAdmin(Cliente cliente) {
         return ClienteAdminResponse.builder()
-                .id(cliente.getId())
-                .nif(cliente.getNif())
-                .nombre(cliente.getNombre())
-                .email(cliente.getEmail())
-                .direccion(cliente.getDireccion())
-                .telefono(cliente.getTelefono())
+                .id(cliente.getId()).nif(cliente.getNif()).nombre(cliente.getNombre()).email(cliente.getEmail())
+                .direccion(cliente.getDireccion()).telefono(cliente.getTelefono())
                 .preferenciaCanal(cliente.getPreferenciaCanal() != null ? cliente.getPreferenciaCanal().name() : PreferenciaCanalCliente.AMBOS.name())
+                .avisoIncidenciasActivo(cliente.isAvisoIncidenciasActivo())
+                .horaAvisoIncidencias(cliente.getHoraAvisoIncidencias() != null ? cliente.getHoraAvisoIncidencias().toString() : "17:00")
+                .avisoFinalizadosActivo(cliente.isAvisoFinalizadosActivo())
+                .horaAvisoFinalizados(cliente.getHoraAvisoFinalizados() != null ? cliente.getHoraAvisoFinalizados().toString() : "17:00")
                 .logoPrincipalUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.PRINCIPAL))
                 .logoCompactoUrl(ClienteBrandingUrls.logoUrl(cliente, TipoLogoCliente.COMPACTO))
                 .documentos(documentoService.listarPorCliente(cliente.getId()).stream().map(this::mapDocumento).toList())
                 .administradores(clienteInteresadoRepository.findByClienteIdAndRepresentanteLegalTrueOrderByInteresadoNombreAsc(cliente.getId()).stream()
                         .map(ClienteInteresado::getInteresado)
                         .map(i -> new AdministradorClienteResponse(i.getId(), i.getDni(), i.getNombre(), i.getTelefono(), i.getDireccion()))
-                        .toList())
-                .build();
+                        .toList()).build();
     }
-
     private DocumentoExpedienteResponse mapDocumento(Documento documento) {
         return DocumentoExpedienteResponse.builder()
                 .id(documento.getId())
@@ -406,6 +410,14 @@ public class AdminManagementApiController {
                 .activo(usuario.isActivo())
                 .cliente(usuario.getCliente() != null ? mapClienteResumen(usuario.getCliente()) : null)
                 .build();
+    }
+
+    private LocalTime horaAviso(String value, String tipo) {
+        try {
+            return LocalTime.parse(value == null || value.isBlank() ? "17:00" : value);
+        } catch (DateTimeParseException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Hora de aviso de " + tipo + " no valida");
+        }
     }
 
     private PreferenciaCanalCliente preferenciaCanal(String value) {

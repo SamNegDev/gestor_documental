@@ -8273,3 +8273,20 @@ input.records-table-filter {
   .selected-mail-preview__frame iframe { height: 58vh; }
   .selected-mail-preview__actions button { flex: 1; justify-content: center; }
 }
+.notification-schedule {
+  padding: 18px;
+  border: 1px solid #dbe3ea;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 72%);
+}
+.notification-schedule__heading strong { display: block; color: #172033; font-size: 0.95rem; }
+.notification-schedule__heading span { display: block; margin-top: 3px; color: #64748b; font-size: 0.82rem; }
+.notification-schedule__items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.notification-schedule__item { display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 13px 14px; border: 1px solid #e2e8f0; border-radius: 11px; background: #fff; cursor: pointer; }
+.notification-schedule__item > input[type="checkbox"] { width: 18px; height: 18px; accent-color: #166534; }
+.notification-schedule__item span strong, .notification-schedule__item span small { display: block; }
+.notification-schedule__item span strong { color: #1e293b; font-size: 0.88rem; }
+.notification-schedule__item span small { margin-top: 2px; color: #64748b; font-size: 0.74rem; line-height: 1.25; }
+.notification-schedule__item > input[type="time"] { width: 105px; min-height: 38px; padding: 7px 9px; }
+.notification-schedule__item > input[type="time"]:disabled { opacity: .45; cursor: not-allowed; }
+@media (max-width: 760px) { .notification-schedule__items { grid-template-columns: 1fr; } }
