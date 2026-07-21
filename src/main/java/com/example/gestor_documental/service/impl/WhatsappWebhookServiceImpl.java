@@ -597,7 +597,7 @@ public class WhatsappWebhookServiceImpl implements WhatsappWebhookService {
         aviso.setCanal("WHATSAPP");
         aviso.setEstadoEnvio("RECIBIDO");
         avisoIncidenciaRepository.save(aviso);
-        historialCambioService.registrarCambioExpediente(incidencia.getExpediente(), usuario, "AVISO INCIDENCIA",
+        historialCambioService.registrarComunicacionExpediente(incidencia.getExpediente(), usuario, "AVISO INCIDENCIA",
                 "Aviso " + numero + " por WHATSAPP mostrado al cliente tras pulsar Recibir info.");
     }
 

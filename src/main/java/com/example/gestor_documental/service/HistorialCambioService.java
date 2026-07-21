@@ -10,6 +10,8 @@ import java.util.List;
 public interface HistorialCambioService {
     
     void registrarCambioExpediente(Expediente expediente, Usuario usuario, String accion, String descripcion);
+
+    void registrarComunicacionExpediente(Expediente expediente, Usuario usuario, String accion, String descripcion);
     
     void registrarCambioSolicitud(Solicitud solicitud, Usuario usuario, String accion, String descripcion);
     

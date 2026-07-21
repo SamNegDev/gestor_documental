@@ -844,7 +844,7 @@ public class ResumenDiarioTramitesService {
             incidencia.setFechaArchivoSeguimiento(null);
             incidencia.setSeguimientoArchivadoPor(null);
             incidenciaRepository.save(incidencia);
-            historialCambioService.registrarCambioExpediente(incidencia.getExpediente(), admin, "LISTADO INCIDENCIAS",
+            historialCambioService.registrarComunicacionExpediente(incidencia.getExpediente(), admin, "LISTADO INCIDENCIAS",
                     "Incidencia incluida en el listado diario enviado al cliente" + (simulado ? " (simulado)." : "."));
         }
     }

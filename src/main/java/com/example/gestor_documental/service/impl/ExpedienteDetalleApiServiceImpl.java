@@ -933,6 +933,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .descripcion(cambio.getDescripcion())
                 .fechaCambio(formatearFecha(cambio.getFechaCambio()))
                 .usuario(cambio.getUsuario() != null ? nombreCompleto(cambio.getUsuario()) : null)
+                .tipoActividad(cambio.getTipoActividad() != null ? cambio.getTipoActividad().name() : "CAMBIO")
                 .build();
     }
 

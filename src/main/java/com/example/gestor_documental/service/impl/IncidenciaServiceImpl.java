@@ -142,7 +142,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
 
         Incidencia incidencia = new Incidencia(tipo, expediente, observaciones, admin);
         incidenciaRepository.save(incidencia);
-        historialCambioService.registrarCambioExpediente(
+        historialCambioService.registrarComunicacionExpediente(
                 expediente,
                 admin,
                 "AVISO PENDIENTE",
@@ -514,7 +514,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         LocalDateTime anterior = incidencia.getProximoAviso();
         incidencia.setProximoAviso(proximoAviso);
         incidenciaRepository.save(incidencia);
-        historialCambioService.registrarCambioExpediente(
+        historialCambioService.registrarComunicacionExpediente(
                 incidencia.getExpediente(),
                 admin,
                 "SEGUIMIENTO POSPUESTO",
@@ -567,7 +567,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         incidencia.setSeguimientoArchivadoPor(null);
         incidenciaRepository.save(incidencia);
         mensajeService.añadirAExpediente(incidencia.getExpediente().getId(), texto, admin);
-        historialCambioService.registrarCambioExpediente(incidencia.getExpediente(), admin, "AVISO INCIDENCIA",
+        historialCambioService.registrarComunicacionExpediente(incidencia.getExpediente(), admin, "AVISO INCIDENCIA",
                 "Aviso " + numero + " por " + canal + (simulado ? " simulado." : " enviado al cliente."));
     }
 

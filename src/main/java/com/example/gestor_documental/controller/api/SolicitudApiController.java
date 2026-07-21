@@ -978,6 +978,7 @@ public class SolicitudApiController {
                 .descripcion(cambio.getDescripcion())
                 .fechaCambio(formatDate(cambio.getFechaCambio()))
                 .usuario(cambio.getUsuario() != null ? nombreCompleto(cambio.getUsuario()) : "Sistema")
+                .tipoActividad(cambio.getTipoActividad() != null ? cambio.getTipoActividad().name() : "CAMBIO")
                 .build();
     }
 

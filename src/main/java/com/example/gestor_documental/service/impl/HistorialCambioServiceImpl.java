@@ -1,5 +1,6 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.enums.TipoActividadHistorial;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.HistorialCambio;
 import com.example.gestor_documental.model.Solicitud;
@@ -38,6 +39,19 @@ public class HistorialCambioServiceImpl implements HistorialCambioService {
         expediente.setFechaUltimaModificacion(fechaCambio);
         expediente.setModificadoPor(usuario);
         expedienteRepository.save(expediente);
+    }
+
+    @Override
+    public void registrarComunicacionExpediente(Expediente expediente, Usuario usuario, String accion, String descripcion) {
+        HistorialCambio historial = new HistorialCambio(
+                accion,
+                descripcion,
+                expediente,
+                null,
+                usuario
+        );
+        historial.setTipoActividad(TipoActividadHistorial.COMUNICACION);
+        historialCambioRepository.save(historial);
     }
 
     @Override

@@ -385,6 +385,7 @@ export interface HistorialExpediente {
   descripcion?: string;
   fechaCambio?: string;
   usuario?: string | null;
+  tipoActividad?: "CAMBIO" | "COMUNICACION";
 }
 
 export interface MensajeExpediente {

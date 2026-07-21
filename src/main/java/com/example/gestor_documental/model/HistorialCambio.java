@@ -1,5 +1,6 @@
 package com.example.gestor_documental.model;
 
+import com.example.gestor_documental.enums.TipoActividadHistorial;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,6 +31,10 @@ public class HistorialCambio {
     @Column(nullable = false, length = 100)
     private String accion;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30, columnDefinition = "varchar(30) default 'CAMBIO'")
+    private TipoActividadHistorial tipoActividad = TipoActividadHistorial.CAMBIO;
+
     @Column(columnDefinition = "TEXT")
     private String descripcion;
 
@@ -45,6 +50,18 @@ public class HistorialCambio {
     @JoinColumn(name = "usuario_id")
     private Usuario usuario;
 
+
+    public TipoActividadHistorial getTipoActividad() {
+        if (tipoActividad == TipoActividadHistorial.COMUNICACION) {
+            return tipoActividad;
+        }
+        return "AVISO INCIDENCIA".equals(accion)
+                || "AVISO PENDIENTE".equals(accion)
+                || "LISTADO INCIDENCIAS".equals(accion)
+                || "SEGUIMIENTO POSPUESTO".equals(accion)
+                ? TipoActividadHistorial.COMUNICACION
+                : TipoActividadHistorial.CAMBIO;
+    }
     public HistorialCambio(String accion, String descripcion, Expediente expediente, Solicitud solicitud, Usuario usuario) {
         this.accion = accion;
         this.descripcion = descripcion;

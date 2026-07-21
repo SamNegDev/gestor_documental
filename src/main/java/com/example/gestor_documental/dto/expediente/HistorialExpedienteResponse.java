@@ -17,4 +17,5 @@ public class HistorialExpedienteResponse {
     private String descripcion;
     private String fechaCambio;
     private String usuario;
+    private String tipoActividad;
 }

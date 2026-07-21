@@ -8,6 +8,7 @@ import { notifyIncidentResolvedByClient, uploadIncidentDocument } from "../servi
 import { uploadExpedienteDocument } from "../services/documentosApi";
 import { uploadRequirementDocument } from "../services/requisitosApi";
 import { DocumentUploadDialog, type DocumentUploadSubmit } from "../components/DocumentUploadDialog";
+import { HistoryTimelineItem } from "../components/HistoryTimelineItem";
 import type { DocumentoExpediente, IncidenciaExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 import { uppercaseInputPreservingCursor } from "../../../shared/utils/text";
@@ -669,13 +670,7 @@ export function ClienteExpedientePage() {
               {historial.length === 0 ? (
                 <p className="exp-empty">No hay movimientos todavia.</p>
               ) : (
-                historial.map((item) => (
-                  <article className="timeline-item" key={item.id}>
-                    <strong>{humanizeEnum(item.accion)}</strong>
-                    <p>{item.descripcion || "Movimiento registrado en el expediente."}</p>
-                    <small>{formatDateTime(item.fechaCambio)}</small>
-                  </article>
-                ))
+                historial.map((item) => <HistoryTimelineItem item={item} key={item.id} showUser={false} />)
               )}
             </div>
           </Tabs.Content>
