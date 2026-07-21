@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2, LockKeyhole, Mail } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { login } from "../../../shared/api/authApi";
 import { getSessionUser } from "../../../shared/api/sessionApi";
 import { ApiError } from "../../../shared/api/http";
@@ -18,6 +19,7 @@ function useLoginMessage() {
 }
 
 export function LoginPage() {
+  const navigate = useNavigate();
   const initialMessage = useLoginMessage();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +33,7 @@ export function LoginPage() {
     try {
       const target = await login(username.trim(), password);
       await getSessionUser();
-      window.location.replace(target || "/admin/dashboard");
+      navigate(target || "/admin/dashboard", { replace: true });
     } catch (cause) {
       const text = cause instanceof ApiError && cause.details ? cause.details : "No se pudo iniciar sesión.";
       setMessage({ tone: "danger", text });
