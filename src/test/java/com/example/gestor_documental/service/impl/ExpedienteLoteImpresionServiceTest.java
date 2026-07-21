@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Optional;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -38,7 +40,15 @@ class ExpedienteLoteImpresionServiceTest {
     void anteponeLaPortadaAlDocumentoCompleto() throws Exception {
         Path original = tempDir.resolve("completo.pdf");
         try (PDDocument pdf = new PDDocument()) {
-            pdf.addPage(new PDPage());
+            PDPage primera = new PDPage();
+            pdf.addPage(primera);
+            try (PDPageContentStream contenido = new PDPageContentStream(pdf, primera)) {
+                contenido.beginText();
+                contenido.setFont(PDType1Font.HELVETICA, 12);
+                contenido.newLineAtOffset(72, 720);
+                contenido.showText("CONTENIDO DEL DOCUMENTO ORIGINAL");
+                contenido.endText();
+            }
             pdf.addPage(new PDPage());
             pdf.save(original.toFile());
         }
@@ -66,7 +76,7 @@ class ExpedienteLoteImpresionServiceTest {
         try (PDDocument resultado = PDDocument.load(salida.toByteArray())) {
             assertThat(resultado.getNumberOfPages()).isEqualTo(3);
             String portada = new PDFTextStripper().getText(resultado);
-            assertThat(portada).contains("1234 ABC", "Cliente Norte", "Maria Lopez", "INCIDENCIAS / ANOTACIONES");
+            assertThat(portada).contains("1234 ABC", "Cliente Norte", "Maria Lopez", "INCIDENCIAS / ANOTACIONES", "CONTENIDO DEL DOCUMENTO ORIGINAL");
         }
     }
 }

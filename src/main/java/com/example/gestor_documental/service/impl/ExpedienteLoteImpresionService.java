@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
+import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.*;
@@ -45,7 +46,7 @@ public class ExpedienteLoteImpresionService {
                 Path ruta = ruta(completo, base, id);
                 resultado.addPage(portada(resultado, expediente, completo.getFechaSubida()));
                 try (PDDocument original = PDDocument.load(Files.readAllBytes(ruta))) {
-                    for (PDPage pagina : original.getPages()) resultado.importPage(pagina);
+                    new PDFMergerUtility().appendDocument(resultado, original);
                 }
             }
             resultado.save(salida);
