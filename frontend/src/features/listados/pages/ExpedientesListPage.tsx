@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useOutletContext, useSearchParams } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, ChevronDown, Download, Eye, FilePlus2, FolderOpen, Search, UserRoundCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Download, Eye, FilePlus2, FolderOpen, Printer, Search, UserRoundCheck } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { ApiError } from "../../../shared/api/http";
-import { bulkAdvanceExpedientes, bulkFinalDocumentsUrl, bulkHaciendaDocumentsUrl, getExpedienteListCatalogs, getExpedientes } from "../services/listadosApi";
+import { bulkAdvanceExpedientes, bulkFinalDocumentsUrl, bulkHaciendaDocumentsUrl, bulkPrintUrl, getExpedienteListCatalogs, getExpedientes } from "../services/listadosApi";
 import { ListFiltersBar } from "../components/ListFiltersBar";
 import { ListPageChrome } from "../components/ListPageChrome";
 import type { ExpedienteListItem, ListCatalogs, ListFilters } from "../types";
@@ -93,6 +93,20 @@ export function ExpedientesListPage() {
     }
   }
 
+  async function handlePrintBatch() {
+    const confirmed = await confirm({
+      title: "Preparar lote de impresión",
+      description: `Se generará un PDF con la portada y el documento completo de ${selectedExpedientes.length} expedientes. Si alguno no tiene documento completo, el lote no se generará.`,
+      confirmLabel: "Preparar PDF",
+      tone: "default",
+    });
+    if (!confirmed) return;
+    const link = document.createElement("a");
+    link.href = bulkPrintUrl(selectedExpedientes.map((expediente) => expediente.id));
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.click();
+  }
   async function handleDownloadFinalDocuments() {
     const invalid = selectedExpedientes.some((expediente) => !expediente.justificantesFinalesDisponibles);
     if (invalid) {
@@ -184,6 +198,7 @@ export function ExpedientesListPage() {
             onClear={() => setSelectedIds(new Set())}
             onDownloadHaciendaDocuments={handleDownloadHaciendaDocuments}
             onDownloadFinalDocuments={handleDownloadFinalDocuments}
+            onPrintBatch={handlePrintBatch}
           />
         ) : null}
 
@@ -422,12 +437,14 @@ function BulkActionsBar({
   onClear,
   onDownloadHaciendaDocuments,
   onDownloadFinalDocuments,
+  onPrintBatch,
 }: {
   selected: ExpedienteListItem[];
   onAdvance: () => void;
   onClear: () => void;
   onDownloadHaciendaDocuments: () => void;
   onDownloadFinalDocuments: () => void;
+  onPrintBatch: () => void;
 }) {
   const firstAction = selected[0]?.siguienteAccion;
   const samePoint = Boolean(firstAction) && selected.every((expediente) => sameBulkAction(expediente.siguienteAccion, firstAction));
@@ -447,6 +464,10 @@ function BulkActionsBar({
       <div className="bulk-actions-bar__actions">
         <button className="soft-button soft-button--compact" onClick={onClear} type="button">
           Limpiar
+        </button>
+        <button className="soft-button soft-button--compact" onClick={onPrintBatch} type="button">
+          <Printer size={15} />
+          Preparar impresión
         </button>
         <button className="soft-button soft-button--compact" disabled={!allFinalDocs} onClick={onDownloadFinalDocuments} type="button">
           <Download size={15} />

@@ -22,6 +22,8 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long> {
 
     List<Documento> findByExpedienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(Long expedienteId, Collection<TipoDocumento> tipos);
 
+    Optional<Documento> findFirstByExpedienteIdAndTipoDocumentoOrderByFechaSubidaDesc(Long expedienteId, TipoDocumento tipoDocumento);
+
     @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
     List<Documento> findBySolicitudId(Long solicitudId);
 

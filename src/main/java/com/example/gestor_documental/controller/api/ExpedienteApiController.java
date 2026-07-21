@@ -39,6 +39,7 @@ import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.impl.ExpedienteJustificanteFinalService;
 import com.example.gestor_documental.service.impl.ExpedienteHaciendaDocumentacionService;
 import com.example.gestor_documental.service.impl.ExpedienteDocumentacionActualizacionService;
+import com.example.gestor_documental.service.impl.ExpedienteLoteImpresionService;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import java.io.IOException;
@@ -88,6 +89,7 @@ public class ExpedienteApiController {
     private final ExpedienteJustificanteFinalService justificanteFinalService;
     private final ExpedienteHaciendaDocumentacionService haciendaDocumentacionService;
     private final ExpedienteDocumentacionActualizacionService documentacionActualizacionService;
+    private final ExpedienteLoteImpresionService loteImpresionService;
 
     @GetMapping
     public PagedResponse<ExpedienteListItemResponse> listarExpedientes(
@@ -487,6 +489,22 @@ public class ExpedienteApiController {
         response.setContentType("application/zip");
         response.setHeader("Content-Disposition", "attachment; filename=\"documentacion_hacienda_620.zip\"");
         haciendaDocumentacionService.escribirZipDocumentacionHacienda(ids, admin, response.getOutputStream());
+    }
+
+    @GetMapping("/lote-impresion")
+    public void descargarLoteImpresion(
+            @RequestParam("ids") List<Long> expedienteIds,
+            Authentication authentication,
+            HttpServletResponse response
+    ) throws IOException {
+        requireAdmin(authentication);
+        List<Long> ids = normalizarIds(expedienteIds);
+        if (ids.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecciona al menos un expediente");
+        }
+        response.setContentType("application/pdf");
+        response.setHeader("Content-Disposition", "inline; filename=\"lote_expedientes.pdf\"");
+        loteImpresionService.escribirLote(ids, response.getOutputStream());
     }
 
     @PostMapping("/{id}/incidencia")

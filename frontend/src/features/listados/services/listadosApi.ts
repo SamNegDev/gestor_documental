@@ -33,6 +33,11 @@ export function bulkFinalDocumentsUrl(expedienteIds: number[]) {
   return `/api/expedientes/justificantes-finales?${params.toString()}`;
 }
 
+export function bulkPrintUrl(expedienteIds: number[]) {
+  const params = new URLSearchParams();
+  expedienteIds.forEach((id) => params.append("ids", String(id)));
+  return `/api/expedientes/lote-impresion?${params.toString()}`;
+}
 export function bulkHaciendaDocumentsUrl(expedienteIds: number[]) {
   const params = new URLSearchParams();
   expedienteIds.forEach((id) => params.append("ids", String(id)));
