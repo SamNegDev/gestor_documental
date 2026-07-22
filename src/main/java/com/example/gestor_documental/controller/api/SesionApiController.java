@@ -3,14 +3,18 @@ package com.example.gestor_documental.controller.api;
 import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
 import com.example.gestor_documental.enums.TipoLogoCliente;
+import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.security.CurrentUserService;
+import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.util.ClienteBrandingUrls;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -20,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class SesionApiController {
 
     private final CurrentUserService currentUserService;
+    private final ClienteService clienteService;
 
     @GetMapping
     public UsuarioResumenResponse obtenerSesion(Authentication authentication) {
@@ -34,7 +39,26 @@ public class SesionApiController {
                 .email(usuario.getEmail())
                 .rol(usuario.getRolUsuario() != null ? usuario.getRolUsuario().name() : null)
                 .cliente(mapCliente(usuario.getCliente()))
+                .clientes((usuario.getRolUsuario() == RolUsuario.ADMIN
+                        ? clienteService.listarTodos().stream()
+                        : usuario.getClientesAutorizados().stream()).map(this::mapCliente).toList())
                 .build();
+    }
+
+    @PutMapping("/cliente-activo")
+    public UsuarioResumenResponse seleccionarClienteActivo(
+            @RequestBody ClienteActivoRequest request,
+            Authentication authentication
+    ) {
+        Usuario usuario = currentUserService.requireUser(authentication);
+        if (request.clienteId() == null && usuario.getRolUsuario() != RolUsuario.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecciona un cliente");
+        }
+        currentUserService.seleccionarClienteActivo(usuario, request.clienteId());
+        return obtenerSesion(authentication);
+    }
+
+    public record ClienteActivoRequest(Long clienteId) {
     }
 
     private ClienteResumenResponse mapCliente(com.example.gestor_documental.model.Cliente cliente) {

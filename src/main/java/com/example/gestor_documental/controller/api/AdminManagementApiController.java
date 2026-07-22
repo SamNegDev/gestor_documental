@@ -271,7 +271,12 @@ public class AdminManagementApiController {
     ) {
         requireAdmin(authentication);
         validarUsuario(request, true);
-        Usuario creado = usuarioService.crearUsuario(mapUsuario(request, new Usuario()), request.getClienteId(), request.getPassword());
+        List<Long> clienteIds = clientesSolicitados(request);
+        Usuario creado = usuarioService.crearUsuario(
+                mapUsuario(request, new Usuario()),
+                request.getRolUsuario() == RolUsuario.CLIENTE ? clienteIds : List.of(),
+                request.getRolUsuario() == RolUsuario.CLIENTE ? request.getClienteId() : null,
+                request.getPassword());
         return ResponseEntity.created(URI.create("/admin/usuarios/" + creado.getId()))
                 .body(Map.of("id", creado.getId()));
     }
@@ -284,7 +289,12 @@ public class AdminManagementApiController {
     ) {
         requireAdmin(authentication);
         validarUsuario(request, false);
-        usuarioService.actualizarUsuario(id, mapUsuario(request, new Usuario()), request.getClienteId(), request.getPassword());
+        List<Long> clienteIds = clientesSolicitados(request);
+        usuarioService.actualizarUsuario(
+                id, mapUsuario(request, new Usuario()),
+                request.getRolUsuario() == RolUsuario.CLIENTE ? clienteIds : List.of(),
+                request.getRolUsuario() == RolUsuario.CLIENTE ? request.getClienteId() : null,
+                request.getPassword());
         return ResponseEntity.noContent().build();
     }
 
@@ -312,10 +322,27 @@ public class AdminManagementApiController {
         if (creating && isBlank(request.getPassword())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contrasena es obligatoria para crear un usuario");
         }
-        if (request.getRolUsuario() == RolUsuario.CLIENTE && request.getClienteId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecciona un cliente para usuarios cliente");
+        if (request.getRolUsuario() == RolUsuario.CLIENTE) {
+            List<Long> clienteIds = clientesSolicitados(request);
+            if (clienteIds.isEmpty() || request.getClienteId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecciona al menos un cliente y el cliente activo");
+            }
+            if (!clienteIds.contains(request.getClienteId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El cliente activo debe estar entre los clientes asignados");
+            }
         }
     }
+
+    private List<Long> clientesSolicitados(UsuarioUpsertRequest request) {
+        if (request.getClienteIds() != null && !request.getClienteIds().isEmpty()) {
+            return request.getClienteIds().stream().filter(java.util.Objects::nonNull).distinct().toList();
+        }
+        if (request.getClienteId() != null) {
+            return List.of(request.getClienteId());
+        }
+        return List.of();
+    }
+
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
@@ -409,6 +436,7 @@ public class AdminManagementApiController {
                 .rol(usuario.getRolUsuario() != null ? usuario.getRolUsuario().name() : null)
                 .activo(usuario.isActivo())
                 .cliente(usuario.getCliente() != null ? mapClienteResumen(usuario.getCliente()) : null)
+                .clientes(usuario.getClientesAutorizados().stream().map(this::mapClienteResumen).toList())
                 .build();
     }
 

@@ -19,7 +19,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     Optional<Usuario> findFirstByRolUsuarioAndActivoTrueOrderByIdAsc(RolUsuario rolUsuario);
 
-    @EntityGraph(attributePaths = "cliente")
+    @EntityGraph(attributePaths = {"cliente", "clientesAutorizados"})
     Optional<Usuario> findWithClienteByEmail(String email);
 
 }

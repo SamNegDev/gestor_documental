@@ -3,7 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { BellRing, CarFront, DatabaseSearch, FolderOpen, FolderPlus, Inbox, LayoutDashboard, LogOut, MessageCircle, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
 import { SidebarLink } from "./SidebarLink";
 import { Tooltip } from "../../shared/ui/Tooltip";
-import { getSessionUser, type SessionUser } from "../../shared/api/sessionApi";
+import { getSessionUser, selectActiveClient, type SessionUser } from "../../shared/api/sessionApi";
 import { logout } from "../../shared/api/authApi";
 import { ApiError } from "../../shared/api/http";
 import { useQuery } from "@tanstack/react-query";
@@ -96,6 +96,7 @@ export function AppLayout() {
   const [sessionExpired, setSessionExpired] = useState(false);
   const [menuSettingsOpen, setMenuSettingsOpen] = useState(false);
   const [hiddenMenuItems, setHiddenMenuItems] = useState<string[]>([]);
+  const [changingClient, setChangingClient] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -160,6 +161,18 @@ export function AppLayout() {
     window.location.href = "/login?logout=1";
   };
 
+  const handleClientChange = async (clienteId: number | null) => {
+    if (!user || (user.cliente?.id ?? null) === clienteId) return;
+    setChangingClient(true);
+    try {
+      const updatedUser = await selectActiveClient(clienteId);
+      setUser(updatedUser);
+      window.location.href = user.rol === "ADMIN" ? "/admin/dashboard" : "/cliente/dashboard";
+    } finally {
+      setChangingClient(false);
+    }
+  };
+
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="Navegacion principal">
@@ -217,9 +230,23 @@ export function AppLayout() {
           <GlobalSearch />
           <div className="topbar__user">
             {user?.rol === "ADMIN" ? <AvisosBell /> : null}
-            <div>
+            {(user?.rol === "ADMIN" || (user?.rol === "CLIENTE" && user.clientes?.length > 1)) ? (
+              <label className="active-client-selector">
+                <span>Cuenta de trabajo</span>
+                <select aria-label="Cliente activo" disabled={changingClient}
+                  onChange={(event) => void handleClientChange(event.target.value ? Number(event.target.value) : null)}
+                  value={user.cliente?.id || ""}
+                >
+                  {user.rol === "ADMIN" ? <option value="">Todos los clientes</option> : null}
+                  {user.clientes.map((cliente) => (
+                    <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <div className="topbar__identity">
               <strong>{user?.nombreCompleto || (sessionExpired ? "Sesión caducada" : "Usuario")}</strong>
-              <span>{roleLabel}</span>
+              <span>{roleLabel}{user?.rol === "ADMIN" ? ` · ${user.cliente?.nombre || "Todos los clientes"}` : user?.cliente?.nombre ? ` · ${user.cliente.nombre}` : ""}</span>
             </div>
             <Tooltip label="Cerrar sesion">
               <button

@@ -1,5 +1,7 @@
 package com.example.gestor_documental.dto.expediente;
 
+import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,4 +19,5 @@ public class UsuarioResumenResponse {
     private String email;
     private String rol;
     private ClienteResumenResponse cliente;
+    private List<ClienteResumenResponse> clientes;
 }

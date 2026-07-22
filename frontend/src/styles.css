@@ -1742,6 +1742,28 @@ select {
   font-size: 0.8rem;
 }
 
+.active-client-selector {
+  display: grid;
+  gap: 3px;
+  min-width: 180px;
+}
+
+.topbar__user .active-client-selector > span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.active-client-selector select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 0 30px 0 9px;
+  color: var(--ink-strong);
+}
+
 .icon-button {
   display: grid;
   width: 36px;
@@ -7526,6 +7548,49 @@ input.records-table-filter {
   gap: 8px;
 }
 
+.admin-client-assignment {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr);
+  gap: 14px;
+}
+
+.admin-client-assignment fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.admin-client-assignment legend {
+  padding: 0 5px;
+  color: var(--ink-strong);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.admin-client-assignment__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.admin-client-assignment__options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 7px;
+  background: var(--panel-soft);
+}
+
+.admin-client-assignment__options input {
+  width: 17px;
+  height: 17px;
+}
 .toggle-field {
   display: grid;
   grid-column: 1 / -1;

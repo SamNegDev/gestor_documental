@@ -108,7 +108,7 @@ public class ExpedienteApiController {
     ) {
         Usuario usuarioLogueado = usuario(authentication);
         Long clienteVisibleId = usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN
-                ? clienteId
+                ? usuarioLogueado.getCliente() != null ? usuarioLogueado.getCliente().getId() : clienteId
                 : usuarioLogueado.getCliente() != null ? usuarioLogueado.getCliente().getId() : null;
         if (usuarioLogueado.getRolUsuario() != RolUsuario.ADMIN && clienteVisibleId == null) {
             return PagedResponse.of(List.of(), pagina, tamanio);
@@ -140,7 +140,9 @@ public class ExpedienteApiController {
                                 .build())
                         .toList())
                 .clientes(usuarioLogueado.getRolUsuario() == RolUsuario.ADMIN
-                        ? clienteService.listarTodos().stream()
+                        ? (usuarioLogueado.getCliente() != null
+                                ? java.util.stream.Stream.of(usuarioLogueado.getCliente())
+                                : clienteService.listarTodos().stream())
                                 .map(cliente -> ClienteResumenResponse.builder()
                                         .id(cliente.getId())
                                         .nombre(cliente.getNombre())
@@ -168,9 +170,11 @@ public class ExpedienteApiController {
 
     @GetMapping("/catalogos-edicion")
     public ExpedienteEditCatalogsResponse obtenerCatalogosEdicion(Authentication authentication) {
-        requireAdmin(authentication);
+        Usuario usuarioLogueado = requireAdmin(authentication);
         return ExpedienteEditCatalogsResponse.builder()
-                .clientes(clienteService.listarTodos().stream()
+                .clientes((usuarioLogueado.getCliente() != null
+                        ? java.util.stream.Stream.of(usuarioLogueado.getCliente())
+                        : clienteService.listarTodos().stream())
                         .map(cliente -> ClienteResumenResponse.builder()
                                 .id(cliente.getId())
                                 .nombre(cliente.getNombre())

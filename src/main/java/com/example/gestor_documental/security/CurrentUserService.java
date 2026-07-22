@@ -32,4 +32,8 @@ public class CurrentUserService {
         }
         return usuario;
     }
+
+    public Usuario seleccionarClienteActivo(Usuario usuario, Long clienteId) {
+        return usuarioService.seleccionarClienteActivo(usuario.getId(), clienteId);
+    }
 }

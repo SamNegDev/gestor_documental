@@ -44,6 +44,7 @@ export interface ResumenDiarioResponse {
 export interface UsuarioAdmin {
   id: number;
   nombre: string;
+  clientes: ClienteResumen[];
   apellidos: string;
   nombreCompleto: string;
   email: string;
@@ -54,6 +55,7 @@ export interface UsuarioAdmin {
 
 export interface UsuarioInput {
   nombre: string;
+  clienteIds: number[];
   apellidos: string;
   email: string;
   password?: string | null;

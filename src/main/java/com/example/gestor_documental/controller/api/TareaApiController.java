@@ -103,9 +103,10 @@ public class TareaApiController {
 
     private List<TareaResponse> calcularTareas(Usuario usuario) {
         List<TareaResponse> tareas = new ArrayList<>();
-        Long clienteId = usuario.getRolUsuario() == RolUsuario.ADMIN || usuario.getCliente() == null
-                ? null
-                : usuario.getCliente().getId();
+        if (usuario.getRolUsuario() != RolUsuario.ADMIN && usuario.getCliente() == null) {
+            return tareas;
+        }
+        Long clienteId = usuario.getCliente() != null ? usuario.getCliente().getId() : null;
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
             LocalDateTime ahora = LocalDateTime.now();
             int diasPrimerAviso = configuracionSeguimientoService.obtener().getDiasPrimerAviso();
@@ -127,7 +128,7 @@ public class TareaApiController {
                     .filter(Objects::nonNull)
                     .map(Expediente::getId)
                     .collect(Collectors.toSet());
-            expedienteRepository.findTareasPorEstados(null, List.of(
+            expedienteRepository.findTareasPorEstados(clienteId, List.of(
                             EstadoExpediente.PENDIENTE_DOCUMENTACION,
                             EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL
                     ))
@@ -144,7 +145,7 @@ public class TareaApiController {
                 .forEach(solicitud -> tareas.add(tareaSolicitud(solicitud, usuario)));
 
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
-            expedienteRepository.findTareasPorEstados(null, List.of(
+            expedienteRepository.findTareasPorEstados(clienteId, List.of(
                             EstadoExpediente.REVISANDO_INCIDENCIAS,
                             EstadoExpediente.INFORMACION_ADICIONAL_RECIBIDA
                     ))
@@ -191,6 +192,9 @@ public class TareaApiController {
                 if (expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION) tareas.add(tareaExpediente(expediente, "DOCUMENTACION_PENDIENTE_CLIENTE", "ALTA", "Documentacion pendiente", "Debes aportar la documentacion solicitada.", contextoDocumentacion(expediente.getId()), "CLIENTE"));
                 if (expediente.getEstadoExpediente() == EstadoExpediente.SOLICITADA_INFORMACION_ADICIONAL) tareas.add(tareaExpediente(expediente, "INFORMACION_PENDIENTE_CLIENTE", "ALTA", "Informacion pendiente", "Debes responder a la informacion solicitada.", ultimoMensaje(expediente.getId(), RolUsuario.ADMIN), "CLIENTE"));
             }
+        }
+        if (usuario.getRolUsuario() == RolUsuario.ADMIN && clienteId != null) {
+            return tareas.stream().filter(tarea -> clienteId.equals(tarea.getClienteId())).toList();
         }
         return tareas;
     }

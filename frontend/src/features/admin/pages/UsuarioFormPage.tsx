@@ -15,6 +15,7 @@ function emptyUsuario(): UsuarioInput {
     rolUsuario: "CLIENTE",
     activo: true,
     clienteId: null,
+    clienteIds: [],
   };
 }
 
@@ -31,6 +32,7 @@ function clean(input: UsuarioInput, isEdit: boolean): UsuarioInput {
     rolUsuario: input.rolUsuario,
     activo: input.activo,
     clienteId: input.rolUsuario === "CLIENTE" ? input.clienteId || null : null,
+    clienteIds: input.rolUsuario === "CLIENTE" ? input.clienteIds : [],
   };
 }
 
@@ -61,13 +63,14 @@ export function UsuarioFormPage() {
         rolUsuario: usuarioQuery.data.rol || "CLIENTE",
         activo: usuarioQuery.data.activo,
         clienteId: usuarioQuery.data.cliente?.id || null,
+        clienteIds: usuarioQuery.data.clientes?.map((cliente) => cliente.id) || (usuarioQuery.data.cliente ? [usuarioQuery.data.cliente.id] : []),
       });
     }
   }, [usuarioQuery.data]);
 
   useEffect(() => {
-    if (!isEdit && form.rolUsuario === "CLIENTE" && !form.clienteId && catalogsQuery.data?.clientes[0]) {
-      setForm((current) => ({ ...current, clienteId: catalogsQuery.data!.clientes[0].id }));
+    if (!isEdit && form.rolUsuario === "CLIENTE" && form.clienteIds.length === 0 && catalogsQuery.data?.clientes[0]) {
+      setForm((current) => ({ ...current, clienteId: catalogsQuery.data!.clientes[0].id, clienteIds: [catalogsQuery.data!.clientes[0].id] }));
     }
   }, [catalogsQuery.data, form.clienteId, form.rolUsuario, isEdit]);
 
@@ -77,7 +80,7 @@ export function UsuarioFormPage() {
         throw new Error("Nombre, apellidos, email y rol son obligatorios.");
       }
       if (!isEdit && !form.password?.trim()) throw new Error("La contraseña es obligatoria al crear un usuario.");
-      if (form.rolUsuario === "CLIENTE" && !form.clienteId) throw new Error("Selecciona un cliente para el usuario.");
+      if (form.rolUsuario === "CLIENTE" && (!form.clienteId || form.clienteIds.length === 0)) throw new Error("Selecciona al menos un cliente y el cliente activo.");
       if (isEdit && id) {
         await updateUsuario(id, clean(form, true));
         return { id: Number(id) };
@@ -89,6 +92,18 @@ export function UsuarioFormPage() {
   });
   const updateUpperField = (field: keyof UsuarioInput, event: ChangeEvent<HTMLInputElement>) => {
     uppercaseInputPreservingCursor(event, (value) => setForm((current) => ({ ...current, [field]: value })));
+  };
+
+  const toggleClient = (clienteId: number) => {
+    setForm((current) => {
+      const selected = current.clienteIds.includes(clienteId)
+        ? current.clienteIds.filter((id) => id !== clienteId)
+        : [...current.clienteIds, clienteId];
+      const active = selected.includes(current.clienteId || -1)
+        ? current.clienteId
+        : selected[0] || null;
+      return { ...current, clienteIds: selected, clienteId: active };
+    });
   };
 
   return (
@@ -137,22 +152,40 @@ export function UsuarioFormPage() {
             </label>
             <label>
               Rol
-              <select value={form.rolUsuario} required onChange={(event) => setForm({ ...form, rolUsuario: event.target.value, clienteId: event.target.value === "CLIENTE" ? form.clienteId : null })}>
+              <select value={form.rolUsuario} required onChange={(event) => setForm({ ...form, rolUsuario: event.target.value, clienteId: event.target.value === "CLIENTE" ? form.clienteId : null, clienteIds: event.target.value === "CLIENTE" ? form.clienteIds : [] })}>
                 {catalogsQuery.data?.roles.map((rol) => (
                   <option key={rol} value={rol}>{rol}</option>
                 ))}
               </select>
             </label>
             {form.rolUsuario === "CLIENTE" ? (
-              <label>
-                Cliente asignado
-                <select value={form.clienteId || ""} required onChange={(event) => setForm({ ...form, clienteId: Number(event.target.value) })}>
-                  <option value="">Selecciona cliente</option>
-                  {catalogsQuery.data?.clientes.map((cliente) => (
-                    <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="admin-client-assignment">
+                <fieldset>
+                  <legend>Clientes autorizados</legend>
+                  <div className="admin-client-assignment__options">
+                    {catalogsQuery.data?.clientes.map((cliente) => (
+                      <label key={cliente.id}>
+                        <input
+                          type="checkbox"
+                          checked={form.clienteIds.includes(cliente.id)}
+                          onChange={() => toggleClient(cliente.id)}
+                        />
+                        <span>{cliente.nombre}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <label>
+                  Cliente activo inicialmente
+                  <select value={form.clienteId || ""} required disabled={form.clienteIds.length === 0} onChange={(event) => setForm({ ...form, clienteId: Number(event.target.value) })}>
+                    <option value="">Selecciona cliente activo</option>
+                    {catalogsQuery.data?.clientes.filter((cliente) => form.clienteIds.includes(cliente.id)).map((cliente) => (
+                      <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>
+                    ))}
+                  </select>
+                  <small>El usuario podr? cambiar entre los clientes autorizados desde la cabecera.</small>
+                </label>
+              </div>
             ) : null}
             <label className="toggle-field">
               <input checked={form.activo} type="checkbox" onChange={(event) => setForm({ ...form, activo: event.target.checked })} />

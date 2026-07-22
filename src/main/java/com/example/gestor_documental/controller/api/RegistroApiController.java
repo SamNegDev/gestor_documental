@@ -387,9 +387,9 @@ public class RegistroApiController {
     }
 
     private Long clienteIdVisible(Usuario usuario) {
-        return usuario.getRolUsuario() == RolUsuario.ADMIN || usuario.getCliente() == null
-                ? null
-                : usuario.getCliente().getId();
+        return usuario.getCliente() != null
+                ? usuario.getCliente().getId()
+                : null;
     }
 
     private List<Expediente> expedientesVisibles(Usuario usuario) {
@@ -398,7 +398,11 @@ public class RegistroApiController {
 
     private List<Expediente> expedientesVisibles(Usuario usuario, String periodo, LocalDate fechaDesde, LocalDate fechaHasta) {
         DateRange range = dateRange(periodo, fechaDesde, fechaHasta);
-        if (usuario.getRolUsuario() == RolUsuario.ADMIN) return expedienteRepository.findByPeriodo(range.desde(), range.hasta());
+        if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
+            return usuario.getCliente() == null
+                    ? expedienteRepository.findByPeriodo(range.desde(), range.hasta())
+                    : expedienteRepository.findByClienteIdAndPeriodo(usuario.getCliente().getId(), range.desde(), range.hasta());
+        }
         if (usuario.getCliente() == null) return List.of();
         return expedienteRepository.findByClienteIdAndPeriodo(usuario.getCliente().getId(), range.desde(), range.hasta());
     }

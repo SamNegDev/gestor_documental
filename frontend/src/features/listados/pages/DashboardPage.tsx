@@ -21,7 +21,7 @@ export function DashboardPage() {
   const productivityQuery = useQuery({
     queryKey: ["dashboard-productivity", productivityFilters.periodo, productivityFilters.fechaDesde, productivityFilters.fechaHasta],
     queryFn: () => getProductivity(productivityFilters),
-    enabled: isAdmin && customRangeReady,
+    enabled: isAdmin && !user?.cliente && customRangeReady,
   });
 
   if (dashboardQuery.isLoading) {
@@ -49,7 +49,7 @@ export function DashboardPage() {
         <div>
           <p className="eyebrow">{isAdmin ? "Gestión interna" : "Portal cliente"}</p>
           <h2>{isAdmin ? "Resumen operativo" : "Tu actividad"}</h2>
-          <p>{isAdmin ? "Actividad reciente, bloqueos y accesos rapidos para la gestoria." : "Estado de tus solicitudes y expedientes abiertos."}</p>
+          <p>{isAdmin ? user?.cliente ? `Vista operativa limitada a ${user.cliente.nombre}.` : "Actividad reciente, bloqueos y accesos rapidos para la gestoria." : "Estado de tus solicitudes y expedientes abiertos."}</p>
         </div>
         <div className="dashboard-hero__actions">
           {isAdmin ? (
@@ -94,7 +94,7 @@ export function DashboardPage() {
         />
       </section>
 
-      {isAdmin ? (
+      {isAdmin && !user?.cliente ? (
         <ProductivitySection
           data={productivityQuery.data}
           error={Boolean(productivityQuery.error)}

@@ -38,8 +38,9 @@ public class BusquedaGlobalApiController {
         String termino = q != null ? q.trim().toUpperCase(Locale.ROOT) : "";
         if (termino.length() < 2) return BusquedaGlobalResponse.vacia();
 
-        Long clienteId = usuario.getRolUsuario() == RolUsuario.ADMIN ? null
-                : usuario.getCliente() != null ? usuario.getCliente().getId() : -1L;
+        Long clienteId = usuario.getCliente() != null
+                ? usuario.getCliente().getId()
+                : usuario.getRolUsuario() == RolUsuario.ADMIN ? null : -1L;
         String texto = "%" + termino + "%";
         String digitos = termino.replaceAll("[^0-9]", "");
         String identificador = digitos.isBlank() ? "__SIN_ID__" : "%" + digitos + "%";

@@ -28,6 +28,7 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
         ensureSolicitudRolColumn("interesado1_rol");
         ensureSolicitudRolColumn("interesado2_rol");
         ensureSolicitudRolColumn("interesado3_rol");
+        migrateUsuarioClienteAssignments();
     }
 
     private boolean isMySql() {
@@ -60,6 +61,19 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
             log.info("Actualizada columna solicitud.{} para admitir COMPRAVENTA", columnName);
         } catch (Exception exception) {
             log.warn("No se pudo verificar/actualizar la columna solicitud.{}", columnName, exception);
+        }
+    }
+
+    private void migrateUsuarioClienteAssignments() {
+        try {
+            jdbcTemplate.update("""
+                    insert ignore into usuario_cliente (usuario_id, cliente_id)
+                    select id, cliente_id
+                    from usuario
+                    where cliente_id is not null
+                    """);
+        } catch (Exception exception) {
+            log.warn("No se pudieron migrar las asignaciones actuales a usuario_cliente", exception);
         }
     }
 }

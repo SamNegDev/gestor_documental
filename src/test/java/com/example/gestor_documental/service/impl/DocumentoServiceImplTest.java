@@ -1,6 +1,10 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.model.Cliente;
+import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.ClienteRepository;
@@ -38,6 +42,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -134,6 +139,26 @@ class DocumentoServiceImplTest {
 
         assertThat(paginas).isEqualTo(1);
         assertThat(ImageIO.read(new java.io.ByteArrayInputStream(preview))).isNotNull();
+    }
+
+    @Test
+    void aislaDocumentosSegunElClienteActivo() {
+        Cliente clienteA = new Cliente();
+        clienteA.setId(10L);
+        Cliente clienteB = new Cliente();
+        clienteB.setId(20L);
+        Usuario usuario = new Usuario("Cliente", "Multiple", "cliente@test.local", "secret", RolUsuario.CLIENTE, true);
+        usuario.getClientesAutorizados().addAll(List.of(clienteA, clienteB));
+        usuario.setCliente(clienteA);
+        Documento documento = documento(9L, "cliente-b.pdf", "CLIENTE-B.PDF");
+        documento.setCliente(clienteB);
+        when(documentoRepository.findByIdConRelaciones(9L)).thenReturn(Optional.of(documento));
+
+        assertThatThrownBy(() -> service.obtenerDocumentoConPermiso(9L, usuario))
+                .isInstanceOf(AccesoDenegadoException.class);
+
+        usuario.setCliente(clienteB);
+        assertThat(service.obtenerDocumentoConPermiso(9L, usuario)).isSameAs(documento);
     }
 
     private Documento documento(Long id, String nombreFisico, String nombreOriginal) {

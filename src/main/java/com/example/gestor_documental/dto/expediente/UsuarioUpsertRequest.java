@@ -1,6 +1,8 @@
 package com.example.gestor_documental.dto.expediente;
 
 import com.example.gestor_documental.enums.RolUsuario;
+import java.util.List;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,6 +14,7 @@ public class UsuarioUpsertRequest {
     private String email;
     private String password;
     private RolUsuario rolUsuario;
+    private List<Long> clienteIds;
     private boolean activo;
     private Long clienteId;
 }

@@ -48,6 +48,9 @@ public class DashboardApiController {
     public DashboardResponse obtenerDashboard(Authentication authentication) {
         Usuario usuario = currentUserService.requireUser(authentication);
         if (usuario.getRolUsuario() == RolUsuario.ADMIN) {
+            if (usuario.getCliente() != null) {
+                return clienteDashboard(usuario);
+            }
             return adminDashboard(usuario);
         }
         if (usuario.getCliente() == null) {

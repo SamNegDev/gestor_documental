@@ -7,7 +7,9 @@ import com.example.gestor_documental.enums.RolUsuario;
 
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 //Mediante el uso de Lombrok generamos los getters, setters y constructor vacío
     @Getter
@@ -44,6 +46,19 @@ import java.util.List;
         @ManyToOne(fetch = FetchType.EAGER)
         @JoinColumn(name = "cliente_id")
         private Cliente cliente;
+
+        @ManyToMany(fetch = FetchType.LAZY)
+        @JoinTable(
+                name = "usuario_cliente",
+                joinColumns = @JoinColumn(name = "usuario_id"),
+                inverseJoinColumns = @JoinColumn(name = "cliente_id"),
+                uniqueConstraints = @UniqueConstraint(
+                        name = "uk_usuario_cliente",
+                        columnNames = {"usuario_id", "cliente_id"}
+                )
+        )
+        @OrderBy("nombre ASC")
+        private Set<Cliente> clientesAutorizados = new LinkedHashSet<>();
 
         @OneToMany(mappedBy = "creadoPor", fetch = FetchType.LAZY)
         private List<Solicitud> solicitudes = new ArrayList<>();

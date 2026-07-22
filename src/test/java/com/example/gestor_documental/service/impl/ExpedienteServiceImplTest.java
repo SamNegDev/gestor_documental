@@ -5,6 +5,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
@@ -230,6 +232,29 @@ class ExpedienteServiceImplTest {
                 List.of());
 
         verify(operacionExpedienteService).sincronizarYListar(expediente);
+    }
+
+    @Test
+    void aislaExpedientesSegunElClienteActivoAunqueElUsuarioTengaAmbosAutorizados() {
+        Cliente clienteA = new Cliente();
+        clienteA.setId(10L);
+        Cliente clienteB = new Cliente();
+        clienteB.setId(20L);
+        Usuario usuario = new Usuario("Cliente", "Multiple", "cliente@test.local", "secret", RolUsuario.CLIENTE, true);
+        usuario.getClientesAutorizados().addAll(List.of(clienteA, clienteB));
+        usuario.setCliente(clienteA);
+        Expediente expedienteA = expediente(EstadoExpediente.EN_TRAMITE, TipoTramiteEnum.TRASPASO);
+        expedienteA.setCliente(clienteA);
+        Expediente expedienteB = expediente(EstadoExpediente.EN_TRAMITE, TipoTramiteEnum.TRASPASO);
+        expedienteB.setCliente(clienteB);
+
+        assertTrue(service.tienePermisoExpediente(expedienteA, usuario));
+        assertFalse(service.tienePermisoExpediente(expedienteB, usuario));
+
+        usuario.setCliente(clienteB);
+
+        assertFalse(service.tienePermisoExpediente(expedienteA, usuario));
+        assertTrue(service.tienePermisoExpediente(expedienteB, usuario));
     }
 
     private Expediente expediente(EstadoExpediente estado, TipoTramiteEnum tramiteEnum) {

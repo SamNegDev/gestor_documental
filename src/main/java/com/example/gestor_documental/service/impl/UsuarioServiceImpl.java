@@ -10,9 +10,12 @@ import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -50,13 +53,9 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     @Override
-    public Usuario crearUsuario(Usuario usuario, Long clienteId, String rawPassword) {
-        if (clienteId != null) {
-            Cliente cliente = clienteRepository.findById(clienteId).orElse(null);
-            usuario.setCliente(cliente);
-        } else {
-            usuario.setCliente(null);
-        }
+    @Transactional
+    public Usuario crearUsuario(Usuario usuario, List<Long> clienteIds, Long clienteActivoId, String rawPassword) {
+        asignarClientes(usuario, clienteIds, clienteActivoId);
 
         if (rawPassword == null || rawPassword.trim().isEmpty()) {
             throw new IllegalArgumentException("La contraseña es obligatoria para crear un usuario nuevo.");
@@ -69,16 +68,12 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     @Override
-    public Usuario actualizarUsuario(Long id, Usuario datosNuevos, Long clienteId, String newRawPassword) {
+    @Transactional
+    public Usuario actualizarUsuario(Long id, Usuario datosNuevos, List<Long> clienteIds, Long clienteActivoId, String newRawPassword) {
         Usuario existente = usuarioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no válido: " + id));
 
-        if (clienteId != null) {
-            Cliente cliente = clienteRepository.findById(clienteId).orElse(null);
-            existente.setCliente(cliente);
-        } else {
-            existente.setCliente(null);
-        }
+        asignarClientes(existente, clienteIds, clienteActivoId);
 
         existente.setNombre(TextNormalizer.upperOrNull(datosNuevos.getNombre()));
         existente.setApellidos(TextNormalizer.upperOrNull(datosNuevos.getApellidos()));
@@ -91,6 +86,54 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
 
         return usuarioRepository.save(existente);
+    }
+
+    @Override
+    @Transactional
+    public Usuario seleccionarClienteActivo(Long usuarioId, Long clienteId) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
+        if (usuario.getRolUsuario() == com.example.gestor_documental.enums.RolUsuario.ADMIN) {
+            Cliente cliente = clienteId == null
+                    ? null
+                    : clienteRepository.findById(clienteId)
+                            .orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado"));
+            usuario.setCliente(cliente);
+            return usuarioRepository.save(usuario);
+        }
+        if (clienteId == null) {
+            throw new IllegalArgumentException("Selecciona un cliente activo");
+        }
+
+        Cliente cliente = usuario.getClientesAutorizados().stream()
+                .filter(autorizado -> autorizado.getId().equals(clienteId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("El cliente no esta autorizado para este usuario"));
+        usuario.setCliente(cliente);
+        return usuarioRepository.save(usuario);
+    }
+
+    private void asignarClientes(Usuario usuario, List<Long> clienteIds, Long clienteActivoId) {
+        Set<Long> ids = clienteIds == null
+                ? Set.of()
+                : clienteIds.stream()
+                        .filter(java.util.Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        List<Cliente> clientes = clienteRepository.findAllById(ids);
+        if (clientes.size() != ids.size()) {
+            throw new IllegalArgumentException("Alguno de los clientes seleccionados no existe");
+        }
+        usuario.getClientesAutorizados().clear();
+        usuario.getClientesAutorizados().addAll(clientes);
+        if (clienteActivoId == null) {
+            usuario.setCliente(null);
+            return;
+        }
+        Cliente activo = clientes.stream()
+                .filter(cliente -> cliente.getId().equals(clienteActivoId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("El cliente activo debe estar entre los clientes asignados"));
+        usuario.setCliente(activo);
     }
 
     private void normalizarUsuario(Usuario usuario) {
