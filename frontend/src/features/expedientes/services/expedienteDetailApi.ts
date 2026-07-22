@@ -1,16 +1,30 @@
 import { apiGet, apiPost, apiPostForm, apiPostJson, apiPutJson } from "../../../shared/api/http";
 import type {
   ActualizacionDocumentalExpediente,
+  CategoriaHistorial,
   CreacionConProcesamiento,
   ExpedienteDetail,
   ExpedienteEditCatalogs,
   ExpedienteEditInput,
+  HistorialPage,
   InteresadoSearchResult,
   TipoIncidencia,
 } from "../types/expedienteDetail.types";
 
 export function getExpedienteDetail(id: string | number): Promise<ExpedienteDetail> {
   return apiGet<ExpedienteDetail>(`/api/expedientes/${id}`);
+}
+
+export function getExpedienteHistory(
+  id: string | number,
+  options: { pagina?: number; tamanio?: number; categoria?: CategoriaHistorial } = {},
+): Promise<HistorialPage> {
+  const params = new URLSearchParams({
+    pagina: String(options.pagina ?? 0),
+    tamanio: String(options.tamanio ?? 20),
+  });
+  if (options.categoria) params.set("categoria", options.categoria);
+  return apiGet<HistorialPage>(`/api/expedientes/${id}/historial?${params}`);
 }
 
 export function getExpedienteEditCatalogs(): Promise<ExpedienteEditCatalogs> {

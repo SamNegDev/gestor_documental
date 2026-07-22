@@ -62,7 +62,13 @@ public class ClienteExpedienteApiController {
                         .toList())
                 .incidencias(detalle.getIncidencias())
                 .mensajes(detalle.getMensajes())
-                .historial(detalle.getHistorial())
+                .historial(detalle.getHistorial().stream()
+                        .filter(item -> !"INTERNO".equals(item.getAudiencia()))
+                        .peek(item -> {
+                            item.setUsuario(null);
+                            item.setAudiencia(null);
+                        })
+                        .toList())
                 .lecturaIa(extraccionGaIaService.obtenerLecturaCliente(id, usuarioLogueado))
                 .build();
     }

@@ -8,7 +8,7 @@ import { notifyIncidentResolvedByClient, uploadIncidentDocument } from "../servi
 import { uploadExpedienteDocument } from "../services/documentosApi";
 import { uploadRequirementDocument } from "../services/requisitosApi";
 import { DocumentUploadDialog, type DocumentUploadSubmit } from "../components/DocumentUploadDialog";
-import { HistoryTimelineItem } from "../components/HistoryTimelineItem";
+import { HistoryPanel } from "../components/HistoryPanel";
 import type { DocumentoExpediente, IncidenciaExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 import { formatDateTime, formatDocumentType, humanizeEnum } from "../utils/formatters";
 import { uppercaseInputPreservingCursor } from "../../../shared/utils/text";
@@ -583,35 +583,25 @@ export function ClienteExpedientePage() {
             </button>
           ) : null}
         </div>
-        <div className="documents-list">
-          {documentos.length === 0 ? (
-            <p className="exp-empty">Todavia no hay documentos disponibles.</p>
-          ) : (
-            documentos.map((documento) => (
-              <article className="document-row" key={documento.id || documento.nombre}>
-                <div className="pdf-icon">
-                  <FileText size={18} />
-                  <strong>PDF</strong>
-                </div>
-                <div className="document-row__body">
-                  <strong>{documento.nombreOriginal || documento.nombre}</strong>
-                  <span>{formatDocumentType(documento.tipo)}</span>
-                  <small>{formatDateTime(documento.fechaSubida)}</small>
-                </div>
-                <div className="document-row__actions">
-                  <button
-                    className="soft-button soft-button--compact"
-                    disabled={!documento.id}
-                    onClick={() => documento.id && window.open(`/documentos/ver/${documento.id}`, "_blank", "noopener,noreferrer")}
-                    type="button"
-                  >
-                    <Eye size={15} />
-                    Ver
-                  </button>
-                </div>
-              </article>
-            ))
-          )}
+        <div className="document-table">
+          {documentos.length === 0 ? <div className="document-table__empty">Todavia no hay documentos disponibles.</div> : null}
+          {documentos.map((documento) => (
+            <div className="document-table__row" key={documento.id || documento.nombre}>
+              <FileText size={20} />
+              <div className="document-table__main">
+                <strong>{documento.nombreOriginal || documento.nombre}</strong>
+                <span>{formatDocumentType(documento.tipo)}</span>
+              </div>
+              <small>{formatDateTime(documento.fechaSubida)}</small>
+              {documento.id ? (
+                <a className="soft-button soft-button--compact" href={`/documentos/ver/${documento.id}`} target="_blank" rel="noreferrer">
+                  Ver
+                </a>
+              ) : (
+                <button className="soft-button soft-button--compact" disabled type="button">Ver</button>
+              )}
+            </div>
+          ))}
         </div>
       </section>
 
@@ -666,13 +656,7 @@ export function ClienteExpedientePage() {
           </Tabs.Content>
 
           <Tabs.Content value="historial" className="secondary-tabs__content">
-            <div className="timeline-list">
-              {historial.length === 0 ? (
-                <p className="exp-empty">No hay movimientos todavia.</p>
-              ) : (
-                historial.map((item) => <HistoryTimelineItem item={item} key={item.id} showUser={false} />)
-              )}
-            </div>
+            <HistoryPanel clientView expedienteId={expediente.id} initialItems={historial} />
           </Tabs.Content>
         </Tabs.Root>
       </section>

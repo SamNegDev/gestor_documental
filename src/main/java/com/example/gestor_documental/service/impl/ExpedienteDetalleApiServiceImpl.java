@@ -111,7 +111,6 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         List<Documento> documentos = documentoService.listarPorExpediente(expedienteId);
         List<ExpedienteInteresado> interesados = expedienteInteresadoRepository.findByExpedienteId(expedienteId);
         List<Incidencia> incidencias = incidenciaService.listarPorExpediente(expedienteId);
-        List<HistorialCambio> historial = historialCambioService.listarPorExpediente(expedienteId);
         List<Mensaje> mensajes = mensajeService.listarPorExpediente(expedienteId);
         List<WhatsappWebhookEvento> whatsappMensajes = whatsappWebhookEventoRepository.findMensajesClienteByExpedienteId(expedienteId);
         List<OperacionExpediente> operaciones = operacionExpedienteService.sincronizarYListar(expediente);
@@ -154,7 +153,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .operaciones(operacionesResponse)
                 .hitos(hitos)
                 .incidencias(incidencias.stream().map(incidencia -> mapIncidencia(incidencia, documentos, expediente)).toList())
-                .historial(historial.stream().map(this::mapHistorial).toList())
+                .historial(List.of())
                 .mensajes(mensajes.stream().map(mensaje -> mapMensaje(mensaje, usuarioLogueado)).toList())
                 .whatsappMensajes(whatsappMensajes.stream().map(this::mapWhatsapp).toList())
                 .build();
@@ -934,6 +933,8 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .fechaCambio(formatearFecha(cambio.getFechaCambio()))
                 .usuario(cambio.getUsuario() != null ? nombreCompleto(cambio.getUsuario()) : null)
                 .tipoActividad(cambio.getTipoActividad() != null ? cambio.getTipoActividad().name() : "CAMBIO")
+                .categoria(cambio.getCategoriaClasificada().name())
+                .audiencia(cambio.getAudienciaClasificada().name())
                 .build();
     }
 

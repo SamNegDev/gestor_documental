@@ -1,6 +1,6 @@
 import { apiGet, apiPostJson } from "../../../shared/api/http";
 import type { ExtraccionGaJob } from "../../ia/types";
-import type { ClienteResumen, DocumentoExpediente, HistorialExpediente, IncidenciaExpediente, MensajeExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
+import type { CategoriaHistorial, ClienteResumen, DocumentoExpediente, HistorialExpediente, HistorialPage, IncidenciaExpediente, MensajeExpediente, RequisitoDocumental } from "../types/expedienteDetail.types";
 
 export interface LecturaIaCliente {
   expedienteId: number;
@@ -49,6 +49,18 @@ export async function getClienteExpediente(id: string | number): Promise<Expedie
     historial: expediente.historial ?? [],
     lecturaIa: expediente.lecturaIa ?? null,
   };
+}
+
+export function getClienteExpedienteHistory(
+  id: string | number,
+  options: { pagina?: number; tamanio?: number; categoria?: CategoriaHistorial } = {},
+): Promise<HistorialPage> {
+  const params = new URLSearchParams({
+    pagina: String(options.pagina ?? 0),
+    tamanio: String(options.tamanio ?? 20),
+  });
+  if (options.categoria) params.set("categoria", options.categoria);
+  return apiGet<HistorialPage>(`/api/cliente/expedientes/${id}/historial?${params}`);
 }
 
 export function sendClienteExpedienteMessage(expedienteId: string | number, contenido: string): Promise<void> {

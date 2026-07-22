@@ -5,7 +5,7 @@ import { History, MessageCircle, MessageSquareWarning, MessagesSquare } from "lu
 import type { ExpedienteDetail } from "../types/expedienteDetail.types";
 import { formatDateTime, humanizeEnum } from "../utils/formatters";
 import { uppercaseInputPreservingCursor } from "../../../shared/utils/text";
-import { HistoryTimelineItem } from "./HistoryTimelineItem";
+import { HistoryPanel } from "./HistoryPanel";
 
 type Props = {
   expediente: ExpedienteDetail;
@@ -78,13 +78,7 @@ export function SecondaryExpedienteTabs({ expediente, onOpenMessages, onSendMess
         </Tabs.Content>
 
         <Tabs.Content value="historial" className="secondary-tabs__content">
-          {expediente.historial.length === 0 ? (
-            <p className="exp-empty">No hay movimientos en el historial.</p>
-          ) : (
-            <div className="timeline-list">
-              {expediente.historial.map((item) => <HistoryTimelineItem item={item} key={item.id} />)}
-            </div>
-          )}
+          <HistoryPanel expedienteId={expediente.id} initialItems={expediente.historial} />
         </Tabs.Content>
 
         <Tabs.Content value="mensajes" className="secondary-tabs__content">

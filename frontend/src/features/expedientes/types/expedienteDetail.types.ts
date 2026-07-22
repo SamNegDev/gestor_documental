@@ -379,6 +379,8 @@ export interface OperacionExpediente {
   hitos: HitoExpediente[];
 }
 
+export type CategoriaHistorial = "ESTADO" | "DOCUMENTO" | "INCIDENCIA" | "COMUNICACION" | "TRAMITE" | "SISTEMA";
+
 export interface HistorialExpediente {
   id: number;
   accion: string;
@@ -386,8 +388,18 @@ export interface HistorialExpediente {
   fechaCambio?: string;
   usuario?: string | null;
   tipoActividad?: "CAMBIO" | "COMUNICACION";
+  categoria?: CategoriaHistorial;
+  audiencia?: "INTERNO" | "CLIENTE" | "AMBOS";
 }
 
+
+export interface HistorialPage {
+  contenido: HistorialExpediente[];
+  pagina: number;
+  tamanio: number;
+  totalElementos: number;
+  totalPaginas: number;
+}
 export interface MensajeExpediente {
   id: number;
   autor?: string | null;
