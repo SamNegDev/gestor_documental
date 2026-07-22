@@ -81,16 +81,15 @@ public class InteresadoServiceImpl implements InteresadoService {
                 });
         interesado.setDni(dni);
         interesado.setNombre(nombre);
-        if (tieneNombreEstructurado(request)) {
-            interesado.setNombrePila(TextNormalizer.upperOrNull(request.nombrePila()));
-            interesado.setApellido1(TextNormalizer.upperOrNull(request.apellido1()));
-            interesado.setApellido2(TextNormalizer.upperOrNull(request.apellido2()));
-            interesado.setRazonSocial(NombrePersonaNormalizer.normalizar(request.razonSocial()));
-            if (interesado.getRazonSocial() != null) {
-                interesado.setNombre(interesado.getRazonSocial());
-            } else if (nombre == null) {
-                interesado.setNombre(nombreVisible(interesado));
-            }
+        interesado.setNombrePila(TextNormalizer.upperOrNull(request.nombrePila()));
+        interesado.setApellido1(TextNormalizer.upperOrNull(request.apellido1()));
+        interesado.setApellido2(TextNormalizer.upperOrNull(request.apellido2()));
+        interesado.setRazonSocial(NombrePersonaNormalizer.normalizar(request.razonSocial()));
+        interesado.setTipoPersona(request.tipoPersona() != null ? request.tipoPersona() : TipoPersona.PARTICULAR);
+        if (interesado.getTipoPersona() == TipoPersona.EMPRESA && interesado.getRazonSocial() != null) {
+            interesado.setNombre(interesado.getRazonSocial());
+        } else if (interesado.getTipoPersona() == TipoPersona.PARTICULAR) {
+            interesado.setRazonSocial(null);
         }
         interesado.setTelefono(TextNormalizer.upperOrNull(request.telefono()));
         interesado.setTipoVia(TextNormalizer.upperOrNull(request.tipoVia()));
@@ -119,13 +118,7 @@ public class InteresadoServiceImpl implements InteresadoService {
                     interesado.getMunicipio(),
                     interesado.getProvincia()));
         }
-        interesado.setTipoPersona(request.tipoPersona() != null ? request.tipoPersona() : TipoPersona.PARTICULAR);
         return interesadoRepository.save(interesado);
-    }
-
-    private boolean tieneNombreEstructurado(InteresadoUpdateRequest request) {
-        return java.util.stream.Stream.of(request.nombrePila(), request.apellido1(), request.apellido2(), request.razonSocial())
-                .anyMatch(value -> value != null && !value.trim().isBlank());
     }
 
     private void normalizarNombreEstructurado(Interesado interesado) {
