@@ -82,6 +82,18 @@ class DocumentoServiceImplTest {
     }
 
     @Test
+    void listarPorClienteDevuelveSoloDocumentacionRecurrentePropia() {
+        Documento recurrente = documento(10L, "cif.pdf", "CIF.PDF");
+        when(documentoRepository.findByClienteIdAndExpedienteIsNullAndSolicitudIsNullAndInteresadoIsNullOrderByFechaSubidaDesc(4L))
+                .thenReturn(List.of(recurrente));
+
+        List<Documento> resultado = service.listarPorCliente(4L);
+
+        assertThat(resultado).containsExactly(recurrente);
+        verify(documentoRepository).findByClienteIdAndExpedienteIsNullAndSolicitudIsNullAndInteresadoIsNullOrderByFechaSubidaDesc(4L);
+    }
+
+    @Test
     void unaUnionRevertidaConservaLosArchivosOriginales() throws Exception {
         Documento principal = documento(1L, "principal.pdf", "PRINCIPAL.PDF");
         Documento secundario = documento(2L, "secundario.jpeg", "SECUNDARIO.JPEG");
