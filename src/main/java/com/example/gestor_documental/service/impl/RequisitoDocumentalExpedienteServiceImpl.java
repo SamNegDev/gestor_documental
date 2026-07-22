@@ -408,18 +408,35 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         }
 
         boolean tramiteAvanzado = hitoRepository.existsByExpedienteIdAndCodigo(expediente.getId(), hitoTramite);
+        boolean finalizado = expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
+                || (hitoFinalizacion != null && hitoRepository.existsByExpedienteIdAndCodigo(expediente.getId(), hitoFinalizacion));
+        if (!tramiteAvanzado && !finalizado) {
+            devolverRequisitosAFasePosterior(expediente.getId(), operacion, descripcionModelo, descripcionComprobante);
+            return;
+        }
         if (tramiteAvanzado && requiereModelo620(expediente)) {
             crearPorOperacionSiNoExiste(expediente, TipoDocumento.MODELO_620, operacion, descripcionModelo, EstadoRequisitoDocumental.POSTERIOR, usuario);
         }
 
-        boolean finalizado = expediente.getEstadoExpediente() == EstadoExpediente.FINALIZADO
-                || (hitoFinalizacion != null && hitoRepository.existsByExpedienteIdAndCodigo(expediente.getId(), hitoFinalizacion));
         if (tramiteAvanzado || finalizado) {
             EstadoRequisitoDocumental estado = finalizado ? EstadoRequisitoDocumental.REQUERIDO : EstadoRequisitoDocumental.POSTERIOR;
             crearPorOperacionSiNoExiste(expediente, TipoDocumento.COMPROBANTE_DGT, operacion, descripcionComprobante, estado, usuario);
         }
     }
 
+    private void devolverRequisitosAFasePosterior(
+            Long expedienteId,
+            OperacionExpediente operacion,
+            String descripcionModelo,
+            String descripcionComprobante
+    ) {
+        requisitoRepository.findByExpedienteIdAndTipoDocumento(expedienteId, TipoDocumento.MODELO_620).stream()
+                .filter(requisito -> mismaOperacion(requisito.getOperacion(), operacion))
+                .forEach(requisito -> actualizarRegla(requisito, descripcionModelo, EstadoRequisitoDocumental.POSTERIOR));
+        requisitoRepository.findByExpedienteIdAndTipoDocumento(expedienteId, TipoDocumento.COMPROBANTE_DGT).stream()
+                .filter(requisito -> mismaOperacion(requisito.getOperacion(), operacion))
+                .forEach(requisito -> actualizarRegla(requisito, descripcionComprobante, EstadoRequisitoDocumental.POSTERIOR));
+    }
     private void generarIdentificacionRol(Expediente expediente, Interesado interesado, RolInteresado rol, OperacionExpediente operacion, Usuario usuario) {
         if (interesado == null) {
             crearPorRolSiNoExiste(expediente, TipoDocumento.DNI, rol, operacion, "DNI/CIF " + rol.name().toLowerCase(Locale.ROOT), usuario);
@@ -773,7 +790,8 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             requisito.setEstado(EstadoRequisitoDocumental.REQUERIDO);
             modificado = true;
         }
-        if (requisito.getTipoDocumento() == TipoDocumento.MODELO_620
+        if ((requisito.getTipoDocumento() == TipoDocumento.MODELO_620
+                || requisito.getTipoDocumento() == TipoDocumento.COMPROBANTE_DGT)
                 && requisito.getEstado() == EstadoRequisitoDocumental.REQUERIDO
                 && estado == EstadoRequisitoDocumental.POSTERIOR
                 && requisito.getDocumento() == null) {
