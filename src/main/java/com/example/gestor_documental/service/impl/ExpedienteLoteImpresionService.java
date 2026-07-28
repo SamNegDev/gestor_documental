@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
@@ -25,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ExpedienteLoteImpresionService {
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final Color AZUL = new Color(22, 87, 111), GRIS = new Color(84, 98, 106);
@@ -44,6 +46,15 @@ public class ExpedienteLoteImpresionService {
                 Documento completo = documentoRepository.findFirstByExpedienteIdAndTipoDocumentoOrderByFechaSubidaDesc(id, TipoDocumento.EXPEDIENTE_COMPLETO)
                         .orElseThrow(() -> error(HttpStatus.BAD_REQUEST, "El expediente " + id + " no tiene documento completo"));
                 Path ruta = ruta(completo, base, id);
+                log.info(
+                        "LOTE_IMPRESION portada expedienteId={} matricula={} relaciones={}",
+                        id,
+                        expediente.getMatricula(),
+                        expediente.getInteresados().stream()
+                                .map(relacion -> (relacion.getRol() != null ? relacion.getRol().name() : "SIN_ROL")
+                                        + ":" + (relacion.getInteresado() != null ? relacion.getInteresado().getId() : "SIN_INTERESADO"))
+                                .sorted()
+                                .toList());
                 resultado.addPage(portada(resultado, expediente, completo.getFechaSubida()));
                 try (PDDocument original = PDDocument.load(Files.readAllBytes(ruta))) {
                     new PDFMergerUtility().appendDocument(resultado, original);

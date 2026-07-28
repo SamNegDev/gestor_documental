@@ -25,6 +25,7 @@ public class InteresadoSearchResponse {
     private String puerta;
     private String codigoPostal;
     private String municipio;
+    private String localidad;
     private String provincia;
     private String tipoPersona;
 }

@@ -112,7 +112,7 @@ public class DocumentoApiController {
                     "Solo un administrador puede eliminar documentos del cliente"
             );
         }
-        documentoService.eliminar(id);
+        documentoService.eliminar(id, usuarioLogueado);
         return ResponseEntity.noContent().build();
     }
 

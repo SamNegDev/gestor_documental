@@ -73,6 +73,9 @@ public class Interesado {
     @Column(length = 80)
     private String municipio;
 
+    @Column(length = 120)
+    private String localidad;
+
     @Column(length = 80)
     private String provincia;
 

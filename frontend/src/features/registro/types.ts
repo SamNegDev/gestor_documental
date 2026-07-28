@@ -30,6 +30,7 @@ export interface InteresadoRegistro {
   puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
+  localidad?: string | null;
   provincia?: string | null;
   tipoPersona?: string | null;
   habitual?: boolean;
@@ -59,6 +60,7 @@ export interface InteresadoRegistroUpdateInput {
   puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
+  localidad?: string | null;
   provincia?: string | null;
   tipoPersona?: string | null;
 }

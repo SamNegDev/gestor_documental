@@ -40,6 +40,7 @@ import {
   procesarSolicitudDocumentacionIa,
   procesarSolicitudDocumentacionIaCliente,
   resetSolicitudDatosIa,
+  getJustificanteProvisional, solicitarJustificanteProvisional, cambiarEstadoJustificanteProvisional, adjuntarJustificanteProvisional,
 } from "../services/listadosApi";
 import type {
   InteresadoSolicitud,
@@ -87,6 +88,17 @@ export function SolicitudDetailPage() {
     enabled: Boolean(id),
   });
 
+  const justificanteQuery = useQuery({
+    queryKey: ["solicitudes", "justificante-provisional", id],
+    queryFn: () => getJustificanteProvisional(id!),
+    enabled: Boolean(id),
+  });
+  const actualizarJustificante = async () => {
+    await Promise.all([queryClient.invalidateQueries({ queryKey: ["solicitudes", "justificante-provisional", id] }), queryClient.invalidateQueries({ queryKey: ["tareas"] })]);
+  };
+  const solicitarJustificanteMutation = useMutation({ mutationFn: () => solicitarJustificanteProvisional(id!), onSuccess: actualizarJustificante });
+  const estadoJustificanteMutation = useMutation({ mutationFn: (estado: "EN_PREPARACION" | "CANCELADO") => cambiarEstadoJustificanteProvisional(id!, estado), onSuccess: actualizarJustificante });
+  const adjuntarJustificanteMutation = useMutation({ mutationFn: (archivo: File) => adjuntarJustificanteProvisional(id!, archivo), onSuccess: actualizarJustificante });
   const preparacionQuery = useQuery({
     queryKey: ["solicitudes", "preparacion-traspaso", id],
     queryFn: () => getSolicitudPreparacionTraspaso(id!),
@@ -665,6 +677,31 @@ export function SolicitudDetailPage() {
           </div>
         </div>
 
+        <section className="record-observations" aria-label="Observaciones de la solicitud">
+          <MessageSquare size={16} aria-hidden="true" />
+          <div>
+            <strong>Observaciones</strong>
+            <p>{solicitud.observaciones || "Sin observaciones"}</p>
+          </div>
+        </section>
+
+        {solicitud.tipoTramite === "TRASPASO" ? (
+          <section className="record-observations provisional-proof" aria-label="Justificante provisional de gestoria">
+            <FileSignature size={18} aria-hidden="true" />
+            <div>
+              <strong>Justificante provisional de gestoria</strong>
+              <p>Documento provisional de la gestoria. No sustituye al justificante final emitido por la DGT.</p>
+              <StatusBadge tone={justificanteQuery.data?.estado === "DISPONIBLE" ? "success" : justificanteQuery.data?.estado === "CANCELADO" ? "danger" : "warning"}>{formatEnum(justificanteQuery.data?.estado || "NO_SOLICITADO")}</StatusBadge>
+            </div>
+            <div className="provisional-proof__actions">
+              {!isAdmin && ["NO_SOLICITADO", "CANCELADO"].includes(justificanteQuery.data?.estado || "NO_SOLICITADO") ? <button className="soft-button soft-button--compact" disabled={solicitarJustificanteMutation.isPending} onClick={() => solicitarJustificanteMutation.mutate()} type="button">Solicitar</button> : null}
+              {isAdmin && justificanteQuery.data?.estado === "SOLICITADO" ? <button className="soft-button soft-button--compact" onClick={() => estadoJustificanteMutation.mutate("EN_PREPARACION")} type="button">Iniciar preparación</button> : null}
+              {isAdmin && ["SOLICITADO", "EN_PREPARACION"].includes(justificanteQuery.data?.estado || "") ? <label className="soft-button soft-button--compact"><FileUp size={15}/> Adjuntar PDF<input hidden type="file" accept="application/pdf" onChange={(event) => { const archivo = event.target.files?.[0]; if (archivo) adjuntarJustificanteMutation.mutate(archivo); }} /></label> : null}
+              {isAdmin && ["SOLICITADO", "EN_PREPARACION"].includes(justificanteQuery.data?.estado || "") ? <button className="soft-button soft-button--compact" onClick={() => estadoJustificanteMutation.mutate("CANCELADO")} type="button">Cancelar</button> : null}
+              {justificanteQuery.data?.estado === "DISPONIBLE" ? <a className="soft-button soft-button--compact" href={`/api/solicitudes/${id}/justificante-provisional/archivo`} target="_blank" rel="noreferrer"><FileText size={15}/> Ver PDF</a> : null}
+            </div>
+          </section>
+        ) : null}
         <div className="request-summary-strip">
           <section className="request-summary-block request-summary-block--vehicle" aria-labelledby="solicitud-vehiculo-title">
             <div className="request-summary-block__head">

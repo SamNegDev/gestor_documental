@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPostForm, apiPostJson, apiPutJson } from "../../../shared/api/http";
+import { apiDelete, apiGet, apiGetBlob, apiPostForm, apiPostJson, apiPutJson, apiPutJsonResponse } from "../../../shared/api/http";
 import type { CreacionConProcesamiento } from "../../expedientes/types/expedienteDetail.types";
 import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudDocumentacionIaResponse, SolicitudIdentidadDetectadaInput, SolicitudInteresadoCoincidencia, SolicitudInteresadoHabitual, SolicitudInteresadoHabitualInput, SolicitudListItem, SolicitudPreparacionTraspaso, SolicitudUpsertInput } from "../types";
 
@@ -36,12 +36,13 @@ export function bulkFinalDocumentsUrl(expedienteIds: number[]) {
 export function bulkPrintUrl(expedienteIds: number[]) {
   const params = new URLSearchParams();
   expedienteIds.forEach((id) => params.append("ids", String(id)));
+  params.set("_", String(Date.now()));
   return `/api/expedientes/lote-impresion?${params.toString()}`;
 }
-export function bulkHaciendaDocumentsUrl(expedienteIds: number[]) {
+export function downloadBulkHaciendaDocuments(expedienteIds: number[]) {
   const params = new URLSearchParams();
   expedienteIds.forEach((id) => params.append("ids", String(id)));
-  return `/api/expedientes/documentacion-hacienda?${params.toString()}`;
+  return apiGetBlob(`/api/expedientes/documentacion-hacienda?${params.toString()}`);
 }
 
 export function getSolicitudes(filters: ListFilters) {
@@ -68,7 +69,7 @@ export function createSolicitudWithCompleteProcessing(input: { tipoTramiteId: nu
   const formData = new FormData();
   formData.append("tipoTramiteId", String(input.tipoTramiteId));
   formData.append("matricula", input.matricula);
-  if (input.observaciones?.trim()) formData.append("observaciones", input.observaciones.trim());
+  formData.append("observaciones", input.observaciones?.trim() || "");
   formData.append("archivo", input.archivo);
   return apiPostForm<CreacionConProcesamiento>("/api/solicitudes/creacion-multiple", formData);
 }
@@ -144,3 +145,9 @@ export function getProductivity(filters: Pick<ListFilters, "periodo" | "fechaDes
   if (filters.fechaHasta) params.set("fechaHasta", filters.fechaHasta);
   return apiGet<ProductivityData>(`/api/dashboard/productividad?${params.toString()}`);
 }
+
+export type JustificanteProvisional = { id:number|null; solicitudId:number; estado:"NO_SOLICITADO"|"SOLICITADO"|"EN_PREPARACION"|"DISPONIBLE"|"CANCELADO"; nombreOriginal?:string; solicitadoEn?:string; actualizadoEn?:string };
+export function getJustificanteProvisional(id:number|string){return apiGet<JustificanteProvisional>(`/api/solicitudes/${id}/justificante-provisional`)}
+export function solicitarJustificanteProvisional(id:number|string){return apiPostJson<JustificanteProvisional>(`/api/solicitudes/${id}/justificante-provisional/solicitar`,{})}
+export function cambiarEstadoJustificanteProvisional(id:number|string,estado:"EN_PREPARACION"|"CANCELADO"){return apiPutJsonResponse<JustificanteProvisional>(`/api/solicitudes/${id}/justificante-provisional/estado/${estado}`,{})}
+export function adjuntarJustificanteProvisional(id:number|string,archivo:File){const form=new FormData();form.append("archivo",archivo);return apiPostForm<JustificanteProvisional>(`/api/solicitudes/${id}/justificante-provisional/archivo`,form)}

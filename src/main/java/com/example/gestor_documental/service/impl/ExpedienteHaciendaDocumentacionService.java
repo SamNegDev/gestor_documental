@@ -14,6 +14,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -67,11 +68,13 @@ public class ExpedienteHaciendaDocumentacionService {
     public void escribirZipDocumentacionHacienda(List<Long> expedienteIds, Usuario admin, OutputStream outputStream) throws IOException {
         Path rutaBase = Paths.get(uploadDir).normalize().toAbsolutePath();
         Map<String, PaqueteHacienda> paquetes = new LinkedHashMap<>();
+        List<String> incidencias = new ArrayList<>();
 
         for (Long expedienteId : expedienteIds) {
             ExpedienteDetailResponse detalle = expedienteDetalleApiService.obtenerDetalle(expedienteId, admin);
+            List<String> faltas = new ArrayList<>();
             if (!tieneDocumentacionHaciendaDisponible(detalle)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El expediente " + expedienteId + " no esta en fase de presentar Modelo 620");
+                faltas.add("no esta en fase de presentar Modelo 620");
             }
             List<Documento> documentos = documentoRepository.findByExpedienteId(expedienteId).stream()
                     .filter(documento -> documento.getTipoDocumento() != null)
@@ -80,24 +83,37 @@ public class ExpedienteHaciendaDocumentacionService {
             List<Path> vehiculo = rutasPdf(documentos, DOCUMENTOS_VEHICULO, rutaBase);
             List<Path> venta = rutasPdf(documentos, DOCUMENTOS_VENTA, rutaBase);
             if (vehiculo.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta documentacion del vehiculo en el expediente " + expedienteId);
+                faltas.add("falta documentacion del vehiculo");
             }
+            PaqueteHacienda paquete;
             if (esBatecom(detalle)) {
                 List<Path> ventaBate = rutasPdfOperacion(documentos, TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE, rutaBase);
                 List<Path> ventaCom = rutasPdfOperacion(documentos, TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM, rutaBase);
                 if (ventaBate.isEmpty()) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta contrato o factura BATE en el expediente " + expedienteId);
+                    faltas.add("falta contrato o factura BATE");
                 }
                 if (ventaCom.isEmpty()) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta contrato o factura COM en el expediente " + expedienteId);
+                    faltas.add("falta contrato o factura COM");
                 }
-                paquetes.put(carpetaZip(detalle, expedienteId, paquetes.keySet()), PaqueteHacienda.batecom(vehiculo, ventaBate, ventaCom));
+                paquete = PaqueteHacienda.batecom(vehiculo, ventaBate, ventaCom);
             } else {
                 if (venta.isEmpty()) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta contrato o factura en el expediente " + expedienteId);
+                    faltas.add("falta contrato o factura");
                 }
-                paquetes.put(carpetaZip(detalle, expedienteId, paquetes.keySet()), PaqueteHacienda.simple(vehiculo, venta));
+                paquete = PaqueteHacienda.simple(vehiculo, venta);
             }
+            if (faltas.isEmpty()) {
+                paquetes.put(carpetaZip(detalle, expedienteId, paquetes.keySet()), paquete);
+            } else {
+                incidencias.add(identificadorExpediente(detalle, expedienteId) + ": " + String.join(", ", faltas));
+            }
+        }
+
+        if (!incidencias.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "No se puede preparar la documentacion de Hacienda. Revisa:" + System.lineSeparator()
+                            + "- " + String.join(System.lineSeparator() + "- ", incidencias));
         }
 
         try (ZipOutputStream zip = new ZipOutputStream(outputStream)) {
@@ -157,6 +173,13 @@ public class ExpedienteHaciendaDocumentacionService {
             merged.writeTo(zip);
         }
         zip.closeEntry();
+    }
+
+    private String identificadorExpediente(ExpedienteDetailResponse detalle, Long expedienteId) {
+        if (detalle != null && detalle.getMatricula() != null && !detalle.getMatricula().isBlank()) {
+            return detalle.getMatricula() + " (EXP-" + expedienteId + ")";
+        }
+        return "EXP-" + expedienteId;
     }
 
     private String carpetaZip(ExpedienteDetailResponse detalle, Long expedienteId, Set<String> usadas) {

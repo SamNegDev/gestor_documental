@@ -32,5 +32,6 @@ public class InteresadoExpedienteResponse {
     private String puerta;
     private String codigoPostal;
     private String municipio;
+    private String localidad;
     private String provincia;
 }

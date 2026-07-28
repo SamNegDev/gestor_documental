@@ -366,6 +366,7 @@ public class SolicitudServiceImpl implements SolicitudService {
          interesado1dto.setPuerta(solicitud.getInteresado1Puerta());
          interesado1dto.setCodigoPostal(solicitud.getInteresado1CodigoPostal());
          interesado1dto.setMunicipio(solicitud.getInteresado1Municipio());
+         interesado1dto.setLocalidad(solicitud.getInteresado1Localidad());
          interesado1dto.setProvincia(solicitud.getInteresado1Provincia());
 
          InteresadoFormDto interesado2dto = new InteresadoFormDto();
@@ -388,6 +389,7 @@ public class SolicitudServiceImpl implements SolicitudService {
          interesado2dto.setPuerta(solicitud.getInteresado2Puerta());
          interesado2dto.setCodigoPostal(solicitud.getInteresado2CodigoPostal());
          interesado2dto.setMunicipio(solicitud.getInteresado2Municipio());
+         interesado2dto.setLocalidad(solicitud.getInteresado2Localidad());
          interesado2dto.setProvincia(solicitud.getInteresado2Provincia());
 
          InteresadoFormDto interesado3dto = new InteresadoFormDto();
@@ -410,6 +412,7 @@ public class SolicitudServiceImpl implements SolicitudService {
          interesado3dto.setPuerta(solicitud.getInteresado3Puerta());
          interesado3dto.setCodigoPostal(solicitud.getInteresado3CodigoPostal());
          interesado3dto.setMunicipio(solicitud.getInteresado3Municipio());
+         interesado3dto.setLocalidad(solicitud.getInteresado3Localidad());
          interesado3dto.setProvincia(solicitud.getInteresado3Provincia());
 
         expedienteService.validarInteresados(List.of(interesado1dto, interesado2dto, interesado3dto));
@@ -698,6 +701,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitudBase.setInteresado1Puerta(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Puerta()));
         solicitudBase.setInteresado1CodigoPostal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1CodigoPostal()));
         solicitudBase.setInteresado1Municipio(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Municipio()));
+        solicitudBase.setInteresado1Localidad(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Localidad()));
         solicitudBase.setInteresado1Provincia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado1Provincia()));
         solicitudBase.setInteresado1Direccion(direccionSolicitud(
                 solicitudActualizada.getInteresado1Direccion(),
@@ -727,6 +731,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitudBase.setInteresado2Puerta(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Puerta()));
         solicitudBase.setInteresado2CodigoPostal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2CodigoPostal()));
         solicitudBase.setInteresado2Municipio(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Municipio()));
+        solicitudBase.setInteresado2Localidad(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Localidad()));
         solicitudBase.setInteresado2Provincia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado2Provincia()));
         solicitudBase.setInteresado2Direccion(direccionSolicitud(
                 solicitudActualizada.getInteresado2Direccion(),
@@ -756,6 +761,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitudBase.setInteresado3Puerta(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Puerta()));
         solicitudBase.setInteresado3CodigoPostal(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3CodigoPostal()));
         solicitudBase.setInteresado3Municipio(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Municipio()));
+        solicitudBase.setInteresado3Localidad(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Localidad()));
         solicitudBase.setInteresado3Provincia(TextNormalizer.upperOrNull(solicitudActualizada.getInteresado3Provincia()));
         solicitudBase.setInteresado3Direccion(direccionSolicitud(
                 solicitudActualizada.getInteresado3Direccion(),
@@ -1440,6 +1446,7 @@ public class SolicitudServiceImpl implements SolicitudService {
             solicitud.setInteresado1Puerta(interesado.getPuerta());
             solicitud.setInteresado1CodigoPostal(interesado.getCodigoPostal());
             solicitud.setInteresado1Municipio(interesado.getMunicipio());
+            solicitud.setInteresado1Localidad(interesado.getLocalidad());
             solicitud.setInteresado1Provincia(interesado.getProvincia());
         } else if (slot == 2) {
             solicitud.setInteresado2Rol(rol);
@@ -1461,6 +1468,7 @@ public class SolicitudServiceImpl implements SolicitudService {
             solicitud.setInteresado2Puerta(interesado.getPuerta());
             solicitud.setInteresado2CodigoPostal(interesado.getCodigoPostal());
             solicitud.setInteresado2Municipio(interesado.getMunicipio());
+            solicitud.setInteresado2Localidad(interesado.getLocalidad());
             solicitud.setInteresado2Provincia(interesado.getProvincia());
         } else {
             solicitud.setInteresado3Rol(rol);
@@ -1482,6 +1490,7 @@ public class SolicitudServiceImpl implements SolicitudService {
             solicitud.setInteresado3Puerta(interesado.getPuerta());
             solicitud.setInteresado3CodigoPostal(interesado.getCodigoPostal());
             solicitud.setInteresado3Municipio(interesado.getMunicipio());
+            solicitud.setInteresado3Localidad(interesado.getLocalidad());
             solicitud.setInteresado3Provincia(interesado.getProvincia());
         }
     }
@@ -1578,6 +1587,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado1Puerta(null);
         solicitud.setInteresado1CodigoPostal(null);
         solicitud.setInteresado1Municipio(null);
+        solicitud.setInteresado1Localidad(null);
         solicitud.setInteresado1Provincia(null);
     }
 
@@ -1601,6 +1611,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado2Puerta(null);
         solicitud.setInteresado2CodigoPostal(null);
         solicitud.setInteresado2Municipio(null);
+        solicitud.setInteresado2Localidad(null);
         solicitud.setInteresado2Provincia(null);
     }
 
@@ -1624,6 +1635,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado3Puerta(null);
         solicitud.setInteresado3CodigoPostal(null);
         solicitud.setInteresado3Municipio(null);
+        solicitud.setInteresado3Localidad(null);
         solicitud.setInteresado3Provincia(null);
     }
 
@@ -1694,6 +1706,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado1Puerta(TextNormalizer.upperOrNull(solicitud.getInteresado1Puerta()));
         solicitud.setInteresado1CodigoPostal(TextNormalizer.upperOrNull(solicitud.getInteresado1CodigoPostal()));
         solicitud.setInteresado1Municipio(TextNormalizer.upperOrNull(solicitud.getInteresado1Municipio()));
+        solicitud.setInteresado1Localidad(TextNormalizer.upperOrNull(solicitud.getInteresado1Localidad()));
         solicitud.setInteresado1Provincia(TextNormalizer.upperOrNull(solicitud.getInteresado1Provincia()));
         solicitud.setInteresado1Direccion(direccionSolicitud(
                 solicitud.getInteresado1Direccion(),
@@ -1725,6 +1738,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado2Puerta(TextNormalizer.upperOrNull(solicitud.getInteresado2Puerta()));
         solicitud.setInteresado2CodigoPostal(TextNormalizer.upperOrNull(solicitud.getInteresado2CodigoPostal()));
         solicitud.setInteresado2Municipio(TextNormalizer.upperOrNull(solicitud.getInteresado2Municipio()));
+        solicitud.setInteresado2Localidad(TextNormalizer.upperOrNull(solicitud.getInteresado2Localidad()));
         solicitud.setInteresado2Provincia(TextNormalizer.upperOrNull(solicitud.getInteresado2Provincia()));
         solicitud.setInteresado2Direccion(direccionSolicitud(
                 solicitud.getInteresado2Direccion(),
@@ -1756,6 +1770,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setInteresado3Puerta(TextNormalizer.upperOrNull(solicitud.getInteresado3Puerta()));
         solicitud.setInteresado3CodigoPostal(TextNormalizer.upperOrNull(solicitud.getInteresado3CodigoPostal()));
         solicitud.setInteresado3Municipio(TextNormalizer.upperOrNull(solicitud.getInteresado3Municipio()));
+        solicitud.setInteresado3Localidad(TextNormalizer.upperOrNull(solicitud.getInteresado3Localidad()));
         solicitud.setInteresado3Provincia(TextNormalizer.upperOrNull(solicitud.getInteresado3Provincia()));
         solicitud.setInteresado3Direccion(direccionSolicitud(
                 solicitud.getInteresado3Direccion(),

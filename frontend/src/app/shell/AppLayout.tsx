@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { BellRing, CarFront, DatabaseSearch, FolderOpen, FolderPlus, Inbox, LayoutDashboard, LogOut, MessageCircle, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
+import { BellRing, CarFront, DatabaseSearch, FolderOpen, FolderPlus, Inbox, ReceiptText, LayoutDashboard, LogOut, MessageCircle, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
 import { SidebarLink } from "./SidebarLink";
 import { Tooltip } from "../../shared/ui/Tooltip";
 import { getSessionUser, selectActiveClient, type SessionUser } from "../../shared/api/sessionApi";
@@ -33,6 +33,7 @@ function pageTitle(pathname: string) {
   if (pathname.includes("/admin/usuarios/")) return "Editar usuario";
   if (pathname === "/expedientes") return "Expedientes";
   if (pathname === "/expedientes/creacion-multiple") return "Creacion multiple";
+  if (pathname === "/facturas") return "Facturas";
   if (pathname === "/solicitudes") return "Solicitudes";
   if (pathname.startsWith("/interesados")) return pathname === "/interesados" ? "Interesados" : "Ficha del interesado";
   if (pathname.startsWith("/vehiculos")) return pathname === "/vehiculos" ? "Vehiculos" : "Ficha del vehiculo";
@@ -61,6 +62,7 @@ const adminMenuItems: MenuItemConfig[] = [
   { id: "whatsapp", to: "/admin/whatsapp", icon: MessageCircle, label: "WhatsApp" },
   { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Expedientes" },
   { id: "expedientes-bulk", to: "/expedientes/creacion-multiple", icon: FolderPlus, label: "Creacion multiple" },
+  { id: "facturas", to: "/facturas", icon: ReceiptText, label: "Facturas" },
   { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },
   { id: "interesados", to: "/interesados", icon: UserRound, label: "Interesados" },
   { id: "vehiculos", to: "/vehiculos", icon: CarFront, label: "Vehiculos" },
@@ -77,6 +79,7 @@ const clientMenuItems: MenuItemConfig[] = [
   { id: "dashboard", to: "/cliente/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { id: "tareas", to: "/cliente/tareas", icon: Inbox, label: "Mis tareas" },
   { id: "expedientes", to: "/expedientes", icon: FolderOpen, label: "Mis expedientes" },
+  { id: "facturas", to: "/facturas", icon: ReceiptText, label: "Facturas" },
   { id: "solicitudes", to: "/solicitudes", icon: Inbox, label: "Solicitudes" },
   { id: "solicitudes-bulk", to: "/cliente/solicitudes/creacion-multiple", icon: FolderPlus, label: "Creacion multiple" },
   { id: "interesados", to: "/interesados", icon: UserRound, label: "Interesados" },

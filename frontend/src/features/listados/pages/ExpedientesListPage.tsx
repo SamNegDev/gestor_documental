@@ -4,7 +4,7 @@ import { Link, useOutletContext, useSearchParams } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, ChevronDown, Download, Eye, FilePlus2, FolderOpen, Printer, Search, UserRoundCheck } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { ApiError } from "../../../shared/api/http";
-import { bulkAdvanceExpedientes, bulkFinalDocumentsUrl, bulkHaciendaDocumentsUrl, bulkPrintUrl, getExpedienteListCatalogs, getExpedientes } from "../services/listadosApi";
+import { bulkAdvanceExpedientes, bulkFinalDocumentsUrl, bulkPrintUrl, downloadBulkHaciendaDocuments, getExpedienteListCatalogs, getExpedientes } from "../services/listadosApi";
 import { ListFiltersBar } from "../components/ListFiltersBar";
 import { ListPageChrome } from "../components/ListPageChrome";
 import type { ExpedienteListItem, ListCatalogs, ListFilters } from "../types";
@@ -136,7 +136,19 @@ export function ExpedientesListPage() {
       tone: "default",
     });
     if (!confirmed) return;
-    window.location.href = bulkHaciendaDocumentsUrl(selectedExpedientes.map((expediente) => expediente.id));
+    try {
+      const { blob, filename } = await downloadBulkHaciendaDocuments(
+        selectedExpedientes.map((expediente) => expediente.id),
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename || "documentacion_hacienda_620.zip";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || cause.message : "No se pudo preparar la documentacion de Hacienda.");
+    }
   }
 
   return (

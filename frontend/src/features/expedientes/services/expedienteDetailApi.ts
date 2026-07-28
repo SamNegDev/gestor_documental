@@ -70,7 +70,7 @@ export function createExpedienteWithCompleteProcessing(input: {
   formData.append("clienteId", String(input.clienteId));
   formData.append("tipoTramiteId", String(input.tipoTramiteId));
   formData.append("matricula", input.matricula);
-  if (input.observaciones?.trim()) formData.append("observaciones", input.observaciones.trim());
+  formData.append("observaciones", input.observaciones?.trim() || "");
   formData.append("archivo", input.archivo);
   return apiPostForm<CreacionConProcesamiento>("/api/expedientes/creacion-multiple", formData);
 }

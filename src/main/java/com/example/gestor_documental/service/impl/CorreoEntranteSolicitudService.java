@@ -43,12 +43,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.multipart.MultipartFile;
+import tools.jackson.core.StreamReadConstraints;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -63,7 +63,14 @@ import java.util.regex.Pattern;
 public class CorreoEntranteSolicitudService {
 
     private static final Logger log = LoggerFactory.getLogger(CorreoEntranteSolicitudService.class);
+    private static final int GRAPH_MAX_JSON_STRING_LENGTH = 128 * 1024 * 1024;
     private static final Pattern MATRICULA_MODERNA = Pattern.compile("\\b(\\d{4})\\s*[- ]?\\s*([BCDFGHJKLMNPRSTVWXYZ]{3})\\b", Pattern.CASE_INSENSITIVE);
+
+    static {
+        StreamReadConstraints.overrideDefaultStreamReadConstraints(
+                StreamReadConstraints.builder().maxStringLength(GRAPH_MAX_JSON_STRING_LENGTH).build()
+        );
+    }
 
     private final CorreoEntranteProcesadoRepository procesadoRepository;
     private final ClienteRepository clienteRepository;
@@ -161,8 +168,7 @@ public class CorreoEntranteSolicitudService {
                             procesarMensajeImap(mensajes[i]);
                         } catch (Exception exception) {
                             registrarErrorMensaje(mensajes[i], exception.getMessage());
-                            mensajes[i].setFlag(Flags.Flag.SEEN, true);
-                            log.warn("Correo entrante ignorado por error de procesamiento: {}", exception.getMessage(), exception);
+                            log.warn("Correo entrante pendiente de reintento por error de procesamiento: {}", exception.getMessage(), exception);
                         }
                     }
                 } finally {
@@ -213,7 +219,7 @@ public class CorreoEntranteSolicitudService {
 
     private void procesarMensajeImap(Message mensaje) throws MessagingException, IOException {
         String messageId = resolverMessageId(mensaje);
-        if (procesadoRepository.existsByMessageId(messageId)) {
+        if (correoFinalizado(messageId)) {
             mensaje.setFlag(Flags.Flag.SEEN, true);
             return;
         }
@@ -237,7 +243,7 @@ public class CorreoEntranteSolicitudService {
         if (isBlank(graphId) || isBlank(messageId)) {
             return;
         }
-        if (procesadoRepository.existsByMessageId(limitar(messageId, 255))) {
+        if (correoFinalizado(messageId)) {
             marcarLeidoGraph(token, graphId);
             return;
         }
@@ -255,8 +261,7 @@ public class CorreoEntranteSolicitudService {
             marcarLeidoGraph(token, graphId);
         } catch (Exception exception) {
             registrarProcesado(messageId, asunto, remitente, null, null, "ERROR", exception.getMessage());
-            marcarLeidoGraph(token, graphId);
-            log.warn("Correo entrante Graph ignorado por error de procesamiento: {}", exception.getMessage(), exception);
+            log.warn("Correo entrante Graph pendiente de reintento por error de procesamiento: {}", exception.getMessage(), exception);
         }
     }
 
@@ -371,13 +376,29 @@ public class CorreoEntranteSolicitudService {
             }
             String nombre = valor(attachment.get("name"));
             String contentType = valor(attachment.get("contentType"));
-            String contentBytes = valor(attachment.get("contentBytes"));
             boolean pdf = nombre.toLowerCase(Locale.ROOT).endsWith(".pdf") || "application/pdf".equalsIgnoreCase(contentType);
-            if (pdf && !isBlank(contentBytes)) {
-                adjuntos.add(new AdjuntoPdf(nombre, Base64.getDecoder().decode(contentBytes)));
+            String attachmentId = valor(attachment.get("id"));
+            if (pdf && !isBlank(attachmentId)) {
+                byte[] contenido = descargarAdjuntoGraph(token, messageId, attachmentId);
+                if (contenido != null && contenido.length > 0) {
+                    adjuntos.add(new AdjuntoPdf(nombre, contenido));
+                }
             }
         }
         return adjuntos;
+    }
+
+    private byte[] descargarAdjuntoGraph(String token, String messageId, String attachmentId) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .scheme("https")
+                        .host("graph.microsoft.com")
+                        .pathSegment("v1.0", "users", graphMailbox.trim(), "messages", messageId,
+                                "attachments", attachmentId, "$value")
+                        .build())
+                .header("Authorization", "Bearer " + token)
+                .retrieve()
+                .body(byte[].class);
     }
 
     private void marcarLeidoGraph(String token, String messageId) {
@@ -477,11 +498,12 @@ public class CorreoEntranteSolicitudService {
 
     private void registrarProcesado(String messageId, String asunto, String remitente, String matricula, Long solicitudId, String estado, String detalle) {
         String id = limitar(messageId, 255);
-        if (procesadoRepository.existsByMessageId(id)) {
-            return;
-        }
-        CorreoEntranteProcesado procesado = new CorreoEntranteProcesado();
-        procesado.setMessageId(id);
+        CorreoEntranteProcesado procesado = procesadoRepository.findByMessageId(id)
+                .orElseGet(() -> {
+                    CorreoEntranteProcesado nuevo = new CorreoEntranteProcesado();
+                    nuevo.setMessageId(id);
+                    return nuevo;
+                });
         procesado.setAsunto(limitar(asunto, 500));
         procesado.setRemitente(limitar(remitente, 250));
         procesado.setMatricula(matricula);
@@ -491,12 +513,17 @@ public class CorreoEntranteSolicitudService {
         procesadoRepository.save(procesado);
     }
 
+    private boolean correoFinalizado(String messageId) {
+        return procesadoRepository.findByMessageId(limitar(messageId, 255))
+                .map(CorreoEntranteProcesado::getEstado)
+                .filter(estado -> !"ERROR".equalsIgnoreCase(estado))
+                .isPresent();
+    }
+
     private void registrarErrorMensaje(Message mensaje, String detalle) {
         try {
             String messageId = resolverMessageId(mensaje);
-            if (!procesadoRepository.existsByMessageId(messageId)) {
-                registrarProcesado(messageId, mensaje.getSubject(), resolverRemitente(mensaje), null, null, "ERROR", detalle);
-            }
+            registrarProcesado(messageId, mensaje.getSubject(), resolverRemitente(mensaje), null, null, "ERROR", detalle);
         } catch (Exception exception) {
             log.warn("No se pudo registrar el error del correo entrante: {}", exception.getMessage());
         }

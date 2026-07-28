@@ -20,8 +20,8 @@ FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
 # Tesseract OCR + idioma espanol.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+RUN apt-get -o Acquire::Retries=5 update \
+    && apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
         tesseract-ocr \
         tesseract-ocr-spa \
         tesseract-ocr-eng \

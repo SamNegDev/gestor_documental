@@ -1165,6 +1165,13 @@ public class ExtraccionGaIaServiceImpl implements ExtraccionGaIaService {
         }
 
         if (expedienteInteresadoRepository.findByExpedienteIdAndInteresadoId(expediente.getId(), interesado.getId()).isEmpty()) {
+            expedienteInteresadoRepository.findByExpedienteId(expediente.getId()).stream()
+                    .filter(relacion -> relacion.getRol() == rol)
+                    .findAny()
+                    .ifPresent(relacion -> {
+                        throw new OperacionInvalidaException(
+                                "Ya existe otro interesado con el rol " + rol.name() + " en el expediente.");
+                    });
             expedienteInteresadoRepository.save(new ExpedienteInteresado(expediente, interesado, rol));
             contador.relacionesCreadas++;
         }

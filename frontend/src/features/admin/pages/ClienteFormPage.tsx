@@ -21,6 +21,7 @@ import type { DocumentoExpediente } from "../../expedientes/types/expedienteDeta
 import { readDocumentIdentity } from "../../expedientes/services/documentosApi";
 import { cleanLowerText, cleanUpperText, uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
+import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 
 type LogoType = "principal" | "compacto";
 
@@ -43,16 +44,40 @@ const CLIENT_DOCUMENT_TYPES = [
 ];
 
 function emptyCliente(): ClienteInput {
-  return { nif: "", nombre: "", email: "", telefono: "", direccion: "", preferenciaCanal: "AMBOS", avisoIncidenciasActivo: true, horaAvisoIncidencias: "17:00", avisoFinalizadosActivo: true, horaAvisoFinalizados: "17:00" };
+  return { nif: "", nombre: "", email: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", localidad: "", provincia: "", preferenciaCanal: "AMBOS", avisoIncidenciasActivo: true, horaAvisoIncidencias: "17:00", avisoFinalizadosActivo: true, horaAvisoFinalizados: "17:00" };
 }
 
+function formatAddress(value: AddressValue): string | null {
+  const via = [value.tipoVia, value.nombreVia, value.numeroVia && `Nº ${value.numeroVia}`].filter(Boolean).join(" ");
+  const details = [
+    value.bloque && `BLOQUE ${value.bloque}`,
+    value.portal && `PORTAL ${value.portal}`,
+    value.escalera && `ESC. ${value.escalera}`,
+    value.piso && `PISO ${value.piso}`,
+    value.puerta && `PTA. ${value.puerta}`,
+  ].filter(Boolean).join(", ");
+  const locality = [value.codigoPostal, value.municipio, value.provincia].filter(Boolean).join(" ");
+  return [via, details, locality].filter(Boolean).join(", ") || cleanUpperText(value.direccion) || null;
+}
 function clean(input: ClienteInput): ClienteInput {
   return {
     nif: cleanUpperText(input.nif) || "",
     nombre: cleanUpperText(input.nombre) || "",
     email: cleanLowerText(input.email) || "",
     telefono: cleanUpperText(input.telefono),
-    direccion: cleanUpperText(input.direccion),
+    direccion: formatAddress(input),
+    tipoVia: cleanUpperText(input.tipoVia),
+    nombreVia: cleanUpperText(input.nombreVia),
+    numeroVia: cleanUpperText(input.numeroVia),
+    bloque: cleanUpperText(input.bloque),
+    portal: cleanUpperText(input.portal),
+    escalera: cleanUpperText(input.escalera),
+    piso: cleanUpperText(input.piso),
+    puerta: cleanUpperText(input.puerta),
+    codigoPostal: (input.codigoPostal || "").replace(/\D/g, "").slice(0, 5),
+    municipio: cleanUpperText(input.municipio),
+    localidad: cleanUpperText(input.localidad),
+    provincia: cleanUpperText(input.provincia),
     preferenciaCanal: input.preferenciaCanal || "AMBOS",
     avisoIncidenciasActivo: input.avisoIncidenciasActivo,
     horaAvisoIncidencias: input.horaAvisoIncidencias || "17:00",
@@ -370,10 +395,14 @@ export function ClienteFormPage() {
                 </label>
               </div>
             </div>
-            <label className="edit-form-grid__wide">
-              Direccion
-              <input value={form.direccion || ""} maxLength={200} onChange={(event) => updateUpperField("direccion", event)} />
-            </label>
+            <div className="edit-form-grid__wide">
+              <AddressFields
+                idPrefix="cliente-direccion"
+                value={form}
+                onChange={(direccion) => setForm((current) => ({ ...current, ...direccion }))}
+                wideClassName="edit-form-grid__wide"
+              />
+            </div>
           </div>
         </section>
 
@@ -512,25 +541,93 @@ export function ClienteFormPage() {
   );
 }
 
-const emptyAdministrador = (): AdministradorClienteInput => ({ dni: "", nombre: "", telefono: "", direccion: "" });
+const emptyAddress = (): AddressValue => ({
+  direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "",
+  piso: "", puerta: "", codigoPostal: "", municipio: "", localidad: "", provincia: "",
+});
+
+const emptyAdministrador = (): AdministradorClienteInput => ({
+  dni: "", nombre: "", telefono: "", ...emptyAddress(),
+});
 
 function AdministradoresPanel({ clienteId, items, onChanged }: { clienteId: string; items: AdministradorCliente[]; onChanged: () => Promise<unknown> }) {
   const [editing, setEditing] = useState<AdministradorCliente | null>(null);
   const [draft, setDraft] = useState<AdministradorClienteInput>(emptyAdministrador);
   const [open, setOpen] = useState(false);
   const mutation = useMutation({
-    mutationFn: async () => { if (editing) await updateAdministradorCliente(clienteId, editing.id, draft); else await createAdministradorCliente(clienteId, draft); },
-    onSuccess: async () => { setOpen(false); setEditing(null); setDraft(emptyAdministrador()); await onChanged(); },
+    mutationFn: async () => {
+      const payload = { ...draft, direccion: formatAddress(draft) };
+      if (editing) await updateAdministradorCliente(clienteId, editing.id, payload);
+      else await createAdministradorCliente(clienteId, payload);
+    },
+    onSuccess: async () => {
+      setOpen(false);
+      setEditing(null);
+      setDraft(emptyAdministrador());
+      await onChanged();
+    },
   });
   const removeMutation = useMutation({ mutationFn: (id: number) => deleteAdministradorCliente(clienteId, id), onSuccess: onChanged });
-  const begin = (item?: AdministradorCliente) => { setEditing(item || null); setDraft(item ? { dni: item.dni, nombre: item.nombre, telefono: item.telefono || "", direccion: item.direccion || "" } : emptyAdministrador()); setOpen(true); };
-  return <section className="client-branding-panel">
-    <div className="client-branding-panel__heading"><div className="row-icon"><UserRound size={18} /></div><div><p className="eyebrow">Empresa</p><h3>Administradores</h3><p>Personas autorizadas para representar a este cliente.</p></div><button className="soft-button soft-button--compact" type="button" onClick={() => begin()}><Plus size={15} />Añadir</button></div>
-    {open ? <div className="edit-form-grid"><label>DNI / NIE<input value={draft.dni} onChange={(e) => setDraft({ ...draft, dni: uppercaseInput(e.target.value) })} /></label><label>Nombre completo<input value={draft.nombre} onChange={(e) => setDraft({ ...draft, nombre: uppercaseInput(e.target.value) })} /></label><label>Teléfono<input value={draft.telefono || ""} onChange={(e) => setDraft({ ...draft, telefono: e.target.value })} /></label><label className="edit-form-grid__wide">Dirección<input value={draft.direccion || ""} onChange={(e) => setDraft({ ...draft, direccion: uppercaseInput(e.target.value) })} /></label><div className="request-form-actions"><button className="soft-button" type="button" onClick={() => setOpen(false)}><X size={15} />Cancelar</button><button className="primary-button" disabled={!draft.dni || !draft.nombre || mutation.isPending} type="button" onClick={() => mutation.mutate()}><Save size={15} />Guardar administrador</button></div></div> : null}
-    <div className="client-documents-list">{items.length ? items.map((item) => <article className="client-document-row" key={item.id}><div className="client-document-row__icon"><UserRound size={17} /></div><div className="client-document-row__main"><strong>{item.nombre}</strong><span>{item.dni}{item.telefono ? ` · ${item.telefono}` : ""}</span>{item.direccion ? <span>{item.direccion}</span> : null}</div><div className="client-document-row__actions"><button className="icon-button" type="button" title="Editar administrador" onClick={() => begin(item)}><Pencil size={15} /></button><button className="icon-button icon-button--danger" disabled={removeMutation.isPending} type="button" title="Desvincular administrador" onClick={() => removeMutation.mutate(item.id)}><Trash2 size={15} /></button></div></article>) : <div className="client-documents-empty"><UserRound size={18} /><span>No hay administradores registrados.</span></div>}</div>
-  </section>;
+  const begin = (item?: AdministradorCliente) => {
+    setEditing(item || null);
+    setDraft(item ? {
+      dni: item.dni,
+      nombre: item.nombre,
+      telefono: item.telefono || "",
+      direccion: item.direccion || "",
+      tipoVia: item.tipoVia || "",
+      nombreVia: item.nombreVia || "",
+      numeroVia: item.numeroVia || "",
+      bloque: item.bloque || "",
+      portal: item.portal || "",
+      escalera: item.escalera || "",
+      piso: item.piso || "",
+      puerta: item.puerta || "",
+      codigoPostal: item.codigoPostal || "",
+      municipio: item.municipio || "",
+      localidad: item.localidad || "",
+      provincia: item.provincia || "",
+    } : emptyAdministrador());
+    setOpen(true);
+  };
+  return (
+    <section className="client-branding-panel">
+      <div className="client-branding-panel__heading">
+        <div className="row-icon"><UserRound size={18} /></div>
+        <div><p className="eyebrow">Empresa</p><h3>Administradores</h3><p>Personas autorizadas para representar a este cliente.</p></div>
+        <button className="soft-button soft-button--compact" type="button" onClick={() => begin()}><Plus size={15} />Añadir</button>
+      </div>
+      {open ? (
+        <div className="edit-form-grid">
+          <label>DNI / NIE<input value={draft.dni} onChange={(event) => setDraft({ ...draft, dni: uppercaseInput(event.target.value) })} /></label>
+          <label>Nombre completo<input value={draft.nombre} onChange={(event) => setDraft({ ...draft, nombre: uppercaseInput(event.target.value) })} /></label>
+          <label>Teléfono<input value={draft.telefono || ""} onChange={(event) => setDraft({ ...draft, telefono: event.target.value })} /></label>
+          <div className="edit-form-grid__wide">
+            <AddressFields
+              idPrefix="administrador-direccion"
+              value={draft}
+              onChange={(direccion) => setDraft((current) => ({ ...current, ...direccion }))}
+              wideClassName="edit-form-grid__wide"
+            />
+          </div>
+          <div className="request-form-actions">
+            <button className="soft-button" type="button" onClick={() => setOpen(false)}><X size={15} />Cancelar</button>
+            <button className="primary-button" disabled={!draft.dni || !draft.nombre || mutation.isPending} type="button" onClick={() => mutation.mutate()}><Save size={15} />Guardar administrador</button>
+          </div>
+        </div>
+      ) : null}
+      <div className="client-documents-list">
+        {items.length ? items.map((item) => (
+          <article className="client-document-row" key={item.id}>
+            <div className="client-document-row__icon"><UserRound size={17} /></div>
+            <div className="client-document-row__main"><strong>{item.nombre}</strong><span>{item.dni}{item.telefono ? ` · ${item.telefono}` : ""}</span>{item.direccion ? <span>{item.direccion}</span> : null}</div>
+            <div className="client-document-row__actions"><button className="icon-button" type="button" title="Editar administrador" onClick={() => begin(item)}><Pencil size={15} /></button><button className="icon-button icon-button--danger" disabled={removeMutation.isPending} type="button" title="Desvincular administrador" onClick={() => removeMutation.mutate(item.id)}><Trash2 size={15} /></button></div>
+          </article>
+        )) : <div className="client-documents-empty"><UserRound size={18} /><span>No hay administradores registrados.</span></div>}
+      </div>
+    </section>
+  );
 }
-
 function LogoEditor({
   tipo,
   title,

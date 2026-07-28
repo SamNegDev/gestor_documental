@@ -33,6 +33,7 @@ public class SolicitudUpsertRequest {
     private String interesado1Puerta;
     private String interesado1CodigoPostal;
     private String interesado1Municipio;
+    private String interesado1Localidad;
     private String interesado1Provincia;
     private RolInteresado interesado2Rol;
     private String interesado2Nombre;
@@ -53,6 +54,7 @@ public class SolicitudUpsertRequest {
     private String interesado2Puerta;
     private String interesado2CodigoPostal;
     private String interesado2Municipio;
+    private String interesado2Localidad;
     private String interesado2Provincia;
     private RolInteresado interesado3Rol;
     private String interesado3Nombre;
@@ -73,5 +75,6 @@ public class SolicitudUpsertRequest {
     private String interesado3Puerta;
     private String interesado3CodigoPostal;
     private String interesado3Municipio;
+    private String interesado3Localidad;
     private String interesado3Provincia;
 }

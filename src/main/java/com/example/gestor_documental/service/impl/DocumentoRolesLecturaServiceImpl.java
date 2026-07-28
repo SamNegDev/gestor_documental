@@ -12,11 +12,13 @@ import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.Interesado;
+import com.example.gestor_documental.model.OperacionExpediente;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
+import com.example.gestor_documental.repository.OperacionExpedienteRepository;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.validation.DniNieValidator;
@@ -57,6 +59,7 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
     private final DocumentoRepository documentoRepository;
     private final DocumentoRolesLecturaRepository lecturaRepository;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final OperacionExpedienteRepository operacionExpedienteRepository;
     private final OpenAiProperties openAiProperties;
     private final DniNieValidator dniNieValidator;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -81,6 +84,9 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         if (!forzar) {
             DocumentoRolesLectura lecturaExistente = lecturaRepository.findByDocumentoId(documentoId).orElse(null);
             if (lecturaExistente != null) {
+                if (asignarOperacionBatecomSiInequivoca(documento, lecturaExistente)) {
+                    lecturaExistente = lecturaRepository.save(lecturaExistente);
+                }
                 return DocumentoRolesLecturaResponse.from(lecturaExistente);
             }
         }
@@ -99,8 +105,58 @@ public class DocumentoRolesLecturaServiceImpl implements DocumentoRolesLecturaSe
         DocumentoRolesLectura lectura = lecturaRepository.findByDocumentoId(documentoId).orElseGet(DocumentoRolesLectura::new);
         lectura.setDocumento(documento);
         aplicarResultado(documento, lectura, resultado, modeloUsado);
+        asignarOperacionBatecomSiInequivoca(documento, lectura);
         lectura = lecturaRepository.save(lectura);
         return DocumentoRolesLecturaResponse.from(lectura);
+    }
+
+    private boolean asignarOperacionBatecomSiInequivoca(Documento documento, DocumentoRolesLectura lectura) {
+        if (!esExpedienteBatecom(documento)
+                || documento.getOperacion() != null
+                || lectura == null
+                || lectura.isRequiereRevision()
+                || lectura.getConfianzaGlobal() == null
+                || lectura.getConfianzaGlobal() < CONFIANZA_MINIMA_AUTOMATICA) {
+            return false;
+        }
+        RolInteresado rolVendedor = rolInteresadoExpediente(documento, lectura.getVendedorIdentificador());
+        RolInteresado rolComprador = rolInteresadoExpediente(documento, lectura.getCompradorIdentificador());
+        TipoOperacionExpediente tipoOperacion = null;
+        if (rolVendedor == RolInteresado.VENDEDOR && rolComprador == RolInteresado.COMPRAVENTA) {
+            tipoOperacion = TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE;
+        } else if (rolVendedor == RolInteresado.COMPRAVENTA && rolComprador == RolInteresado.COMPRADOR) {
+            tipoOperacion = TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM;
+        }
+        if (tipoOperacion == null) {
+            return false;
+        }
+        OperacionExpediente operacion = operacionExpedienteRepository
+                .findByExpedienteIdAndTipo(documento.getExpediente().getId(), tipoOperacion)
+                .orElse(null);
+        if (operacion == null) {
+            return false;
+        }
+        documento.setOperacion(operacion);
+        documentoRepository.save(documento);
+        lectura.setMensaje((lectura.getMensaje() != null ? lectura.getMensaje() + " " : "")
+                + "Operacion " + (tipoOperacion == TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE ? "BATE" : "COM")
+                + " asignada automaticamente.");
+        return true;
+    }
+
+    private RolInteresado rolInteresadoExpediente(Documento documento, String identificador) {
+        String normalizado = normalizarIdentificador(identificador);
+        if (normalizado == null || documento.getExpediente() == null || documento.getExpediente().getId() == null) {
+            return null;
+        }
+        List<RolInteresado> roles = expedienteInteresadoRepository.findByExpedienteId(documento.getExpediente().getId()).stream()
+                .filter(relacion -> relacion.getInteresado() != null)
+                .filter(relacion -> normalizado.equals(normalizarIdentificador(relacion.getInteresado().getDni())))
+                .map(ExpedienteInteresado::getRol)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        return roles.size() == 1 ? roles.get(0) : null;
     }
 
     private void validarTipoDocumento(Documento documento) {

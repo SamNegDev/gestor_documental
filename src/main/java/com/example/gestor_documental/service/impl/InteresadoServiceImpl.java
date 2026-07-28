@@ -46,6 +46,7 @@ public class InteresadoServiceImpl implements InteresadoService {
         nuevoInteresado.setPuerta(TextNormalizer.upperOrNull(nuevoInteresado.getPuerta()));
         nuevoInteresado.setCodigoPostal(TextNormalizer.upperOrNull(nuevoInteresado.getCodigoPostal()));
         nuevoInteresado.setMunicipio(TextNormalizer.upperOrNull(nuevoInteresado.getMunicipio()));
+        nuevoInteresado.setLocalidad(TextNormalizer.upperOrNull(nuevoInteresado.getLocalidad()));
         nuevoInteresado.setProvincia(TextNormalizer.upperOrNull(nuevoInteresado.getProvincia()));
         nuevoInteresado.setDireccion(TextNormalizer.upperOrNull(nuevoInteresado.getDireccion()));
         if (nuevoInteresado.getDireccion() == null) {
@@ -102,6 +103,7 @@ public class InteresadoServiceImpl implements InteresadoService {
         interesado.setPuerta(TextNormalizer.upperOrNull(request.puerta()));
         interesado.setCodigoPostal(TextNormalizer.upperOrNull(request.codigoPostal()));
         interesado.setMunicipio(TextNormalizer.upperOrNull(request.municipio()));
+        interesado.setLocalidad(TextNormalizer.upperOrNull(request.localidad()));
         interesado.setProvincia(TextNormalizer.upperOrNull(request.provincia()));
         interesado.setDireccion(TextNormalizer.upperOrNull(request.direccion()));
         if (interesado.getDireccion() == null) {

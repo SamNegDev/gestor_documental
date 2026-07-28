@@ -59,7 +59,7 @@ class InteresadoServiceImplTest {
                 tipoPersona == TipoPersona.EMPRESA ? "B38436556" : "45551127H",
                 nombre,
                 null, null, null, razonSocial,
-                null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null,
                 tipoPersona
         );
     }

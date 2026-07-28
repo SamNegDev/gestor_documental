@@ -99,7 +99,7 @@ const COMPLETE_DOCUMENT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 type InteresadoCorrection = ExpedienteEditInput["interesados"][number];
 
 function emptyInteresadoCorrection(): InteresadoCorrection {
-  return { nombre: "", nombrePila: "", apellido1: "", apellido2: "", razonSocial: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
+  return { nombre: "", nombrePila: "", apellido1: "", apellido2: "", razonSocial: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", localidad: "", provincia: "", rol: "" };
 }
 
 function interesadoCorrectionFromExpediente(interesado: ExpedienteDetail["interesados"][number]): InteresadoCorrection {
@@ -640,6 +640,7 @@ function InterestedPartiesCorrectionDialog({
       puerta: uppercaseInput(interesado.puerta || ""),
       codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
       municipio: uppercaseInput(interesado.municipio || ""),
+      localidad: uppercaseInput(interesado.localidad || ""),
       provincia: uppercaseInput(interesado.provincia || ""),
     } : row)));
   };
@@ -1615,6 +1616,13 @@ export function ExpedienteDetailPage() {
         expediente={expediente}
         onCancel={expedienteCerrado ? undefined : handleCancelExpediente}
       />
+      <section className="record-observations" aria-label="Observaciones del expediente">
+        <MessageCircle size={16} aria-hidden="true" />
+        <div>
+          <strong>Observaciones</strong>
+          <p>{expediente.observaciones || "Sin observaciones"}</p>
+        </div>
+      </section>
       <OperationTabs
         activeOperationId={activeOperation?.id ?? null}
         operaciones={operaciones}

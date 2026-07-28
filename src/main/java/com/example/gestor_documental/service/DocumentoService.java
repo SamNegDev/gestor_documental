@@ -14,7 +14,7 @@ public interface DocumentoService {
 
     Optional<Documento> buscarPorId(Long id);
 
-    Long eliminar(Long id);
+    Long eliminar(Long id, Usuario usuario);
 
     Documento obtenerDocumentoConPermiso(Long documentoId, Usuario usuario);
 

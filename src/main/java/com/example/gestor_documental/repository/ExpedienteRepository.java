@@ -6,6 +6,7 @@ import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Expediente;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,8 +15,14 @@ import org.springframework.data.repository.query.Param;
 import java.util.Collection;
 import java.util.List;
 import java.time.LocalDateTime;
+import java.util.Optional;
+import jakarta.persistence.LockModeType;
 
 public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from Expediente e where e.id = :id")
+    Optional<Expediente> findByIdForUpdate(@Param("id") Long id);
 
     List<Expediente> findByClienteId(Long clienteId);
 

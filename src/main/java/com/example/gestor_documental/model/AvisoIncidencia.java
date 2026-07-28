@@ -17,7 +17,7 @@ public class AvisoIncidencia {
     private Incidencia incidencia;
     @Column(nullable = false) private int numeroAviso;
     @CreationTimestamp @Column(nullable = false, updatable = false) private LocalDateTime fechaEnvio;
-    @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "enviado_por_usuario_id", nullable = false)
+    @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "enviado_por_usuario_id")
     private Usuario enviadoPor;
     @Column(columnDefinition = "TEXT") private String mensaje;
     @Column(length = 250) private String destinatario;

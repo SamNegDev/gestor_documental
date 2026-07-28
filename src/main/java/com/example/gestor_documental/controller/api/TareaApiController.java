@@ -4,6 +4,8 @@ import com.example.gestor_documental.dto.PagedResponse;
 import com.example.gestor_documental.dto.tarea.TareaResponse;
 import com.example.gestor_documental.dto.tarea.TareasResumenResponse;
 import com.example.gestor_documental.enums.EstadoExpediente;
+import com.example.gestor_documental.enums.EstadoComprobantePago;
+import com.example.gestor_documental.enums.EstadoJustificanteProvisional;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.EstadoWhatsappAdjunto;
@@ -12,6 +14,8 @@ import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.PreferenciaCanalCliente;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.model.ComprobantePago;
+import com.example.gestor_documental.model.JustificanteProvisional;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Incidencia;
 import com.example.gestor_documental.model.Mensaje;
@@ -21,6 +25,8 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.model.WhatsappAdjunto;
 import com.example.gestor_documental.model.WhatsappWebhookEvento;
 import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.repository.ComprobantePagoRepository;
+import com.example.gestor_documental.repository.JustificanteProvisionalRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.MensajeRepository;
@@ -60,6 +66,8 @@ public class TareaApiController {
     private final ExpedienteRepository expedienteRepository;
     private final SolicitudRepository solicitudRepository;
     private final DocumentoRepository documentoRepository;
+    private final ComprobantePagoRepository comprobantePagoRepository;
+    private final JustificanteProvisionalRepository justificanteProvisionalRepository;
     private final IncidenciaRepository incidenciaRepository;
     private final MensajeRepository mensajeRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
@@ -154,6 +162,8 @@ public class TareaApiController {
                             contextoAportacion(expediente))));
 
             tareas.addAll(tareasJustificantesFinales());
+            comprobantePagoRepository.findByEstadoOrderByCreadoEnAsc(EstadoComprobantePago.PENDIENTE_VERIFICACION).forEach(c -> tareas.add(tareaComprobante(c)));
+            justificanteProvisionalRepository.findByEstadoInOrderBySolicitadoEnAsc(List.of(EstadoJustificanteProvisional.SOLICITADO, EstadoJustificanteProvisional.EN_PREPARACION)).forEach(j -> tareas.add(tareaJustificanteProvisional(j)));
             tareas.addAll(tareasRevisionDocumentosHabituales());
             int diasEstancado = configuracionSeguimientoService.obtener().getDiasExpedienteEstancado();
             expedienteRepository.findEstancados(LocalDateTime.now().minusDays(diasEstancado), List.of(
@@ -541,6 +551,22 @@ public class TareaApiController {
                 .build();
     }
 
+    private TareaResponse tareaComprobante(ComprobantePago c) {
+        var factura = c.getFactura(); var cliente = factura.getCliente();
+        return TareaResponse.builder().id("COMPROBANTE-" + c.getId()).tipo("COMPROBANTE_PAGO_PENDIENTE").ambito("GESTION").prioridad("ALTA")
+                .titulo("Comprobante de pago pendiente").detalle("Revisar el comprobante aportado; no cambia el estado contable de Holded.")
+                .contexto(factura.getNumero()).entidad("FACTURA").entidadId(factura.getId()).clienteId(cliente != null ? cliente.getId() : null)
+                .cliente(cliente != null ? cliente.getNombre() : null).fechaReferencia(format(c.getCreadoEn())).diasPendiente(dias(c.getCreadoEn())).enlace("/facturas").build();
+    }
+
+    private TareaResponse tareaJustificanteProvisional(JustificanteProvisional j) {
+        Solicitud s = j.getSolicitud(); var cliente = s.getCliente(); LocalDateTime fecha = j.getSolicitadoEn();
+        return TareaResponse.builder().id("JUSTIFICANTE-PROVISIONAL-" + j.getId()).tipo("JUSTIFICANTE_PROVISIONAL_PENDIENTE").ambito("GESTION").prioridad("ALTA")
+                .titulo(j.getEstado() == EstadoJustificanteProvisional.SOLICITADO ? "Justificante provisional solicitado" : "Justificante provisional en preparacion")
+                .detalle("Preparar y adjuntar el justificante provisional de gestoria; no es el justificante final de la DGT.").entidad("SOLICITUD").entidadId(s.getId())
+                .matricula(s.getMatricula()).clienteId(cliente != null ? cliente.getId() : null).cliente(cliente != null ? cliente.getNombre() : null)
+                .fechaReferencia(format(fecha)).diasPendiente(dias(fecha)).enlace("/solicitudes/" + s.getId()).build();
+    }
     private TareaResponse tareaSolicitud(Solicitud solicitud, Usuario usuario) {
         LocalDateTime fecha = solicitud.getFechaUltimaModificacion() != null ? solicitud.getFechaUltimaModificacion() : solicitud.getFechaCreacion();
         boolean revision = solicitud.getEstadoSolicitud() == EstadoSolicitud.REVISANDO_INCIDENCIAS;

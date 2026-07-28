@@ -60,6 +60,7 @@ export interface InteresadoExpediente {
   puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
+  localidad?: string | null;
   provincia?: string | null;
 }
 
@@ -83,6 +84,7 @@ export interface InteresadoSearchResult {
   puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
+  localidad?: string | null;
   provincia?: string | null;
   tipoPersona?: string | null;
 }
@@ -130,6 +132,7 @@ export interface DocumentoIdentidadLectura {
   puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
+  localidad?: string | null;
   provincia?: string | null;
   confianzaGlobal?: number | null;
   requiereRevision: boolean;
@@ -164,6 +167,7 @@ export interface DocumentoIdentidadDetectada {
   puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
+  localidad?: string | null;
   provincia?: string | null;
   confianzaGlobal?: number | null;
   requiereRevision: boolean;
@@ -362,6 +366,7 @@ export interface ExpedienteEditInput {
     puerta?: string | null;
     codigoPostal?: string | null;
     municipio?: string | null;
+    localidad?: string | null;
     provincia?: string | null;
     rol?: string | null;
   }>;
@@ -444,6 +449,7 @@ export interface PlantillaInteresado {
   puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
+  localidad?: string | null;
   provincia?: string | null;
 }
 

@@ -36,6 +36,7 @@ public class DocumentoIdentidadDetectadaResponse {
     private String puerta;
     private String codigoPostal;
     private String municipio;
+    private String localidad;
     private String provincia;
     private Double confianzaGlobal;
     private boolean requiereRevision;

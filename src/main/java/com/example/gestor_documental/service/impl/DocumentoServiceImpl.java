@@ -95,12 +95,14 @@ public class DocumentoServiceImpl implements DocumentoService {
      * asíncronos bajo el mismo documento base.
      */
     @Override
+    @Transactional
     public Documento guardarParaExpediente(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento,
             Usuario usuario) {
         return guardarParaExpediente(expedienteId, archivo, tipoDocumento, null, usuario);
     }
 
     @Override
+    @Transactional
     public Documento guardarParaExpediente(Long expedienteId, MultipartFile archivo, TipoDocumento tipoDocumento,
             Long operacionId, Usuario usuario) {
         if (archivo == null || archivo.isEmpty()) {
@@ -127,6 +129,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             doc.setOperacion(operacion);
 
             documentoRepository.save(doc);
+            incorporarAlExpedienteCompleto(expediente, doc, usuario);
             registrarCargaDocumentoExpediente(expediente, doc, usuario);
             notificarJustificanteDgtFinal(doc, usuario);
             return doc;
@@ -273,6 +276,9 @@ public class DocumentoServiceImpl implements DocumentoService {
                         docOriginal.getExpediente().getMatricula() + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf",
                         docOriginal.getOperacion(),
                         false);
+                generado.setExpedienteCompletoOrigen(docOriginal);
+                generado.setPaginasExpedienteCompleto(serializarPaginas(detectado.getPaginas()));
+                documentoRepository.save(generado);
                 log.info("OCR_DIAG separacion-generado tipo=EXPEDIENTE originalId={} generadoId={} expedienteId={} tipoDocumento={} paginas={} bytes={}",
                         docOriginal.getId(),
                         generado.getId(),
@@ -479,6 +485,105 @@ public class DocumentoServiceImpl implements DocumentoService {
         return documentoRepository.findBySolicitudId(id);
     }
 
+    private void incorporarAlExpedienteCompleto(Expediente expediente, Documento documento, Usuario usuario) throws IOException {
+        if (expediente == null || documento == null || documento.getTipoDocumento() == TipoDocumento.EXPEDIENTE_COMPLETO) {
+            return;
+        }
+
+        Path carpetaUploads = obtenerCarpetaUploads();
+        Path rutaDocumento = carpetaUploads.resolve(documento.getNombreArchivo()).normalize();
+        if (!rutaDocumento.startsWith(carpetaUploads) || !Files.exists(rutaDocumento)) {
+            throw new RecursoNoEncontradoException("El archivo individual no existe para incorporarlo al expediente completo");
+        }
+
+        byte[] contenidoIndividual = Files.readAllBytes(rutaDocumento);
+        Optional<Documento> completoExistente = documentoRepository
+                .findFirstByExpedienteIdAndTipoDocumentoOrderByFechaSubidaDesc(
+                        expediente.getId(), TipoDocumento.EXPEDIENTE_COMPLETO);
+
+        if (completoExistente.isEmpty()) {
+            byte[] contenidoCompleto = pdfSplitService.unirDocumentos(List.of(contenidoIndividual));
+            Documento completo = construirDocumentoBase(
+                    contenidoCompleto,
+                    expediente.getMatricula() + "_EXPEDIENTE_COMPLETO.PDF",
+                    TipoDocumento.EXPEDIENTE_COMPLETO,
+                    usuario);
+            completo.setExpediente(expediente);
+            completo.setOperacion(documento.getOperacion());
+            documentoRepository.save(completo);
+            vincularPaginasDossier(documento, completo, 0, contarPaginasPdf(contenidoCompleto));
+            registrarActualizacionExpedienteCompleto(expediente, documento, usuario, true);
+            return;
+        }
+
+        Documento completo = completoExistente.get();
+        Path rutaCompleto = carpetaUploads.resolve(completo.getNombreArchivo()).normalize();
+        if (!rutaCompleto.startsWith(carpetaUploads) || !Files.exists(rutaCompleto)) {
+            throw new RecursoNoEncontradoException("El archivo fisico del expediente completo no existe");
+        }
+
+        byte[] contenidoAnterior = Files.readAllBytes(rutaCompleto);
+        int paginaInicio = contarPaginasPdf(contenidoAnterior);
+        byte[] contenidoCompleto = pdfSplitService.unirDocumentos(List.of(contenidoAnterior, contenidoIndividual));
+        int paginasAnadidas = contarPaginasPdf(contenidoCompleto) - paginaInicio;
+        reemplazarContenidoDocumento(completo, contenidoCompleto);
+        vincularPaginasDossier(documento, completo, paginaInicio, paginasAnadidas);
+        registrarActualizacionExpedienteCompleto(expediente, documento, usuario, false);
+    }
+
+    private void vincularPaginasDossier(Documento documento, Documento completo, int paginaInicio, int totalPaginas) {
+        if (totalPaginas <= 0) {
+            throw new OperacionInvalidaException("El documento individual no contiene paginas validas");
+        }
+        List<Integer> paginas = java.util.stream.IntStream.range(paginaInicio, paginaInicio + totalPaginas)
+                .boxed()
+                .toList();
+        documento.setExpedienteCompletoOrigen(completo);
+        documento.setPaginasExpedienteCompleto(serializarPaginas(paginas));
+        documentoRepository.save(documento);
+    }
+
+    private int contarPaginasPdf(byte[] contenido) throws IOException {
+        try (org.apache.pdfbox.pdmodel.PDDocument pdf = org.apache.pdfbox.pdmodel.PDDocument.load(contenido)) {
+            return pdf.getNumberOfPages();
+        }
+    }
+
+    private String serializarPaginas(List<Integer> paginas) {
+        return paginas.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .sorted()
+                .map(String::valueOf)
+                .collect(Collectors.joining(","));
+    }
+
+    private List<Integer> parsearPaginasDossier(String paginas) {
+        if (paginas == null || paginas.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(paginas.split(","))
+                .map(String::trim)
+                .filter(valor -> !valor.isBlank())
+                .map(Integer::valueOf)
+                .distinct()
+                .sorted()
+                .toList();
+    }
+    private void registrarActualizacionExpedienteCompleto(
+            Expediente expediente,
+            Documento documento,
+            Usuario usuario,
+            boolean creado
+    ) {
+        historialCambioService.registrarCambioExpediente(
+                expediente,
+                usuario,
+                ACCION_CARGAR_DOCUMENTO,
+                (creado ? "Se creo" : "Se actualizo")
+                        + " el expediente completo incorporando el documento individual '"
+                        + documento.getNombreArchivoOriginal() + "'.");
+    }
     private Documento guardarDocumentoGeneradoParaSolicitud(Solicitud solicitud,
             byte[] contenido,
             TipoDocumento tipoDocumento,
@@ -595,7 +700,7 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     @Override
     @Transactional
-    public Long eliminar(Long id) {
+    public Long eliminar(Long id, Usuario usuario) {
         Documento documento = documentoRepository.findByIdConRelaciones(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Documento no encontrado"));
 
@@ -610,6 +715,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             throw new OperacionInvalidaException("Ruta de archivo no permitida");
         }
 
+        retirarDelExpedienteCompleto(documento, usuario);
         desvincularRequisitos(documento);
         correccionClasificacionDocumentoRepository.desvincularDocumento(documento.getId());
         documentoRepository.delete(documento);
@@ -619,6 +725,86 @@ public class DocumentoServiceImpl implements DocumentoService {
         return entidadId;
     }
 
+    private void retirarDelExpedienteCompleto(Documento documento, Usuario usuario) {
+        if (documento.getTipoDocumento() == TipoDocumento.EXPEDIENTE_COMPLETO) {
+            desvincularDocumentosDelDossier(documento);
+            return;
+        }
+
+        Documento completo = documento.getExpedienteCompletoOrigen();
+        List<Integer> paginasEliminar = parsearPaginasDossier(documento.getPaginasExpedienteCompleto());
+        if (completo == null || paginasEliminar.isEmpty()) {
+            return;
+        }
+
+        Path carpetaUploads = obtenerCarpetaUploads();
+        Path rutaCompleto = carpetaUploads.resolve(completo.getNombreArchivo()).normalize();
+        if (!rutaCompleto.startsWith(carpetaUploads) || !Files.exists(rutaCompleto)) {
+            throw new RecursoNoEncontradoException("El archivo fisico del expediente completo no existe");
+        }
+
+        try {
+            byte[] contenidoCompleto = Files.readAllBytes(rutaCompleto);
+            int totalPaginas = contarPaginasPdf(contenidoCompleto);
+            List<Integer> paginasValidas = paginasEliminar.stream()
+                    .filter(pagina -> pagina >= 0 && pagina < totalPaginas)
+                    .toList();
+            if (paginasValidas.isEmpty()) {
+                return;
+            }
+
+            List<Documento> vinculados = documentoRepository
+                    .findByExpedienteCompletoOrigenIdOrderById(completo.getId());
+            if (paginasValidas.size() >= totalPaginas) {
+                desvincularDocumentosDelDossier(completo);
+                desvincularRequisitos(completo);
+                correccionClasificacionDocumentoRepository.desvincularDocumento(completo.getId());
+                documentoRepository.delete(completo);
+                documentoRepository.flush();
+                transactionalFileService.eliminarTrasCommit(List.of(rutaCompleto));
+            } else {
+                reemplazarContenidoDocumento(
+                        completo,
+                        pdfSplitService.eliminarPaginas(contenidoCompleto, paginasValidas));
+                for (Documento vinculado : vinculados) {
+                    if (vinculado.getId().equals(documento.getId())) {
+                        continue;
+                    }
+                    List<Integer> paginasActualizadas = parsearPaginasDossier(vinculado.getPaginasExpedienteCompleto())
+                            .stream()
+                            .filter(pagina -> !paginasValidas.contains(pagina))
+                            .map(pagina -> pagina - (int) paginasValidas.stream().filter(eliminada -> eliminada < pagina).count())
+                            .toList();
+                    vinculado.setPaginasExpedienteCompleto(serializarPaginas(paginasActualizadas));
+                    documentoRepository.save(vinculado);
+                }
+            }
+
+            documento.setExpedienteCompletoOrigen(null);
+            documento.setPaginasExpedienteCompleto(null);
+            if (documento.getExpediente() != null) {
+                historialCambioService.registrarCambioExpediente(
+                        documento.getExpediente(),
+                        usuario,
+                        ACCION_CARGAR_DOCUMENTO,
+                        "Se retiro del expediente completo el documento '"
+                                + documento.getNombreArchivoOriginal() + "'.");
+            }
+        } catch (IOException exception) {
+            throw new RuntimeException("No se pudieron retirar las paginas del expediente completo", exception);
+        }
+    }
+
+    private void desvincularDocumentosDelDossier(Documento completo) {
+        if (completo == null || completo.getId() == null) {
+            return;
+        }
+        for (Documento vinculado : documentoRepository.findByExpedienteCompletoOrigenIdOrderById(completo.getId())) {
+            vinculado.setExpedienteCompletoOrigen(null);
+            vinculado.setPaginasExpedienteCompleto(null);
+            documentoRepository.save(vinculado);
+        }
+    }
     private void desvincularRequisitos(Documento documento) {
         for (RequisitoDocumentalExpediente requisito : requisitoDocumentalRepository.findByDocumentoId(documento.getId())) {
             requisito.setDocumento(null);
@@ -1131,6 +1317,9 @@ public class DocumentoServiceImpl implements DocumentoService {
                         usuario,
                         docOriginal.getSolicitud().getMatricula() + "_" + detectado.getTipoDocumento().name().toLowerCase() + ".pdf",
                         false);
+                generado.setExpedienteCompletoOrigen(docOriginal);
+                generado.setPaginasExpedienteCompleto(serializarPaginas(detectado.getPaginas()));
+                documentoRepository.save(generado);
                 log.info("OCR_DIAG separacion-generado tipo=SOLICITUD originalId={} generadoId={} solicitudId={} tipoDocumento={} paginas={} bytes={}",
                         docOriginal.getId(),
                         generado.getId(),

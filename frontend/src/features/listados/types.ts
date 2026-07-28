@@ -83,6 +83,7 @@ export interface InteresadoSolicitud {
   puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
+  localidad?: string | null;
   provincia?: string | null;
   personaJuridica?: boolean;
   clienteHabitual?: boolean;
@@ -175,6 +176,7 @@ export interface SolicitudIdentidadDetectadaInput {
   puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
+  localidad?: string | null;
   provincia?: string | null;
 }
 
@@ -198,6 +200,7 @@ export interface SolicitudInteresadoHabitual {
   puerta?: string | null;
   codigoPostal?: string | null;
   municipio?: string | null;
+  localidad?: string | null;
   provincia?: string | null;
   tipoPersona?: string | null;
   documentos: number;
@@ -297,6 +300,7 @@ export interface SolicitudUpsertInput {
   interesado1Puerta?: string | null;
   interesado1CodigoPostal?: string | null;
   interesado1Municipio?: string | null;
+  interesado1Localidad?: string | null;
   interesado1Provincia?: string | null;
   interesado2Rol?: string | null;
   interesado2Nombre?: string | null;
@@ -317,6 +321,7 @@ export interface SolicitudUpsertInput {
   interesado2Puerta?: string | null;
   interesado2CodigoPostal?: string | null;
   interesado2Municipio?: string | null;
+  interesado2Localidad?: string | null;
   interesado2Provincia?: string | null;
   interesado3Rol?: string | null;
   interesado3Nombre?: string | null;
@@ -337,6 +342,7 @@ export interface SolicitudUpsertInput {
   interesado3Puerta?: string | null;
   interesado3CodigoPostal?: string | null;
   interesado3Municipio?: string | null;
+  interesado3Localidad?: string | null;
   interesado3Provincia?: string | null;
 }
 

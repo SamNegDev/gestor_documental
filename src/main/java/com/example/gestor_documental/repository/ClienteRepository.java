@@ -12,6 +12,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ClienteRepository extends JpaRepository<Cliente, Long> {
+    Optional<Cliente> findByNifIgnoreCase(String nif);
+
+    Optional<Cliente> findByHoldedContactId(String holdedContactId);
+
     Optional<Cliente> findByEmailIgnoreCase(String email);
 
     @Query("select c from Cliente c where c.avisoIncidenciasActivo = true and c.horaAvisoIncidencias <= :hora and (c.ultimoAvisoIncidencias is null or c.ultimoAvisoIncidencias < :fecha)")

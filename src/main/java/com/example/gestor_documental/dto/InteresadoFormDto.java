@@ -50,6 +50,7 @@ public class InteresadoFormDto {
     private String codigoPostal;
     @Size(max = 80, message = "El municipio no puede superar los 80 caracteres")
     private String municipio;
+    private String localidad;
     @Size(max = 80, message = "La provincia no puede superar los 80 caracteres")
     private String provincia;
     private RolInteresado rol;

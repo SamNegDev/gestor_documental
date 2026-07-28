@@ -21,6 +21,7 @@ public record InteresadoHabitualRequest(
         String puerta,
         String codigoPostal,
         String municipio,
+        String localidad,
         String provincia,
         TipoPersona tipoPersona
 ) {

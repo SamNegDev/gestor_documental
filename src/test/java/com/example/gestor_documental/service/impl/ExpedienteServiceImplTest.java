@@ -1,5 +1,6 @@
 package com.example.gestor_documental.service.impl;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -8,8 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
+import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
@@ -18,6 +21,8 @@ import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.ExpedienteInteresado;
+import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Incidencia;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.TipoIncidencia;
@@ -235,6 +240,47 @@ class ExpedienteServiceImplTest {
     }
 
     @Test
+    void rechazaDniExistenteCuandoElNombrePerteneceAOtraPersona() {
+        Expediente expediente = expediente(EstadoExpediente.EN_TRAMITE, TipoTramiteEnum.TRASPASO);
+        Interesado existente = new Interesado("12345678A", "MARIA LOPEZ");
+        existente.setId(22L);
+        InteresadoFormDto recibido = interesado("12345678A", "PEDRO MARTIN", RolInteresado.COMPRADOR);
+        when(interesadoService.buscarInteresadoPorDNI("12345678A")).thenReturn(Optional.of(existente));
+
+        OperacionInvalidaException error = assertThrows(
+                OperacionInvalidaException.class,
+                () -> service.guardarInteresadoSiValido(expediente, recibido));
+
+        assertTrue(error.getMessage().contains("ya pertenece a MARIA LOPEZ"));
+        verify(expedienteInteresadoRepository, never()).save(any(ExpedienteInteresado.class));
+    }
+
+    @Test
+    void aceptaElMismoNombreAunqueCambienLosAcentos() {
+        Expediente expediente = expediente(EstadoExpediente.EN_TRAMITE, TipoTramiteEnum.TRASPASO);
+        Interesado existente = new Interesado("12345678A", "RAÚL POUQUET");
+        existente.setId(22L);
+        InteresadoFormDto recibido = interesado("12345678A", "RAUL POUQUET", RolInteresado.COMPRADOR);
+        when(interesadoService.buscarInteresadoPorDNI("12345678A")).thenReturn(Optional.of(existente));
+
+        service.guardarInteresadoSiValido(expediente, recibido);
+
+        verify(expedienteInteresadoRepository).save(any(ExpedienteInteresado.class));
+    }
+
+    @Test
+    void rechazaDosInteresadosConElMismoRol() {
+        InteresadoFormDto primero = interesado("12345678A", "MARIA LOPEZ", RolInteresado.COMPRADOR);
+        InteresadoFormDto segundo = interesado("87654321B", "PEDRO MARTIN", RolInteresado.COMPRADOR);
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.validarInteresados(List.of(primero, segundo)));
+
+        assertTrue(error.getMessage().contains("varios interesados con el rol COMPRADOR"));
+    }
+
+    @Test
     void aislaExpedientesSegunElClienteActivoAunqueElUsuarioTengaAmbosAutorizados() {
         Cliente clienteA = new Cliente();
         clienteA.setId(10L);
@@ -255,6 +301,14 @@ class ExpedienteServiceImplTest {
 
         assertFalse(service.tienePermisoExpediente(expedienteA, usuario));
         assertTrue(service.tienePermisoExpediente(expedienteB, usuario));
+    }
+
+    private InteresadoFormDto interesado(String dni, String nombre, RolInteresado rol) {
+        InteresadoFormDto dto = new InteresadoFormDto();
+        dto.setDni(dni);
+        dto.setNombre(nombre);
+        dto.setRol(rol);
+        return dto;
     }
 
     private Expediente expediente(EstadoExpediente estado, TipoTramiteEnum tramiteEnum) {

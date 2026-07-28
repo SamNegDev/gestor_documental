@@ -168,6 +168,7 @@ public class RegistroApiController {
             nuevo.setPuerta(request.puerta());
             nuevo.setCodigoPostal(request.codigoPostal());
             nuevo.setMunicipio(request.municipio());
+            nuevo.setLocalidad(request.localidad());
             nuevo.setProvincia(request.provincia());
             nuevo.setTipoPersona(request.tipoPersona());
             return interesadoService.guardar(nuevo);
@@ -301,6 +302,7 @@ public class RegistroApiController {
                 .puerta(interesado.getPuerta())
                 .codigoPostal(interesado.getCodigoPostal())
                 .municipio(interesado.getMunicipio())
+                .localidad(interesado.getLocalidad())
                 .provincia(interesado.getProvincia())
                 .tipoPersona(interesado.getTipoPersona() != null ? interesado.getTipoPersona().name() : null)
                 .habitual(habitual != null && Boolean.TRUE.equals(habitual.getHabitual()))

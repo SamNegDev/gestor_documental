@@ -31,6 +31,7 @@ public class InteresadoSolicitudResponse {
     private String puerta;
     private String codigoPostal;
     private String municipio;
+    private String localidad;
     private String provincia;
     private boolean personaJuridica;
     private boolean clienteHabitual;

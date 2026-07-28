@@ -157,8 +157,9 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             return;
         }
 
-        Interesado interesado = interesadoService.buscarInteresadoPorDNI(dto.getDni())
-                .orElseGet(() -> {
+        Optional<Interesado> interesadoExistente = interesadoService.buscarInteresadoPorDNI(dto.getDni());
+        interesadoExistente.ifPresent(interesado -> validarIdentidadCoincidente(interesado, dto));
+        Interesado interesado = interesadoExistente.orElseGet(() -> {
                     Interesado nuevoInteresado = new Interesado();
                     nuevoInteresado.setNombre(NombrePersonaNormalizer.normalizar(dto.getNombre()));
                     nuevoInteresado.setNombrePila(TextNormalizer.upperOrNull(dto.getNombrePila()));
@@ -177,6 +178,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                     nuevoInteresado.setPuerta(TextNormalizer.upperOrNull(dto.getPuerta()));
                     nuevoInteresado.setCodigoPostal(TextNormalizer.upperOrNull(dto.getCodigoPostal()));
                     nuevoInteresado.setMunicipio(TextNormalizer.upperOrNull(dto.getMunicipio()));
+                    nuevoInteresado.setLocalidad(TextNormalizer.upperOrNull(dto.getLocalidad()));
                     nuevoInteresado.setProvincia(TextNormalizer.upperOrNull(dto.getProvincia()));
                     String direccion = TextNormalizer.upperOrNull(dto.getDireccion());
                     nuevoInteresado.setDireccion(direccion != null
@@ -193,8 +195,23 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 .isPresent();
 
         if (yaRelacionado) {
+            expedienteInteresadoRepository
+                    .findByExpedienteIdAndInteresadoId(expediente.getId(), interesado.getId())
+                    .filter(relacion -> relacion.getRol() != dto.getRol())
+                    .ifPresent(relacion -> {
+                        throw new OperacionInvalidaException(
+                                "El interesado con DNI " + dto.getDni() + " ya figura con otro rol en el expediente.");
+                    });
             return;
         }
+
+        expedienteInteresadoRepository.findByExpedienteId(expediente.getId()).stream()
+                .filter(relacion -> relacion.getRol() == dto.getRol())
+                .findAny()
+                .ifPresent(relacion -> {
+                    throw new OperacionInvalidaException(
+                            "Ya existe otro interesado con el rol " + dto.getRol().name() + " en el expediente.");
+                });
 
         ExpedienteInteresado relacion = new ExpedienteInteresado();
         relacion.setExpediente(expediente);
@@ -202,6 +219,25 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         relacion.setRol(dto.getRol());
 
         expedienteInteresadoRepository.save(relacion);
+    }
+
+    private void validarIdentidadCoincidente(Interesado existente, InteresadoFormDto recibido) {
+        String nombreExistente = normalizarNombreComparacion(existente.getNombre());
+        String nombreRecibido = normalizarNombreComparacion(recibido.getNombre());
+        if (nombreExistente != null && nombreRecibido != null && !nombreExistente.equals(nombreRecibido)) {
+            throw new OperacionInvalidaException(
+                    "El DNI " + recibido.getDni() + " ya pertenece a " + existente.getNombre()
+                            + ". Revisa el DNI o selecciona el interesado registrado.");
+        }
+    }
+
+    private String normalizarNombreComparacion(String nombre) {
+        String normalizado = NombrePersonaNormalizer.normalizar(nombre);
+        if (normalizado == null) {
+            return null;
+        }
+        return java.text.Normalizer.normalize(normalizado, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "");
     }
 
     private void completarNombreEstructuradoSiVacio(Interesado interesado, InteresadoFormDto dto) {
@@ -645,6 +681,10 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             for (int j = i + 1; j < informados.size(); j++) {
                 if (informados.get(i).getDni().equalsIgnoreCase(informados.get(j).getDni())) {
                     throw new IllegalArgumentException("Los interesados no pueden tener el mismo DNI.");
+                }
+                if (informados.get(i).getRol() == informados.get(j).getRol()) {
+                    throw new IllegalArgumentException(
+                            "No puede haber varios interesados con el rol " + informados.get(i).getRol().name() + ".");
                 }
             }
         }

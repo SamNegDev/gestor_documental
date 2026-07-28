@@ -43,6 +43,7 @@ function emptyForm(): SolicitudUpsertInput {
     interesado1Puerta: "",
     interesado1CodigoPostal: "",
     interesado1Municipio: "",
+    interesado1Localidad: "",
     interesado1Provincia: "",
     interesado2Rol: "",
     interesado2Nombre: "",
@@ -63,6 +64,7 @@ function emptyForm(): SolicitudUpsertInput {
     interesado2Puerta: "",
     interesado2CodigoPostal: "",
     interesado2Municipio: "",
+    interesado2Localidad: "",
     interesado2Provincia: "",
     interesado3Rol: "",
     interesado3Nombre: "",
@@ -83,6 +85,7 @@ function emptyForm(): SolicitudUpsertInput {
     interesado3Puerta: "",
     interesado3CodigoPostal: "",
     interesado3Municipio: "",
+    interesado3Localidad: "",
     interesado3Provincia: "",
   };
 }
@@ -121,6 +124,7 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     interesado1Puerta: uppercaseInput(interesado1?.puerta || ""),
     interesado1CodigoPostal: uppercaseInput(interesado1?.codigoPostal || postalCodeFromAddress(interesado1?.direccion) || ""),
     interesado1Municipio: uppercaseInput(interesado1?.municipio || ""),
+    interesado1Localidad: uppercaseInput(interesado1?.localidad || ""),
     interesado1Provincia: uppercaseInput(interesado1?.provincia || ""),
     interesado2Rol: interesado2?.rol || "",
     interesado2Nombre: uppercaseInput(interesado2?.nombre || ""),
@@ -141,6 +145,7 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     interesado2Puerta: uppercaseInput(interesado2?.puerta || ""),
     interesado2CodigoPostal: uppercaseInput(interesado2?.codigoPostal || postalCodeFromAddress(interesado2?.direccion) || ""),
     interesado2Municipio: uppercaseInput(interesado2?.municipio || ""),
+    interesado2Localidad: uppercaseInput(interesado2?.localidad || ""),
     interesado2Provincia: uppercaseInput(interesado2?.provincia || ""),
     interesado3Rol: interesado3?.rol || "",
     interesado3Nombre: uppercaseInput(interesado3?.nombre || ""),
@@ -161,6 +166,7 @@ function fromSolicitud(solicitud: SolicitudDetail): SolicitudUpsertInput {
     interesado3Puerta: uppercaseInput(interesado3?.puerta || ""),
     interesado3CodigoPostal: uppercaseInput(interesado3?.codigoPostal || postalCodeFromAddress(interesado3?.direccion) || ""),
     interesado3Municipio: uppercaseInput(interesado3?.municipio || ""),
+    interesado3Localidad: uppercaseInput(interesado3?.localidad || ""),
     interesado3Provincia: uppercaseInput(interesado3?.provincia || ""),
   };
 }
@@ -197,6 +203,7 @@ function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
     interesado1Puerta: cleanUpperText(form.interesado1Puerta),
     interesado1CodigoPostal: cleanUpperText(form.interesado1CodigoPostal),
     interesado1Municipio: cleanUpperText(form.interesado1Municipio),
+    interesado1Localidad: cleanUpperText(form.interesado1Localidad),
     interesado1Provincia: cleanUpperText(form.interesado1Provincia),
     interesado2Rol: cleanUpperText(form.interesado2Rol),
     interesado2Nombre: cleanUpperText(form.interesado2Nombre),
@@ -217,6 +224,7 @@ function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
     interesado2Puerta: cleanUpperText(form.interesado2Puerta),
     interesado2CodigoPostal: cleanUpperText(form.interesado2CodigoPostal),
     interesado2Municipio: cleanUpperText(form.interesado2Municipio),
+    interesado2Localidad: cleanUpperText(form.interesado2Localidad),
     interesado2Provincia: cleanUpperText(form.interesado2Provincia),
     interesado3Rol: cleanUpperText(form.interesado3Rol),
     interesado3Nombre: cleanUpperText(form.interesado3Nombre),
@@ -237,6 +245,7 @@ function cleanPayload(form: SolicitudUpsertInput): SolicitudUpsertInput {
     interesado3Puerta: cleanUpperText(form.interesado3Puerta),
     interesado3CodigoPostal: cleanUpperText(form.interesado3CodigoPostal),
     interesado3Municipio: cleanUpperText(form.interesado3Municipio),
+    interesado3Localidad: cleanUpperText(form.interesado3Localidad),
     interesado3Provincia: cleanUpperText(form.interesado3Provincia),
   };
 }
@@ -277,6 +286,7 @@ function clearThirdInteresado(form: SolicitudUpsertInput): SolicitudUpsertInput 
     interesado3Puerta: "",
     interesado3CodigoPostal: "",
     interesado3Municipio: "",
+    interesado3Localidad: "",
     interesado3Provincia: "",
   };
 }
@@ -514,6 +524,7 @@ function InteresadoFields({
     puerta: form[field("Puerta")] as string,
     codigoPostal: form[field("CodigoPostal")] as string,
     municipio: form[field("Municipio")] as string,
+    localidad: form[field("Localidad")] as string,
     provincia: form[field("Provincia")] as string,
   };
   const updateAddress = (value: AddressValue) => {
@@ -530,6 +541,7 @@ function InteresadoFields({
       [field("Puerta")]: value.puerta,
       [field("CodigoPostal")]: value.codigoPostal,
       [field("Municipio")]: value.municipio,
+      [field("Localidad")]: value.localidad,
       [field("Provincia")]: value.provincia,
     });
   };
@@ -557,6 +569,7 @@ function InteresadoFields({
       [field("Puerta")]: uppercaseInput(interesado.puerta || ""),
       [field("CodigoPostal")]: uppercaseInput(interesado.codigoPostal || ""),
       [field("Municipio")]: uppercaseInput(interesado.municipio || ""),
+      [field("Localidad")]: uppercaseInput(interesado.localidad || ""),
       [field("Provincia")]: uppercaseInput(interesado.provincia || ""),
     });
   };

@@ -257,6 +257,7 @@ public class ExpedienteApiController {
                         .puerta(interesado.getPuerta())
                         .codigoPostal(interesado.getCodigoPostal())
                         .municipio(interesado.getMunicipio())
+                        .localidad(interesado.getLocalidad())
                         .provincia(interesado.getProvincia())
                         .tipoPersona(interesado.getTipoPersona() != null ? interesado.getTipoPersona().name() : null)
                         .build())
@@ -304,9 +305,7 @@ public class ExpedienteApiController {
 
         Expediente expediente = new Expediente();
         expediente.setMatricula(TextNormalizer.upperOrNull(matricula));
-        expediente.setObservaciones(TextNormalizer.upperOrNull(observaciones) != null
-                ? TextNormalizer.upperOrNull(observaciones)
-                : "CREACION MULTIPLE");
+        expediente.setObservaciones(TextNormalizer.upperOrNull(observaciones));
 
         Expediente creado = expedienteService.crearExpedienteCompleto(
                 expediente,
@@ -508,6 +507,9 @@ public class ExpedienteApiController {
         }
         response.setContentType("application/pdf");
         response.setHeader("Content-Disposition", "inline; filename=\"lote_expedientes.pdf\"");
+        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+        response.setHeader("Pragma", "no-cache");
+        response.setDateHeader("Expires", 0);
         loteImpresionService.escribirLote(ids, response.getOutputStream());
     }
 
@@ -630,6 +632,7 @@ public class ExpedienteApiController {
         dto.setPuerta(TextNormalizer.upperOrNull(interesado.getPuerta()));
         dto.setCodigoPostal(TextNormalizer.upperOrNull(interesado.getCodigoPostal()));
         dto.setMunicipio(TextNormalizer.upperOrNull(interesado.getMunicipio()));
+        dto.setLocalidad(TextNormalizer.upperOrNull(interesado.getLocalidad()));
         dto.setProvincia(TextNormalizer.upperOrNull(interesado.getProvincia()));
         dto.setRol(interesado.getRol());
         return dto;

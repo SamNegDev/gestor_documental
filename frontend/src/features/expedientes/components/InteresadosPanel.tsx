@@ -58,7 +58,7 @@ export function InteresadosPanel({ interesados, onEditInteresados }: Props) {
                   <dt>
                     <Home size={15} /> Dirección
                   </dt>
-                  <dd>{interesado.direccion || "No informada"}</dd>
+                  <dd>{formatInteresadoAddress(interesado) || "No informada"}</dd>
                 </div>
               </dl>
             </article>
@@ -67,4 +67,69 @@ export function InteresadosPanel({ interesados, onEditInteresados }: Props) {
       )}
     </section>
   );
+}
+function formatInteresadoAddress(interesado: InteresadoExpediente) {
+  const structuredValues = [
+    interesado.tipoVia,
+    interesado.nombreVia,
+    interesado.numeroVia,
+    interesado.bloque,
+    interesado.portal,
+    interesado.escalera,
+    interesado.piso,
+    interesado.puerta,
+    interesado.codigoPostal,
+    interesado.municipio,
+    interesado.localidad,
+    interesado.provincia,
+  ];
+  const hasStructuredAddress = structuredValues.some((value) => value?.trim());
+
+  if (!hasStructuredAddress) {
+    return interesado.direccion?.trim() || "";
+  }
+
+  const via = [
+    interesado.tipoVia,
+    interesado.nombreVia,
+    interesado.numeroVia,
+    withAddressLabel("BLOQ", interesado.bloque),
+    withAddressLabel("PORTAL", interesado.portal),
+    withAddressLabel("ESC", interesado.escalera),
+    withAddressLabel("PISO", interesado.piso),
+    withAddressLabel("PTA", interesado.puerta),
+  ]
+    .map(cleanAddressPart)
+    .filter(Boolean)
+    .join(" ");
+
+  return uniqueAddressParts([
+    via,
+    interesado.codigoPostal,
+    interesado.localidad,
+    interesado.municipio,
+    interesado.provincia,
+  ]).join(", ");
+}
+
+function withAddressLabel(label: string, value?: string | null) {
+  const clean = value?.trim();
+  return clean ? `${label} ${clean}` : "";
+}
+
+function cleanAddressPart(value?: string | null) {
+  return value?.trim() || "";
+}
+
+function uniqueAddressParts(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  return values
+    .map(cleanAddressPart)
+    .filter((value) => {
+      if (!value) return false;
+      const key = value.toLocaleUpperCase("es");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }

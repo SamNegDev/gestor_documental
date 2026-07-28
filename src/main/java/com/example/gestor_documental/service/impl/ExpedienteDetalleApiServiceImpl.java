@@ -883,6 +883,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .puerta(interesado != null ? interesado.getPuerta() : null)
                 .codigoPostal(interesado != null ? interesado.getCodigoPostal() : null)
                 .municipio(interesado != null ? interesado.getMunicipio() : null)
+                .localidad(interesado != null ? interesado.getLocalidad() : null)
                 .provincia(interesado != null ? interesado.getProvincia() : null)
                 .build();
     }

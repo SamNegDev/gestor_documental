@@ -15,7 +15,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       TZ: Atlantic/Canary
     ports:
-      - "127.0.0.1:3306:3306"
+      - "127.0.0.1:${MYSQL_HOST_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
@@ -49,7 +49,7 @@ services:
       DB_USER: ${MYSQL_USER}
       DB_PASSWORD: ${MYSQL_PASSWORD}
 
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SPRING_JPA_OPEN_IN_VIEW: "false"
       SPRING_JPA_SHOW_SQL: "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MySQLDialect
@@ -101,7 +101,17 @@ services:
       MAIL_INBOUND_ADMIN_EMAIL: ${MAIL_INBOUND_ADMIN_EMAIL:-${APP_ADMIN_EMAIL:-}}
       MAIL_INBOUND_DEFAULT_TIPO_TRAMITE: ${MAIL_INBOUND_DEFAULT_TIPO_TRAMITE:-TRASPASO}
       MAIL_INBOUND_GRAPH_MAILBOX: ${MAIL_INBOUND_GRAPH_MAILBOX:-${MAIL_GRAPH_SENDER:-${MAIL_FROM:-}}}
+      APP_CLIENT_NOTIFICATIONS_ENABLED: ${APP_CLIENT_NOTIFICATIONS_ENABLED:-false}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
+      HOLDED_ENABLED: ${HOLDED_ENABLED:-false}
+      HOLDED_API_TOKEN: ${HOLDED_API_TOKEN:-}
+      HOLDED_API_BASE_URL: ${HOLDED_API_BASE_URL:-https://api.holded.com/api/v2}
+      HOLDED_WEBHOOK_SECRET: ${HOLDED_WEBHOOK_SECRET:-}
+      HOLDED_SYNC_CRON: ${HOLDED_SYNC_CRON:-0 15 */4 * * *}
+      HOLDED_SYNC_ZONE: ${HOLDED_SYNC_ZONE:-Atlantic/Canary}
+      HOLDED_SYNC_YEAR: ${HOLDED_SYNC_YEAR:-2026}
+      HOLDED_CONNECT_TIMEOUT_SECONDS: ${HOLDED_CONNECT_TIMEOUT_SECONDS:-10}
+      HOLDED_READ_TIMEOUT_SECONDS: ${HOLDED_READ_TIMEOUT_SECONDS:-30}
       WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
       WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
@@ -112,7 +122,7 @@ services:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${APP_HOST_PORT:-8080}:8080"
     healthcheck:
       test: [ "CMD-SHELL", "curl --fail --silent http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'" ]
       interval: 30s

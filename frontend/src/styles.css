@@ -4555,7 +4555,7 @@ input.records-table-filter {
   grid-column: 1 / -1;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 8px;
-  align-items: end;
+  align-items: start;
 }
 
 .address-fields .address-field {
@@ -4574,13 +4574,33 @@ input.records-table-filter {
   grid-column: span 1;
 }
 
+.address-field--province {
+  grid-column: span 3;
+}
+
+.address-field--municipality {
+  grid-column: span 4;
+}
+
 .address-field--postal {
   grid-column: span 2;
 }
 
-.address-field--province,
-.address-field--municipality {
-  grid-column: span 5;
+.address-field--locality {
+  grid-column: span 3;
+}
+
+.address-field__optional {
+  color: var(--ink-muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.address-field--locality small {
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  line-height: 1.25;
 }
 
 .address-field--legacy {
@@ -4591,6 +4611,77 @@ input.records-table-filter {
   text-align: center;
 }
 
+.address-input-status {
+  position: relative;
+}
+
+.address-input-status input {
+  width: 100%;
+  padding-right: 32px;
+}
+
+.address-input-status > svg {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  color: var(--brand);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.address-postal-picker {
+  display: grid;
+  align-content: end;
+  gap: 5px;
+}
+
+.address-postal-picker > label {
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.address-postal-picker small,
+.address-field--municipality small {
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.address-match-button {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid oklch(78% 0.08 158);
+  border-radius: 7px;
+  background: oklch(96% 0.025 158);
+  color: oklch(40% 0.09 158);
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.address-postal-matches {
+  min-height: 32px;
+  font-size: 0.74rem;
+}
+
+.address-catalog-note {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+}
+
+.address-catalog-note svg {
+  color: var(--brand);
+}
 .vehicle-edit-form__actions {
   grid-column: 1 / -1;
   display: flex;
@@ -5009,7 +5100,8 @@ input.records-table-filter {
   .address-field--street,
   .address-field--postal,
   .address-field--province,
-  .address-field--municipality {
+  .address-field--municipality,
+  .address-field--locality {
     grid-column: 1 / -1;
   }
 

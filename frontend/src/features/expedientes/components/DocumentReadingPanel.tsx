@@ -3,6 +3,7 @@ import { ExternalLink, Loader2, RefreshCw, UserPlus, X } from "lucide-react";
 import { uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import type { DocumentoExpediente, DocumentoIdentidadDetectada, DocumentoIdentidadLectura } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
+import { AddressFields } from "../../../shared/ui/AddressFields";
 
 export type DocumentReadingExistingIdentity = {
   identificador: string;
@@ -328,51 +329,14 @@ function IdentityReviewDialog({
                 <span>Apellido 2</span>
                 <input value={draft.apellido2} onChange={(event) => updateInput("apellido2", event)} />
               </label>
-              <label>
-                <span>Tipo via</span>
-                <input value={draft.tipoVia} onChange={(event) => updateInput("tipoVia", event)} />
-              </label>
-              <label className="identity-review-modal__wide-field">
-                <span>Nombre via</span>
-                <input value={draft.nombreVia} onChange={(event) => updateInput("nombreVia", event)} />
-              </label>
-              <label>
-                <span>Numero</span>
-                <input value={draft.numeroVia} onChange={(event) => updateInput("numeroVia", event)} />
-              </label>
-              <label>
-                <span>Bloque</span>
-                <input value={draft.bloque} onChange={(event) => updateInput("bloque", event)} />
-              </label>
-              <label>
-                <span>Portal</span>
-                <input value={draft.portal} onChange={(event) => updateInput("portal", event)} />
-              </label>
-              <label>
-                <span>Escalera</span>
-                <input value={draft.escalera} onChange={(event) => updateInput("escalera", event)} />
-              </label>
-              <label>
-                <span>Piso</span>
-                <input value={draft.piso} onChange={(event) => updateInput("piso", event)} />
-              </label>
-              <label>
-                <span>Puerta</span>
-                <input value={draft.puerta} onChange={(event) => updateInput("puerta", event)} />
-              </label>
-              <label>
-                <span>Codigo postal</span>
-                <input value={draft.codigoPostal} onChange={(event) => updateInput("codigoPostal", event)} />
-              </label>
-              <label>
-                <span>Municipio</span>
-                <input value={draft.municipio} onChange={(event) => updateInput("municipio", event)} />
-              </label>
-              <label>
-                <span>Provincia</span>
-                <input value={draft.provincia} onChange={(event) => updateInput("provincia", event)} />
-              </label>
-            </div>
+              <div className="identity-review-modal__wide-field">
+                <AddressFields
+                  idPrefix="lectura-documento-direccion"
+                  value={{ ...draft, direccion: review.item.direccionTexto }}
+                  onChange={(direccion) => setDraft((current) => ({ ...current, ...direccion }))}
+                  wideClassName="identity-review-modal__wide-field"
+                />
+              </div>            </div>
           </div>
         </div>
         <footer className="exp-modal__footer">

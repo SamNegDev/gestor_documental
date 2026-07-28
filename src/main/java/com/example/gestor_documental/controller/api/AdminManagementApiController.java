@@ -131,6 +131,18 @@ public class AdminManagementApiController {
         interesado.setNombre(NombrePersonaNormalizer.normalizar(request.nombre()));
         interesado.setTelefono(TextNormalizer.upperOrNull(request.telefono()));
         interesado.setDireccion(TextNormalizer.upperOrNull(request.direccion()));
+        interesado.setTipoVia(TextNormalizer.upperOrNull(request.tipoVia()));
+        interesado.setNombreVia(TextNormalizer.upperOrNull(request.nombreVia()));
+        interesado.setNumeroVia(TextNormalizer.upperOrNull(request.numeroVia()));
+        interesado.setBloque(TextNormalizer.upperOrNull(request.bloque()));
+        interesado.setPortal(TextNormalizer.upperOrNull(request.portal()));
+        interesado.setEscalera(TextNormalizer.upperOrNull(request.escalera()));
+        interesado.setPiso(TextNormalizer.upperOrNull(request.piso()));
+        interesado.setPuerta(TextNormalizer.upperOrNull(request.puerta()));
+        interesado.setCodigoPostal(TextNormalizer.upperOrNull(request.codigoPostal()));
+        interesado.setMunicipio(TextNormalizer.upperOrNull(request.municipio()));
+        interesado.setLocalidad(TextNormalizer.upperOrNull(request.localidad()));
+        interesado.setProvincia(TextNormalizer.upperOrNull(request.provincia()));
         interesado = interesadoRepository.save(interesado);
         ClienteInteresado relacion = clienteInteresadoRepository.findByClienteIdAndInteresadoId(clienteId, interesado.getId())
                 .orElseGet(ClienteInteresado::new);
@@ -156,6 +168,18 @@ public class AdminManagementApiController {
         interesado.setNombre(NombrePersonaNormalizer.normalizar(request.nombre()));
         interesado.setTelefono(TextNormalizer.upperOrNull(request.telefono()));
         interesado.setDireccion(TextNormalizer.upperOrNull(request.direccion()));
+        interesado.setTipoVia(TextNormalizer.upperOrNull(request.tipoVia()));
+        interesado.setNombreVia(TextNormalizer.upperOrNull(request.nombreVia()));
+        interesado.setNumeroVia(TextNormalizer.upperOrNull(request.numeroVia()));
+        interesado.setBloque(TextNormalizer.upperOrNull(request.bloque()));
+        interesado.setPortal(TextNormalizer.upperOrNull(request.portal()));
+        interesado.setEscalera(TextNormalizer.upperOrNull(request.escalera()));
+        interesado.setPiso(TextNormalizer.upperOrNull(request.piso()));
+        interesado.setPuerta(TextNormalizer.upperOrNull(request.puerta()));
+        interesado.setCodigoPostal(TextNormalizer.upperOrNull(request.codigoPostal()));
+        interesado.setMunicipio(TextNormalizer.upperOrNull(request.municipio()));
+        interesado.setLocalidad(TextNormalizer.upperOrNull(request.localidad()));
+        interesado.setProvincia(TextNormalizer.upperOrNull(request.provincia()));
         interesadoRepository.save(interesado);
         return mapClienteAdmin(relacion.getCliente());
     }
@@ -360,6 +384,18 @@ public class AdminManagementApiController {
         cliente.setNombre(NombrePersonaNormalizer.normalizar(request.getNombre()));
         cliente.setEmail(TextNormalizer.lowerOrNull(request.getEmail()));
         cliente.setDireccion(TextNormalizer.upperOrNull(request.getDireccion()));
+        cliente.setTipoVia(TextNormalizer.upperOrNull(request.getTipoVia()));
+        cliente.setNombreVia(TextNormalizer.upperOrNull(request.getNombreVia()));
+        cliente.setNumeroVia(TextNormalizer.upperOrNull(request.getNumeroVia()));
+        cliente.setBloque(TextNormalizer.upperOrNull(request.getBloque()));
+        cliente.setPortal(TextNormalizer.upperOrNull(request.getPortal()));
+        cliente.setEscalera(TextNormalizer.upperOrNull(request.getEscalera()));
+        cliente.setPiso(TextNormalizer.upperOrNull(request.getPiso()));
+        cliente.setPuerta(TextNormalizer.upperOrNull(request.getPuerta()));
+        cliente.setCodigoPostal(TextNormalizer.upperOrNull(request.getCodigoPostal()));
+        cliente.setMunicipio(TextNormalizer.upperOrNull(request.getMunicipio()));
+        cliente.setLocalidad(TextNormalizer.upperOrNull(request.getLocalidad()));
+        cliente.setProvincia(TextNormalizer.upperOrNull(request.getProvincia()));
         cliente.setTelefono(TextNormalizer.upperOrNull(request.getTelefono()));
         cliente.setPreferenciaCanal(preferenciaCanal(request.getPreferenciaCanal()));
         cliente.setAvisoIncidenciasActivo(request.isAvisoIncidenciasActivo());
@@ -381,7 +417,12 @@ public class AdminManagementApiController {
     private ClienteAdminResponse mapClienteAdmin(Cliente cliente) {
         return ClienteAdminResponse.builder()
                 .id(cliente.getId()).nif(cliente.getNif()).nombre(cliente.getNombre()).email(cliente.getEmail())
-                .direccion(cliente.getDireccion()).telefono(cliente.getTelefono())
+                .direccion(cliente.getDireccion())
+                .tipoVia(cliente.getTipoVia()).nombreVia(cliente.getNombreVia()).numeroVia(cliente.getNumeroVia())
+                .bloque(cliente.getBloque()).portal(cliente.getPortal()).escalera(cliente.getEscalera())
+                .piso(cliente.getPiso()).puerta(cliente.getPuerta()).codigoPostal(cliente.getCodigoPostal())
+                .municipio(cliente.getMunicipio()).localidad(cliente.getLocalidad()).provincia(cliente.getProvincia())
+                .telefono(cliente.getTelefono())
                 .preferenciaCanal(cliente.getPreferenciaCanal() != null ? cliente.getPreferenciaCanal().name() : PreferenciaCanalCliente.AMBOS.name())
                 .avisoIncidenciasActivo(cliente.isAvisoIncidenciasActivo())
                 .horaAvisoIncidencias(cliente.getHoraAvisoIncidencias() != null ? cliente.getHoraAvisoIncidencias().toString() : "17:00")
@@ -392,7 +433,10 @@ public class AdminManagementApiController {
                 .documentos(documentoService.listarPorCliente(cliente.getId()).stream().map(this::mapDocumento).toList())
                 .administradores(clienteInteresadoRepository.findByClienteIdAndRepresentanteLegalTrueOrderByInteresadoNombreAsc(cliente.getId()).stream()
                         .map(ClienteInteresado::getInteresado)
-                        .map(i -> new AdministradorClienteResponse(i.getId(), i.getDni(), i.getNombre(), i.getTelefono(), i.getDireccion()))
+                        .map(i -> new AdministradorClienteResponse(
+                                i.getId(), i.getDni(), i.getNombre(), i.getTelefono(), i.getDireccion(),
+                                i.getTipoVia(), i.getNombreVia(), i.getNumeroVia(), i.getBloque(), i.getPortal(),
+                                i.getEscalera(), i.getPiso(), i.getPuerta(), i.getCodigoPostal(), i.getMunicipio(), i.getLocalidad(), i.getProvincia()))
                         .toList()).build();
     }
     private DocumentoExpedienteResponse mapDocumento(Documento documento) {

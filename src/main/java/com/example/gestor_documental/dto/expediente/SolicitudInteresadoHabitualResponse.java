@@ -23,6 +23,7 @@ public record SolicitudInteresadoHabitualResponse(
         String puerta,
         String codigoPostal,
         String municipio,
+        String localidad,
         String provincia,
         String tipoPersona,
         int documentos,

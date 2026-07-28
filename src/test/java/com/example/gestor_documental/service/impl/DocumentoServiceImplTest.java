@@ -6,6 +6,7 @@ import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.CorreccionClasificacionDocumentoRepository;
@@ -30,6 +31,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -43,7 +45,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -76,6 +80,7 @@ class DocumentoServiceImplTest {
     @BeforeEach
     void configurar() {
         ReflectionTestUtils.setField(service, "uploadDir", tempDir.toString());
+        ReflectionTestUtils.setField(service, "allowedExtensions", "pdf,jpg,jpeg,png");
     }
 
     @AfterEach
@@ -86,6 +91,95 @@ class DocumentoServiceImplTest {
         TransactionSynchronizationManager.setActualTransactionActive(false);
     }
 
+    @Test
+    void creaExpedienteCompletoAlSubirElPrimerDocumentoIndividual() throws Exception {
+        Expediente expediente = new Expediente();
+        expediente.setId(7L);
+        expediente.setMatricula("1234ABC");
+        MockMultipartFile archivo = new MockMultipartFile(
+                "archivo", "dni.pdf", "application/pdf", "pagina-individual".getBytes());
+        when(expedienteRepository.findById(7L)).thenReturn(Optional.of(expediente));
+        when(expedienteService.tienePermisoExpediente(expediente, null)).thenReturn(true);
+        when(documentoRepository.findFirstByExpedienteIdAndTipoDocumentoOrderByFechaSubidaDesc(
+                7L, TipoDocumento.EXPEDIENTE_COMPLETO)).thenReturn(Optional.empty());
+        when(pdfSplitService.unirDocumentos(anyList())).thenReturn(pdfConPaginas(1));
+        when(documentoRepository.save(any(Documento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.guardarParaExpediente(7L, archivo, TipoDocumento.DNI, null);
+
+        org.mockito.ArgumentCaptor<Documento> documentos = org.mockito.ArgumentCaptor.forClass(Documento.class);
+        verify(documentoRepository, times(3)).save(documentos.capture());
+        assertThat(documentos.getAllValues()).extracting(Documento::getTipoDocumento)
+                .contains(TipoDocumento.DNI, TipoDocumento.EXPEDIENTE_COMPLETO);
+        Documento completo = documentos.getAllValues().stream()
+                .filter(documento -> documento.getTipoDocumento() == TipoDocumento.EXPEDIENTE_COMPLETO)
+                .findFirst().orElseThrow();
+        assertThat(contarPaginas(Files.readAllBytes(tempDir.resolve(completo.getNombreArchivo())))).isEqualTo(1);
+    }
+
+    @Test
+    void anadeElDocumentoIndividualAlExpedienteCompletoExistente() throws Exception {
+        Expediente expediente = new Expediente();
+        expediente.setId(8L);
+        expediente.setMatricula("5678DEF");
+        Documento completo = documento(20L, "completo.pdf", "5678DEF_EXPEDIENTE_COMPLETO.PDF");
+        completo.setTipoDocumento(TipoDocumento.EXPEDIENTE_COMPLETO);
+        completo.setExpediente(expediente);
+        Files.write(tempDir.resolve(completo.getNombreArchivo()), pdfConPaginas(1));
+        MockMultipartFile archivo = new MockMultipartFile(
+                "archivo", "permiso.jpg", "image/jpeg", "pagina-nueva".getBytes());
+        when(expedienteRepository.findById(8L)).thenReturn(Optional.of(expediente));
+        when(expedienteService.tienePermisoExpediente(expediente, null)).thenReturn(true);
+        when(documentoRepository.findFirstByExpedienteIdAndTipoDocumentoOrderByFechaSubidaDesc(
+                8L, TipoDocumento.EXPEDIENTE_COMPLETO)).thenReturn(Optional.of(completo));
+        when(pdfSplitService.unirDocumentos(anyList())).thenReturn(pdfConPaginas(2));
+        when(documentoRepository.save(any(Documento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        iniciarTransaccion();
+
+        service.guardarParaExpediente(8L, archivo, TipoDocumento.PERMISO_CIRCULACION, null);
+
+        assertThat(completo.getNombreArchivo()).isNotEqualTo("completo.pdf");
+        assertThat(contarPaginas(Files.readAllBytes(tempDir.resolve(completo.getNombreArchivo())))).isEqualTo(2);
+        verify(pdfSplitService).unirDocumentos(anyList());
+
+        completar(TransactionSynchronization.STATUS_ROLLED_BACK);
+        assertThat(tempDir.resolve("completo.pdf")).exists();
+        assertThat(tempDir.resolve(completo.getNombreArchivo())).doesNotExist();
+    }
+    @Test
+    void eliminarDocumentoSeparadoRetiraSusPaginasDelExpedienteCompleto() throws Exception {
+        Expediente expediente = new Expediente();
+        expediente.setId(9L);
+        expediente.setMatricula("9012GHI");
+        Documento completo = documento(30L, "completo-3.pdf", "9012GHI_EXPEDIENTE_COMPLETO.PDF");
+        completo.setTipoDocumento(TipoDocumento.EXPEDIENTE_COMPLETO);
+        completo.setExpediente(expediente);
+        Documento eliminado = documento(31L, "eliminado.pdf", "PAGINA_EN_BLANCO.PDF");
+        eliminado.setExpediente(expediente);
+        eliminado.setExpedienteCompletoOrigen(completo);
+        eliminado.setPaginasExpedienteCompleto("1");
+        Documento posterior = documento(32L, "posterior.pdf", "DNI.PDF");
+        posterior.setExpediente(expediente);
+        posterior.setExpedienteCompletoOrigen(completo);
+        posterior.setPaginasExpedienteCompleto("2");
+        Files.write(tempDir.resolve(completo.getNombreArchivo()), pdfConPaginas(3));
+        Files.write(tempDir.resolve(eliminado.getNombreArchivo()), pdfConPaginas(1));
+        when(documentoRepository.findByIdConRelaciones(31L)).thenReturn(Optional.of(eliminado));
+        when(documentoRepository.findByExpedienteCompletoOrigenIdOrderById(30L))
+                .thenReturn(List.of(eliminado, posterior));
+        when(pdfSplitService.eliminarPaginas(any(), anyList())).thenReturn(pdfConPaginas(2));
+        when(documentoRepository.save(any(Documento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        iniciarTransaccion();
+
+        service.eliminar(31L, null);
+
+        assertThat(posterior.getPaginasExpedienteCompleto()).isEqualTo("1");
+        assertThat(contarPaginas(Files.readAllBytes(tempDir.resolve(completo.getNombreArchivo())))).isEqualTo(2);
+        verify(documentoRepository).delete(eliminado);
+
+        completar(TransactionSynchronization.STATUS_ROLLED_BACK);
+        assertThat(tempDir.resolve("completo-3.pdf")).exists();
+    }
     @Test
     void listarPorClienteDevuelveSoloDocumentacionRecurrentePropia() {
         Documento recurrente = documento(10L, "cif.pdf", "CIF.PDF");
@@ -161,6 +255,21 @@ class DocumentoServiceImplTest {
         assertThat(service.obtenerDocumentoConPermiso(9L, usuario)).isSameAs(documento);
     }
 
+    private int contarPaginas(byte[] contenido) throws Exception {
+        try (org.apache.pdfbox.pdmodel.PDDocument pdf = org.apache.pdfbox.pdmodel.PDDocument.load(contenido)) {
+            return pdf.getNumberOfPages();
+        }
+    }
+    private byte[] pdfConPaginas(int totalPaginas) throws Exception {
+        try (org.apache.pdfbox.pdmodel.PDDocument pdf = new org.apache.pdfbox.pdmodel.PDDocument();
+             java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream()) {
+            for (int pagina = 0; pagina < totalPaginas; pagina++) {
+                pdf.addPage(new org.apache.pdfbox.pdmodel.PDPage());
+            }
+            pdf.save(output);
+            return output.toByteArray();
+        }
+    }
     private Documento documento(Long id, String nombreFisico, String nombreOriginal) {
         Documento documento = new Documento();
         documento.setId(id);

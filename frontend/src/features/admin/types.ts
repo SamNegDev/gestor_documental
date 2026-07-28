@@ -1,7 +1,8 @@
 import type { ClienteResumen } from "../expedientes/types/expedienteDetail.types";
 import type { DocumentoExpediente } from "../expedientes/types/expedienteDetail.types";
+import type { AddressValue } from "../../shared/ui/AddressFields";
 
-export interface ClienteAdmin {
+export interface ClienteAdmin extends AddressValue {
   id: number;
   nif: string;
   nombre: string;
@@ -19,10 +20,10 @@ export interface ClienteAdmin {
   administradores?: AdministradorCliente[];
 }
 
-export interface AdministradorCliente { id: number; dni: string; nombre: string; telefono?: string | null; direccion?: string | null; }
+export interface AdministradorCliente extends AddressValue { id: number; dni: string; nombre: string; telefono?: string | null; }
 export type AdministradorClienteInput = Omit<AdministradorCliente, "id">;
 
-export interface ClienteInput {
+export interface ClienteInput extends AddressValue {
   nif: string;
   nombre: string;
   email: string;

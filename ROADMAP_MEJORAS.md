@@ -9,6 +9,18 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 - Anotar nuevas ideas en el bloque que corresponda.
 - Priorizar reduccion de trabajo manual, seguridad, trazabilidad y escalabilidad.
 
+### Facturacion Holded
+
+- Integrar en modo solo lectura las facturas de Holded como fuente de verdad contable: sincronizacion manual y periodica, webhooks firmados e idempotentes, estados de cobro, listado paginado y filtrado, descarga PDF/ZIP y permisos multicliente aplicados en backend.
+- Permitir aportar comprobantes de pago asociados a facturas, con verificacion administrativa y tareas derivadas del estado real, sin alterar nunca el estado contable confirmado por Holded.
+- Incorporar modalidades de facturacion por expediente, lote quincenal y lote mensual, con una modalidad predeterminada por referencia y posibilidad de sobrescribirla por factura.
+- Permitir carga masiva de facturas PDF, extraccion de numero, fecha, matricula, bastidor y comprador, y propuesta segura de vinculacion con expedientes finalizados que tengan justificantes finales.
+
+### Justificantes provisionales
+
+- Permitir solicitar, preparar, adjuntar y descargar el justificante provisional de gestoria en solicitudes de traspaso, claramente diferenciado del justificante final de la DGT y con tareas derivadas de su estado real.
+
+
 ## Pendientes prioritarios
 
 ### Notificaciones y recordatorios
@@ -32,6 +44,7 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 
 ### Gestion documental avanzada
 
+- Extender la edicion de administradores ya disponible en la ficha de cliente a expediente y ficha de interesado; migrar las marcas genericas existentes despues de revision.
 - Evaluar extraccion IA de datos FORMATO_GA sobre documentacion relevante del expediente, con validacion humana antes de persistir.
 - Guardar datos estructurados validados de clientes y representantes para reutilizarlos sin nueva extraccion IA.
 - Registrar decisiones validadas en revision GA como memoria auxiliar trazable para reutilizar correcciones de personas, direcciones y vehiculos en futuras extracciones.

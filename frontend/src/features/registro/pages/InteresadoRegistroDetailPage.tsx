@@ -92,6 +92,7 @@ export function InteresadoRegistroDetailPage() {
       puerta: query.data.puerta || "",
       codigoPostal: query.data.codigoPostal || "",
       municipio: query.data.municipio || "",
+      localidad: query.data.localidad || "",
       provincia: query.data.provincia || "",
       tipoPersona: query.data.tipoPersona || "PARTICULAR",
     });

@@ -4441,3 +4441,49 @@
     min-height: 82px;
   }
 }
+
+.record-observations {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--brand-deep);
+}
+
+.request-sheet .record-observations {
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+
+.record-observations > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.record-observations > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.record-observations strong {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.record-observations p {
+  margin: 0;
+  color: var(--ink-strong);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.provisional-proof{align-items:center}.provisional-proof>div:nth-child(2){flex:1}.provisional-proof__actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.provisional-proof__actions label{cursor:pointer}

@@ -20,7 +20,7 @@ const BATECOM_LABELS = ["Vendedor inicial", "Compraventa", "Comprador final"];
 type InteresadoForm = ExpedienteEditInput["interesados"][number];
 
 function emptyInteresado(): InteresadoForm {
-  return { nombre: "", nombrePila: "", apellido1: "", apellido2: "", razonSocial: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", provincia: "", rol: "" };
+  return { nombre: "", nombrePila: "", apellido1: "", apellido2: "", razonSocial: "", dni: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", localidad: "", provincia: "", rol: "" };
 }
 
 function ensureBatecomInteresados(interesados: InteresadoForm[]) {
@@ -89,6 +89,7 @@ function buildInitialForm(expediente: ExpedienteDetail): ExpedienteEditInput {
           puerta: uppercaseInput(interesado.puerta || ""),
           codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
           municipio: uppercaseInput(interesado.municipio || ""),
+          localidad: uppercaseInput(interesado.localidad || ""),
           provincia: uppercaseInput(interesado.provincia || ""),
           rol: interesado.rol || "",
         }
@@ -132,6 +133,7 @@ function buildSavePayload(form: ExpedienteEditInput): ExpedienteEditInput {
       puerta: cleanText(interesado.puerta),
       codigoPostal: cleanText(interesado.codigoPostal),
       municipio: cleanText(interesado.municipio),
+      localidad: cleanText(interesado.localidad),
       provincia: cleanText(interesado.provincia),
       rol: cleanText(interesado.rol),
     })),
@@ -240,6 +242,7 @@ export function ExpedienteEditPage() {
         puerta: uppercaseInput(interesado.puerta || ""),
         codigoPostal: uppercaseInput(interesado.codigoPostal || ""),
         municipio: uppercaseInput(interesado.municipio || ""),
+      localidad: uppercaseInput(interesado.localidad || ""),
         provincia: uppercaseInput(interesado.provincia || ""),
       };
       return { ...current, interesados };

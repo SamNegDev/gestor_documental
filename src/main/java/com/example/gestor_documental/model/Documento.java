@@ -74,6 +74,12 @@ public class Documento {
     @JoinColumn(name = "operacion_id")
     private OperacionExpediente operacion;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "expediente_completo_origen_id")
+    private Documento expedienteCompletoOrigen;
+
+    @Column(name = "paginas_expediente_completo", length = 1000)
+    private String paginasExpedienteCompleto;
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "subido_por_usuario_id")
     private Usuario subidoPor;

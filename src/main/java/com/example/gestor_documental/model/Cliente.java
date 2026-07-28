@@ -1,6 +1,7 @@
 package com.example.gestor_documental.model;
 
 import com.example.gestor_documental.enums.PreferenciaCanalCliente;
+import com.example.gestor_documental.enums.ModalidadFacturacion;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,6 +28,13 @@ public class Cliente {
     @Column(nullable = false, unique = true, length = 20)
     private String nif;
 
+    @Column(name = "holded_contact_id", unique = true, length = 100)
+    private String holdedContactId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "modalidad_facturacion_predeterminada", nullable = false, length = 30, columnDefinition = "varchar(30) default 'POR_EXPEDIENTE'")
+    private ModalidadFacturacion modalidadFacturacionPredeterminada = ModalidadFacturacion.POR_EXPEDIENTE;
+
     @Column(nullable = false, length = 120)
     private String nombre;
 
@@ -35,6 +43,42 @@ public class Cliente {
 
     @Column(length = 200)
     private String direccion;
+
+    @Column(length = 30)
+    private String tipoVia;
+
+    @Column(length = 120)
+    private String nombreVia;
+
+    @Column(length = 20)
+    private String numeroVia;
+
+    @Column(length = 20)
+    private String bloque;
+
+    @Column(length = 20)
+    private String portal;
+
+    @Column(length = 20)
+    private String escalera;
+
+    @Column(length = 20)
+    private String piso;
+
+    @Column(length = 20)
+    private String puerta;
+
+    @Column(length = 10)
+    private String codigoPostal;
+
+    @Column(length = 80)
+    private String municipio;
+
+    @Column(length = 120)
+    private String localidad;
+
+    @Column(length = 80)
+    private String provincia;
 
     @Column(length = 20)
     private String telefono;

@@ -372,9 +372,7 @@ public class SolicitudApiController {
 
         Solicitud solicitud = new Solicitud();
         solicitud.setMatricula(TextNormalizer.upperOrNull(matricula));
-        solicitud.setObservaciones(TextNormalizer.upperOrNull(observaciones) != null
-                ? TextNormalizer.upperOrNull(observaciones)
-                : "CREACION MULTIPLE");
+        solicitud.setObservaciones(TextNormalizer.upperOrNull(observaciones));
 
         Solicitud creada = solicitudService.crearSolicitudCompleta(
                 solicitud,
@@ -498,6 +496,7 @@ public class SolicitudApiController {
         solicitud.setInteresado1Puerta(TextNormalizer.upperOrNull(request.getInteresado1Puerta()));
         solicitud.setInteresado1CodigoPostal(TextNormalizer.upperOrNull(request.getInteresado1CodigoPostal()));
         solicitud.setInteresado1Municipio(TextNormalizer.upperOrNull(request.getInteresado1Municipio()));
+        solicitud.setInteresado1Localidad(TextNormalizer.upperOrNull(request.getInteresado1Localidad()));
         solicitud.setInteresado1Provincia(TextNormalizer.upperOrNull(request.getInteresado1Provincia()));
         solicitud.setInteresado2Rol(request.getInteresado2Rol());
         solicitud.setInteresado2Nombre(TextNormalizer.upperOrNull(request.getInteresado2Nombre()));
@@ -518,6 +517,7 @@ public class SolicitudApiController {
         solicitud.setInteresado2Puerta(TextNormalizer.upperOrNull(request.getInteresado2Puerta()));
         solicitud.setInteresado2CodigoPostal(TextNormalizer.upperOrNull(request.getInteresado2CodigoPostal()));
         solicitud.setInteresado2Municipio(TextNormalizer.upperOrNull(request.getInteresado2Municipio()));
+        solicitud.setInteresado2Localidad(TextNormalizer.upperOrNull(request.getInteresado2Localidad()));
         solicitud.setInteresado2Provincia(TextNormalizer.upperOrNull(request.getInteresado2Provincia()));
         solicitud.setInteresado3Rol(request.getInteresado3Rol());
         solicitud.setInteresado3Nombre(TextNormalizer.upperOrNull(request.getInteresado3Nombre()));
@@ -538,6 +538,7 @@ public class SolicitudApiController {
         solicitud.setInteresado3Puerta(TextNormalizer.upperOrNull(request.getInteresado3Puerta()));
         solicitud.setInteresado3CodigoPostal(TextNormalizer.upperOrNull(request.getInteresado3CodigoPostal()));
         solicitud.setInteresado3Municipio(TextNormalizer.upperOrNull(request.getInteresado3Municipio()));
+        solicitud.setInteresado3Localidad(TextNormalizer.upperOrNull(request.getInteresado3Localidad()));
         solicitud.setInteresado3Provincia(TextNormalizer.upperOrNull(request.getInteresado3Provincia()));
         return solicitud;
     }
@@ -687,6 +688,7 @@ public class SolicitudApiController {
                 .puerta(interesado.getPuerta())
                 .codigoPostal(interesado.getCodigoPostal())
                 .municipio(interesado.getMunicipio())
+                        .localidad(interesado.getLocalidad())
                 .provincia(interesado.getProvincia())
                 .tipoPersona(interesado.getTipoPersona() != null ? interesado.getTipoPersona().name() : null)
                 .documentos(documentos.size())
