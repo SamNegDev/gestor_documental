@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type DragEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Download, FilePlus2, FileText, Info, Link2, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ShieldAlert, ShieldCheck, Trash2, Unlink, Upload, UserRound, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Download, FilePlus2, FileText, Info, Link2, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ReceiptText, ShieldAlert, ShieldCheck, Trash2, Unlink, Upload, UserRound, X } from "lucide-react";
 import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteUploadPanel";
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
 import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
@@ -793,6 +793,14 @@ function ExpedienteIaResultPanel({ response, onDismiss }: { response: Actualizac
   );
 }
 
+function InvoiceSummaryPanel({ expediente }: { expediente: ExpedienteDetail }) {
+  const factura = expediente.factura;
+  const estados: Record<string,string> = {PENDIENTE:"Pendiente de pago",PARCIALMENTE_PAGADA:"Parcialmente pagada",PAGADA:"Pagada",ANULADA:"Anulada"};
+  if (!factura) return <section className="exp-invoice-summary exp-invoice-summary--empty" aria-label="Facturación del expediente"><ReceiptText size={18}/><div><span>Facturación</span><strong>Sin factura asignada</strong></div></section>;
+  const importe = new Intl.NumberFormat("es-ES",{style:"currency",currency:factura.moneda||"EUR"}).format(factura.total||0);
+  const fecha = factura.fechaEmision ? new Date(`${factura.fechaEmision}T00:00:00`).toLocaleDateString("es-ES") : "Sin fecha";
+  return <section className="exp-invoice-summary" aria-label="Facturación del expediente"><div className="exp-invoice-summary__identity"><ReceiptText size={18}/><div><span>Factura vinculada</span><strong>{factura.numero||`Factura #${factura.id}`}</strong></div></div><div className="exp-invoice-summary__data"><div><span>Importe</span><strong>{importe}</strong></div><div><span>Emisión</span><strong>{fecha}</strong></div><div><span>Estado</span><strong className={`exp-invoice-state exp-invoice-state--${factura.estadoFactura.toLowerCase()}`}>{estados[factura.estadoFactura]||factura.estadoFactura}</strong></div><div><span>Vinculación</span><strong>{factura.estadoVinculacion==="CONFIRMADA"?"Confirmada":"Requiere revisión"}</strong></div></div><Link className="soft-button soft-button--compact" to={`/facturas/${factura.id}`}>Ver factura</Link></section>;
+}
 export function ExpedienteDetailPage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
@@ -1639,7 +1647,8 @@ export function ExpedienteDetailPage() {
           <strong>Observaciones</strong>
           <p>{expediente.observaciones || "Sin observaciones"}</p>
         </div>
-      </section>
+      </section>      <InvoiceSummaryPanel expediente={expediente} />
+
       <OperationTabs
         activeOperationId={activeOperation?.id ?? null}
         operaciones={operaciones}

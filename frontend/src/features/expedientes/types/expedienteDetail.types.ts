@@ -507,6 +507,17 @@ export interface ExpedienteDetail {
   } | null;
   siguientePaso?: HitoExpediente | null;
   mensajesNoLeidos?: number;
+  factura?: {
+    id: number;
+    numero?: string | null;
+    fechaEmision?: string | null;
+    total?: number | null;
+    importePagado?: number | null;
+    moneda?: string | null;
+    estadoFactura: "PENDIENTE" | "PARCIALMENTE_PAGADA" | "PAGADA" | "ANULADA";
+    estadoVinculacion: "PROPUESTA" | "CONFIRMADA" | "REQUIERE_REVISION";
+    confianza: number;
+  } | null;
   cliente?: ClienteResumen | null;
   creadoPor?: UsuarioResumen | null;
   modificadoPor?: UsuarioResumen | null;

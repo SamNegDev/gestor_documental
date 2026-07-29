@@ -29,6 +29,7 @@ public class ExpedienteDetailResponse {
     private ExpedienteVinculadoResponse tramiteVinculado;
     private HitoExpedienteResponse siguientePaso;
     private int mensajesNoLeidos;
+    private FacturaExpedienteResumenResponse factura;
 
     private ClienteResumenResponse cliente;
     private UsuarioResumenResponse creadoPor;

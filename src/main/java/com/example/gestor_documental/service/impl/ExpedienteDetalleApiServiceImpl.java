@@ -4,6 +4,7 @@ import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.ExpedienteDetailResponse;
 import com.example.gestor_documental.dto.expediente.ExpedienteVinculadoResponse;
+import com.example.gestor_documental.dto.expediente.FacturaExpedienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.HistorialExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.HitoAccionResponse;
 import com.example.gestor_documental.dto.expediente.HitoExpedienteResponse;
@@ -34,6 +35,7 @@ import com.example.gestor_documental.model.DocumentoRolesLectura;
 import com.example.gestor_documental.model.DocumentoVehiculoLectura;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
+import com.example.gestor_documental.model.FacturaExpediente;
 import com.example.gestor_documental.model.HistorialCambio;
 import com.example.gestor_documental.model.HitoExpediente;
 import com.example.gestor_documental.model.Incidencia;
@@ -47,6 +49,7 @@ import com.example.gestor_documental.repository.DocumentoIdentidadLecturaReposit
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoVehiculoLecturaRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
+import com.example.gestor_documental.repository.FacturaExpedienteRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
@@ -94,6 +97,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
     private final HitoExpedienteService hitoExpedienteService;
     private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final FacturaExpedienteRepository facturaExpedienteRepository;
     private final DocumentoIdentidadLecturaRepository documentoIdentidadLecturaRepository;
     private final DocumentoRolesLecturaRepository documentoRolesLecturaRepository;
     private final DocumentoVehiculoLecturaRepository documentoVehiculoLecturaRepository;
@@ -148,6 +152,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .tramiteVinculado(mapTramiteVinculado(expediente))
                 .siguientePaso(calcularSiguientePaso(estadoDetalle, hitosSiguientePaso))
                 .mensajesNoLeidos((int) mensajeService.contarNoLeidosExpediente(expedienteId, usuarioLogueado))
+                .factura(facturaExpedienteRepository.findByExpedienteId(expedienteId).map(this::mapFactura).orElse(null))
                 .cliente(mapCliente(expediente.getCliente()))
                 .creadoPor(mapUsuario(expediente.getCreadoPor()))
                 .modificadoPor(mapUsuario(expediente.getModificadoPor()))
@@ -164,6 +169,13 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .build();
     }
 
+    private FacturaExpedienteResumenResponse mapFactura(FacturaExpediente vinculacion) {
+        var factura = vinculacion.getFactura();
+        return new FacturaExpedienteResumenResponse(
+                factura.getId(), factura.getNumero(), factura.getFechaEmision(), factura.getTotal(),
+                factura.getImportePagado(), factura.getMoneda(), factura.getEstado().name(),
+                vinculacion.getEstado().name(), vinculacion.getConfianza());
+    }
     private WhatsappExpedienteResponse mapWhatsapp(WhatsappWebhookEvento evento) {
         return WhatsappExpedienteResponse.builder()
                 .id(evento.getId())

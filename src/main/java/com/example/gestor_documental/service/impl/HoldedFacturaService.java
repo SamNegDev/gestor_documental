@@ -352,7 +352,8 @@ public class HoldedFacturaService {
         Path archivo = Paths.get(uploadDir, "facturas", factura.getArchivoFactura()).toAbsolutePath().normalize();
         if (!Files.isRegularFile(archivo)) return;
         try (PDDocument pdf = PDDocument.load(archivo.toFile())) {
-            BigDecimal total = FacturaDocumentoAnalisisService.extraerTotalTexto(new PDFTextStripper().getText(pdf));
+            PDFTextStripper extractor = new PDFTextStripper(); extractor.setSortByPosition(true);
+            BigDecimal total = FacturaDocumentoAnalisisService.extraerTotalTexto(extractor.getText(pdf));
             if (total != null && (factura.getTotal() == null || total.compareTo(factura.getTotal()) != 0)) { factura.setTotal(total); facturaRepository.save(factura); }
         } catch (IOException ignored) {
             // El detalle sigue disponible aunque el PDF historico no pueda releerse.

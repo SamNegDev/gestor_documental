@@ -221,8 +221,12 @@ public class FacturaDocumentoAnalisisService {
     private AnalisisFacturaArchivoResponse analizarUno(MultipartFile archivo) throws IOException {
         validarPdf(archivo);
         String texto;
+        String textoOrdenado;
         try (PDDocument pdf = PDDocument.load(archivo.getBytes())) {
             texto = new PDFTextStripper().getText(pdf).replace('\u00a0', ' ');
+            PDFTextStripper extractorOrdenado = new PDFTextStripper();
+            extractorOrdenado.setSortByPosition(true);
+            textoOrdenado = extractorOrdenado.getText(pdf).replace('\u00a0', ' ');
         }
         int primerDocumento = texto.toLowerCase(Locale.ROOT).indexOf("documento:");
         String cabeceraTexto = primerDocumento > 0 ? texto.substring(0, primerDocumento) : texto;
@@ -230,7 +234,7 @@ public class FacturaDocumentoAnalisisService {
         Matcher numeroMatcher = NUMERO_FACTURA.matcher(cabeceraTexto);
         String numero = numeroMatcher.find() ? numeroMatcher.group(1).replace('-', '/') : null;
         LocalDate fecha = fechaMatcher.find() ? LocalDate.parse(fechaMatcher.group(1), DateTimeFormatter.ofPattern("dd/MM/yyyy")) : null;
-        BigDecimal total = extraerTotalTexto(texto);
+        BigDecimal total = extraerTotalTexto(textoOrdenado);
         FacturaHolded factura = numero == null ? null : facturaRepository.findFirstByNumeroIgnoreCase(numero).orElse(null);
         List<LineaFacturaDetectadaResponse> lineas = extraerLineas(texto, factura, fecha, identificadores(cabeceraTexto));
         String estado = numero == null ? "NUMERO_NO_DETECTADO" : lineas.isEmpty() ? "SIN_EXPEDIENTES_DETECTADOS" : factura == null ? "FACTURA_LOCAL_NUEVA" : "PROPUESTA_LISTA";
