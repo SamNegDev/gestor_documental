@@ -8,6 +8,7 @@ import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoOperacionExpediente;
+import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
@@ -17,6 +18,7 @@ import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.Interesado;
+import com.example.gestor_documental.model.OperacionExpediente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.model.Vehiculo;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
@@ -25,6 +27,7 @@ import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoVehiculoLecturaRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
+import com.example.gestor_documental.repository.OperacionExpedienteRepository;
 import com.example.gestor_documental.repository.VehiculoRepository;
 import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
@@ -72,6 +75,7 @@ public class ExpedienteDocumentacionActualizacionService {
     private final DocumentoVehiculoLecturaRepository documentoVehiculoLecturaRepository;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
     private final InteresadoRepository interesadoRepository;
+    private final OperacionExpedienteRepository operacionExpedienteRepository;
     private final VehiculoRepository vehiculoRepository;
     private final DocumentoIdentidadLecturaService documentoIdentidadLecturaService;
     private final DocumentoRolesLecturaService documentoRolesLecturaService;
@@ -170,11 +174,17 @@ public class ExpedienteDocumentacionActualizacionService {
                 continue;
             }
             try {
-                boolean existia = documentoRolesLecturaRepository.findByDocumentoId(documento.getId()).isPresent();
+                DocumentoRolesLectura lecturaExistente = documentoRolesLecturaRepository
+                        .findByDocumentoId(documento.getId())
+                        .orElse(null);
+                boolean existia = lecturaExistente != null;
+                boolean forzarLecturaDocumento = forzarRelectura
+                        || (lecturaExistente != null && !lecturaRolesAltaConfianza(lecturaExistente));
                 String interesadosAntes = resumenInteresados(expedienteId);
-                DocumentoRolesLecturaResponse lectura = documentoRolesLecturaService.leerRoles(documento.getId(), forzarRelectura, admin);
+                DocumentoRolesLecturaResponse lectura = documentoRolesLecturaService
+                        .leerRoles(documento.getId(), forzarLecturaDocumento, admin);
                 contadores.operacionesLeidas++;
-                if (existia && !forzarRelectura) {
+                if (existia && !forzarLecturaDocumento) {
                     contadores.rolesReutilizada++;
                 } else {
                     contadores.rolesNueva++;
@@ -186,18 +196,32 @@ public class ExpedienteDocumentacionActualizacionService {
                 }
                 DocumentoRolesLectura lecturaRoles = documentoRolesLecturaRepository.findByDocumentoId(documento.getId())
                         .orElseThrow(() -> new OperacionInvalidaException("Primero debes leer roles del contrato o factura."));
-                ConsolidacionRoles consolidacion = consolidarRoles(expediente, documento, lecturaRoles, identidades, admin);
-                String interesadosDespues = resumenInteresados(expedienteId);
-                if (consolidacion.datosAplicados() || !Objects.equals(interesadosAntes, interesadosDespues)) {
-                    datosAplicados++;
-                    detalles.add(nombreDocumento(documento) + ": datos aplicados desde contrato/factura.");
+                if (esBatecom(expediente)) {
+                    detalles.add(nombreDocumento(documento) + ": lectura BATECOM preparada para consolidar la cadena completa.");
                 } else {
-                    detalles.add(nombreDocumento(documento) + ": interesados ya estaban aplicados; se comprobaron sin cambios.");
+                    ConsolidacionRoles consolidacion = consolidarRoles(expediente, documento, lecturaRoles, identidades, admin);
+                    String interesadosDespues = resumenInteresados(expedienteId);
+                    if (consolidacion.datosAplicados() || !Objects.equals(interesadosAntes, interesadosDespues)) {
+                        datosAplicados++;
+                        detalles.add(nombreDocumento(documento) + ": datos aplicados desde contrato/factura.");
+                    } else {
+                        detalles.add(nombreDocumento(documento) + ": interesados ya estaban aplicados; se comprobaron sin cambios.");
+                    }
+                    detalles.addAll(consolidacion.avisos());
                 }
-                detalles.addAll(consolidacion.avisos());
             } catch (RuntimeException exception) {
                 requiereRevision = true;
                 detalles.add(nombreDocumento(documento) + ": no se pudieron aplicar datos (" + mensaje(exception) + ").");
+            }
+        }
+
+        if (esBatecom(expediente)) {
+            try {
+                int aplicadosBatecom = consolidarCadenaBatecom(expediente, documentos, identidades, admin, detalles);
+                datosAplicados += aplicadosBatecom;
+            } catch (RuntimeException exception) {
+                requiereRevision = true;
+                detalles.add("BATECOM: no se pudo consolidar la cadena de interesados (" + mensaje(exception) + ").");
             }
         }
 
@@ -341,10 +365,12 @@ public class ExpedienteDocumentacionActualizacionService {
         }
 
         List<String> avisos = new ArrayList<>();
-        validarIdentidadCorroborada(expediente, vendedor.identificador(), identidades, "vendedor");
-        validarIdentidadCorroborada(expediente, comprador.identificador(), identidades, "comprador");
+        avisarFaltaIdentidadIndependiente(expediente, vendedor.identificador(), identidades, "vendedor", avisos);
+        avisarFaltaIdentidadIndependiente(expediente, comprador.identificador(), identidades, "comprador", avisos);
         avisarNombreIdentidad(lectura.getVendedorIdentificador(), lectura.getVendedorNombre(), "vendedor", identidades, avisos);
         avisarNombreIdentidad(lectura.getCompradorIdentificador(), lectura.getCompradorNombre(), "comprador", identidades, avisos);
+        avisarNombreInteresadoRegistrado(vendedor, "vendedor", avisos);
+        avisarNombreInteresadoRegistrado(comprador, "comprador", avisos);
 
         boolean actualizado = false;
         Interesado interesadoVendedor = obtenerOCrearInteresado(vendedor);
@@ -374,6 +400,103 @@ public class ExpedienteDocumentacionActualizacionService {
                             + rolComprador(documento).name().toLowerCase(Locale.ROOT) + " desde " + nombreDocumento(documento) + ".");
         }
         return new ConsolidacionRoles(actualizado, avisos);
+    }
+
+    private int consolidarCadenaBatecom(
+            Expediente expediente,
+            List<Documento> documentos,
+            Map<String, IdentidadExpediente> identidades,
+            Usuario admin,
+            List<String> detalles
+    ) {
+        Map<Long, Documento> documentosOperacion = documentos.stream()
+                .filter(documento -> DOCUMENTOS_OPERACION.contains(documento.getTipoDocumento()))
+                .filter(documento -> documento.getId() != null)
+                .collect(java.util.stream.Collectors.toMap(Documento::getId, documento -> documento));
+        List<DocumentoRolesLectura> lecturas = documentoRolesLecturaRepository
+                .findByDocumentoIdIn(documentosOperacion.keySet().stream().toList()).stream()
+                .filter(this::lecturaRolesAltaConfianza)
+                .toList();
+        CadenaBatecom mejor = null;
+        for (DocumentoRolesLectura bate : lecturas) {
+            String intermediario = normalizarIdentificador(bate.getCompradorIdentificador());
+            for (DocumentoRolesLectura com : lecturas) {
+                if (mismaLectura(bate, com)
+                        || intermediario == null
+                        || !intermediario.equals(normalizarIdentificador(com.getVendedorIdentificador()))) {
+                    continue;
+                }
+                double confianzaMedia = (confianza(bate.getConfianzaGlobal()) + confianza(com.getConfianzaGlobal())) / 2;
+                if (mejor == null || confianzaMedia > mejor.confianza()) {
+                    mejor = new CadenaBatecom(bate, com, confianzaMedia);
+                }
+            }
+        }
+        if (mejor == null) {
+            throw new OperacionInvalidaException(
+                    "hacen falta dos contratos/facturas coherentes con una compraventa comun");
+        }
+        Documento documentoBate = documentosOperacion.get(mejor.bate().getDocumento().getId());
+        Documento documentoCom = documentosOperacion.get(mejor.com().getDocumento().getId());
+        if (documentoBate == null || documentoCom == null) {
+            throw new OperacionInvalidaException("las lecturas no pertenecen a documentos actuales del expediente");
+        }
+        OperacionExpediente operacionBate = operacionExpedienteRepository
+                .findByExpedienteIdAndTipo(expediente.getId(), TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE)
+                .orElseThrow(() -> new OperacionInvalidaException("falta la operacion BATE del expediente"));
+        OperacionExpediente operacionCom = operacionExpedienteRepository
+                .findByExpedienteIdAndTipo(expediente.getId(), TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM)
+                .orElseThrow(() -> new OperacionInvalidaException("falta la operacion COM del expediente"));
+        documentoBate.setOperacion(operacionBate);
+        documentoCom.setOperacion(operacionCom);
+        documentoRepository.save(documentoBate);
+        documentoRepository.save(documentoCom);
+
+        int aplicados = 0;
+        ConsolidacionRoles bate = consolidarRoles(expediente, documentoBate, mejor.bate(), identidades, admin);
+        ConsolidacionRoles com = consolidarRoles(expediente, documentoCom, mejor.com(), identidades, admin);
+        if (bate.datosAplicados()) aplicados++;
+        if (com.datosAplicados()) aplicados++;
+        detalles.addAll(bate.avisos());
+        detalles.addAll(com.avisos());
+        detalles.add("BATECOM: cadena consolidada como vendedor inicial, compraventa y comprador final.");
+        return aplicados;
+    }
+
+    private boolean lecturaRolesAltaConfianza(DocumentoRolesLectura lectura) {
+        if (lectura == null || lectura.getDocumento() == null || lectura.getDocumento().getId() == null
+                || lectura.isRequiereRevision() || confianza(lectura.getConfianzaGlobal()) < CONFIANZA_MINIMA_ROLES) {
+            return false;
+        }
+        String vendedor = normalizarIdentificador(lectura.getVendedorIdentificador());
+        String comprador = normalizarIdentificador(lectura.getCompradorIdentificador());
+        return identificadorValido(vendedor) && identificadorValido(comprador)
+                && !vendedor.equals(comprador)
+                && !enBlanco(lectura.getVendedorNombre())
+                && !enBlanco(lectura.getCompradorNombre());
+    }
+
+    private boolean mismaLectura(DocumentoRolesLectura primera, DocumentoRolesLectura segunda) {
+        return primera != null && segunda != null
+                && primera.getDocumento() != null && segunda.getDocumento() != null
+                && Objects.equals(primera.getDocumento().getId(), segunda.getDocumento().getId());
+    }
+
+    private void avisarFaltaIdentidadIndependiente(
+            Expediente expediente,
+            String identificador,
+            Map<String, IdentidadExpediente> identidades,
+            String etiqueta,
+            List<String> avisos
+    ) {
+        if (!identidadCorroboraRol(expediente, identificador, identidades)) {
+            avisos.add("El " + etiqueta + " se ha creado desde contrato/factura de alta confianza; falta DNI/CIF independiente para completar sus datos personales.");
+        }
+    }
+
+    private boolean esBatecom(Expediente expediente) {
+        return expediente != null && expediente.getTipoTramite() != null
+                && expediente.getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM;
     }
 
     private void validarLecturaRolesUsable(
@@ -428,10 +551,15 @@ public class ExpedienteDocumentacionActualizacionService {
         String nombreIdentidad = identidad != null ? identidad.nombreCompleto() : null;
         String direccionIdentidad = identidad != null ? identidad.direccionTexto() : null;
         String direccionRoles = normalizarTexto(vendedor ? lectura.getVendedorDireccion() : lectura.getCompradorDireccion());
+        Interesado registrado = identificador != null ? interesadoRepository.findByDni(identificador).orElse(null) : null;
+        String nombreRegistrado = registrado != null
+                ? normalizarNombre(!enBlanco(registrado.getRazonSocial()) ? registrado.getRazonSocial() : registrado.getNombre())
+                : null;
+        String nombreDocumental = nombreMasCompleto(nombreIdentidad, nombreRoles);
         return new PersonaExpediente(
                 identificador,
-                nombreMasCompleto(nombreIdentidad, nombreRoles),
-                direccionMasCompleta(direccionIdentidad, direccionRoles)
+                nombreMasCompleto(nombreDocumental, nombreRegistrado),
+                direccionMasCompleta(direccionIdentidad, direccionRoles, registrado != null ? registrado.getDireccion() : null)
         );
     }
 
@@ -526,6 +654,26 @@ public class ExpedienteDocumentacionActualizacionService {
         if (nombreIdentidad != null && nombreRol != null && !NombrePersonaNormalizer.equivalentes(nombreIdentidad, nombreRol)) {
             avisos.add("Aviso: el nombre del " + etiqueta + " difiere entre DNI/CIF y contrato/factura. Revisa la lectura.");
         }
+    }
+
+    private void avisarNombreInteresadoRegistrado(
+            PersonaExpediente persona,
+            String etiqueta,
+            List<String> avisos
+    ) {
+        if (persona == null || persona.identificador() == null) {
+            return;
+        }
+        interesadoRepository.findByDni(persona.identificador()).ifPresent(registrado -> {
+            String nombreRegistrado = normalizarNombre(
+                    !enBlanco(registrado.getRazonSocial()) ? registrado.getRazonSocial() : registrado.getNombre());
+            String nombreLeido = normalizarNombre(persona.nombre());
+            if (nombreRegistrado != null && nombreLeido != null
+                    && !NombrePersonaNormalizer.equivalentes(nombreRegistrado, nombreLeido)) {
+                avisos.add("Aviso: el " + etiqueta + " con identificador " + persona.identificador()
+                        + " ya existe con un nombre distinto; se han conservado los datos registrados para revision.");
+            }
+        });
     }
 
     private Interesado obtenerOCrearInteresado(PersonaExpediente persona) {
@@ -927,6 +1075,13 @@ public class ExpedienteDocumentacionActualizacionService {
     }
 
     private record PersonaExpediente(String identificador, String nombre, String direccion) {
+    }
+
+    private record CadenaBatecom(
+            DocumentoRolesLectura bate,
+            DocumentoRolesLectura com,
+            double confianza
+    ) {
     }
 
     private record ConsolidacionRoles(boolean datosAplicados, List<String> avisos) {

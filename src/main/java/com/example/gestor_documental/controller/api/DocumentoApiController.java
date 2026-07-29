@@ -62,10 +62,12 @@ public class DocumentoApiController {
             @PathVariable Long expedienteId,
             @RequestParam("archivo") MultipartFile archivo,
             @RequestParam(required = false) Long operacionId,
+            @RequestParam(defaultValue = "true") boolean reordenarPorTipo,
             Authentication authentication
     ) {
         Usuario usuarioLogueado = currentUserService.requireUser(authentication);
-        return expedienteCompletoProcesamientoService.iniciar(expedienteId, archivo, operacionId, usuarioLogueado);
+        return expedienteCompletoProcesamientoService.iniciar(
+                expedienteId, archivo, operacionId, reordenarPorTipo, usuarioLogueado);
     }
 
     @GetMapping("/procesamientos-expediente-completo/{jobId}")

@@ -1436,6 +1436,48 @@
   font-weight: 700;
 }
 
+.complete-upload-order {
+  display: inline-grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  cursor: pointer;
+  color: var(--ink-strong);
+}
+
+.complete-upload-order input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+}
+
+.complete-upload-order__icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid oklch(82% 0.06 232);
+  border-radius: 8px;
+  background: oklch(96% 0.025 232);
+  color: var(--brand);
+}
+
+.complete-upload-order span:last-child {
+  display: grid;
+  gap: 1px;
+}
+
+.complete-upload-order strong {
+  font-size: 0.82rem;
+}
+
+.complete-upload-order small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
 .ocr-review-list {
   display: grid;
   gap: 12px;

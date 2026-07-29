@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CarFront, CheckCircle2, FileSignature, FileText, FileUp, FolderCheck, IdCard, Info, Loader2, MapPin, MessageSquare, Pencil, Phone, RefreshCw, RotateCcw, Scissors, Send, Sparkles, UserPlus, UserRound, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Building2, CarFront, CheckCircle2, FileSignature, FileText, FileUp, FolderCheck, IdCard, Info, Loader2, MapPin, MessageSquare, Pencil, Phone, RefreshCw, RotateCcw, Scissors, Send, Sparkles, UserPlus, UserRound, X } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { ApiError } from "../../../shared/api/http";
@@ -275,7 +275,7 @@ export function SolicitudDetailPage() {
     return () => window.clearInterval(intervalId);
   }, [completeSolicitudJob, id]);
 
-  const handleUploadCompleteSolicitud = async (archivo: File) => {
+  const handleUploadCompleteSolicitud = async (archivo: File, reordenarPorTipo: boolean) => {
     const solicitud = solicitudQuery.data;
     if (!solicitud) return;
     if (!archivo.name.toLowerCase().endsWith(".pdf")) {
@@ -285,7 +285,7 @@ export function SolicitudDetailPage() {
     setCompleteSolicitudProcessing(true);
     setCompleteSolicitudMinimized(false);
     try {
-      const job = await startCompleteSolicitudProcessing(solicitud.id, archivo);
+      const job = await startCompleteSolicitudProcessing(solicitud.id, archivo, reordenarPorTipo);
       setCompleteSolicitudJob(job);
       window.localStorage.setItem(`${COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX}${solicitud.id}`, job.jobId);
       await refreshSolicitud();
@@ -703,6 +703,32 @@ export function SolicitudDetailPage() {
           </section>
         ) : null}
         <div className="request-summary-strip">
+          <section className="request-summary-block request-summary-block--client" aria-labelledby="solicitud-cliente-title">
+            <div className="request-summary-block__head">
+              <span className="row-icon" aria-hidden="true">
+                <Building2 size={16} />
+              </span>
+              <div>
+                <h3 id="solicitud-cliente-title">Cliente</h3>
+                <p>{solicitud.cliente ? "Asignado" : "Pendiente"}</p>
+              </div>
+            </div>
+            <dl className="request-summary-facts request-summary-facts--client">
+              <div>
+                <dt>Nombre</dt>
+                <dd>{solicitud.cliente?.nombre || "No consta"}</dd>
+              </div>
+              <div>
+                <dt>NIF</dt>
+                <dd>{solicitud.cliente?.nif || "No consta"}</dd>
+              </div>
+              <div>
+                <dt>Contacto</dt>
+                <dd>{solicitud.cliente?.email || solicitud.cliente?.telefono || "No consta"}</dd>
+              </div>
+            </dl>
+          </section>
+
           <section className="request-summary-block request-summary-block--vehicle" aria-labelledby="solicitud-vehiculo-title">
             <div className="request-summary-block__head">
               <span className="row-icon" aria-hidden="true">

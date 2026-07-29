@@ -6,9 +6,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface ExpedienteCompletoProcesamientoService {
 
-    ProcesamientoExpedienteCompletoResponse iniciar(Long expedienteId, MultipartFile archivo, Long operacionId, Usuario usuario);
+    ProcesamientoExpedienteCompletoResponse iniciar(Long expedienteId, MultipartFile archivo, Long operacionId,
+            boolean reordenarPorTipo, Usuario usuario);
 
-    ProcesamientoExpedienteCompletoResponse iniciarSolicitud(Long solicitudId, MultipartFile archivo, Usuario usuario);
+    ProcesamientoExpedienteCompletoResponse iniciarSolicitud(Long solicitudId, MultipartFile archivo,
+            boolean reordenarPorTipo, Usuario usuario);
 
     ProcesamientoExpedienteCompletoResponse iniciarDocumentoExistente(Long documentoId, Usuario usuario);
 

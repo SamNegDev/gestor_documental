@@ -1148,7 +1148,7 @@ export function ExpedienteDetailPage() {
     }
   };
 
-  const handleUploadCompleteExpediente = async (archivo: File) => {
+  const handleUploadCompleteExpediente = async (archivo: File, reordenarPorTipo: boolean) => {
     if (!expediente) return;
     if (!archivo.name.toLowerCase().endsWith(".pdf")) {
       alert("El expediente completo debe subirse en formato PDF.");
@@ -1157,7 +1157,7 @@ export function ExpedienteDetailPage() {
     setCompleteExpedienteProcessing(true);
     setCompleteExpedienteMinimized(false);
     try {
-      const job = await startCompleteExpedienteProcessing(expediente.id, archivo, activeOperationId);
+      const job = await startCompleteExpedienteProcessing(expediente.id, archivo, activeOperationId, reordenarPorTipo);
       setCompleteExpedienteJob(job);
       window.localStorage.setItem(`${COMPLETE_EXPEDIENTE_JOB_STORAGE_PREFIX}${expediente.id}`, job.jobId);
       await refreshExpediente();

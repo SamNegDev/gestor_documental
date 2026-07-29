@@ -9,16 +9,18 @@ export function uploadExpedienteDocument(expedienteId: number, tipoDocumento: st
   return apiPostForm(`/api/expedientes/${expedienteId}/documentos`, formData);
 }
 
-export function startCompleteExpedienteProcessing(expedienteId: number, archivo: File, operacionId?: number | null): Promise<ProcesamientoExpedienteCompleto> {
+export function startCompleteExpedienteProcessing(expedienteId: number, archivo: File, operacionId?: number | null, reordenarPorTipo = true): Promise<ProcesamientoExpedienteCompleto> {
   const formData = new FormData();
   formData.append("archivo", archivo);
   if (operacionId) formData.append("operacionId", String(operacionId));
+  formData.append("reordenarPorTipo", String(reordenarPorTipo));
   return apiPostForm<ProcesamientoExpedienteCompleto>(`/api/expedientes/${expedienteId}/documentos/expediente-completo/procesamientos`, formData);
 }
 
-export function startCompleteSolicitudProcessing(solicitudId: number, archivo: File): Promise<ProcesamientoExpedienteCompleto> {
+export function startCompleteSolicitudProcessing(solicitudId: number, archivo: File, reordenarPorTipo = true): Promise<ProcesamientoExpedienteCompleto> {
   const formData = new FormData();
   formData.append("archivo", archivo);
+  formData.append("reordenarPorTipo", String(reordenarPorTipo));
   return apiPostForm<ProcesamientoExpedienteCompleto>(`/api/solicitudes/${solicitudId}/documentos/expediente-completo/procesamientos`, formData);
 }
 

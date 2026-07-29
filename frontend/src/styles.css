@@ -5568,7 +5568,7 @@ input.records-table-filter {
 
 .request-summary-strip {
   display: grid;
-  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
+  grid-template-columns: minmax(230px, 0.75fr) minmax(230px, 0.75fr) minmax(0, 1.5fr);
   border-top: 1px solid var(--line);
 }
 
@@ -5580,6 +5580,7 @@ input.records-table-filter {
   padding: 11px 14px 12px;
 }
 
+.request-summary-block--client,
 .request-summary-block--vehicle {
   border-right: 1px solid var(--line);
 }
@@ -5861,6 +5862,7 @@ input.records-table-filter {
     grid-template-columns: 1fr;
   }
 
+  .request-summary-block--client,
   .request-summary-block--vehicle {
     border-right: 0;
     border-bottom: 1px solid var(--line);
@@ -8349,9 +8351,10 @@ input.records-table-filter {
   }
 
   .request-summary-strip {
-    grid-template-columns: minmax(220px, 0.68fr) minmax(0, 1.32fr);
+    grid-template-columns: minmax(210px, 0.72fr) minmax(210px, 0.72fr) minmax(0, 1.56fr);
   }
 
+  .request-summary-block--client,
   .request-summary-block--vehicle {
     border-right: 1px solid var(--line);
     border-bottom: 0;

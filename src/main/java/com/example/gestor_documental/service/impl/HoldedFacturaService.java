@@ -293,9 +293,14 @@ public class HoldedFacturaService {
     public FacturaDetalleResponse detalle(Long id, Usuario usuario) {
         FacturaHolded factura = requireFactura(id, usuario);
         repararTotalDesdePdf(factura);
+        boolean administracion = usuario.getRolUsuario() == RolUsuario.ADMIN;
         List<FacturaVinculacionResponse> vinculaciones = facturaExpedienteRepository.findByFacturaIdOrderByIdAsc(id).stream()
-                .map(this::mapVinculacion).toList();
-        return new FacturaDetalleResponse(mapFactura(factura), vinculaciones, lineasPendientes(factura));
+                .map(administracion ? this::mapVinculacion : this::mapVinculacionCliente)
+                .toList();
+        return new FacturaDetalleResponse(
+                administracion ? mapFactura(factura) : mapFacturaCliente(factura),
+                vinculaciones,
+                administracion ? lineasPendientes(factura) : List.of());
     }
 
     private List<LineaFacturaPendienteResponse> lineasPendientes(FacturaHolded factura) {
@@ -391,6 +396,27 @@ public class HoldedFacturaService {
                 v.getEstado().name(), v.getMatriculaDetectada(), v.getBastidorDetectado(),
                 v.getCompradorIdentificadorDetectado(), v.getConfianza(), v.getMotivoRevision());
     }
+    private FacturaVinculacionResponse mapVinculacionCliente(FacturaExpediente vinculacion) {
+        Expediente expediente = vinculacion.getExpediente();
+        return new FacturaVinculacionResponse(
+                vinculacion.getId(),
+                expediente.getId(),
+                expediente.getMatricula(),
+                expediente.getCliente() != null ? expediente.getCliente().getNombre() : null,
+                expediente.getEstadoExpediente() != null ? expediente.getEstadoExpediente().name() : null,
+                vinculacion.getEstado().name(),
+                null, null, null, 0, null);
+    }
+
+    private FacturaHoldedResponse mapFacturaCliente(FacturaHolded f) {
+        FacturaHoldedResponse factura = mapFactura(f);
+        return new FacturaHoldedResponse(
+                factura.id(), factura.numero(), factura.contactoNombre(), factura.contactoNif(),
+                factura.fechaEmision(), factura.fechaVencimiento(), factura.total(), factura.importePagado(),
+                factura.moneda(), factura.estado(), factura.sincronizadaEn(), 0, null, false,
+                factura.comprobantes());
+    }
+
     private FacturaHoldedResponse mapFactura(FacturaHolded f) { return new FacturaHoldedResponse(f.getId(), f.getNumero(), f.getContactoNombre(), f.getContactoNif(), f.getFechaEmision(), f.getFechaVencimiento(), f.getTotal(), f.getImportePagado(), f.getMoneda(), f.getEstado(), f.getSincronizadaEn(), f.getLineasPendientesRevision(), f.getDetalleLineasPendientes(), f.getHoldedInvoiceId() != null && f.getHoldedInvoiceId().startsWith("LOCAL:"), comprobanteRepository.findByFacturaIdOrderByCreadoEnDesc(f.getId()).stream().map(this::mapComprobante).toList()); }
     private ComprobantePagoResponse mapComprobante(ComprobantePago c) { return new ComprobantePagoResponse(c.getId(), c.getNombreOriginal(), c.getContentType(), c.getTamano(), c.getEstado(), c.getObservaciones(), c.getCreadoEn(), c.getRevisadoEn()); }
     private void validarConfiguracion() { if (!enabled) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Integracion Holded desactivada"); if (apiToken == null || apiToken.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Falta configurar el token de Holded"); }

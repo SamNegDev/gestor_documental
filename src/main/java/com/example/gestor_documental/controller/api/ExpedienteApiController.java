@@ -318,7 +318,7 @@ public class ExpedienteApiController {
         return new CreacionConProcesamientoResponse(
                 creado.getId(),
                 null,
-                expedienteCompletoProcesamientoService.iniciar(creado.getId(), archivo, null, usuarioLogueado)
+                expedienteCompletoProcesamientoService.iniciar(creado.getId(), archivo, null, false, usuarioLogueado)
         );
     }
 

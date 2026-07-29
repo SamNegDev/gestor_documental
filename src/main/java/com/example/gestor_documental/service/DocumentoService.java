@@ -24,11 +24,19 @@ public interface DocumentoService {
 
     Documento guardarExpedienteCompletoOriginalParaExpediente(Long expedienteId, MultipartFile archivo, Long operacionId, Usuario usuario);
 
-    int procesarExpedienteCompletoDocumento(Long documentoId, Usuario usuario);
+    default int procesarExpedienteCompletoDocumento(Long documentoId, Usuario usuario) {
+        return procesarExpedienteCompletoDocumento(documentoId, false, usuario);
+    }
+
+    int procesarExpedienteCompletoDocumento(Long documentoId, boolean reordenarPorTipo, Usuario usuario);
 
     Documento guardarExpedienteCompletoOriginalParaSolicitud(Long solicitudId, MultipartFile archivo, Usuario usuario);
 
-    int procesarExpedienteCompletoSolicitudDocumento(Long documentoId, Usuario usuario);
+    default int procesarExpedienteCompletoSolicitudDocumento(Long documentoId, Usuario usuario) {
+        return procesarExpedienteCompletoSolicitudDocumento(documentoId, false, usuario);
+    }
+
+    int procesarExpedienteCompletoSolicitudDocumento(Long documentoId, boolean reordenarPorTipo, Usuario usuario);
 
     Documento guardarGeneradoParaExpediente(Long expedienteId, byte[] contenido, TipoDocumento tipoDocumento,
             String nombreArchivoOriginal, String descripcion, Usuario usuario);

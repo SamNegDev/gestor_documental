@@ -64,7 +64,8 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
     }
 
     @Override
-    public ProcesamientoExpedienteCompletoResponse iniciar(Long expedienteId, MultipartFile archivo, Long operacionId, Usuario usuario) {
+    public ProcesamientoExpedienteCompletoResponse iniciar(Long expedienteId, MultipartFile archivo, Long operacionId,
+            boolean reordenarPorTipo, Usuario usuario) {
         Documento documento = documentoService.guardarExpedienteCompletoOriginalParaExpediente(expedienteId, archivo, operacionId, usuario);
         String jobId = UUID.randomUUID().toString();
         LocalDateTime ahora = LocalDateTime.now();
@@ -74,6 +75,7 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
                 null,
                 documento.getId(),
                 documento.getNombreArchivoOriginal(),
+                reordenarPorTipo,
                 JobTarget.EXPEDIENTE,
                 EstadoJob.PENDIENTE,
                 0,
@@ -87,7 +89,8 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
     }
 
     @Override
-    public ProcesamientoExpedienteCompletoResponse iniciarSolicitud(Long solicitudId, MultipartFile archivo, Usuario usuario) {
+    public ProcesamientoExpedienteCompletoResponse iniciarSolicitud(Long solicitudId, MultipartFile archivo,
+            boolean reordenarPorTipo, Usuario usuario) {
         Documento documento = documentoService.guardarExpedienteCompletoOriginalParaSolicitud(solicitudId, archivo, usuario);
         String jobId = UUID.randomUUID().toString();
         LocalDateTime ahora = LocalDateTime.now();
@@ -97,6 +100,7 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
                 solicitudId,
                 documento.getId(),
                 documento.getNombreArchivoOriginal(),
+                reordenarPorTipo,
                 JobTarget.SOLICITUD,
                 EstadoJob.PENDIENTE,
                 0,
@@ -129,6 +133,7 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
                 solicitudId,
                 documento.getId(),
                 documento.getNombreArchivoOriginal(),
+                true,
                 solicitudId != null ? JobTarget.SOLICITUD : JobTarget.EXPEDIENTE,
                 EstadoJob.PENDIENTE,
                 0,
@@ -163,8 +168,8 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
         try {
             JobState job = jobs.get(jobId);
             int generados = job.target() == JobTarget.SOLICITUD
-                    ? documentoService.procesarExpedienteCompletoSolicitudDocumento(job.documentoId(), usuario)
-                    : documentoService.procesarExpedienteCompletoDocumento(job.documentoId(), usuario);
+                    ? documentoService.procesarExpedienteCompletoSolicitudDocumento(job.documentoId(), job.reordenarPorTipo(), usuario)
+                    : documentoService.procesarExpedienteCompletoDocumento(job.documentoId(), job.reordenarPorTipo(), usuario);
             ExtraccionGaJobResponse lecturaInicial = programarLecturaInicialSiProcede(job, generados, usuario);
             actualizar(
                     jobId,
@@ -209,6 +214,7 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
                 job.solicitudId(),
                 job.documentoId(),
                 job.archivo(),
+                job.reordenarPorTipo(),
                 job.target(),
                 estado,
                 documentosGenerados,
@@ -267,6 +273,7 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
             Long solicitudId,
             Long documentoId,
             String archivo,
+            boolean reordenarPorTipo,
             JobTarget target,
             EstadoJob estado,
             int documentosGenerados,

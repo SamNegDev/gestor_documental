@@ -1,8 +1,9 @@
-import { ChevronDown, ChevronUp, FileSearch, Loader2, Upload } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ChevronUp, FileSearch, ListOrdered, Loader2, Upload } from "lucide-react";
 import type { ProcesamientoExpedienteCompleto } from "../types/expedienteDetail.types";
 
 type Props = {
-  onUploadCompleteExpediente: (archivo: File) => void;
+  onUploadCompleteExpediente: (archivo: File, reordenarPorTipo: boolean) => void;
   processing?: boolean;
   minimized?: boolean;
   processingJob?: ProcesamientoExpedienteCompleto | null;
@@ -20,6 +21,7 @@ export function CompleteExpedienteUploadPanel({
   title = "Subir expediente completo",
   description = "Sube un PDF completo y el sistema intentara separar automaticamente los documentos detectados.",
 }: Props) {
+  const [reordenarPorTipo, setReordenarPorTipo] = useState(true);
   const active = processingJob && processingJob.estado !== "COMPLETADO" && processingJob.estado !== "ERROR";
   const done = processingJob?.estado === "COMPLETADO";
   const failed = processingJob?.estado === "ERROR";
@@ -33,6 +35,21 @@ export function CompleteExpedienteUploadPanel({
         <p className="eyebrow">OCR</p>
         <h3>{title}</h3>
         {!minimized ? <p>{processingJob?.mensaje || description}</p> : null}
+        {!minimized && !processingJob ? (
+          <label className="complete-upload-order">
+            <input
+              type="checkbox"
+              checked={reordenarPorTipo}
+              disabled={processing}
+              onChange={(event) => setReordenarPorTipo(event.target.checked)}
+            />
+            <span className="complete-upload-order__icon"><ListOrdered size={15} /></span>
+            <span>
+              <strong>Reordenar tras clasificar</strong>
+              <small>Factura, contrato, titularidad, mandato, otros, identidad y vehiculo.</small>
+            </span>
+          </label>
+        ) : null}
         {processingJob && !minimized ? (
           <div className={`complete-upload-status ${done ? "complete-upload-status--done" : failed ? "complete-upload-status--error" : ""}`}>
             <strong>{processingJob.archivo}</strong>
@@ -68,7 +85,7 @@ export function CompleteExpedienteUploadPanel({
               alert("El expediente completo debe subirse en formato PDF.");
               return;
             }
-            onUploadCompleteExpediente(file);
+            onUploadCompleteExpediente(file, reordenarPorTipo);
           }}
         />
       </label>

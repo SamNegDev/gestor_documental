@@ -384,7 +384,7 @@ public class SolicitudApiController {
         return new CreacionConProcesamientoResponse(
                 null,
                 creada.getId(),
-                expedienteCompletoProcesamientoService.iniciarSolicitud(creada.getId(), archivo, usuarioLogueado)
+                expedienteCompletoProcesamientoService.iniciarSolicitud(creada.getId(), archivo, true, usuarioLogueado)
         );
     }
 
@@ -446,10 +446,11 @@ public class SolicitudApiController {
     public ProcesamientoExpedienteCompletoResponse iniciarProcesamientoExpedienteCompleto(
             @PathVariable Long id,
             @RequestParam("archivo") MultipartFile archivo,
+            @RequestParam(defaultValue = "true") boolean reordenarPorTipo,
             Authentication authentication
     ) {
         Usuario usuarioLogueado = usuario(authentication);
-        return expedienteCompletoProcesamientoService.iniciarSolicitud(id, archivo, usuarioLogueado);
+        return expedienteCompletoProcesamientoService.iniciarSolicitud(id, archivo, reordenarPorTipo, usuarioLogueado);
     }
 
     private Usuario usuario(Authentication authentication) {

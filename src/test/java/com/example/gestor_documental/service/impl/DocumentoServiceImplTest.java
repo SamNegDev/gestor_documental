@@ -92,6 +92,22 @@ class DocumentoServiceImplTest {
     }
 
     @Test
+    void aplicaElOrdenDocumentalOperativoAlExpedienteCompleto() {
+        assertThat(List.of(
+                TipoDocumento.MODELO_620, TipoDocumento.DNI, TipoDocumento.FACTURA,
+                TipoDocumento.OTROS, TipoDocumento.MANDATO, TipoDocumento.PERMISO_CIRCULACION,
+                TipoDocumento.CONTRATO_COMPRAVENTA, TipoDocumento.INFORME_DGT,
+                TipoDocumento.CAMBIO_TITULARIDAD, TipoDocumento.FICHA_TECNICA, TipoDocumento.CIF)
+                .stream()
+                .sorted(java.util.Comparator.comparingInt(DocumentoServiceImpl::ordenDocumento)))
+                .containsExactly(
+                        TipoDocumento.FACTURA, TipoDocumento.CONTRATO_COMPRAVENTA,
+                        TipoDocumento.CAMBIO_TITULARIDAD, TipoDocumento.MANDATO, TipoDocumento.OTROS,
+                        TipoDocumento.DNI, TipoDocumento.CIF, TipoDocumento.PERMISO_CIRCULACION,
+                        TipoDocumento.FICHA_TECNICA, TipoDocumento.INFORME_DGT, TipoDocumento.MODELO_620);
+    }
+
+    @Test
     void creaExpedienteCompletoAlSubirElPrimerDocumentoIndividual() throws Exception {
         Expediente expediente = new Expediente();
         expediente.setId(7L);
