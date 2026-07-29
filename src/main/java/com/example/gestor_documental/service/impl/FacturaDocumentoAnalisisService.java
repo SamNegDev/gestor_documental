@@ -35,8 +35,8 @@ public class FacturaDocumentoAnalisisService {
     private static final Pattern FECHA_FACTURA = Pattern.compile("(\\d{2}/\\d{2}/\\d{4})");
     private static final Pattern NUMERO_FACTURA = Pattern.compile("(\\d{4}[/\\-]\\d+)");
     private static final List<Pattern> TOTAL_FACTURA = List.of(
-            Pattern.compile("(?im)TOTAL\\s+FACTURA\\s*:?\\s*([\\d.]+,\\d{2}|\\d+[.,]\\d{2})"),
             Pattern.compile("(?im)TOTAL\\s+A\\s+PAGAR\\s*:?\\s*([\\d.]+,\\d{2}|\\d+[.,]\\d{2})"),
+            Pattern.compile("(?im)TOTAL\\s+FACTURA\\s*:?\\s*([\\d.]+,\\d{2}|\\d+[.,]\\d{2})"),
             Pattern.compile("(?im)IMPORTE\\s+TOTAL\\s*:?\\s*([\\d.]+,\\d{2}|\\d+[.,]\\d{2})")
     );
     private static final Pattern DOCUMENTO = Pattern.compile("Documento:\\s*(\\d{4}/\\d+)", Pattern.CASE_INSENSITIVE);

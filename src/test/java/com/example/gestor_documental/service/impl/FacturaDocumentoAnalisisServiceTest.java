@@ -132,4 +132,9 @@ class FacturaDocumentoAnalisisServiceTest {
         assertThat(FacturaDocumentoAnalisisService.extraerTotalTexto("Base 1.000,00\nIVA 210,00\nTOTAL FACTURA 1.210,00 EUR"))
                 .isEqualByComparingTo("1210.00");
     }
+    @Test
+    void priorizaTotalAPagarFrenteAOtrosImportes() {
+        assertThat(FacturaDocumentoAnalisisService.extraerTotalTexto("TOTAL FACTURA\n723,36\nTOTAL A PAGAR:\n2.763,17 Euros"))
+                .isEqualByComparingTo("2763.17");
+    }
 }
