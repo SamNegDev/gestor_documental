@@ -5,5 +5,5 @@ export type Factura = { id:number; numero?:string; contactoNombre?:string; conta
 export type FacturasPage = { contenido:Factura[]; pagina:number; tamanio:number; totalElementos:number; totalPaginas:number };
 
 export type ModalidadFacturacion = "POR_EXPEDIENTE" | "LOTE_QUINCENAL" | "LOTE_MENSUAL";
-export type LineaFacturaDetectada = { documento?:string; matricula?:string; bastidor?:string; compradorIdentificador?:string; compradorNombre?:string; expedienteId?:number; confianza:number; estado:"COINCIDENCIA_SEGURA"|"REVISION"; motivo?:string };
+export type LineaFacturaDetectada = { documento?:string; matricula?:string; bastidor?:string; compradorIdentificador?:string; compradorNombre?:string; expedienteId?:number; confianza:number; estado:"COINCIDENCIA_SEGURA"|"REVISION"; motivo?:string; confirmacionManualPermitida:boolean };
 export type AnalisisFactura = { archivo:string; numeroFactura?:string; fechaFactura?:string; facturaId?:number; estado:string; lineas:LineaFacturaDetectada[] };

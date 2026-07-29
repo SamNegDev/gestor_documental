@@ -79,10 +79,13 @@ public class FacturaDocumentoAnalisisService {
         if (facturaId != null && !facturaId.equals(analisis.facturaId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "El numero del PDF no coincide con la factura seleccionada");
         }
-        Set<Long> seguros = new HashSet<>();
-        analisis.lineas().stream().filter(l -> "COINCIDENCIA_SEGURA".equals(l.estado()) && l.expedienteId() != null).forEach(l -> seguros.add(l.expedienteId()));
-        if (!seguros.containsAll(expedienteIds)) throw new ResponseStatusException(HttpStatus.CONFLICT, "Hay expedientes que requieren revision antes de confirmar");
-
+        Set<Long> confirmables = new HashSet<>();
+        analisis.lineas().stream()
+                .filter(l -> l.expedienteId() != null && ("COINCIDENCIA_SEGURA".equals(l.estado()) || l.confirmacionManualPermitida()))
+                .forEach(l -> confirmables.add(l.expedienteId()));
+        if (!confirmables.containsAll(expedienteIds)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La seleccion contiene expedientes no confirmables");
+        }
         List<Expediente> expedientes = new ArrayList<>();
         Cliente cliente = null;
         for (Long expedienteId : new LinkedHashSet<>(expedienteIds)) {
@@ -200,55 +203,103 @@ public class FacturaDocumentoAnalisisService {
         String numero = numeroMatcher.find() ? numeroMatcher.group(1).replace('-', '/') : null;
         LocalDate fecha = fechaMatcher.find() ? LocalDate.parse(fechaMatcher.group(1), DateTimeFormatter.ofPattern("dd/MM/yyyy")) : null;
         FacturaHolded factura = numero == null ? null : facturaRepository.findFirstByNumeroIgnoreCase(numero).orElse(null);
-        List<LineaFacturaDetectadaResponse> lineas = extraerLineas(texto, factura, fecha);
+        List<LineaFacturaDetectadaResponse> lineas = extraerLineas(texto, factura, fecha, identificadores(cabeceraTexto));
         String estado = numero == null ? "NUMERO_NO_DETECTADO" : lineas.isEmpty() ? "SIN_EXPEDIENTES_DETECTADOS" : factura == null ? "FACTURA_LOCAL_NUEVA" : "PROPUESTA_LISTA";
         return new AnalisisFacturaArchivoResponse(nombreSeguro(archivo.getOriginalFilename()), numero, fecha, factura == null ? null : factura.getId(), estado, lineas);
     }
 
-    private List<LineaFacturaDetectadaResponse> extraerLineas(String texto, FacturaHolded factura, LocalDate fechaFactura) {
-        List<LineaFacturaDetectadaResponse> resultado = new ArrayList<>();
+    private List<LineaFacturaDetectadaResponse> extraerLineas(String texto, FacturaHolded factura, LocalDate fechaFactura, Set<String> identificadoresCabecera) {
         Matcher documentos = DOCUMENTO.matcher(texto);
         List<Integer> inicios = new ArrayList<>();
         List<String> numeros = new ArrayList<>();
-        while (documentos.find()) { inicios.add(documentos.start()); numeros.add(documentos.group(1)); }
+        while (documentos.find()) {
+            inicios.add(documentos.start());
+            numeros.add(documentos.group(1));
+        }
+        List<String> bloques = new ArrayList<>();
+        Map<String, Integer> aparicionesPorBloque = new HashMap<>();
         for (int i = 0; i < inicios.size(); i++) {
             String bloque = texto.substring(inicios.get(i), i + 1 < inicios.size() ? inicios.get(i + 1) : texto.length());
+            bloques.add(bloque);
+            identificadores(bloque).forEach(id -> aparicionesPorBloque.merge(id, 1, Integer::sum));
+        }
+        Set<String> identificadoresEmisor = new HashSet<>(identificadoresCabecera);
+        aparicionesPorBloque.forEach((id, apariciones) -> {
+            if (apariciones > 1) identificadoresEmisor.add(id);
+        });
+        List<LineaFacturaDetectadaResponse> resultado = new ArrayList<>();
+        for (int i = 0; i < bloques.size(); i++) {
+            String bloque = bloques.get(i);
             String matricula = primero(MATRICULA, bloque);
             String bastidor = primero(BASTIDOR, bloque);
-            String identificador = identificadorAntesDelBastidor(bloque, bastidor);
+            String identificador = identificadorAntesDelBastidor(bloque, bastidor, identificadoresEmisor);
             String nombre = extraerNombre(bloque, identificador, bastidor);
             resultado.add(proponer(numeros.get(i), matricula, bastidor, identificador, nombre, factura, fechaFactura));
         }
         return resultado;
     }
 
+    private Set<String> identificadores(String texto) {
+        Set<String> resultado = new LinkedHashSet<>();
+        Matcher matcher = IDENTIFICADOR.matcher(texto.toUpperCase(Locale.ROOT));
+        while (matcher.find()) resultado.add(normalizar(matcher.group(1)));
+        return resultado;
+    }
+
     private LineaFacturaDetectadaResponse proponer(String documento, String matricula, String bastidor, String compradorId, String compradorNombre, FacturaHolded factura, LocalDate fechaFactura) {
-        if (matricula == null) return linea(documento, null, bastidor, compradorId, compradorNombre, null, 0, "REVISION", "No se detecto matricula");
+        if (matricula == null) return linea(documento, null, bastidor, compradorId, compradorNombre, null, 0, "REVISION", "No se detecto matricula", false);
         List<Expediente> candidatos = factura != null && factura.getCliente() != null
                 ? expedienteRepository.findByClienteIdAndMatriculaNormalizada(factura.getCliente().getId(), normalizar(matricula))
                 : expedienteRepository.findByMatriculaNormalizada(normalizar(matricula));
-        if (candidatos.size() != 1) return linea(documento, matricula, bastidor, compradorId, compradorNombre, null, 0, "REVISION", candidatos.isEmpty() ? "No existe expediente para la matricula" : "Hay varios expedientes posibles");
+        if (candidatos.size() != 1) return linea(documento, matricula, bastidor, compradorId, compradorNombre, null, 0, "REVISION", candidatos.isEmpty() ? "No existe expediente para la matricula" : "Hay varios expedientes posibles", false);
         Expediente expediente = candidatos.get(0);
-        List<String> motivos = new ArrayList<>();
+        List<String> avisos = new ArrayList<>();
+        List<String> bloqueos = new ArrayList<>();
         int confianza = 45;
-        if (expediente.getEstadoExpediente() != EstadoExpediente.FINALIZADO) motivos.add("El expediente no esta finalizado"); else confianza += 15;
-        if (vinculacionRepository.existsActivoByExpedienteId(expediente.getId())) motivos.add("El expediente ya esta facturado");
+        if (expediente.getEstadoExpediente() != EstadoExpediente.FINALIZADO) avisos.add("El expediente no esta finalizado"); else confianza += 15;
+        if (vinculacionRepository.existsActivoByExpedienteId(expediente.getId())) bloqueos.add("El expediente ya esta facturado");
         boolean justificante = !documentoRepository.findByExpedienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(expediente.getId(), JUSTIFICANTES).isEmpty();
-        if (!justificante) motivos.add("Faltan justificantes finales"); else confianza += 15;
+        if (!justificante) avisos.add("Faltan justificantes finales"); else confianza += 15;
         String bastidorLocal = expediente.getVehiculo() == null ? null : normalizar(expediente.getVehiculo().getBastidor());
-        if (bastidor != null && bastidorLocal != null) { if (normalizar(bastidor).equals(bastidorLocal)) confianza += 15; else motivos.add("El bastidor no coincide"); }
+        if (bastidor != null && bastidorLocal != null) {
+            if (normalizar(bastidor).equals(bastidorLocal)) confianza += 15; else bloqueos.add("El bastidor no coincide");
+        }
         ExpedienteInteresado comprador = expediente.getInteresados().stream().filter(x -> x.getRol() == RolInteresado.COMPRADOR).findFirst().orElse(null);
         if (compradorId != null && comprador != null && comprador.getInteresado() != null) {
-            if (normalizar(compradorId).equals(normalizar(comprador.getInteresado().getDni()))) confianza += 10; else motivos.add("El comprador no coincide");
+            if (normalizar(compradorId).equals(normalizar(comprador.getInteresado().getDni()))) confianza += 10; else bloqueos.add("El comprador no coincide");
         }
-        if (factura != null && fechaFactura != null && factura.getFechaEmision() != null && !fechaFactura.equals(factura.getFechaEmision())) motivos.add("La fecha no coincide con la factura registrada");
-        String estado = motivos.isEmpty() && confianza >= 85 ? "COINCIDENCIA_SEGURA" : "REVISION";
-        return linea(documento, matricula, bastidor, compradorId, compradorNombre, expediente.getId(), confianza, estado, String.join("; ", motivos));
+        if (factura != null && fechaFactura != null && factura.getFechaEmision() != null && !fechaFactura.equals(factura.getFechaEmision())) bloqueos.add("La fecha no coincide con la factura registrada");
+        List<String> motivos = new ArrayList<>(bloqueos);
+        motivos.addAll(avisos);
+        boolean segura = motivos.isEmpty() && confianza >= 85;
+        boolean confirmacionManual = !segura && bloqueos.isEmpty();
+        if (confirmacionManual && motivos.isEmpty()) motivos.add("Coincidencia por matricula pendiente de confirmacion manual");
+        return linea(documento, matricula, bastidor, compradorId, compradorNombre, expediente.getId(), confianza,
+                segura ? "COINCIDENCIA_SEGURA" : "REVISION", String.join("; ", motivos), confirmacionManual);
     }
 
-    private LineaFacturaDetectadaResponse linea(String doc,String mat,String vin,String id,String nombre,Long expediente,int confianza,String estado,String motivo){return new LineaFacturaDetectadaResponse(doc,mat,vin,id,nombre,expediente,confianza,estado,motivo);}
-    private String primero(Pattern patron,String texto){Matcher m=patron.matcher(texto.toUpperCase(Locale.ROOT));return m.find()?m.group(1):null;}
-    private String identificadorAntesDelBastidor(String bloque,String bastidor){if(bastidor==null)return primero(IDENTIFICADOR,bloque);String upper=bloque.toUpperCase(Locale.ROOT);int limite=upper.indexOf(bastidor.toUpperCase(Locale.ROOT));if(limite<0)return primero(IDENTIFICADOR,bloque);Matcher m=IDENTIFICADOR.matcher(upper.substring(0,limite));String ultimo=null;while(m.find())ultimo=m.group(1);return ultimo;}
+    private LineaFacturaDetectadaResponse linea(String doc, String mat, String vin, String id, String nombre, Long expediente,
+                                                  int confianza, String estado, String motivo, boolean confirmacionManualPermitida) {
+        return new LineaFacturaDetectadaResponse(doc, mat, vin, id, nombre, expediente, confianza, estado, motivo, confirmacionManualPermitida);
+    }
+
+    private String primero(Pattern patron, String texto) {
+        Matcher matcher = patron.matcher(texto.toUpperCase(Locale.ROOT));
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    private String identificadorAntesDelBastidor(String bloque, String bastidor, Set<String> excluidos) {
+        String upper = bloque.toUpperCase(Locale.ROOT);
+        int limite = bastidor == null ? upper.length() : upper.indexOf(bastidor.toUpperCase(Locale.ROOT));
+        if (limite < 0) limite = upper.length();
+        Matcher matcher = IDENTIFICADOR.matcher(upper.substring(0, limite));
+        String ultimo = null;
+        while (matcher.find()) {
+            String candidato = matcher.group(1);
+            if (!excluidos.contains(normalizar(candidato))) ultimo = candidato;
+        }
+        return ultimo;
+    }
     private String extraerNombre(String bloque,String id,String vin){if(id==null||vin==null)return null;String upper=bloque.toUpperCase(Locale.ROOT);int a=upper.indexOf(id)+id.length(),b=upper.indexOf(vin,a);return b>a?bloque.substring(a,b).replaceAll("\\s+"," ").trim():null;}
     private String normalizar(String valor){return valor==null?null:valor.replaceAll("[^A-Za-z0-9]","").toUpperCase(Locale.ROOT);}
     private String nombreSeguro(String nombre){return Optional.ofNullable(nombre).orElse("factura.pdf").replaceAll("[\\\\/:*?\"<>|]","_");}

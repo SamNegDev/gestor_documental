@@ -9,5 +9,6 @@ public record LineaFacturaDetectadaResponse(
         Long expedienteId,
         int confianza,
         String estado,
-        String motivo
+        String motivo,
+        boolean confirmacionManualPermitida
 ) {}

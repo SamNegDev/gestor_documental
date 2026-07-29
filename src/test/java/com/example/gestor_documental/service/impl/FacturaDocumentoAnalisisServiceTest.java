@@ -66,6 +66,44 @@ class FacturaDocumentoAnalisisServiceTest {
         verify(expedientes).findByMatriculaNormalizada("2565NPX");
         verify(expedientes, never()).findByClienteIdAndMatriculaNormalizada(anyLong(), anyString());
     }
+    @Test
+    void excluyeElCifDelEmisorCuandoSeRepiteEnVariasLineas() throws Exception {
+        FacturaHoldedRepository facturas = mock(FacturaHoldedRepository.class);
+        var service = new FacturaDocumentoAnalisisService(facturas, mock(ExpedienteRepository.class), mock(DocumentoRepository.class), mock(FacturaExpedienteRepository.class));
+        MockMultipartFile archivo = new MockMultipartFile("archivos", "factura.pdf", "application/pdf", pdf(
+                "16/07/2026 2026/1997 Documento: 2026/4605 J76711373 GESTORIA 78854946K COMPRADOR UNO WB10P2101T6N28733 2565NPX " +
+                "Documento: 2026/4606 J76711373 GESTORIA B38501631 COMPRADOR DOS WBA31GE0307V19978 2543NPX"));
+
+        var resultado = service.analizar(List.of(archivo)).get(0);
+
+        assertThat(resultado.lineas()).extracting("compradorIdentificador").containsExactly("78854946K", "B38501631");
+    }
+
+    @Test
+    void permiteConfirmarManualmenteUnExpedienteNoFinalizadoSinContradicciones() throws Exception {
+        FacturaHoldedRepository facturas = mock(FacturaHoldedRepository.class);
+        ExpedienteRepository expedientes = mock(ExpedienteRepository.class);
+        DocumentoRepository documentos = mock(DocumentoRepository.class);
+        FacturaExpedienteRepository vinculaciones = mock(FacturaExpedienteRepository.class);
+        Expediente expediente = mock(Expediente.class);
+        when(expediente.getId()).thenReturn(4605L);
+        when(expediente.getEstadoExpediente()).thenReturn(EstadoExpediente.EN_TRAMITE);
+        Vehiculo vehiculo = mock(Vehiculo.class);
+        when(vehiculo.getBastidor()).thenReturn("WB10P2101T6N28733");
+        when(expediente.getVehiculo()).thenReturn(vehiculo);
+        when(expediente.getInteresados()).thenReturn(List.of());
+        when(expedientes.findByMatriculaNormalizada("2565NPX")).thenReturn(List.of(expediente));
+        when(documentos.findByExpedienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(eq(4605L), anySet())).thenReturn(List.of());
+        var service = new FacturaDocumentoAnalisisService(facturas, expedientes, documentos, vinculaciones);
+        MockMultipartFile archivo = new MockMultipartFile("archivos", "factura.pdf", "application/pdf",
+                pdf("16/07/2026 2026/1997 Documento: 2026/4605 78854946K COMPRADOR UNO WB10P2101T6N28733 2565NPX"));
+
+        var linea = service.analizar(List.of(archivo)).get(0).lineas().get(0);
+
+        assertThat(linea.estado()).isEqualTo("REVISION");
+        assertThat(linea.confirmacionManualPermitida()).isTrue();
+        assertThat(linea.motivo()).contains("no esta finalizado");
+    }
     private byte[] pdf(String texto) throws Exception {
         try (PDDocument doc = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PDPage page = new PDPage(); doc.addPage(page);
