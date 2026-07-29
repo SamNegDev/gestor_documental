@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPostForm, apiPutJsonResponse } from "../../../shared/api/http";
+import { apiDelete, apiGet, apiPost, apiPostForm, apiPutJsonResponse } from "../../../shared/api/http";
 import type { AnalisisFactura, EstadoComprobante, FacturaDetalle, FacturasPage, ModalidadFacturacion } from "../types";
 export function listarFacturas(params:URLSearchParams){return apiGet<FacturasPage>(`/api/facturas?${params}`)}
 export function sincronizarFacturas(){return apiPost("/api/facturas/sincronizar")}
@@ -13,3 +13,5 @@ export function confirmarFactura(input:{facturaId?:number;modalidad:ModalidadFac
 export function obtenerFacturaDetalle(id:number){return apiGet<FacturaDetalle>(`/api/facturas/${id}`)}
 export function corregirVinculacionFactura(facturaId:number,vinculacionId:number,expedienteId:number){return apiPutJsonResponse<FacturaDetalle>(`/api/facturas/${facturaId}/vinculaciones/${vinculacionId}`,{expedienteId})}
 export function asignarLineaPendienteFactura(facturaId:number,indice:number,expedienteId:number){return apiPutJsonResponse<FacturaDetalle>(`/api/facturas/${facturaId}/lineas-pendientes/${indice}`,{expedienteId})}
+
+export function eliminarFactura(id:number){return apiDelete(`/api/facturas/${id}`)}

@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface FacturaExpedienteRepository extends JpaRepository<FacturaExpediente, Long> {
     List<FacturaExpediente> findByFacturaIdOrderByIdAsc(Long facturaId);
     Optional<FacturaExpediente> findByExpedienteId(Long expedienteId);
+    void deleteByFacturaId(Long facturaId);
     @Query("select count(v) > 0 from FacturaExpediente v where v.expediente.id = :expedienteId and v.factura.estado <> com.example.gestor_documental.enums.EstadoFacturaHolded.ANULADA")
     boolean existsActivoByExpedienteId(@Param("expedienteId") Long expedienteId);
 }

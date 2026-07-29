@@ -20,6 +20,8 @@ import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.client.RestClient;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.multipart.MultipartFile;
@@ -178,7 +180,7 @@ public class HoldedFacturaService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PagedResponse<FacturaHoldedResponse> listar(Usuario usuario, String busqueda, EstadoFacturaHolded estado, LocalDate desde, LocalDate hasta, int pagina, int tamanio) {
         Set<Long> clientes = clientesPermitidos(usuario);
         Specification<FacturaHolded> spec = (root, query, cb) -> {
@@ -194,6 +196,7 @@ public class HoldedFacturaService {
             return cb.and(ps.toArray(Predicate[]::new));
         };
         Page<FacturaHolded> page = facturaRepository.findAll(spec, PageRequest.of(Math.max(0, pagina), Math.max(1, Math.min(tamanio, 100)), Sort.by(Sort.Direction.DESC, "fechaEmision", "id")));
+        page.getContent().forEach(this::repararTotalDesdePdf);
         return PagedResponse.of(page.map(this::mapFactura));
     }
 
@@ -329,6 +332,21 @@ public class HoldedFacturaService {
         return detalle(facturaId, admin);
     }
 
+    @Transactional
+    public void eliminar(Long facturaId, Usuario admin) {
+        if (admin.getRolUsuario() != RolUsuario.ADMIN) throw new AccesoDenegadoException("Solo administracion puede eliminar facturas");
+        FacturaHolded factura = requireFactura(facturaId, admin);
+        if (factura.getHoldedInvoiceId() == null || !factura.getHoldedInvoiceId().startsWith("LOCAL:")) throw new ResponseStatusException(HttpStatus.CONFLICT, "Las facturas sincronizadas desde Holded no se pueden eliminar");
+        if (comprobanteRepository.existsByFacturaId(facturaId)) throw new ResponseStatusException(HttpStatus.CONFLICT, "No se puede eliminar una factura con comprobantes de pago");
+        Path archivo = factura.getArchivoFactura() == null ? null : Paths.get(uploadDir, "facturas", factura.getArchivoFactura()).toAbsolutePath().normalize();
+        facturaExpedienteRepository.deleteByFacturaId(facturaId);
+        facturaRepository.delete(factura);
+        if (archivo != null && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { try { Files.deleteIfExists(archivo); } catch (IOException ignored) { } }
+            });
+        }
+    }
     private void repararTotalDesdePdf(FacturaHolded factura) {
         if ((factura.getTotal() != null && factura.getTotal().signum() != 0) || factura.getArchivoFactura() == null) return;
         Path archivo = Paths.get(uploadDir, "facturas", factura.getArchivoFactura()).toAbsolutePath().normalize();
@@ -372,7 +390,7 @@ public class HoldedFacturaService {
                 v.getEstado().name(), v.getMatriculaDetectada(), v.getBastidorDetectado(),
                 v.getCompradorIdentificadorDetectado(), v.getConfianza(), v.getMotivoRevision());
     }
-    private FacturaHoldedResponse mapFactura(FacturaHolded f) { return new FacturaHoldedResponse(f.getId(), f.getNumero(), f.getContactoNombre(), f.getContactoNif(), f.getFechaEmision(), f.getFechaVencimiento(), f.getTotal(), f.getImportePagado(), f.getMoneda(), f.getEstado(), f.getSincronizadaEn(), f.getLineasPendientesRevision(), f.getDetalleLineasPendientes(), comprobanteRepository.findByFacturaIdOrderByCreadoEnDesc(f.getId()).stream().map(this::mapComprobante).toList()); }
+    private FacturaHoldedResponse mapFactura(FacturaHolded f) { return new FacturaHoldedResponse(f.getId(), f.getNumero(), f.getContactoNombre(), f.getContactoNif(), f.getFechaEmision(), f.getFechaVencimiento(), f.getTotal(), f.getImportePagado(), f.getMoneda(), f.getEstado(), f.getSincronizadaEn(), f.getLineasPendientesRevision(), f.getDetalleLineasPendientes(), f.getHoldedInvoiceId() != null && f.getHoldedInvoiceId().startsWith("LOCAL:"), comprobanteRepository.findByFacturaIdOrderByCreadoEnDesc(f.getId()).stream().map(this::mapComprobante).toList()); }
     private ComprobantePagoResponse mapComprobante(ComprobantePago c) { return new ComprobantePagoResponse(c.getId(), c.getNombreOriginal(), c.getContentType(), c.getTamano(), c.getEstado(), c.getObservaciones(), c.getCreadoEn(), c.getRevisadoEn()); }
     private void validarConfiguracion() { if (!enabled) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Integracion Holded desactivada"); if (apiToken == null || apiToken.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Falta configurar el token de Holded"); }
     private RestClient client() {
