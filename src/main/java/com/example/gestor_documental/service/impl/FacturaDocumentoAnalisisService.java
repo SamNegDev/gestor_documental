@@ -34,6 +34,11 @@ public class FacturaDocumentoAnalisisService {
     private static final long MAX_PDF = 20L * 1024 * 1024;
     private static final Pattern FECHA_FACTURA = Pattern.compile("(\\d{2}/\\d{2}/\\d{4})");
     private static final Pattern NUMERO_FACTURA = Pattern.compile("(\\d{4}[/\\-]\\d+)");
+    private static final List<Pattern> TOTAL_FACTURA = List.of(
+            Pattern.compile("(?im)TOTAL\\s+FACTURA\\s*:?\\s*([\\d.]+,\\d{2}|\\d+[.,]\\d{2})"),
+            Pattern.compile("(?im)TOTAL\\s+A\\s+PAGAR\\s*:?\\s*([\\d.]+,\\d{2}|\\d+[.,]\\d{2})"),
+            Pattern.compile("(?im)IMPORTE\\s+TOTAL\\s*:?\\s*([\\d.]+,\\d{2}|\\d+[.,]\\d{2})")
+    );
     private static final Pattern DOCUMENTO = Pattern.compile("Documento:\\s*(\\d{4}/\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern MATRICULA = Pattern.compile("(?<![A-Z0-9])(\\d{4}[BCDFGHJKLMNPRSTVWXYZ]{3})(?![A-Z0-9])", Pattern.CASE_INSENSITIVE);
     private static final Pattern BASTIDOR = Pattern.compile("(?<![A-Z0-9])([A-HJ-NPR-Z0-9]{17})(?![A-Z0-9])", Pattern.CASE_INSENSITIVE);
@@ -140,6 +145,7 @@ public class FacturaDocumentoAnalisisService {
         factura.setArchivoFacturaOriginal(nombreSeguro(archivo.getOriginalFilename()));
         factura.setArchivoFacturaContentType("application/pdf");
         factura.setArchivoFacturaTamano(archivo.getSize());
+        if (analisis.total() != null && (factura.getTotal() == null || factura.getTotal().signum() == 0)) factura.setTotal(analisis.total());
         Set<Integer> indicesManuales = lineasAsignadasManualmente == null ? Set.of() : new HashSet<>(lineasAsignadasManualmente);
         if (indicesManuales.stream().anyMatch(i -> i == null || i < 0 || i >= analisis.lineas().size())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La seleccion manual contiene lineas no validas");
@@ -186,7 +192,7 @@ public class FacturaDocumentoAnalisisService {
             factura.setNumero(analisis.numeroFactura());
             factura.setFechaEmision(analisis.fechaFactura());
             factura.setEstado(com.example.gestor_documental.enums.EstadoFacturaHolded.PENDIENTE);
-            factura.setTotal(BigDecimal.ZERO);
+            factura.setTotal(analisis.total() != null ? analisis.total() : BigDecimal.ZERO);
             factura.setImportePagado(BigDecimal.ZERO);
             factura.setMoneda("EUR");
             factura.setSincronizadaEn(LocalDateTime.now());
@@ -224,10 +230,24 @@ public class FacturaDocumentoAnalisisService {
         Matcher numeroMatcher = NUMERO_FACTURA.matcher(cabeceraTexto);
         String numero = numeroMatcher.find() ? numeroMatcher.group(1).replace('-', '/') : null;
         LocalDate fecha = fechaMatcher.find() ? LocalDate.parse(fechaMatcher.group(1), DateTimeFormatter.ofPattern("dd/MM/yyyy")) : null;
+        BigDecimal total = extraerTotalTexto(texto);
         FacturaHolded factura = numero == null ? null : facturaRepository.findFirstByNumeroIgnoreCase(numero).orElse(null);
         List<LineaFacturaDetectadaResponse> lineas = extraerLineas(texto, factura, fecha, identificadores(cabeceraTexto));
         String estado = numero == null ? "NUMERO_NO_DETECTADO" : lineas.isEmpty() ? "SIN_EXPEDIENTES_DETECTADOS" : factura == null ? "FACTURA_LOCAL_NUEVA" : "PROPUESTA_LISTA";
-        return new AnalisisFacturaArchivoResponse(nombreSeguro(archivo.getOriginalFilename()), numero, fecha, factura == null ? null : factura.getId(), estado, lineas);
+        return new AnalisisFacturaArchivoResponse(nombreSeguro(archivo.getOriginalFilename()), numero, fecha, total, factura == null ? null : factura.getId(), estado, lineas);
+    }
+
+    static BigDecimal extraerTotalTexto(String texto) {
+        for (Pattern patron : TOTAL_FACTURA) {
+            Matcher matcher = patron.matcher(texto);
+            BigDecimal ultimo = null;
+            while (matcher.find()) {
+                try { ultimo = new BigDecimal(matcher.group(1).replace(".", "").replace(',', '.')); }
+                catch (NumberFormatException ignored) { }
+            }
+            if (ultimo != null) return ultimo;
+        }
+        return null;
     }
 
     private List<LineaFacturaDetectadaResponse> extraerLineas(String texto, FacturaHolded factura, LocalDate fechaFactura, Set<String> identificadoresCabecera) {

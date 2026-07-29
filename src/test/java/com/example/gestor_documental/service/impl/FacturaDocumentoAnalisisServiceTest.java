@@ -127,4 +127,9 @@ class FacturaDocumentoAnalisisServiceTest {
             doc.save(out); return out.toByteArray();
         }
     }
+    @Test
+    void extraeTotalFacturaConFormatoEspanol() {
+        assertThat(FacturaDocumentoAnalisisService.extraerTotalTexto("Base 1.000,00\nIVA 210,00\nTOTAL FACTURA 1.210,00 EUR"))
+                .isEqualByComparingTo("1210.00");
+    }
 }

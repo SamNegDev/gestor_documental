@@ -24,6 +24,8 @@ import org.springframework.web.client.RestClient;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.http.HttpStatus;
 
 import javax.crypto.Mac;
@@ -284,14 +286,60 @@ public class HoldedFacturaService {
     }
     private FacturaHolded requireFactura(Long id, Usuario u) { FacturaHolded f = facturaRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Factura no encontrada")); validarAcceso(f, u); return f; }
     private void validarAcceso(FacturaHolded f, Usuario u) { if (u.getRolUsuario() == RolUsuario.ADMIN && u.getCliente() == null) return; if (f.getCliente() == null || !clientesPermitidos(u).contains(f.getCliente().getId())) throw new AccesoDenegadoException("No tienes acceso a esta factura"); }
-    @Transactional(readOnly = true)
+    @Transactional
     public FacturaDetalleResponse detalle(Long id, Usuario usuario) {
         FacturaHolded factura = requireFactura(id, usuario);
+        repararTotalDesdePdf(factura);
         List<FacturaVinculacionResponse> vinculaciones = facturaExpedienteRepository.findByFacturaIdOrderByIdAsc(id).stream()
                 .map(this::mapVinculacion).toList();
-        return new FacturaDetalleResponse(mapFactura(factura), vinculaciones);
+        return new FacturaDetalleResponse(mapFactura(factura), vinculaciones, lineasPendientes(factura));
     }
 
+    private List<LineaFacturaPendienteResponse> lineasPendientes(FacturaHolded factura) {
+        if (factura.getDetalleLineasPendientes() == null || factura.getDetalleLineasPendientes().isBlank()) return List.of();
+        String[] detalles = factura.getDetalleLineasPendientes().split(";\\s*");
+        List<LineaFacturaPendienteResponse> resultado = new ArrayList<>();
+        for (int i = 0; i < detalles.length; i++) {
+            String[] partes = detalles[i].trim().split("\\s+-\\s+", 2);
+            String documento = partes.length > 0 && !partes[0].isBlank() ? partes[0] : "Linea " + (i + 1);
+            String matricula = partes.length > 1 && !"sin matricula".equalsIgnoreCase(partes[1]) ? partes[1] : null;
+            resultado.add(new LineaFacturaPendienteResponse(i, documento, matricula));
+        }
+        return resultado;
+    }
+
+    @Transactional
+    public FacturaDetalleResponse asignarLineaPendiente(Long facturaId, int indice, Long expedienteId, Usuario admin) {
+        if (admin.getRolUsuario() != RolUsuario.ADMIN) throw new AccesoDenegadoException("Solo administracion puede asignar lineas pendientes");
+        FacturaHolded factura = requireFactura(facturaId, admin);
+        List<LineaFacturaPendienteResponse> pendientes = new ArrayList<>(lineasPendientes(factura));
+        if (indice < 0 || indice >= pendientes.size()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "La linea pendiente ya no existe");
+        Expediente expediente = expedienteRepository.findById(expedienteId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Expediente no encontrado"));
+        if (expediente.getCliente() == null || factura.getCliente() == null || !expediente.getCliente().getId().equals(factura.getCliente().getId())) throw new ResponseStatusException(HttpStatus.CONFLICT, "El expediente debe pertenecer al cliente de la factura");
+        facturaExpedienteRepository.findByExpedienteId(expedienteId).ifPresent(otra -> { throw new ResponseStatusException(HttpStatus.CONFLICT, "El expediente ya esta vinculado a una factura"); });
+        LineaFacturaPendienteResponse linea = pendientes.remove(indice);
+        FacturaExpediente vinculacion = new FacturaExpediente();
+        vinculacion.setFactura(factura); vinculacion.setExpediente(expediente); vinculacion.setEstado(EstadoVinculacionFactura.CONFIRMADA);
+        vinculacion.setMatriculaDetectada(linea.matricula()); vinculacion.setConfianza(0);
+        vinculacion.setMotivoRevision("Asignacion manual de linea pendiente " + linea.documento()); vinculacion.setConfirmadoEn(LocalDateTime.now());
+        facturaExpedienteRepository.save(vinculacion);
+        factura.setLineasPendientesRevision(pendientes.size());
+        factura.setDetalleLineasPendientes(pendientes.isEmpty() ? null : pendientes.stream().map(item -> item.documento() + " - " + (item.matricula() != null ? item.matricula() : "sin matricula")).collect(java.util.stream.Collectors.joining("; ")));
+        facturaRepository.save(factura);
+        return detalle(facturaId, admin);
+    }
+
+    private void repararTotalDesdePdf(FacturaHolded factura) {
+        if ((factura.getTotal() != null && factura.getTotal().signum() != 0) || factura.getArchivoFactura() == null) return;
+        Path archivo = Paths.get(uploadDir, "facturas", factura.getArchivoFactura()).toAbsolutePath().normalize();
+        if (!Files.isRegularFile(archivo)) return;
+        try (PDDocument pdf = PDDocument.load(archivo.toFile())) {
+            BigDecimal total = FacturaDocumentoAnalisisService.extraerTotalTexto(new PDFTextStripper().getText(pdf));
+            if (total != null) { factura.setTotal(total); facturaRepository.save(factura); }
+        } catch (IOException ignored) {
+            // El detalle sigue disponible aunque el PDF historico no pueda releerse.
+        }
+    }
     @Transactional
     public FacturaDetalleResponse corregirVinculacion(Long facturaId, Long vinculacionId, Long expedienteId, Usuario admin) {
         if (admin.getRolUsuario() != RolUsuario.ADMIN) throw new AccesoDenegadoException("Solo administracion puede corregir vinculaciones");

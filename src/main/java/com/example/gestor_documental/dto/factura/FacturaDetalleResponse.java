@@ -4,5 +4,6 @@ import java.util.List;
 
 public record FacturaDetalleResponse(
         FacturaHoldedResponse factura,
-        List<FacturaVinculacionResponse> vinculaciones
+        List<FacturaVinculacionResponse> vinculaciones,
+        List<LineaFacturaPendienteResponse> lineasPendientes
 ) {}
