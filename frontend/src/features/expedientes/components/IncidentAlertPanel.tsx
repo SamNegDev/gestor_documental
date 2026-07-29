@@ -1,14 +1,15 @@
-import { AlertTriangle, CheckCircle2, Eye, Plus, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, Pencil, Plus, ShieldAlert } from "lucide-react";
 import type { IncidenciaExpediente } from "../types/expedienteDetail.types";
 import { formatDateTime, humanizeEnum } from "../utils/formatters";
 
 type Props = {
   incidencias: IncidenciaExpediente[];
   onCreateIncident?: () => void;
+  onEditIncident: (incidencia: IncidenciaExpediente) => void;
   onResolveIncident: (incidencia: IncidenciaExpediente) => void;
 };
 
-export function IncidentAlertPanel({ incidencias, onCreateIncident, onResolveIncident }: Props) {
+export function IncidentAlertPanel({ incidencias, onCreateIncident, onEditIncident, onResolveIncident }: Props) {
   const activas = incidencias.filter((incidencia) => !incidencia.resuelta);
   if (activas.length === 0) return null;
   const tieneRevisionCliente = activas.some((incidencia) => incidencia.pendienteRevisionCliente);
@@ -79,6 +80,10 @@ export function IncidentAlertPanel({ incidencias, onCreateIncident, onResolveInc
               <small>Abierta {formatDateTime(incidencia.fechaCreacion)}</small>
             </div>
             <div className="incident-alert-item__actions">
+              <button className="soft-button soft-button--compact" onClick={() => onEditIncident(incidencia)} type="button">
+                <Pencil size={15} />
+                Editar
+              </button>
               {(incidencia.documentosRevision || []).slice(0, 1).map((documento) => (
                 <button
                   className="soft-button soft-button--compact"

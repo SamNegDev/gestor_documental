@@ -132,6 +132,10 @@ export function resolveIncident(incidenciaId: number): Promise<void> {
   return apiPost(`/api/incidencias/${incidenciaId}/resolver`);
 }
 
+export function updateIncident(incidenciaId: number, observaciones: string): Promise<void> {
+  return apiPutJson(`/api/incidencias/${incidenciaId}`, { observaciones });
+}
+
 export function reclaimIncident(incidenciaId: number, observaciones: string): Promise<void> {
   const formData = new FormData();
   formData.append("observaciones", observaciones);

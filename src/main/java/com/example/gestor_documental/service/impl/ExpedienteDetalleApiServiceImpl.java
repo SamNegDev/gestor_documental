@@ -24,6 +24,7 @@ import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
 import com.example.gestor_documental.enums.TipoLogoCliente;
 import com.example.gestor_documental.enums.TipoOperacionExpediente;
+import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.Cliente;
@@ -125,6 +126,10 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
         List<OperacionExpedienteResponse> operacionesResponse = operaciones.stream()
                 .map(operacion -> mapOperacion(expediente, operacion, estadoDetalle))
                 .toList();
+        List<HitoExpedienteResponse> hitosSiguientePaso = hitosParaSiguientePaso(
+                esBatecom(expediente),
+                hitos,
+                operacionesResponse);
 
         return ExpedienteDetailResponse.builder()
                 .id(expediente.getId())
@@ -141,7 +146,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .observaciones(expediente.getObservaciones())
                 .solicitudId(expediente.getSolicitud() != null ? expediente.getSolicitud().getId() : null)
                 .tramiteVinculado(mapTramiteVinculado(expediente))
-                .siguientePaso(calcularSiguientePaso(estadoDetalle, hitos))
+                .siguientePaso(calcularSiguientePaso(estadoDetalle, hitosSiguientePaso))
                 .mensajesNoLeidos((int) mensajeService.contarNoLeidosExpediente(expedienteId, usuarioLogueado))
                 .cliente(mapCliente(expediente.getCliente()))
                 .creadoPor(mapUsuario(expediente.getCreadoPor()))
@@ -386,6 +391,29 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .build());
 
         return hitos;
+    }
+
+    static List<HitoExpedienteResponse> hitosParaSiguientePaso(
+            boolean batecom,
+            List<HitoExpedienteResponse> hitosGenerales,
+            List<OperacionExpedienteResponse> operaciones
+    ) {
+        if (!batecom) {
+            return hitosGenerales;
+        }
+        return operaciones.stream()
+                .sorted(Comparator.comparing(
+                        OperacionExpedienteResponse::getOrden,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .flatMap(operacion -> operacion.getHitos() != null
+                        ? operacion.getHitos().stream()
+                        : java.util.stream.Stream.empty())
+                .toList();
+    }
+
+    private boolean esBatecom(Expediente expediente) {
+        return expediente.getTipoTramite() != null
+                && expediente.getTipoTramite().getNombre() == TipoTramiteEnum.BATECOM;
     }
 
     private OperacionExpedienteResponse mapOperacion(Expediente expediente, OperacionExpediente operacion, EstadoDetalle estadoDetalle) {

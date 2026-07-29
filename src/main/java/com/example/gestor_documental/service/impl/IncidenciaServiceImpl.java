@@ -278,6 +278,53 @@ public class IncidenciaServiceImpl implements IncidenciaService {
 
     @Override
     @Transactional
+    public void editarIncidencia(Long incidenciaId, String observaciones, Usuario admin) {
+        validarAdmin(admin);
+        Incidencia incidencia = incidenciaRepository.findById(incidenciaId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Incidencia no encontrada"));
+
+        if (incidencia.isResuelta()) {
+            throw new OperacionInvalidaException("No se puede editar una incidencia resuelta.");
+        }
+        if (incidencia.getExpediente() != null
+                && !expedienteService.tienePermisoExpediente(incidencia.getExpediente(), admin)) {
+            throw new AccesoDenegadoException("No tienes permiso para editar esta incidencia.");
+        }
+        if (incidencia.getSolicitud() != null
+                && !solicitudService.tienePermisoSolicitud(incidencia.getSolicitud(), admin)) {
+            throw new AccesoDenegadoException("No tienes permiso para editar esta incidencia.");
+        }
+
+        String detalle = TextNormalizer.upperOrNull(observaciones);
+        if (detalle == null) {
+            throw new OperacionInvalidaException("Las observaciones de la incidencia no pueden quedar vacias.");
+        }
+        if (detalle.length() > 500) {
+            throw new OperacionInvalidaException("Las observaciones no pueden superar los 500 caracteres.");
+        }
+        String anterior = incidencia.getObservaciones();
+        if (detalle.equals(anterior)) {
+            return;
+        }
+
+        incidencia.setObservaciones(detalle);
+        incidenciaRepository.save(incidencia);
+        String descripcion = "Detalle actualizado de \"" + textoHistorial(anterior) + "\" a \"" + detalle + "\".";
+        if (incidencia.getExpediente() != null) {
+            historialCambioService.registrarCambioExpediente(
+                    incidencia.getExpediente(), admin, "INCIDENCIA EDITADA", descripcion);
+        } else if (incidencia.getSolicitud() != null) {
+            historialCambioService.registrarCambioSolicitud(
+                    incidencia.getSolicitud(), admin, "INCIDENCIA EDITADA", descripcion);
+        }
+    }
+
+    private String textoHistorial(String valor) {
+        return valor == null || valor.isBlank() ? "SIN OBSERVACIONES" : valor;
+    }
+
+    @Override
+    @Transactional
     public void reclamarIncidencia(Long incidenciaId, String observaciones, Usuario admin) {
         if (admin.getRolUsuario() != com.example.gestor_documental.enums.RolUsuario.ADMIN) {
             throw new AccesoDenegadoException("Solo el administrador puede reclamar incidencias.");

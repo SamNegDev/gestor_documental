@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
@@ -28,6 +29,16 @@ public class IncidenciaApiController {
     @PostMapping("/{id}/resolver")
     public ResponseEntity<Void> resolver(@PathVariable Long id, Authentication authentication) {
         incidenciaService.resolverIncidencia(id, usuario(authentication));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Void> editar(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> body,
+            Authentication authentication
+    ) {
+        incidenciaService.editarIncidencia(id, body.get("observaciones"), usuario(authentication));
         return ResponseEntity.noContent().build();
     }
 

@@ -708,7 +708,14 @@ public class ExpedienteApiController {
     private boolean esAccionMasivaSoportada(HitoAccionResponse accion) {
         return accion != null
                 && ("FINALIZAR".equals(accion.getTipo())
-                || ("COMPLETAR_HITO".equals(accion.getTipo()) && accion.getCodigoHito() != null));
+                || ("COMPLETAR_HITO".equals(accion.getTipo())
+                && accion.getCodigoHito() != null
+                && !esEnvioDgt(accion.getCodigoHito())));
+    }
+
+    private boolean esEnvioDgt(String codigoHito) {
+        return CodigoHitoExpediente.ENVIADO_DGT.name().equals(codigoHito)
+                || CodigoHitoExpediente.COM_ENVIADO_DGT.name().equals(codigoHito);
     }
 
     private String codigoHitoDesdeId(String id) {

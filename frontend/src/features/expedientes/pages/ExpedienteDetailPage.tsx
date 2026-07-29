@@ -13,6 +13,7 @@ import { DocumentsPanel } from "../components/DocumentsPanel";
 import { ExpedienteHeader } from "../components/ExpedienteHeader";
 import { IncidentAlertPanel } from "../components/IncidentAlertPanel";
 import { IncidentCreateDialog } from "../components/IncidentCreateDialog";
+import { IncidentEditDialog } from "../components/IncidentEditDialog";
 import { IncidentResolutionDialog } from "../components/IncidentResolutionDialog";
 import { InteresadosPanel } from "../components/InteresadosPanel";
 import { InteresadoAutocomplete } from "../components/InteresadoAutocomplete";
@@ -41,6 +42,7 @@ import {
   unlinkDependentExpediente,
   updateExpedienteFromExistingDocuments,
   updateExpedienteInteresados,
+  updateIncident,
   uploadIncidentDocument,
 } from "../services/expedienteDetailApi";
 import {
@@ -813,6 +815,8 @@ export function ExpedienteDetailPage() {
   const [incidentTypes, setIncidentTypes] = useState<TipoIncidencia[]>([]);
   const [incidentTypesLoading, setIncidentTypesLoading] = useState(false);
   const [resolvingIncident, setResolvingIncident] = useState<IncidenciaExpediente | null>(null);
+  const [editingIncident, setEditingIncident] = useState<IncidenciaExpediente | null>(null);
+  const [savingIncident, setSavingIncident] = useState(false);
   const [activeOperationId, setActiveOperationId] = useState<number | null>(null);
   const [editingDocument, setEditingDocument] = useState<DocumentoExpediente | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -1466,6 +1470,19 @@ export function ExpedienteDetailPage() {
     }
   };
 
+  const handleEditIncident = async (incidencia: IncidenciaExpediente, observaciones: string) => {
+    setSavingIncident(true);
+    try {
+      await updateIncident(incidencia.id, observaciones);
+      setEditingIncident(null);
+      await refreshExpediente();
+    } catch (cause) {
+      alert(cause instanceof ApiError ? cause.details || "No se pudo editar la incidencia." : "No se pudo editar la incidencia.");
+    } finally {
+      setSavingIncident(false);
+    }
+  };
+
   const handleReclaimIncident = async (incidencia: IncidenciaExpediente, observaciones: string) => {
     try {
       await reclaimIncident(incidencia.id, observaciones.trim());
@@ -1671,6 +1688,7 @@ export function ExpedienteDetailPage() {
       <IncidentAlertPanel
         incidencias={expediente.incidencias}
         onCreateIncident={canOpenIncident ? openIncidentDialog : undefined}
+        onEditIncident={setEditingIncident}
         onResolveIncident={setResolvingIncident}
       />
       {canRequestAdditionalInfo ? (
@@ -1902,6 +1920,12 @@ export function ExpedienteDetailPage() {
         onLinkDocument={handleLinkIncidentDocument}
         onReclaim={handleReclaimIncident}
         onUploadDocument={handleUploadIncidentDocument}
+      />
+      <IncidentEditDialog
+        incidencia={editingIncident}
+        saving={savingIncident}
+        onClose={() => setEditingIncident(null)}
+        onSubmit={handleEditIncident}
       />
       <DocumentEditDialog
         documento={editingDocument}
