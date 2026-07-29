@@ -28,6 +28,7 @@ import { SeguimientoClientesPage } from "../features/seguimiento/pages/Seguimien
 import { SeguimientoConfigPage } from "../features/seguimiento/pages/SeguimientoConfigPage";
 import { WhatsappInboxPage } from "../features/whatsapp/pages/WhatsappInboxPage";
 import { FacturasPage } from "../features/facturas/pages/FacturasPage";
+import { FacturaDetailPage } from "../features/facturas/pages/FacturaDetailPage";
 
 
 export const router = createBrowserRouter([
@@ -63,6 +64,7 @@ export const router = createBrowserRouter([
       { path: "expedientes/:id/proceso", element: <RequireRole allow={["ADMIN"]}><ExpedienteDetailPage /></RequireRole> },
       { path: "cliente/expedientes/:id", element: <RequireRole allow={["CLIENTE"]}><ClienteExpedientePage /></RequireRole> },
       { path: "facturas", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><FacturasPage /></RequireRole> },
+      { path: "facturas/:id", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><FacturaDetailPage /></RequireRole> },
       { path: "solicitudes", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><SolicitudesListPage /></RequireRole> },
       { path: "solicitudes/:id", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><SolicitudDetailPage /></RequireRole> },
       { path: "solicitudes/:id/editar", element: <RequireRole allow={["ADMIN"]}><SolicitudFormPage /></RequireRole> },

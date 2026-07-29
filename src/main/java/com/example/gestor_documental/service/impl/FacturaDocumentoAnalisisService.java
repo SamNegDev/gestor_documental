@@ -67,12 +67,10 @@ public class FacturaDocumentoAnalisisService {
                                                      LocalDate periodoHasta,
                                                      List<Long> expedienteIds,
                                                      List<Long> expedienteIdsManuales,
+                                                     List<Integer> lineasAsignadasManualmente,
                                                      MultipartFile archivo) throws IOException {
         if (modalidad == null || expedienteIds == null || expedienteIds.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Faltan modalidad o expedientes");
-        }
-        if (modalidad == com.example.gestor_documental.enums.ModalidadFacturacion.POR_EXPEDIENTE && expedienteIds.size() != 1) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La facturacion por expediente requiere exactamente un expediente");
         }
         if (modalidad != com.example.gestor_documental.enums.ModalidadFacturacion.POR_EXPEDIENTE && (periodoDesde == null || periodoHasta == null || periodoHasta.isBefore(periodoDesde))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El lote requiere un periodo valido");
@@ -142,8 +140,25 @@ public class FacturaDocumentoAnalisisService {
         factura.setArchivoFacturaOriginal(nombreSeguro(archivo.getOriginalFilename()));
         factura.setArchivoFacturaContentType("application/pdf");
         factura.setArchivoFacturaTamano(archivo.getSize());
+        Set<Integer> indicesManuales = lineasAsignadasManualmente == null ? Set.of() : new HashSet<>(lineasAsignadasManualmente);
+        if (indicesManuales.stream().anyMatch(i -> i == null || i < 0 || i >= analisis.lineas().size())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La seleccion manual contiene lineas no validas");
+        }
+        Set<Long> idsSeleccionados = new HashSet<>(expedienteIds);
+        List<LineaFacturaDetectadaResponse> pendientes = new ArrayList<>();
+        for (int i = 0; i < analisis.lineas().size(); i++) {
+            LineaFacturaDetectadaResponse linea = analisis.lineas().get(i);
+            boolean asignada = indicesManuales.contains(i) || (linea.expedienteId() != null && idsSeleccionados.contains(linea.expedienteId()));
+            if (!asignada) pendientes.add(linea);
+        }
+        factura.setLineasPendientesRevision(pendientes.size());
+        factura.setDetalleLineasPendientes(pendientes.isEmpty() ? null : pendientes.stream()
+                .map(l -> (l.documento() != null ? l.documento() : "Linea") + (l.matricula() != null ? " - " + l.matricula() : " - sin matricula"))
+                .collect(java.util.stream.Collectors.joining("; ")));
         for (Expediente expediente : expedientes) {
             Long expedienteId = expediente.getId();
+            Optional<FacturaExpediente> vinculacionExistente = vinculacionRepository.findByExpedienteId(expedienteId);
+            if (vinculacionExistente.isPresent() && factura.getId().equals(vinculacionExistente.get().getFactura().getId())) continue;
             if (vinculacionRepository.existsActivoByExpedienteId(expedienteId)) throw new ResponseStatusException(HttpStatus.CONFLICT, "Un expediente ya pertenece a otra factura activa");
             FacturaExpediente vinculacion = new FacturaExpediente();
             vinculacion.setFactura(factura);
@@ -262,18 +277,23 @@ public class FacturaDocumentoAnalisisService {
         Expediente expediente = candidatos.get(0);
         List<String> avisos = new ArrayList<>();
         List<String> bloqueos = new ArrayList<>();
-        int confianza = 45;
-        if (expediente.getEstadoExpediente() != EstadoExpediente.FINALIZADO) avisos.add("El expediente no esta finalizado"); else confianza += 15;
-        if (vinculacionRepository.existsActivoByExpedienteId(expediente.getId())) bloqueos.add("El expediente ya esta facturado");
+        int confianza = 65;
+        if (expediente.getEstadoExpediente() != EstadoExpediente.FINALIZADO) avisos.add("El expediente no esta finalizado"); else confianza += 5;
+        if (vinculacionRepository.existsActivoByExpedienteId(expediente.getId())) {
+            boolean perteneceAEstaFactura = factura != null && vinculacionRepository.findByExpedienteId(expediente.getId())
+                    .map(v -> v.getFactura() != null && factura.getId().equals(v.getFactura().getId()))
+                    .orElse(false);
+            if (!perteneceAEstaFactura) bloqueos.add("El expediente ya esta facturado");
+        }
         boolean justificante = !documentoRepository.findByExpedienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(expediente.getId(), JUSTIFICANTES).isEmpty();
-        if (!justificante) avisos.add("Faltan justificantes finales"); else confianza += 15;
+        if (!justificante) avisos.add("Faltan justificantes finales"); else confianza += 5;
         String bastidorLocal = expediente.getVehiculo() == null ? null : normalizar(expediente.getVehiculo().getBastidor());
         if (bastidor != null && bastidorLocal != null) {
-            if (normalizar(bastidor).equals(bastidorLocal)) confianza += 15; else bloqueos.add("El bastidor no coincide");
+            if (normalizar(bastidor).equals(bastidorLocal)) confianza += 10; else bloqueos.add("El bastidor no coincide");
         }
         ExpedienteInteresado comprador = expediente.getInteresados().stream().filter(x -> x.getRol() == RolInteresado.COMPRADOR).findFirst().orElse(null);
         if (compradorId != null && comprador != null && comprador.getInteresado() != null) {
-            if (normalizar(compradorId).equals(normalizar(comprador.getInteresado().getDni()))) confianza += 10; else bloqueos.add("El comprador no coincide");
+            if (normalizar(compradorId).equals(normalizar(comprador.getInteresado().getDni()))) confianza += 20; else bloqueos.add("El comprador no coincide");
         }
         if (factura != null && fechaFactura != null && factura.getFechaEmision() != null && !fechaFactura.equals(factura.getFechaEmision())) bloqueos.add("La fecha no coincide con la factura registrada");
         List<String> motivos = new ArrayList<>(bloqueos);

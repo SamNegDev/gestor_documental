@@ -47,6 +47,8 @@ public class HoldedFacturaService {
     private final FacturaHoldedRepository facturaRepository;
     private final ClienteRepository clienteRepository;
     private final ComprobantePagoRepository comprobanteRepository;
+    private final FacturaExpedienteRepository facturaExpedienteRepository;
+    private final ExpedienteRepository expedienteRepository;
     private final HoldedWebhookEventoRepository webhookRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
     @Value("${app.holded.enabled:false}") private boolean enabled;
@@ -282,7 +284,47 @@ public class HoldedFacturaService {
     }
     private FacturaHolded requireFactura(Long id, Usuario u) { FacturaHolded f = facturaRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Factura no encontrada")); validarAcceso(f, u); return f; }
     private void validarAcceso(FacturaHolded f, Usuario u) { if (u.getRolUsuario() == RolUsuario.ADMIN && u.getCliente() == null) return; if (f.getCliente() == null || !clientesPermitidos(u).contains(f.getCliente().getId())) throw new AccesoDenegadoException("No tienes acceso a esta factura"); }
-    private FacturaHoldedResponse mapFactura(FacturaHolded f) { return new FacturaHoldedResponse(f.getId(), f.getNumero(), f.getContactoNombre(), f.getContactoNif(), f.getFechaEmision(), f.getFechaVencimiento(), f.getTotal(), f.getImportePagado(), f.getMoneda(), f.getEstado(), f.getSincronizadaEn(), comprobanteRepository.findByFacturaIdOrderByCreadoEnDesc(f.getId()).stream().map(this::mapComprobante).toList()); }
+    @Transactional(readOnly = true)
+    public FacturaDetalleResponse detalle(Long id, Usuario usuario) {
+        FacturaHolded factura = requireFactura(id, usuario);
+        List<FacturaVinculacionResponse> vinculaciones = facturaExpedienteRepository.findByFacturaIdOrderByIdAsc(id).stream()
+                .map(this::mapVinculacion).toList();
+        return new FacturaDetalleResponse(mapFactura(factura), vinculaciones);
+    }
+
+    @Transactional
+    public FacturaDetalleResponse corregirVinculacion(Long facturaId, Long vinculacionId, Long expedienteId, Usuario admin) {
+        if (admin.getRolUsuario() != RolUsuario.ADMIN) throw new AccesoDenegadoException("Solo administracion puede corregir vinculaciones");
+        FacturaHolded factura = requireFactura(facturaId, admin);
+        FacturaExpediente vinculacion = facturaExpedienteRepository.findById(vinculacionId)
+                .filter(v -> v.getFactura() != null && facturaId.equals(v.getFactura().getId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vinculacion no encontrada"));
+        Expediente nuevo = expedienteRepository.findById(expedienteId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Expediente no encontrado"));
+        if (nuevo.getCliente() == null || factura.getCliente() == null || !nuevo.getCliente().getId().equals(factura.getCliente().getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El expediente debe pertenecer al cliente de la factura");
+        }
+        facturaExpedienteRepository.findByExpedienteId(expedienteId)
+                .filter(otra -> !otra.getId().equals(vinculacionId))
+                .ifPresent(otra -> { throw new ResponseStatusException(HttpStatus.CONFLICT, "El expediente ya esta vinculado a otra factura"); });
+        Long anterior = vinculacion.getExpediente().getId();
+        vinculacion.setExpediente(nuevo);
+        vinculacion.setEstado(EstadoVinculacionFactura.CONFIRMADA);
+        vinculacion.setConfirmadoEn(LocalDateTime.now());
+        vinculacion.setMotivoRevision("Correccion manual: expediente anterior #" + anterior);
+        facturaExpedienteRepository.save(vinculacion);
+        return detalle(facturaId, admin);
+    }
+
+    private FacturaVinculacionResponse mapVinculacion(FacturaExpediente v) {
+        Expediente e = v.getExpediente();
+        return new FacturaVinculacionResponse(v.getId(), e.getId(), e.getMatricula(),
+                e.getCliente() != null ? e.getCliente().getNombre() : null,
+                e.getEstadoExpediente() != null ? e.getEstadoExpediente().name() : null,
+                v.getEstado().name(), v.getMatriculaDetectada(), v.getBastidorDetectado(),
+                v.getCompradorIdentificadorDetectado(), v.getConfianza(), v.getMotivoRevision());
+    }
+    private FacturaHoldedResponse mapFactura(FacturaHolded f) { return new FacturaHoldedResponse(f.getId(), f.getNumero(), f.getContactoNombre(), f.getContactoNif(), f.getFechaEmision(), f.getFechaVencimiento(), f.getTotal(), f.getImportePagado(), f.getMoneda(), f.getEstado(), f.getSincronizadaEn(), f.getLineasPendientesRevision(), f.getDetalleLineasPendientes(), comprobanteRepository.findByFacturaIdOrderByCreadoEnDesc(f.getId()).stream().map(this::mapComprobante).toList()); }
     private ComprobantePagoResponse mapComprobante(ComprobantePago c) { return new ComprobantePagoResponse(c.getId(), c.getNombreOriginal(), c.getContentType(), c.getTamano(), c.getEstado(), c.getObservaciones(), c.getCreadoEn(), c.getRevisadoEn()); }
     private void validarConfiguracion() { if (!enabled) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Integracion Holded desactivada"); if (apiToken == null || apiToken.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Falta configurar el token de Holded"); }
     private RestClient client() {

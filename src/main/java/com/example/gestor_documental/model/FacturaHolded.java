@@ -24,4 +24,6 @@ public class FacturaHolded {
  @Column(name="periodo_desde") private LocalDate periodoDesde; @Column(name="periodo_hasta") private LocalDate periodoHasta;
  @Column(name="archivo_factura",length=180) private String archivoFactura; @Column(name="archivo_factura_original",length=255) private String archivoFacturaOriginal;
  @Column(name="archivo_factura_content_type",length=100) private String archivoFacturaContentType; @Column(name="archivo_factura_tamano") private Long archivoFacturaTamano;
+ @Column(name="lineas_pendientes_revision",nullable=false) private int lineasPendientesRevision;
+ @Column(name="detalle_lineas_pendientes",length=1000) private String detalleLineasPendientes;
 }
