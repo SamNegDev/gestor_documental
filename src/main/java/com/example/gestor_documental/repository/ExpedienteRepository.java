@@ -181,6 +181,15 @@ public interface ExpedienteRepository extends JpaRepository<Expediente, Long> {
                                                             @Param("matricula") String matricula);
 
     @Query("""
+            select e from Expediente e
+            left join fetch e.cliente
+            left join fetch e.tipoTramite
+            where upper(replace(replace(coalesce(e.matricula, ''), ' ', ''), '-', '')) = :matricula
+            order by coalesce(e.fechaUltimaModificacion, e.fechaCreacion) desc
+            """)
+    List<Expediente> findByMatriculaNormalizada(@Param("matricula") String matricula);
+
+    @Query("""
             select distinct e from Expediente e
             left join fetch e.cliente
             left join fetch e.tipoTramite

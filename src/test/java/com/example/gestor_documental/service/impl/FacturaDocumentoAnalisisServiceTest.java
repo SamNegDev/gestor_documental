@@ -1,5 +1,10 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.enums.EstadoExpediente;
+import com.example.gestor_documental.model.Cliente;
+import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.Vehiculo;
 import com.example.gestor_documental.repository.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -24,9 +29,43 @@ class FacturaDocumentoAnalisisServiceTest {
         assertThat(resultado.numeroFactura()).isEqualTo("2026/1997");
         assertThat(resultado.lineas()).extracting("matricula").containsExactly("2565NPX", "2543NPX");
         assertThat(resultado.lineas().get(0).compradorIdentificador()).isEqualTo("78854946K");
-        assertThat(resultado.estado()).isEqualTo("SIN_COINCIDENCIA_HOLDED");
+        assertThat(resultado.estado()).isEqualTo("FACTURA_LOCAL_NUEVA");
     }
 
+    @Test
+    void proponeExpedientePorMatriculaAunqueLaFacturaNoExistaEnHolded() throws Exception {
+        FacturaHoldedRepository facturas = mock(FacturaHoldedRepository.class);
+        ExpedienteRepository expedientes = mock(ExpedienteRepository.class);
+        DocumentoRepository documentos = mock(DocumentoRepository.class);
+        FacturaExpedienteRepository vinculaciones = mock(FacturaExpedienteRepository.class);
+        Cliente cliente = mock(Cliente.class);
+        when(cliente.getId()).thenReturn(9L);
+        Expediente expediente = mock(Expediente.class);
+        when(expediente.getId()).thenReturn(4605L);
+        when(expediente.getCliente()).thenReturn(cliente);
+        when(expediente.getEstadoExpediente()).thenReturn(EstadoExpediente.FINALIZADO);
+        Vehiculo vehiculo = mock(Vehiculo.class);
+        when(vehiculo.getBastidor()).thenReturn("WB10P2101T6N28733");
+        when(expediente.getVehiculo()).thenReturn(vehiculo);
+        when(expediente.getInteresados()).thenReturn(List.of());
+        when(expedientes.findByMatriculaNormalizada("2565NPX")).thenReturn(List.of(expediente));
+        when(documentos.findByExpedienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(eq(4605L), anySet()))
+                .thenReturn(List.of(mock(Documento.class)));
+        var service = new FacturaDocumentoAnalisisService(facturas, expedientes, documentos, vinculaciones);
+        MockMultipartFile archivo = new MockMultipartFile("archivos", "factura.pdf", "application/pdf",
+                pdf("16/07/2026 2026/1997 Documento: 2026/4605 CODIGO MATRICULACION 78854946K COMPRADOR UNO WB10P2101T6N28733 2565NPX"));
+
+        var resultado = service.analizar(List.of(archivo)).get(0);
+
+        assertThat(resultado.estado()).isEqualTo("FACTURA_LOCAL_NUEVA");
+        assertThat(resultado.lineas()).singleElement().satisfies(linea -> {
+            assertThat(linea.expedienteId()).isEqualTo(4605L);
+            assertThat(linea.estado()).isEqualTo("COINCIDENCIA_SEGURA");
+            assertThat(linea.confianza()).isGreaterThanOrEqualTo(85);
+        });
+        verify(expedientes).findByMatriculaNormalizada("2565NPX");
+        verify(expedientes, never()).findByClienteIdAndMatriculaNormalizada(anyLong(), anyString());
+    }
     private byte[] pdf(String texto) throws Exception {
         try (PDDocument doc = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PDPage page = new PDPage(); doc.addPage(page);

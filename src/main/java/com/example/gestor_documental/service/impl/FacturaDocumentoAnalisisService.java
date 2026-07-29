@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -65,8 +66,8 @@ public class FacturaDocumentoAnalisisService {
                                                      LocalDate periodoHasta,
                                                      List<Long> expedienteIds,
                                                      MultipartFile archivo) throws IOException {
-        if (facturaId == null || modalidad == null || expedienteIds == null || expedienteIds.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Faltan factura, modalidad o expedientes");
+        if (modalidad == null || expedienteIds == null || expedienteIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Faltan modalidad o expedientes");
         }
         if (modalidad == com.example.gestor_documental.enums.ModalidadFacturacion.POR_EXPEDIENTE && expedienteIds.size() != 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La facturacion por expediente requiere exactamente un expediente");
@@ -75,12 +76,36 @@ public class FacturaDocumentoAnalisisService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El lote requiere un periodo valido");
         }
         AnalisisFacturaArchivoResponse analisis = analizarUno(archivo);
-        if (!facturaId.equals(analisis.facturaId())) throw new ResponseStatusException(HttpStatus.CONFLICT, "El numero del PDF no coincide con la factura seleccionada");
+        if (facturaId != null && !facturaId.equals(analisis.facturaId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El numero del PDF no coincide con la factura seleccionada");
+        }
         Set<Long> seguros = new HashSet<>();
         analisis.lineas().stream().filter(l -> "COINCIDENCIA_SEGURA".equals(l.estado()) && l.expedienteId() != null).forEach(l -> seguros.add(l.expedienteId()));
         if (!seguros.containsAll(expedienteIds)) throw new ResponseStatusException(HttpStatus.CONFLICT, "Hay expedientes que requieren revision antes de confirmar");
 
-        FacturaHolded factura = facturaRepository.findById(facturaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Factura no encontrada"));
+        List<Expediente> expedientes = new ArrayList<>();
+        Cliente cliente = null;
+        for (Long expedienteId : new LinkedHashSet<>(expedienteIds)) {
+            Expediente expediente = expedienteRepository.findByIdForUpdate(expedienteId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Expediente no encontrado"));
+            if (expediente.getCliente() == null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "El expediente no tiene cliente asignado");
+            }
+            if (cliente != null && !cliente.getId().equals(expediente.getCliente().getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Todos los expedientes de una factura deben pertenecer al mismo cliente");
+            }
+            cliente = expediente.getCliente();
+            expedientes.add(expediente);
+        }
+        FacturaHolded factura = facturaId == null
+                ? crearFacturaLocal(analisis, cliente)
+                : facturaRepository.findById(facturaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Factura no encontrada"));
+        if (factura.getCliente() != null && !factura.getCliente().getId().equals(cliente.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La factura ya pertenece a otro cliente");
+        }
+        factura.setCliente(cliente);
+        if (factura.getContactoNif() == null || factura.getContactoNif().isBlank()) factura.setContactoNif(cliente.getNif());
+        if (factura.getContactoNombre() == null || factura.getContactoNombre().isBlank()) factura.setContactoNombre(cliente.getNombre());
         Path base = Paths.get(uploadDir, "facturas").toAbsolutePath().normalize();
         Files.createDirectories(base);
         String almacenado = UUID.randomUUID() + ".pdf";
@@ -107,11 +132,12 @@ public class FacturaDocumentoAnalisisService {
         factura.setArchivoFacturaOriginal(nombreSeguro(archivo.getOriginalFilename()));
         factura.setArchivoFacturaContentType("application/pdf");
         factura.setArchivoFacturaTamano(archivo.getSize());
-        for (Long expedienteId : new LinkedHashSet<>(expedienteIds)) {
+        for (Expediente expediente : expedientes) {
+            Long expedienteId = expediente.getId();
             if (vinculacionRepository.existsActivoByExpedienteId(expedienteId)) throw new ResponseStatusException(HttpStatus.CONFLICT, "Un expediente ya pertenece a otra factura activa");
             FacturaExpediente vinculacion = new FacturaExpediente();
             vinculacion.setFactura(factura);
-            vinculacion.setExpediente(expedienteRepository.findByIdForUpdate(expedienteId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Expediente no encontrado")));
+            vinculacion.setExpediente(expediente);
             analisis.lineas().stream().filter(l -> expedienteId.equals(l.expedienteId())).findFirst().ifPresent(l -> {
                 vinculacion.setMatriculaDetectada(l.matricula()); vinculacion.setBastidorDetectado(l.bastidor());
                 vinculacion.setCompradorIdentificadorDetectado(l.compradorIdentificador()); vinculacion.setConfianza(l.confianza());
@@ -121,6 +147,29 @@ public class FacturaDocumentoAnalisisService {
             vinculacionRepository.save(vinculacion);
         }
         return analisis;
+    }
+    private FacturaHolded crearFacturaLocal(AnalisisFacturaArchivoResponse analisis, Cliente cliente) {
+        if (analisis.numeroFactura() == null || analisis.numeroFactura().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No se pudo detectar el numero de la factura");
+        }
+        FacturaHolded factura = facturaRepository.findFirstByNumeroIgnoreCase(analisis.numeroFactura()).orElseGet(FacturaHolded::new);
+        if (factura.getCliente() != null && !factura.getCliente().getId().equals(cliente.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El numero de factura ya esta asignado a otro cliente");
+        }
+        if (factura.getId() == null) {
+            factura.setHoldedInvoiceId("LOCAL:" + UUID.randomUUID());
+            factura.setNumero(analisis.numeroFactura());
+            factura.setFechaEmision(analisis.fechaFactura());
+            factura.setEstado(com.example.gestor_documental.enums.EstadoFacturaHolded.PENDIENTE);
+            factura.setTotal(BigDecimal.ZERO);
+            factura.setImportePagado(BigDecimal.ZERO);
+            factura.setMoneda("EUR");
+            factura.setSincronizadaEn(LocalDateTime.now());
+        }
+        factura.setCliente(cliente);
+        factura.setContactoNif(cliente.getNif());
+        factura.setContactoNombre(cliente.getNombre());
+        return facturaRepository.save(factura);
     }
     private void registrarLimpiezaRollback(Path temporal, Path destino) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) return;
@@ -152,7 +201,7 @@ public class FacturaDocumentoAnalisisService {
         LocalDate fecha = fechaMatcher.find() ? LocalDate.parse(fechaMatcher.group(1), DateTimeFormatter.ofPattern("dd/MM/yyyy")) : null;
         FacturaHolded factura = numero == null ? null : facturaRepository.findFirstByNumeroIgnoreCase(numero).orElse(null);
         List<LineaFacturaDetectadaResponse> lineas = extraerLineas(texto, factura, fecha);
-        String estado = numero == null ? "NUMERO_NO_DETECTADO" : factura == null ? "SIN_COINCIDENCIA_HOLDED" : lineas.isEmpty() ? "SIN_EXPEDIENTES_DETECTADOS" : "PROPUESTA_LISTA";
+        String estado = numero == null ? "NUMERO_NO_DETECTADO" : lineas.isEmpty() ? "SIN_EXPEDIENTES_DETECTADOS" : factura == null ? "FACTURA_LOCAL_NUEVA" : "PROPUESTA_LISTA";
         return new AnalisisFacturaArchivoResponse(nombreSeguro(archivo.getOriginalFilename()), numero, fecha, factura == null ? null : factura.getId(), estado, lineas);
     }
 
@@ -174,9 +223,10 @@ public class FacturaDocumentoAnalisisService {
     }
 
     private LineaFacturaDetectadaResponse proponer(String documento, String matricula, String bastidor, String compradorId, String compradorNombre, FacturaHolded factura, LocalDate fechaFactura) {
-        if (factura == null || factura.getCliente() == null) return linea(documento, matricula, bastidor, compradorId, compradorNombre, null, 0, "REVISION", "Factura sin cliente local enlazado");
         if (matricula == null) return linea(documento, null, bastidor, compradorId, compradorNombre, null, 0, "REVISION", "No se detecto matricula");
-        List<Expediente> candidatos = expedienteRepository.findByClienteIdAndMatriculaNormalizada(factura.getCliente().getId(), normalizar(matricula));
+        List<Expediente> candidatos = factura != null && factura.getCliente() != null
+                ? expedienteRepository.findByClienteIdAndMatriculaNormalizada(factura.getCliente().getId(), normalizar(matricula))
+                : expedienteRepository.findByMatriculaNormalizada(normalizar(matricula));
         if (candidatos.size() != 1) return linea(documento, matricula, bastidor, compradorId, compradorNombre, null, 0, "REVISION", candidatos.isEmpty() ? "No existe expediente para la matricula" : "Hay varios expedientes posibles");
         Expediente expediente = candidatos.get(0);
         List<String> motivos = new ArrayList<>();
@@ -191,7 +241,7 @@ public class FacturaDocumentoAnalisisService {
         if (compradorId != null && comprador != null && comprador.getInteresado() != null) {
             if (normalizar(compradorId).equals(normalizar(comprador.getInteresado().getDni()))) confianza += 10; else motivos.add("El comprador no coincide");
         }
-        if (fechaFactura != null && factura.getFechaEmision() != null && !fechaFactura.equals(factura.getFechaEmision())) motivos.add("La fecha no coincide con Holded");
+        if (factura != null && fechaFactura != null && factura.getFechaEmision() != null && !fechaFactura.equals(factura.getFechaEmision())) motivos.add("La fecha no coincide con la factura registrada");
         String estado = motivos.isEmpty() && confianza >= 85 ? "COINCIDENCIA_SEGURA" : "REVISION";
         return linea(documento, matricula, bastidor, compradorId, compradorNombre, expediente.getId(), confianza, estado, String.join("; ", motivos));
     }

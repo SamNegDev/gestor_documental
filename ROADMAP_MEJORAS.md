@@ -14,7 +14,6 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 - Integrar en modo solo lectura las facturas de Holded como fuente de verdad contable: sincronizacion manual y periodica, webhooks firmados e idempotentes, estados de cobro, listado paginado y filtrado, descarga PDF/ZIP y permisos multicliente aplicados en backend.
 - Permitir aportar comprobantes de pago asociados a facturas, con verificacion administrativa y tareas derivadas del estado real, sin alterar nunca el estado contable confirmado por Holded.
 - Incorporar modalidades de facturacion por expediente, lote quincenal y lote mensual, con una modalidad predeterminada por referencia y posibilidad de sobrescribirla por factura.
-- Permitir carga masiva de facturas PDF, extraccion de numero, fecha, matricula, bastidor y comprador, y propuesta segura de vinculacion con expedientes finalizados que tengan justificantes finales.
 
 ### Justificantes provisionales
 
