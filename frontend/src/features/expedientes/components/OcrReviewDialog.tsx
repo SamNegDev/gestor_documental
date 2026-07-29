@@ -219,7 +219,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
         {documentos.length > 0 ? (
           <div className="ocr-review-list">
             {documentos.map((documento) => (
-              <article className="ocr-review-card" key={documento.id ?? documento.nombre}>
+              <article className={`ocr-review-card ${editingId === documento.id ? "ocr-review-card--editing" : ""}`} key={documento.id ?? documento.nombre}>
                 <div className={`ocr-review-card__preview ${documento.id && !isImageDocument(documento) ? "ocr-review-card__preview--pages" : ""}`}>
                   {documento.id ? (
                     isImageDocument(documento) ? (
@@ -245,8 +245,12 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                 <div className="ocr-review-card__body">
                   {editingId === documento.id ? (
                     <div className="ocr-edit-form">
+                      <div className="ocr-edit-form__heading">
+                        <strong>Datos del documento</strong>
+                        <small>Clasifica el archivo antes de confirmar la revisión.</small>
+                      </div>
                       <label>
-                        Tipo documental
+                        <span>Tipo documental</span>
                         <select value={editType} onChange={(event) => setEditType(event.target.value)}>
                           {DOCUMENT_TYPES.map((type) => (
                             <option key={type} value={type}>
@@ -257,7 +261,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                       </label>
                       {operaciones.length > 1 ? (
                         <label>
-                          Operacion
+                          <span>Operación</span>
                           <select value={editOperationId} onChange={(event) => setEditOperationId(event.target.value)}>
                             <option value="">Documento general</option>
                             {operaciones.map((operacion) => (
@@ -268,7 +272,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                           </select>
                         </label>
                       ) : null}
-                      <small>El nombre se generara automaticamente con el formato MATRICULA - TIPO DOCUMENTO.</small>
+                      <small className="ocr-edit-form__help">El nombre se generará automáticamente con el formato MATRÍCULA - TIPO DOCUMENTO.</small>
                     </div>
                   ) : (
                     <div>
@@ -377,7 +381,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                     </div>
                     <div className="ocr-edit-form ocr-edit-form--inline">
                       <label>
-                        Tipo del nuevo documento
+                        <span>Tipo del nuevo documento</span>
                         <select value={extractType} onChange={(event) => setExtractType(event.target.value)}>
                           {DOCUMENT_TYPES.map((type) => (
                             <option key={type} value={type}>
@@ -388,7 +392,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                       </label>
                       {operaciones.length > 1 ? (
                         <label>
-                          Operacion
+                          <span>Operación</span>
                           <select value={extractOperationId} onChange={(event) => setExtractOperationId(event.target.value)}>
                             <option value="">Documento general</option>
                             {operaciones.map((operacion) => (
@@ -399,7 +403,7 @@ export function OcrReviewDialog({ documentos, operaciones = [], open, onClose, o
                           </select>
                         </label>
                       ) : null}
-                      <small>El nombre se generara automaticamente con el formato MATRICULA - TIPO DOCUMENTO.</small>
+                      <small className="ocr-edit-form__help">El nombre se generará automáticamente con el formato MATRÍCULA - TIPO DOCUMENTO.</small>
                     </div>
                     <div className="ocr-page-strip">
                       {Array.from({ length: pageCounts[documento.id] }, (_, index) => index + 1).map((pagina) => (

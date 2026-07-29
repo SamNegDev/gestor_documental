@@ -1443,7 +1443,7 @@
 
 .ocr-review-card {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   gap: 12px;
   padding: 10px;
   border: 1px solid var(--line);
@@ -1633,33 +1633,93 @@
 .ocr-review-card__actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid oklch(90% 0.008 92);
+}
+
+.ocr-review-card--editing {
+  border-color: oklch(70% 0.085 232);
+  background: oklch(98.5% 0.008 232);
+  box-shadow: 0 0 0 2px oklch(93% 0.025 232);
 }
 
 .ocr-edit-form {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid oklch(86% 0.025 232);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.ocr-edit-form__heading,
+.ocr-edit-form__help {
+  grid-column: 1 / -1;
+}
+
+.ocr-edit-form__heading strong,
+.ocr-edit-form__heading small {
+  display: block;
+}
+
+.ocr-edit-form__heading strong {
+  color: var(--ink-strong);
+  font-size: 0.88rem;
+}
+
+.ocr-edit-form__heading small,
+.ocr-edit-form__help {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .ocr-edit-form label {
   display: grid;
-  gap: 4px;
+  min-width: 0;
+  gap: 6px;
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 850;
+}
+
+.ocr-edit-form label > span {
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .ocr-edit-form input,
 .ocr-edit-form select {
-  min-height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 34px 8px 11px;
+  border: 1px solid oklch(82% 0.014 92);
+  border-radius: 8px;
   background: var(--panel);
   color: var(--ink-strong);
-  font-size: 0.9rem;
-  font-weight: 750;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 720;
+  text-transform: none;
+  transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
+}
+
+.ocr-edit-form input:hover,
+.ocr-edit-form select:hover {
+  border-color: oklch(70% 0.035 232);
+}
+
+.ocr-edit-form input:focus-visible,
+.ocr-edit-form select:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px oklch(89% 0.055 232 / 0.7);
+  outline: none;
 }
 
 .ocr-edit-form--inline {
