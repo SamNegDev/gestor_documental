@@ -9,6 +9,7 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
+import com.example.gestor_documental.repository.JustificanteProvisionalRepository;
 import com.example.gestor_documental.repository.MensajeRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
@@ -24,6 +25,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
+import org.springframework.data.jpa.repository.EntityGraph;
+
+import java.util.Arrays;
 
 @ExtendWith(MockitoExtension.class)
 class TareaApiControllerTest {
@@ -39,6 +43,7 @@ class TareaApiControllerTest {
     @Mock ConfiguracionSeguimientoService configuracionSeguimientoService;
     @Mock ExpedienteJustificanteFinalService justificanteFinalService;
     @Mock ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
+    @Mock JustificanteProvisionalRepository justificanteProvisionalRepository;
     @Mock Authentication authentication;
     @InjectMocks TareaApiController controller;
 
@@ -62,6 +67,18 @@ class TareaApiControllerTest {
         assertThat(resultado.getTotalElementos()).isZero();
         verifyNoInteractions(expedienteRepository, solicitudRepository, documentoRepository, incidenciaRepository,
                 mensajeRepository, requisitoRepository, whatsappAdjuntoRepository, whatsappWebhookEventoRepository,
-                configuracionSeguimientoService, justificanteFinalService, tipoTramitePolicyService);
+                configuracionSeguimientoService, justificanteFinalService, tipoTramitePolicyService,
+                justificanteProvisionalRepository);
+    }
+
+    @Test
+    void cargaSolicitudYClienteAlConsultarJustificantesPendientes() throws NoSuchMethodException {
+        EntityGraph entityGraph = JustificanteProvisionalRepository.class
+                .getMethod("findByEstadoInOrderBySolicitadoEnAsc", java.util.List.class)
+                .getAnnotation(EntityGraph.class);
+
+        assertThat(entityGraph).isNotNull();
+        assertThat(Arrays.asList(entityGraph.attributePaths()))
+                .contains("solicitud", "solicitud.cliente");
     }
 }
