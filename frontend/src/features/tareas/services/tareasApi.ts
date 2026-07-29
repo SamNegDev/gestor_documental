@@ -1,7 +1,7 @@
 import { apiGet, apiPostJson } from "../../../shared/api/http";
 import type { AvisoSeleccionadoPreview, ResumenDiarioResponse, TareasPage, TareasResumen } from "../types";
 
-export function getTareas(filters: { tipo?: string; prioridad?: string; ambito?: string; clienteId?: string; pagina?: number; tamanio?: number }) {
+export function getTareas(filters: { grupo?: string; tipo?: string; prioridad?: string; ambito?: string; clienteId?: string; pagina?: number; tamanio?: number }) {
   const params = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") params.set(key, String(value)); });
   return apiGet<TareasPage>(`/api/tareas?${params.toString()}`);
 }

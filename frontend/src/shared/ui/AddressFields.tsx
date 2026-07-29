@@ -186,27 +186,27 @@ export function AddressFields({ idPrefix, value, onChange, fieldNamePrefix, high
         Via
         <input value={value.nombreVia || ""} onChange={(event) => updateInput("nombreVia", event)} />
       </label>
-      <label className={fieldClassName("NumeroVia", "address-field address-field--xs")} data-field={fieldName("NumeroVia")}>
+      <label className={fieldClassName("NumeroVia", "address-field address-field--xs address-field--number")} data-field={fieldName("NumeroVia")}>
         Num.
         <input maxLength={20} value={value.numeroVia || ""} onChange={(event) => updateInput("numeroVia", event)} />
       </label>
-      <label className={fieldClassName("Bloque", "address-field address-field--xs")} data-field={fieldName("Bloque")}>
+      <label className={fieldClassName("Bloque", "address-field address-field--xs address-field--block")} data-field={fieldName("Bloque")}>
         Bloq.
         <input maxLength={20} value={value.bloque || ""} onChange={(event) => updateInput("bloque", event)} />
       </label>
-      <label className={fieldClassName("Portal", "address-field address-field--xs")} data-field={fieldName("Portal")}>
+      <label className={fieldClassName("Portal", "address-field address-field--xs address-field--portal")} data-field={fieldName("Portal")}>
         Portal
         <input maxLength={20} value={value.portal || ""} onChange={(event) => updateInput("portal", event)} />
       </label>
-      <label className={fieldClassName("Escalera", "address-field address-field--xs")} data-field={fieldName("Escalera")}>
+      <label className={fieldClassName("Escalera", "address-field address-field--xs address-field--stair")} data-field={fieldName("Escalera")}>
         Esc.
         <input maxLength={20} value={value.escalera || ""} onChange={(event) => updateInput("escalera", event)} />
       </label>
-      <label className={fieldClassName("Piso", "address-field address-field--xs")} data-field={fieldName("Piso")}>
+      <label className={fieldClassName("Piso", "address-field address-field--xs address-field--floor")} data-field={fieldName("Piso")}>
         Piso
         <input maxLength={20} value={value.piso || ""} onChange={(event) => updateInput("piso", event)} />
       </label>
-      <label className={fieldClassName("Puerta", "address-field address-field--xs")} data-field={fieldName("Puerta")}>
+      <label className={fieldClassName("Puerta", "address-field address-field--xs address-field--door")} data-field={fieldName("Puerta")}>
         Pta.
         <input maxLength={20} value={value.puerta || ""} onChange={(event) => updateInput("puerta", event)} />
       </label>

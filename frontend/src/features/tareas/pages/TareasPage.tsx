@@ -14,12 +14,43 @@ import { SelectedEmailPreviewDialog } from "../components/SelectedEmailPreviewDi
 import { enviarAvisosConjuntos, getTareas, getTareasResumen, revisarTareaWhatsapp } from "../services/tareasApi";
 import type { Tarea } from "../types";
 
+const TASK_GROUPS = [
+  { value: "", label: "Todas" },
+  { value: "REVISION", label: "Por revisar" },
+  { value: "AVISAR", label: "Avisar al cliente" },
+  { value: "COMPLETAR", label: "Completar información" },
+  { value: "SEGUIMIENTO", label: "Seguimiento" },
+];
+
+const TASK_TYPE_OPTIONS = [
+  { value: "SOLICITUD_PENDIENTE_REVISION", label: "Solicitudes por revisar" },
+  { value: "APORTACION_PENDIENTE_REVISION", label: "Aportaciones por revisar" },
+  { value: "INFORMACION_ADICIONAL_RECIBIDA", label: "Información adicional recibida" },
+  { value: "DOCUMENTO_HABITUAL_REVISION_ANUAL", label: "Documentos para revisión anual" },
+  { value: "INCIDENCIA_PENDIENTE_NOTIFICAR", label: "Avisos al cliente" },
+  { value: "INCIDENCIA_RECORDATORIO_PENDIENTE", label: "Recordatorios vencidos" },
+  { value: "DOCUMENTACION_PENDIENTE_CLIENTE", label: "Documentación pendiente" },
+  { value: "INFORMACION_PENDIENTE_CLIENTE", label: "Información pendiente" },
+  { value: "JUSTIFICANTE_FINAL_PENDIENTE", label: "Justificantes finales" },
+  { value: "JUSTIFICANTE_PROVISIONAL_PENDIENTE", label: "Justificantes provisionales" },
+  { value: "COMPROBANTE_PAGO_PENDIENTE", label: "Comprobantes de pago" },
+  { value: "INCIDENCIA_PENDIENTE_CLIENTE", label: "Incidencias" },
+  { value: "INCIDENCIA_PENDIENTE_ARCHIVAR", label: "Seguimientos por archivar" },
+  { value: "EXPEDIENTE_ESTANCADO", label: "Sin actividad" },
+  { value: "WHATSAPP_PENDIENTE_REVISION", label: "Mensajes por revisar" },
+  { value: "WHATSAPP_PENDIENTE_ASOCIAR", label: "Mensajes sin asociar" },
+  { value: "WHATSAPP_ADJUNTO_CLASIFICAR", label: "Adjuntos por clasificar" },
+  { value: "WHATSAPP_CONTACTO_SOLICITADO", label: "Contacto solicitado" },
+  { value: "WHATSAPP_ESTADO_SOLICITADO", label: "Estado solicitado" },
+  { value: "WHATSAPP_MENSAJE_CLIENTE", label: "Mensajes de cliente" },
+];
 export function TareasPage() {
   const { user } = useOutletContext<AppOutletContext>();
   const isAdmin = user?.rol === "ADMIN";
   const queryClient = useQueryClient();
   const { confirm, dialog } = useConfirmDialog();
   const ambito = isAdmin ? "GESTION" : "CLIENTE";
+  const [grupo, setGrupo] = useState("");
   const [tipo, setTipo] = useState("");
   const [prioridad, setPrioridad] = useState("");
   const [clienteId, setClienteId] = useState("");
@@ -30,8 +61,8 @@ export function TareasPage() {
   const [notificacion, setNotificacion] = useState<{ incidenciaId: number; canal: "email" | "whatsapp" } | null>(null);
   const [selectedPreviewOpen, setSelectedPreviewOpen] = useState(false);
   const query = useQuery({
-    queryKey: ["tareas", ambito, tipo, prioridad, clienteId, pagina, tamanio],
-    queryFn: () => getTareas({ ambito, tipo, prioridad, clienteId: isAdmin ? clienteId : "", pagina, tamanio }),
+    queryKey: ["tareas", ambito, grupo, tipo, prioridad, clienteId, pagina, tamanio],
+    queryFn: () => getTareas({ ambito, grupo, tipo, prioridad, clienteId: isAdmin ? clienteId : "", pagina, tamanio }),
   });
   const catalogs = useQuery({ queryKey: ["expedientes", "catalogos-listado"], queryFn: getExpedienteListCatalogs, enabled: isAdmin });
   const resumen = useQuery({ queryKey: ["tareas", "resumen"], queryFn: getTareasResumen });
@@ -87,7 +118,7 @@ export function TareasPage() {
   }
   useEffect(() => {
     setSelectedTasks({});
-  }, [ambito, tipo, prioridad, clienteId, pagina, tamanio]);
+  }, [ambito, grupo, tipo, prioridad, clienteId, pagina, tamanio]);
   const data = query.data;
   function previewSelectedNotifications() {
     setSelectedPreviewOpen(true);
@@ -150,26 +181,7 @@ export function TareasPage() {
           <h2>{isAdmin ? "Bandeja de tareas" : "Mis tareas"}</h2>
           <p>{isAdmin ? "Acciones de gestion que requieren intervencion." : "Acciones que necesitan tu atencion para continuar los tramites."}</p>
         </div>
-        {isAdmin ? (
-          <div className="records-header__actions">
-            <button
-              className="primary-button"
-              disabled={!selectedCanNotify}
-              onClick={previewSelectedNotifications}
-              type="button"
-            >
-              <Send size={16} />
-              {selectedList.length ? `Previsualizar selección (${selectedList.length})` : "Selecciona avisos"}
-            </button>
-            <button className="soft-button" disabled={bulkNotify.isPending || !clienteId} onClick={sendFilteredNotifications} type="button">
-              <Send size={16} />
-              {bulkNotify.isPending ? "Enviando..." : clienteId ? "Enviar pendientes del cliente" : "Selecciona cliente"}
-            </button>
-            <span className="records-count">{data?.totalElementos ?? 0} pendientes</span>
-          </div>
-        ) : (
-          <span className="records-count">{data?.totalElementos ?? 0} pendientes</span>
-        )}
+        <span className="records-count">{data?.totalElementos ?? 0} pendientes</span>
       </header>
 
       {bulkFeedback ? <div aria-live="polite" className="form-feedback" role="status">{bulkFeedback}</div> : null}
@@ -182,59 +194,63 @@ export function TareasPage() {
                 ? "La seleccion mezcla clientes. El aviso conjunto solo se puede crear para un unico cliente."
                 : "La seleccion contiene tareas sin cliente asociado."}
           </span>
-          <button className="soft-button soft-button--compact" onClick={() => setSelectedTasks({})} type="button">
-            Limpiar seleccion
-          </button>
+          <div className="task-selection-bar__actions">
+            <button className="soft-button soft-button--compact" onClick={() => setSelectedTasks({})} type="button">Limpiar selección</button>
+            <button className="primary-button primary-button--compact" disabled={!selectedCanNotify} onClick={previewSelectedNotifications} type="button">
+              <Send size={15} /> Previsualizar aviso
+            </button>
+          </div>
         </div>
       ) : null}
 
-      <section className="task-summary">
-        <Summary icon={Inbox} label="Total" value={resumen.data?.total ?? 0} />
-        <Summary icon={AlertTriangle} label="Prioridad alta" value={resumen.data?.urgentes ?? 0} tone="danger" />
-        <Summary icon={Clock3} label="Sin actividad" value={resumen.data?.estancados ?? 0} tone="warning" />
+      <section className="task-summary" aria-label="Accesos rápidos">
+        <Summary active={!grupo && !tipo && !prioridad && !clienteId} icon={Inbox} label="Todas" onClick={() => { setGrupo(""); setTipo(""); setPrioridad(""); setClienteId(""); setPagina(0); }} value={resumen.data?.total ?? 0} />
+        <Summary active={prioridad === "ALTA"} icon={AlertTriangle} label="Prioridad alta" onClick={() => { setPrioridad("ALTA"); setPagina(0); }} value={resumen.data?.urgentes ?? 0} tone="danger" />
+        <Summary active={tipo === "EXPEDIENTE_ESTANCADO"} icon={Clock3} label="Sin actividad" onClick={() => { setGrupo("SEGUIMIENTO"); setTipo("EXPEDIENTE_ESTANCADO"); setPagina(0); }} value={resumen.data?.estancados ?? 0} tone="warning" />
       </section>
 
-      <div className="task-filters">
-        <label>
-          <span>Tipo</span>
-          <select value={tipo} onChange={(event) => { setTipo(event.target.value); setPagina(0); }}>
-            <option value="">Todas las tareas</option>
-            <option value="SOLICITUD_PENDIENTE_REVISION">Solicitudes por revisar</option>
-            <option value="APORTACION_PENDIENTE_REVISION">Aportaciones por revisar</option>
-            <option value="INCIDENCIA_PENDIENTE_NOTIFICAR">Avisos al cliente</option>
-            <option value="INCIDENCIA_RECORDATORIO_PENDIENTE">Recordatorios vencidos</option>
-            <option value="INCIDENCIA_PENDIENTE_ARCHIVAR">Seguimientos por archivar</option>
-            <option value="INCIDENCIA_PENDIENTE_CLIENTE">Incidencias</option>
-            <option value="DOCUMENTACION_PENDIENTE_CLIENTE">Documentacion pendiente</option>
-            <option value="INFORMACION_PENDIENTE_CLIENTE">Informacion pendiente</option>
-            <option value="JUSTIFICANTE_FINAL_PENDIENTE">Justificantes finales</option>
-            <option value="WHATSAPP_PENDIENTE_REVISION">WhatsApp por revisar</option>
-            <option value="WHATSAPP_PENDIENTE_ASOCIAR">WhatsApp sin asociar</option>
-            <option value="WHATSAPP_ADJUNTO_CLASIFICAR">WhatsApp: adjuntos</option>
-            <option value="WHATSAPP_CONTACTO_SOLICITADO">WhatsApp: contacto solicitado</option>
-            <option value="WHATSAPP_ESTADO_SOLICITADO">WhatsApp: estado solicitado</option>
-            <option value="EXPEDIENTE_ESTANCADO">Sin actividad</option>
-          </select>
-        </label>
-        <label>
-          <span>Prioridad</span>
-          <select value={prioridad} onChange={(event) => { setPrioridad(event.target.value); setPagina(0); }}>
-            <option value="">Todas</option>
-            <option value="ALTA">Alta</option>
-            <option value="MEDIA">Media</option>
-          </select>
-        </label>
-        {isAdmin ? (
+      <nav className="task-view-switcher" aria-label="Vista de trabajo">
+        {TASK_GROUPS.map((option) => (
+          <button className={grupo === option.value && !tipo ? "is-active" : ""} key={option.value || "TODAS"} onClick={() => { setGrupo(option.value); setTipo(""); setPagina(0); }} type="button">{option.label}</button>
+        ))}
+      </nav>
+      <div className="task-filter-bar">
+        <div className="task-filters">
           <label>
-            <span>Cliente</span>
-            <select value={clienteId} onChange={(event) => { setClienteId(event.target.value); setPagina(0); }}>
-              <option value="">Todos los clientes</option>
-              {catalogs.data?.clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
+            <span>Prioridad</span>
+            <select value={prioridad} onChange={(event) => { setPrioridad(event.target.value); setPagina(0); }}>
+              <option value="">Todas</option><option value="ALTA">Alta</option><option value="MEDIA">Media</option>
             </select>
           </label>
-        ) : null}
+          {isAdmin ? (
+            <label className="task-filter--client">
+              <span>Cliente</span>
+              <select value={clienteId} onChange={(event) => { setClienteId(event.target.value); setPagina(0); }}>
+                <option value="">Todos los clientes</option>
+                {catalogs.data?.clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
+              </select>
+            </label>
+          ) : null}
+          <details className="task-more-filters" open={Boolean(tipo)}>
+            <summary>Más filtros{tipo ? " · 1 activo" : ""}</summary>
+            <label>
+              <span>Tipo concreto</span>
+              <select value={tipo} onChange={(event) => { setGrupo(""); setTipo(event.target.value); setPagina(0); }}>
+                <option value="">Cualquier tipo</option>
+                {TASK_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+          </details>
+        </div>
+        <div className="task-filter-bar__actions">
+          {grupo || tipo || prioridad || clienteId ? <button className="link-button" onClick={() => { setGrupo(""); setTipo(""); setPrioridad(""); setClienteId(""); setPagina(0); }} type="button">Limpiar filtros</button> : null}
+          {isAdmin && clienteId ? (
+            <button className="soft-button soft-button--compact" disabled={bulkNotify.isPending} onClick={sendFilteredNotifications} type="button">
+              <Send size={15} /> {bulkNotify.isPending ? "Enviando..." : "Enviar pendientes del cliente"}
+            </button>
+          ) : null}
+        </div>
       </div>
-
       <section className="records-panel records-panel--ledger">
         {isAdmin && selectableVisibleTasks.length > 0 ? (
           <div className="task-selection-toolbar">
@@ -405,8 +421,8 @@ function canNotifyTask(tarea: Tarea) {
     && (tarea.tipo === "INCIDENCIA_PENDIENTE_NOTIFICAR" || tarea.tipo === "INCIDENCIA_RECORDATORIO_PENDIENTE");
 }
 
-function Summary({ icon: Icon, label, value, tone = "default" }: { icon: typeof Inbox; label: string; value: number; tone?: string }) {
-  return <div className={`task-summary__item task-summary__item--${tone}`}><Icon aria-hidden="true" size={19} /><span><small>{label}</small><strong>{value}</strong></span></div>;
+function Summary({ active = false, icon: Icon, label, onClick, value, tone = "default" }: { active?: boolean; icon: typeof Inbox; label: string; onClick: () => void; value: number; tone?: string }) {
+  return <button aria-pressed={active} className={`task-summary__item task-summary__item--${tone}${active ? " is-active" : ""}`} onClick={onClick} type="button"><Icon aria-hidden="true" size={19} /><span><small>{label}</small><strong>{value}</strong></span></button>;
 }
 
 function taskIcon(tipo: string) {

@@ -3760,8 +3760,35 @@
 }
 
 .identity-review-modal__wide-field {
+  grid-column: 1 / -1;
+}
+
+.identity-review-modal__business-name {
   grid-column: span 2;
 }
+
+.identity-review-modal__wide-field.address-fields {
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 12px 10px;
+  padding-top: 4px;
+}
+
+.identity-review-modal__wide-field .address-field--type { grid-column: span 2; }
+.identity-review-modal__wide-field .address-field--street { grid-column: span 6; }
+.identity-review-modal__wide-field .address-field--number { grid-column: span 2; }
+
+.identity-review-modal__wide-field .address-field--block,
+.identity-review-modal__wide-field .address-field--portal,
+.identity-review-modal__wide-field .address-field--stair,
+.identity-review-modal__wide-field .address-field--floor,
+.identity-review-modal__wide-field .address-field--door {
+  grid-column: span 2;
+}
+
+.identity-review-modal__wide-field .address-field--province { grid-column: span 4; }
+.identity-review-modal__wide-field .address-field--municipality { grid-column: span 6; }
+.identity-review-modal__wide-field .address-field--postal { grid-column: span 3; }
+.identity-review-modal__wide-field .address-field--locality { grid-column: span 7; }
 
 .template-dialog {
   width: min(1180px, calc(100vw - 32px));
@@ -4193,8 +4220,31 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .identity-review-modal__business-name,
   .identity-review-modal__wide-field {
     grid-column: auto;
+  }
+
+  .identity-review-modal__wide-field.address-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .identity-review-modal__wide-field .address-field--type,
+  .identity-review-modal__wide-field .address-field--street,
+  .identity-review-modal__wide-field .address-field--province,
+  .identity-review-modal__wide-field .address-field--municipality,
+  .identity-review-modal__wide-field .address-field--postal,
+  .identity-review-modal__wide-field .address-field--locality {
+    grid-column: 1 / -1;
+  }
+
+  .identity-review-modal__wide-field .address-field--number,
+  .identity-review-modal__wide-field .address-field--block,
+  .identity-review-modal__wide-field .address-field--portal,
+  .identity-review-modal__wide-field .address-field--stair,
+  .identity-review-modal__wide-field .address-field--floor,
+  .identity-review-modal__wide-field .address-field--door {
+    grid-column: span 1;
   }
 
   .identity-review-modal__preview iframe {

@@ -309,23 +309,23 @@ function IdentityReviewDialog({
               </label>
             </div>
             <div className="identity-review-modal__grid">
-              <label>
+              <label className="identity-review-modal__identifier">
                 <span>DNI/NIE/CIF</span>
                 <input value={draft.identificador} onChange={(event) => updateInput("identificador", event)} />
               </label>
-              <label>
+              <label className="identity-review-modal__business-name">
                 <span>Razon social</span>
                 <input value={draft.razonSocial} onChange={(event) => updateInput("razonSocial", event)} />
               </label>
-              <label>
+              <label className="identity-review-modal__person-field">
                 <span>Nombre</span>
                 <input value={draft.nombre} onChange={(event) => updateInput("nombre", event)} />
               </label>
-              <label>
+              <label className="identity-review-modal__person-field">
                 <span>Apellido 1</span>
                 <input value={draft.apellido1} onChange={(event) => updateInput("apellido1", event)} />
               </label>
-              <label>
+              <label className="identity-review-modal__person-field">
                 <span>Apellido 2</span>
                 <input value={draft.apellido2} onChange={(event) => updateInput("apellido2", event)} />
               </label>

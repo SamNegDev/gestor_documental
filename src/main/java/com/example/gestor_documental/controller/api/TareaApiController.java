@@ -79,7 +79,8 @@ public class TareaApiController {
     private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
 
     @GetMapping
-    public PagedResponse<TareaResponse> listar(@RequestParam(required = false) String tipo,
+    public PagedResponse<TareaResponse> listar(@RequestParam(required = false) String grupo,
+            @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String prioridad,
             @RequestParam(required = false) String ambito,
             @RequestParam(required = false) Long clienteId,
@@ -89,6 +90,7 @@ public class TareaApiController {
         Usuario usuario = usuario(authentication);
         List<TareaResponse> tareas = calcularTareas(usuario).stream()
                 .filter(tarea -> ambito == null || ambito.isBlank() || ambito.equals(tarea.getAmbito()))
+                .filter(tarea -> perteneceGrupo(tarea.getTipo(), grupo))
                 .filter(tarea -> tipo == null || tipo.isBlank() || tipo.equals(tarea.getTipo()))
                 .filter(tarea -> prioridad == null || prioridad.isBlank() || prioridad.equals(tarea.getPrioridad()))
                 .filter(tarea -> clienteId == null || clienteId.equals(tarea.getClienteId()))
@@ -98,6 +100,29 @@ public class TareaApiController {
         return PagedResponse.of(tareas, pagina, tamanio);
     }
 
+    static boolean perteneceGrupo(String tipo, String grupo) {
+        if (grupo == null || grupo.isBlank()) {
+            return true;
+        }
+        return switch (grupo) {
+            case "REVISION" -> Set.of(
+                    "SOLICITUD_PENDIENTE_REVISION", "APORTACION_PENDIENTE_REVISION",
+                    "INFORMACION_ADICIONAL_RECIBIDA", "DOCUMENTO_HABITUAL_REVISION_ANUAL",
+                    "WHATSAPP_PENDIENTE_REVISION", "WHATSAPP_PENDIENTE_ASOCIAR",
+                    "WHATSAPP_ADJUNTO_CLASIFICAR", "WHATSAPP_CONTACTO_SOLICITADO",
+                    "WHATSAPP_ESTADO_SOLICITADO", "WHATSAPP_MENSAJE_CLIENTE").contains(tipo);
+            case "AVISAR" -> Set.of(
+                    "INCIDENCIA_PENDIENTE_NOTIFICAR", "INCIDENCIA_RECORDATORIO_PENDIENTE").contains(tipo);
+            case "COMPLETAR" -> Set.of(
+                    "DOCUMENTACION_PENDIENTE_CLIENTE", "INFORMACION_PENDIENTE_CLIENTE",
+                    "JUSTIFICANTE_FINAL_PENDIENTE", "JUSTIFICANTE_PROVISIONAL_PENDIENTE",
+                    "COMPROBANTE_PAGO_PENDIENTE").contains(tipo);
+            case "SEGUIMIENTO" -> Set.of(
+                    "INCIDENCIA_PENDIENTE_CLIENTE", "INCIDENCIA_PENDIENTE_ARCHIVAR",
+                    "EXPEDIENTE_ESTANCADO").contains(tipo);
+            default -> false;
+        };
+    }
     @GetMapping("/resumen")
     public TareasResumenResponse resumen(Authentication authentication) {
         Usuario usuario = usuario(authentication);

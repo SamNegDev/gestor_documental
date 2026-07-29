@@ -43,11 +43,20 @@ class TareaApiControllerTest {
     @InjectMocks TareaApiController controller;
 
     @Test
+    void agrupaLasTareasPorTrabajoYNoPorCanal() {
+        assertThat(TareaApiController.perteneceGrupo("WHATSAPP_PENDIENTE_REVISION", "REVISION")).isTrue();
+        assertThat(TareaApiController.perteneceGrupo("SOLICITUD_PENDIENTE_REVISION", "REVISION")).isTrue();
+        assertThat(TareaApiController.perteneceGrupo("INCIDENCIA_PENDIENTE_NOTIFICAR", "AVISAR")).isTrue();
+        assertThat(TareaApiController.perteneceGrupo("DOCUMENTACION_PENDIENTE_CLIENTE", "COMPLETAR")).isTrue();
+        assertThat(TareaApiController.perteneceGrupo("EXPEDIENTE_ESTANCADO", "SEGUIMIENTO")).isTrue();
+        assertThat(TareaApiController.perteneceGrupo("WHATSAPP_PENDIENTE_REVISION", "SEGUIMIENTO")).isFalse();
+    }
+    @Test
     void usuarioClienteSinClienteActivoNoRecibeTareasGlobales() {
         Usuario usuario = new Usuario("Cliente", "Sin contexto", "cliente@test.local", "secret", RolUsuario.CLIENTE, true);
         when(currentUserService.requireUser(authentication)).thenReturn(usuario);
 
-        var resultado = controller.listar(null, null, null, null, 0, 25, authentication);
+        var resultado = controller.listar(null, null, null, null, null, 0, 25, authentication);
 
         assertThat(resultado.getContenido()).isEmpty();
         assertThat(resultado.getTotalElementos()).isZero();
