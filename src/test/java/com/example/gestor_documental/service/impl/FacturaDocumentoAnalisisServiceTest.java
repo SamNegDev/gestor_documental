@@ -104,6 +104,20 @@ class FacturaDocumentoAnalisisServiceTest {
         assertThat(linea.confirmacionManualPermitida()).isTrue();
         assertThat(linea.motivo()).contains("no esta finalizado");
     }
+    @Test
+    void detectaCompradorAunqueLaLineaNoTengaBastidor() throws Exception {
+        FacturaHoldedRepository facturas = mock(FacturaHoldedRepository.class);
+        var service = new FacturaDocumentoAnalisisService(facturas, mock(ExpedienteRepository.class), mock(DocumentoRepository.class), mock(FacturaExpedienteRepository.class));
+        MockMultipartFile archivo = new MockMultipartFile("archivos", "factura.pdf", "application/pdf", pdf(
+                "16/07/2026 2026/1997 Documento: 2026/4605 79083702L PEDRO JOSE DEL BOSQUE DE ARMAS / INFORMACION BASICA DE PROTECCION DE DATOS J76711373 GESTORIA 2565NPX"));
+
+        var linea = service.analizar(List.of(archivo)).get(0).lineas().get(0);
+
+        assertThat(linea.matricula()).isEqualTo("2565NPX");
+        assertThat(linea.bastidor()).isNull();
+        assertThat(linea.compradorIdentificador()).isEqualTo("79083702L");
+        assertThat(linea.compradorNombre()).isEqualTo("PEDRO JOSE DEL BOSQUE DE ARMAS");
+    }
     private byte[] pdf(String texto) throws Exception {
         try (PDDocument doc = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PDPage page = new PDPage(); doc.addPage(page);

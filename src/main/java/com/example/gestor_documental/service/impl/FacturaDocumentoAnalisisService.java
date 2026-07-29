@@ -38,6 +38,7 @@ public class FacturaDocumentoAnalisisService {
     private static final Pattern MATRICULA = Pattern.compile("(?<![A-Z0-9])(\\d{4}[BCDFGHJKLMNPRSTVWXYZ]{3})(?![A-Z0-9])", Pattern.CASE_INSENSITIVE);
     private static final Pattern BASTIDOR = Pattern.compile("(?<![A-Z0-9])([A-HJ-NPR-Z0-9]{17})(?![A-Z0-9])", Pattern.CASE_INSENSITIVE);
     private static final Pattern IDENTIFICADOR = Pattern.compile("(?<![A-Z0-9])([ABCDEFGHJNPQRSUVW]\\d{7}[A-Z0-9]|[XYZ]\\d{7}[A-Z]|\\d{8}[A-Z])(?![A-Z0-9])", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FIN_DATOS_COMPRADOR = Pattern.compile("\\s(?:/|CONTIN.A|INFORMACI.N B.SICA|PROTECCI.N DE DATOS|GESTORIA ADMINISTRATIVA|RESPONSABLE DEL TRATAMIENTO)", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Set<com.example.gestor_documental.enums.TipoDocumento> JUSTIFICANTES = Set.of(
             com.example.gestor_documental.enums.TipoDocumento.HUELLA_TRAMITE,
             com.example.gestor_documental.enums.TipoDocumento.COMPROBANTE_DGT,
@@ -65,6 +66,7 @@ public class FacturaDocumentoAnalisisService {
                                                      LocalDate periodoDesde,
                                                      LocalDate periodoHasta,
                                                      List<Long> expedienteIds,
+                                                     List<Long> expedienteIdsManuales,
                                                      MultipartFile archivo) throws IOException {
         if (modalidad == null || expedienteIds == null || expedienteIds.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Faltan modalidad o expedientes");
@@ -83,6 +85,11 @@ public class FacturaDocumentoAnalisisService {
         analisis.lineas().stream()
                 .filter(l -> l.expedienteId() != null && ("COINCIDENCIA_SEGURA".equals(l.estado()) || l.confirmacionManualPermitida()))
                 .forEach(l -> confirmables.add(l.expedienteId()));
+        Set<Long> manuales = expedienteIdsManuales == null ? Set.of() : new HashSet<>(expedienteIdsManuales);
+        if (!new HashSet<>(expedienteIds).containsAll(manuales)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Las asignaciones manuales no pertenecen a la seleccion");
+        }
+        confirmables.addAll(manuales);
         if (!confirmables.containsAll(expedienteIds)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La seleccion contiene expedientes no confirmables");
         }
@@ -292,15 +299,34 @@ public class FacturaDocumentoAnalisisService {
         String upper = bloque.toUpperCase(Locale.ROOT);
         int limite = bastidor == null ? upper.length() : upper.indexOf(bastidor.toUpperCase(Locale.ROOT));
         if (limite < 0) limite = upper.length();
+        Matcher finDatos = FIN_DATOS_COMPRADOR.matcher(upper);
+        if (finDatos.find() && finDatos.start() < limite) limite = finDatos.start();
         Matcher matcher = IDENTIFICADOR.matcher(upper.substring(0, limite));
         String ultimo = null;
         while (matcher.find()) {
             String candidato = matcher.group(1);
             if (!excluidos.contains(normalizar(candidato))) ultimo = candidato;
         }
-        return ultimo;
+        if (ultimo != null) return ultimo;
+        matcher = IDENTIFICADOR.matcher(upper);
+        while (matcher.find()) {
+            String candidato = matcher.group(1);
+            if (!excluidos.contains(normalizar(candidato))) return candidato;
+        }
+        return null;
     }
-    private String extraerNombre(String bloque,String id,String vin){if(id==null||vin==null)return null;String upper=bloque.toUpperCase(Locale.ROOT);int a=upper.indexOf(id)+id.length(),b=upper.indexOf(vin,a);return b>a?bloque.substring(a,b).replaceAll("\\s+"," ").trim():null;}
+    private String extraerNombre(String bloque, String id, String vin) {
+        if (id == null) return null;
+        String upper = bloque.toUpperCase(Locale.ROOT);
+        int inicio = upper.indexOf(id.toUpperCase(Locale.ROOT));
+        if (inicio < 0) return null;
+        inicio += id.length();
+        int fin = vin == null ? bloque.length() : upper.indexOf(vin.toUpperCase(Locale.ROOT), inicio);
+        if (fin < inicio) fin = bloque.length();
+        String candidato = bloque.substring(inicio, fin).replaceAll("\\s+", " ").trim();
+        candidato = candidato.split("(?i)\\s*(?:/|CONTIN.A|INFORMACI.N B.SICA|PROTECCI.N DE DATOS|GESTORIA ADMINISTRATIVA|RESPONSABLE DEL TRATAMIENTO)\\s*", 2)[0].trim();
+        return candidato.isBlank() || candidato.length() > 120 ? null : candidato;
+    }
     private String normalizar(String valor){return valor==null?null:valor.replaceAll("[^A-Za-z0-9]","").toUpperCase(Locale.ROOT);}
     private String nombreSeguro(String nombre){return Optional.ofNullable(nombre).orElse("factura.pdf").replaceAll("[\\\\/:*?\"<>|]","_");}
     private void validarPdf(MultipartFile archivo){if(archivo==null||archivo.isEmpty())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Factura vacia");if(archivo.getSize()>MAX_PDF)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"La factura supera 20 MB");if(!"application/pdf".equalsIgnoreCase(archivo.getContentType()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Solo se admiten facturas PDF");}
