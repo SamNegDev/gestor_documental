@@ -84,7 +84,28 @@ export function SolicitudDetailPage() {
   const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
 
+  const transferirDatosAExtension = (payload: ReturnType<typeof buildThempusPayload>) => new Promise<void>((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("gestor-documental:thempus-ready", onReady as EventListener);
+      reject(new Error("No se detectó la extensión Thempus 0.3.0. Descárgala o recárgala en chrome://extensions."));
+    }, 3000);
+    const onReady = (event: Event) => {
+      const detail = (event as CustomEvent<{ requestId?: string; ok?: boolean; message?: string }>).detail;
+      if (detail?.requestId !== requestId) return;
+      window.clearTimeout(timeout);
+      window.removeEventListener("gestor-documental:thempus-ready", onReady as EventListener);
+      if (detail.ok) resolve();
+      else reject(new Error(detail.message || "La extensión no pudo guardar los datos."));
+    };
+    window.addEventListener("gestor-documental:thempus-ready", onReady as EventListener);
+    window.dispatchEvent(new CustomEvent("gestor-documental:prepare-thempus", {
+      detail: { requestId, payload },
+    }));
+  });
+
   const prepararEnThempus = async (solicitud: SolicitudDetail) => {
+    let thempusWindow: Window | null = null;
     try {
       const payload = buildThempusPayload(solicitud);
       const missing = getMissingThempusFields(payload);
@@ -94,22 +115,16 @@ export function SolicitudDetailPage() {
         window.alert(message);
         return;
       }
-      const thempusWindow = window.open("about:blank", "_blank");
+      thempusWindow = window.open("about:blank", "_blank");
       if (!thempusWindow) {
-        await navigator.clipboard.writeText(JSON.stringify(payload));
-        window.location.href = THEMPUS_JUSTIFICANTES_URL;
-        return;
+        throw new Error("Chrome ha bloqueado la pestaña. Permite ventanas emergentes para esta aplicación.");
       }
-      try {
-        await navigator.clipboard.writeText(JSON.stringify(payload));
-        thempusWindow.opener = null;
-        thempusWindow.location.href = THEMPUS_JUSTIFICANTES_URL;
-      } catch (error) {
-        thempusWindow.close();
-        throw error;
-      }
-      setThempusMessage("Datos copiados. Thempus creará y rellenará el borrador automáticamente.");
+      await transferirDatosAExtension(payload);
+      thempusWindow.opener = null;
+      thempusWindow.location.href = THEMPUS_JUSTIFICANTES_URL;
+      setThempusMessage("Datos transferidos. Thempus creará y rellenará el borrador automáticamente.");
     } catch (error) {
+      thempusWindow?.close();
       const message = error instanceof Error ? error.message : "No se pudieron preparar los datos para Thempus.";
       setThempusMessage(message);
       window.alert(`No se pudo abrir Thempus: ${message}`);
@@ -729,7 +744,7 @@ export function SolicitudDetailPage() {
             </div>
             <div className="provisional-proof__actions">
               {isAdmin ? <button className="soft-button soft-button--compact" onClick={() => prepararEnThempus(solicitud)} type="button"><ExternalLink size={15}/> Preparar en Thempus</button> : null}
-              {isAdmin ? <a className="soft-button soft-button--compact" download href="/downloads/asistente-thempus-v0.2.0.zip"><Download size={15}/> Descargar asistente</a> : null}
+              {isAdmin ? <a className="soft-button soft-button--compact" download href="/downloads/asistente-thempus-v0.3.0.zip"><Download size={15}/> Descargar asistente</a> : null}
               {!isAdmin && ["NO_SOLICITADO", "CANCELADO"].includes(justificanteQuery.data?.estado || "NO_SOLICITADO") ? <button className="soft-button soft-button--compact" disabled={solicitarJustificanteMutation.isPending} onClick={() => solicitarJustificanteMutation.mutate()} type="button">Solicitar</button> : null}
               {isAdmin && justificanteQuery.data?.estado === "SOLICITADO" ? <button className="soft-button soft-button--compact" onClick={() => estadoJustificanteMutation.mutate("EN_PREPARACION")} type="button">Iniciar preparación</button> : null}
               {isAdmin && ["SOLICITADO", "EN_PREPARACION"].includes(justificanteQuery.data?.estado || "") ? <label className="soft-button soft-button--compact"><FileUp size={15}/> Adjuntar PDF<input hidden type="file" accept="application/pdf" onChange={(event) => { const archivo = event.target.files?.[0]; if (archivo) adjuntarJustificanteMutation.mutate(archivo); }} /></label> : null}
@@ -746,7 +761,7 @@ export function SolicitudDetailPage() {
               <li>Pulsa <strong>Cargar descomprimida</strong> y selecciona la carpeta extraída.</li>
               <li>Para actualizarlo, sustituye la carpeta y pulsa el icono de recarga de la extensión.</li>
             </ol>
-            <p>Versión disponible: 0.2.0. Solo actúa en Thempus y nunca pulsa «ENVIAR».</p>
+            <p>Versión disponible: 0.3.0. Solo conecta esta aplicación con Thempus y nunca pulsa «ENVIAR».</p>
           </details> : null}
         </>) : null}
         <div className="request-summary-strip">

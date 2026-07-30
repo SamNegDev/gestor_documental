@@ -1,11 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Gestor documental - Asistente Thempus",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Rellena borradores de justificantes en Thempus con datos copiados desde el gestor documental.",
-  "permissions": ["clipboardRead"],
+  "permissions": ["clipboardRead", "storage"],
   "content_scripts": [{
-    "matches": ["https://thempus.com/despachos/*/justificantes*"],
+    "matches": [
+      "https://app.gestoriacn.com/*",
+      "https://thempus.com/despachos/*/justificantes*"
+    ],
     "js": ["thempus-content-v2.js"],
     "run_at": "document_idle"
   }]

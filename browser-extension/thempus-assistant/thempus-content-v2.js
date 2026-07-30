@@ -5,11 +5,28 @@
   const PANEL_ID = "gestor-documental-thempus";
   const AUTO_FLAG = "gestor-documental-autofill";
   const CREATE_HASH = "#gestor-documental=nuevo";
+  const STORAGE_KEY = "gestorDocumentalThempusPayload";
 
   const normalize = (value) => String(value || "").trim().toLocaleUpperCase("es-ES");
 
+  if (location.hostname === "app.gestoriacn.com") {
+    window.addEventListener("gestor-documental:prepare-thempus", async (event) => {
+      const { requestId, payload } = event.detail || {};
+      if (!requestId || payload?.kind !== PAYLOAD_KIND) return;
+      try {
+        await chrome.storage.local.set({ [STORAGE_KEY]: payload });
+        window.dispatchEvent(new CustomEvent("gestor-documental:thempus-ready", { detail: { requestId, ok: true } }));
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent("gestor-documental:thempus-ready", { detail: { requestId, ok: false, message: error?.message } }));
+      }
+    });
+    return;
+  }
+
   async function readPayload() {
-    const payload = JSON.parse(await navigator.clipboard.readText());
+    const stored = await chrome.storage.local.get(STORAGE_KEY);
+    let payload = stored[STORAGE_KEY];
+    if (!payload) payload = JSON.parse(await navigator.clipboard.readText());
     if (payload?.kind !== PAYLOAD_KIND) {
       throw new Error("El portapapeles no contiene datos de un justificante.");
     }
@@ -97,6 +114,7 @@
       status.textContent = warnings.length
         ? `Datos rellenados. Revisa manualmente: ${warnings.join(", ")}.`
         : "Datos rellenados. Revisa los campos y completa Documento y Motivo antes de enviar.";
+      await chrome.storage.local.remove(STORAGE_KEY);
       status.closest("aside")?.classList.toggle("gestor-warning", warnings.length > 0);
     } catch (error) {
       status.textContent = error instanceof Error ? error.message : "No se pudieron pegar los datos.";
