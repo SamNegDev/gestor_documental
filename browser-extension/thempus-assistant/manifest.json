@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gestor documental - Asistente Thempus",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Rellena borradores de justificantes en Thempus con datos copiados desde el gestor documental.",
   "permissions": ["clipboardRead", "storage"],
   "content_scripts": [{
