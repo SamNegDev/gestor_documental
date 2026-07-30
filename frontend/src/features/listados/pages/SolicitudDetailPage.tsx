@@ -92,8 +92,14 @@ export function SolicitudDetailPage() {
         setThempusMessage(`Faltan datos obligatorios: ${missing.join(", ")}.`);
         return;
       }
+      const thempusWindow = window.open("about:blank", "_blank");
+      if (!thempusWindow) {
+        setThempusMessage("Chrome ha bloqueado la pestaña. Permite ventanas emergentes para esta aplicación e inténtalo de nuevo.");
+        return;
+      }
       await navigator.clipboard.writeText(JSON.stringify(payload));
-      window.open(THEMPUS_JUSTIFICANTES_URL, "_blank", "noopener,noreferrer");
+      thempusWindow.opener = null;
+      thempusWindow.location.href = THEMPUS_JUSTIFICANTES_URL;
       setThempusMessage("Datos copiados. Thempus creará y rellenará el borrador automáticamente.");
     } catch (error) {
       setThempusMessage(error instanceof Error ? error.message : "No se pudieron preparar los datos para Thempus.");
