@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 import com.example.gestor_documental.dto.expediente.ExpedienteDetailResponse;
+import com.example.gestor_documental.dto.expediente.HitoAccionResponse;
 import com.example.gestor_documental.dto.expediente.HitoExpedienteResponse;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Documento;
@@ -30,6 +31,25 @@ class ExpedienteHaciendaDocumentacionServiceTest {
     @Mock DocumentoRepository documentoRepository;
     @Mock Usuario admin;
     @TempDir Path tempDir;
+
+    @Test
+    void habilitaDocumentacionHaciendaEnLosHitosBatecomDelModelo620() {
+        ExpedienteHaciendaDocumentacionService service =
+                new ExpedienteHaciendaDocumentacionService(expedienteDetalleApiService, documentoRepository);
+
+        for (String codigoHito : List.of("BATE_MODELO_620_PRESENTADO", "COM_MODELO_620_PRESENTADO")) {
+            ExpedienteDetailResponse detalle = ExpedienteDetailResponse.builder()
+                    .tipoTramite("BATECOM")
+                    .siguientePaso(HitoExpedienteResponse.builder()
+                            .id(codigoHito.toLowerCase().replace("_presentado", "").replace('_', '-'))
+                            .accion("COMPLETAR_HITO")
+                            .acciones(List.of(HitoAccionResponse.builder().codigoHito(codigoHito).build()))
+                            .build())
+                    .build();
+
+            assertThat(service.tieneDocumentacionHaciendaDisponible(detalle)).isTrue();
+        }
+    }
 
     @Test
     void informaDeTodosLosExpedientesIncompletosEnUnaSolaRespuesta() throws Exception {

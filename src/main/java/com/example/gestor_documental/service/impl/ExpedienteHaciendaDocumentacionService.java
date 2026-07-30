@@ -35,6 +35,12 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class ExpedienteHaciendaDocumentacionService {
 
+    private static final Set<String> HITOS_MODELO_620 = Set.of(
+            "MODELO_620_PRESENTADO",
+            "BATE_MODELO_620_PRESENTADO",
+            "COM_MODELO_620_PRESENTADO"
+    );
+
     private static final Set<TipoDocumento> DOCUMENTOS_VEHICULO = EnumSet.of(
             TipoDocumento.PERMISO_CIRCULACION,
             TipoDocumento.FICHA_TECNICA,
@@ -57,11 +63,13 @@ public class ExpedienteHaciendaDocumentacionService {
         if (detalle == null || detalle.getSiguientePaso() == null) {
             return false;
         }
-        return "modelo-620-presentado".equals(detalle.getSiguientePaso().getId())
-                || "MODELO_620_PRESENTADO".equals(detalle.getSiguientePaso().getAccion())
+        String idSiguientePaso = detalle.getSiguientePaso().getId();
+        return (idSiguientePaso != null
+                && ("modelo-620-presentado".equals(idSiguientePaso) || idSiguientePaso.endsWith("-modelo-620")))
+                || HITOS_MODELO_620.contains(detalle.getSiguientePaso().getAccion())
                 || (detalle.getSiguientePaso().getAcciones() != null
                 && detalle.getSiguientePaso().getAcciones().stream()
-                .anyMatch(accion -> "MODELO_620_PRESENTADO".equals(accion.getCodigoHito())));
+                .anyMatch(accion -> HITOS_MODELO_620.contains(accion.getCodigoHito())));
     }
 
     @Transactional(readOnly = true)
