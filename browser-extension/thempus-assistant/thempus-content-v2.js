@@ -33,6 +33,14 @@
     return payload;
   }
 
+  async function hasFreshPayload(maxAgeMs = 10 * 60 * 1000) {
+    const stored = await chrome.storage.local.get(STORAGE_KEY);
+    const payload = stored[STORAGE_KEY];
+    if (payload?.kind !== PAYLOAD_KIND) return false;
+    const createdAt = Date.parse(payload.createdAt);
+    return Number.isFinite(createdAt) && Date.now() - createdAt <= maxAgeMs;
+  }
+
   function createPanel(message, withButton = false) {
     document.getElementById(PANEL_ID)?.remove();
     const panel = document.createElement("aside");
@@ -186,10 +194,9 @@
     if (!document.getElementById("form_matricula")) return;
     const ui = createPanel("Rellena este borrador con los datos copiados desde la solicitud.", true);
     ui.button.addEventListener("click", () => fillWithStatus(ui.status, ui.button));
-    if (sessionStorage.getItem(AUTO_FLAG) === "1") {
-      sessionStorage.removeItem(AUTO_FLAG);
-      await fillWithStatus(ui.status, ui.button);
-    }
+    const shouldAutofill = sessionStorage.getItem(AUTO_FLAG) === "1" || await hasFreshPayload();
+    sessionStorage.removeItem(AUTO_FLAG);
+    if (shouldAutofill) await fillWithStatus(ui.status, ui.button);
   }
 
   const style = document.createElement("style");
