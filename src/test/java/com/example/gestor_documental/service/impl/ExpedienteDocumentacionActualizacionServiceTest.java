@@ -101,6 +101,52 @@ class ExpedienteDocumentacionActualizacionServiceTest {
         assertThat(detalles).anyMatch(detalle -> detalle.contains("cadena consolidada"));
     }
 
+    @Test
+    void guardaMarcaYModeloConMatriculaCoincidenteAunqueLaLecturaRequieraRevision() {
+        Expediente expediente = new Expediente();
+        expediente.setMatricula("1234ABC");
+        Vehiculo vehiculo = new Vehiculo();
+        vehiculo.setMatricula("1234ABC");
+        expediente.setVehiculo(vehiculo);
+        var lectura = new com.example.gestor_documental.dto.expediente.DocumentoVehiculoLecturaResponse();
+        lectura.setMatricula("1234 ABC");
+        lectura.setMarca("Toyota");
+        lectura.setModeloVehiculo("Corolla");
+        lectura.setConfianzaGlobal(0.91);
+        lectura.setRequiereRevision(true);
+        List<String> detalles = new ArrayList<>();
+
+        Boolean actualizado = ReflectionTestUtils.invokeMethod(
+                service, "aplicarMarcaModeloSeguros", expediente, lectura, detalles);
+
+        assertThat(actualizado).isTrue();
+        assertThat(vehiculo.getMarca()).isEqualTo("TOYOTA");
+        assertThat(vehiculo.getModelo()).isEqualTo("COROLLA");
+        assertThat(detalles).anyMatch(detalle -> detalle.contains("Marca y modelo guardados"));
+        verify(vehiculoRepository).save(vehiculo);
+    }
+
+    @Test
+    void normalizaNombreEstructuradoAlVincularUnaLecturaYaExistente() {
+        Interesado interesado = new Interesado();
+        interesado.setId(7L);
+        interesado.setDni("12345678Z");
+        interesado.setNombre("PEREZ GARCIA JUAN");
+        DocumentoIdentidadLectura lectura = new DocumentoIdentidadLectura();
+        lectura.setNombre("Juan");
+        lectura.setApellido1("Pérez");
+        lectura.setApellido2("García");
+
+        Boolean actualizado = ReflectionTestUtils.invokeMethod(
+                service, "actualizarNombreEstructurado", interesado, lectura);
+
+        assertThat(actualizado).isTrue();
+        assertThat(interesado.getNombrePila()).isEqualTo("JUAN");
+        assertThat(interesado.getApellido1()).isEqualTo("PÉREZ");
+        assertThat(interesado.getApellido2()).isEqualTo("GARCÍA");
+        assertThat(interesado.getNombre()).isEqualTo("JUAN PÉREZ GARCÍA");
+        verify(interesadoRepository).save(interesado);
+    }
     private Documento documento(Long id, Expediente expediente) {
         Documento documento = new Documento();
         documento.setId(id);

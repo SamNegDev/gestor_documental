@@ -153,9 +153,17 @@ public class ExpedienteDocumentacionActualizacionService {
                 } else {
                     contadores.vehiculoNueva++;
                 }
-                if (lectura == null || lectura.isRequiereRevision()) {
+                if (lectura == null) {
+                    requiereRevision = true;
+                    detalles.add(nombreDocumento(documento) + ": vehiculo no leido.");
+                    continue;
+                }
+                if (lectura.isRequiereRevision()) {
                     requiereRevision = true;
                     detalles.add(nombreDocumento(documento) + ": vehiculo leido, requiere revision.");
+                    if (aplicarMarcaModeloSeguros(expediente, lectura, detalles)) {
+                        datosAplicados++;
+                    }
                     continue;
                 }
                 if (aplicarVehiculoSiProcede(expediente, lectura, detalles)) {
@@ -740,7 +748,7 @@ public class ExpedienteDocumentacionActualizacionService {
             return false;
         }
         DocumentoIdentidadLectura lectura = identidad.lecturaPrincipal();
-        boolean actualizado = false;
+        boolean actualizado = actualizarNombreEstructurado(interesado, lectura);
         if (!Objects.equals(lectura.getInteresadoVinculado() != null ? lectura.getInteresadoVinculado().getId() : null, interesado.getId())) {
             lectura.setInteresadoVinculado(interesado);
             actualizado = true;
@@ -900,6 +908,73 @@ public class ExpedienteDocumentacionActualizacionService {
         return value == null || value.isBlank();
     }
 
+    private boolean actualizarNombreEstructurado(Interesado interesado, DocumentoIdentidadLectura lectura) {
+        boolean actualizado = false;
+        String razonSocial = normalizarNombre(lectura.getRazonSocial());
+        if (razonSocial != null) {
+            if (!Objects.equals(razonSocial, normalizarNombre(interesado.getRazonSocial()))) {
+                interesado.setRazonSocial(razonSocial);
+                actualizado = true;
+            }
+            if (!Objects.equals(razonSocial, normalizarNombre(interesado.getNombre()))) {
+                interesado.setNombre(razonSocial);
+                actualizado = true;
+            }
+        } else {
+            String nombre = TextNormalizer.upperOrNull(lectura.getNombre());
+            String apellido1 = TextNormalizer.upperOrNull(lectura.getApellido1());
+            String apellido2 = TextNormalizer.upperOrNull(lectura.getApellido2());
+            if (nombre != null && !Objects.equals(nombre, TextNormalizer.upperOrNull(interesado.getNombrePila()))) {
+                interesado.setNombrePila(nombre);
+                actualizado = true;
+            }
+            if (apellido1 != null && !Objects.equals(apellido1, TextNormalizer.upperOrNull(interesado.getApellido1()))) {
+                interesado.setApellido1(apellido1);
+                actualizado = true;
+            }
+            if (apellido2 != null && !Objects.equals(apellido2, TextNormalizer.upperOrNull(interesado.getApellido2()))) {
+                interesado.setApellido2(apellido2);
+                actualizado = true;
+            }
+            String completo = normalizarNombre(String.join(" ",
+                    List.of(nombre != null ? nombre : "", apellido1 != null ? apellido1 : "", apellido2 != null ? apellido2 : "")));
+            if (completo != null && !Objects.equals(completo, normalizarNombre(interesado.getNombre()))) {
+                interesado.setNombre(completo);
+                actualizado = true;
+            }
+        }
+        if (actualizado) {
+            interesadoRepository.save(interesado);
+        }
+        return actualizado;
+    }
+
+    private boolean aplicarMarcaModeloSeguros(Expediente expediente, DocumentoVehiculoLecturaResponse lectura, List<String> detalles) {
+        if (lectura.getConfianzaGlobal() == null || lectura.getConfianzaGlobal() < 0.75) {
+            return false;
+        }
+        String matriculaLeida = normalizarMatricula(lectura.getMatricula());
+        String matriculaExpediente = normalizarMatricula(expediente.getMatricula());
+        if (matriculaLeida == null || matriculaExpediente == null || !matriculaExpediente.equals(matriculaLeida)) {
+            return false;
+        }
+        Vehiculo vehiculo = expediente.getVehiculo();
+        if (vehiculo == null) {
+            vehiculo = vehiculoService.obtenerOCrearPorMatricula(matriculaExpediente);
+            expediente.setVehiculo(vehiculo);
+        }
+        if (vehiculo == null) {
+            return false;
+        }
+        boolean actualizado = false;
+        actualizado |= setIfBlank(vehiculo.getMarca(), TextNormalizer.upperOrNull(lectura.getMarca()), vehiculo::setMarca);
+        actualizado |= setIfBlank(vehiculo.getModelo(), TextNormalizer.upperOrNull(lectura.getModeloVehiculo()), vehiculo::setModelo);
+        if (actualizado) {
+            vehiculoRepository.save(vehiculo);
+            detalles.add("Marca y modelo guardados desde una lectura coincidente; el resto de datos sigue pendiente de revision.");
+        }
+        return actualizado;
+    }
     private boolean aplicarVehiculoSiProcede(Expediente expediente, DocumentoVehiculoLecturaResponse lectura, List<String> detalles) {
         boolean actualizado = false;
         String matriculaLeida = normalizarMatricula(lectura.getMatricula());
