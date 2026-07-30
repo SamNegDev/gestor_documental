@@ -52,6 +52,17 @@ class ExpedienteHaciendaDocumentacionServiceTest {
     }
 
     @Test
+    void noFallaCuandoElSiguientePasoNoTieneAccion() {
+        ExpedienteHaciendaDocumentacionService service =
+                new ExpedienteHaciendaDocumentacionService(expedienteDetalleApiService, documentoRepository);
+        ExpedienteDetailResponse detalle = ExpedienteDetailResponse.builder()
+                .siguientePaso(HitoExpedienteResponse.builder().id("documentacion-revisada").build())
+                .build();
+
+        assertThat(service.tieneDocumentacionHaciendaDisponible(detalle)).isFalse();
+    }
+
+    @Test
     void informaDeTodosLosExpedientesIncompletosEnUnaSolaRespuesta() throws Exception {
         Files.write(tempDir.resolve("venta.pdf"), new byte[] {1});
         Files.write(tempDir.resolve("vehiculo.pdf"), new byte[] {1});

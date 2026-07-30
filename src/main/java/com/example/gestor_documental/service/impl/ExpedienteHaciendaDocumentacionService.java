@@ -66,10 +66,14 @@ public class ExpedienteHaciendaDocumentacionService {
         String idSiguientePaso = detalle.getSiguientePaso().getId();
         return (idSiguientePaso != null
                 && ("modelo-620-presentado".equals(idSiguientePaso) || idSiguientePaso.endsWith("-modelo-620")))
-                || HITOS_MODELO_620.contains(detalle.getSiguientePaso().getAccion())
+                || esHitoModelo620(detalle.getSiguientePaso().getAccion())
                 || (detalle.getSiguientePaso().getAcciones() != null
                 && detalle.getSiguientePaso().getAcciones().stream()
-                .anyMatch(accion -> HITOS_MODELO_620.contains(accion.getCodigoHito())));
+                .anyMatch(accion -> esHitoModelo620(accion.getCodigoHito())));
+    }
+
+    private boolean esHitoModelo620(String codigoHito) {
+        return codigoHito != null && HITOS_MODELO_620.contains(codigoHito);
     }
 
     @Transactional(readOnly = true)
