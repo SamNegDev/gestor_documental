@@ -88,7 +88,7 @@ export function SolicitudDetailPage() {
     const requestId = crypto.randomUUID();
     const timeout = window.setTimeout(() => {
       window.removeEventListener("gestor-documental:thempus-ready", onReady as EventListener);
-      reject(new Error("No se detectó la extensión Thempus 0.4.0. Descárgala o recárgala en chrome://extensions."));
+      reject(new Error("No se detectó la extensión Thempus 0.4.1. Descárgala o recárgala en chrome://extensions."));
     }, 3000);
     const onReady = (event: Event) => {
       const detail = (event as CustomEvent<{ requestId?: string; ok?: boolean; message?: string }>).detail;
@@ -744,7 +744,7 @@ export function SolicitudDetailPage() {
             </div>
             <div className="provisional-proof__actions">
               {isAdmin ? <button className="soft-button soft-button--compact" onClick={() => prepararEnThempus(solicitud)} type="button"><ExternalLink size={15}/> Preparar en Thempus</button> : null}
-              {isAdmin ? <a className="soft-button soft-button--compact" download href="/downloads/asistente-thempus-v0.4.0.zip"><Download size={15}/> Descargar asistente</a> : null}
+              {isAdmin ? <a className="soft-button soft-button--compact" download href="/downloads/asistente-thempus-v0.4.1.zip"><Download size={15}/> Descargar asistente</a> : null}
               {!isAdmin && ["NO_SOLICITADO", "CANCELADO"].includes(justificanteQuery.data?.estado || "NO_SOLICITADO") ? <button className="soft-button soft-button--compact" disabled={solicitarJustificanteMutation.isPending} onClick={() => solicitarJustificanteMutation.mutate()} type="button">Solicitar</button> : null}
               {isAdmin && justificanteQuery.data?.estado === "SOLICITADO" ? <button className="soft-button soft-button--compact" onClick={() => estadoJustificanteMutation.mutate("EN_PREPARACION")} type="button">Iniciar preparación</button> : null}
               {isAdmin && ["SOLICITADO", "EN_PREPARACION"].includes(justificanteQuery.data?.estado || "") ? <label className="soft-button soft-button--compact"><FileUp size={15}/> Adjuntar PDF<input hidden type="file" accept="application/pdf" onChange={(event) => { const archivo = event.target.files?.[0]; if (archivo) adjuntarJustificanteMutation.mutate(archivo); }} /></label> : null}
@@ -761,7 +761,7 @@ export function SolicitudDetailPage() {
               <li>Pulsa <strong>Cargar descomprimida</strong> y selecciona la carpeta extraída.</li>
               <li>Para actualizarlo, sustituye la carpeta y pulsa el icono de recarga de la extensión.</li>
             </ol>
-            <p>Versión disponible: 0.4.0. Solo conecta esta aplicación con Thempus y nunca pulsa «ENVIAR».</p>
+            <p>Versión disponible: 0.4.1. Solo conecta esta aplicación con Thempus y nunca pulsa «ENVIAR».</p>
           </details> : null}
         </>) : null}
         <div className="request-summary-strip">

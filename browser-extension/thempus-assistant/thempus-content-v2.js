@@ -72,6 +72,21 @@
     return maxLength > 0 && normalized.length > maxLength ? normalized.slice(0, maxLength) : normalized;
   }
 
+  function setIdentityValue(nif) {
+    const input = document.querySelector('[name="nif_adquirente"]');
+    const value = identityValueFor(input, nif);
+    if (!input || !value) return false;
+    input.focus();
+    input.value = "";
+    [...value].forEach((character, index) => {
+      input.value = value.slice(0, index + 1);
+      input.dispatchEvent(new InputEvent("input", { bubbles: true, data: character, inputType: "insertText" }));
+      input.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: character }));
+    });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  }
+
   function personalValues() {
     const names = [
       "apellido1_adquirente", "apellido2_adquirente", "nombre_adquirente",
@@ -122,10 +137,10 @@
     const buyer = payload.adquirente || {};
     const vehicle = payload.vehiculo || {};
     const company = buyer.razonSocial;
-    const nifInput = document.querySelector('[name="nif_adquirente"]');
     const beforeLookup = personalValues();
-    setValue("nif_adquirente", identityValueFor(nifInput, buyer.nif));
-    const existingPerson = await waitForPersonAutofill(beforeLookup);
+    setIdentityValue(buyer.nif);
+    const existingPerson = await waitForPersonAutofill(beforeLookup, 5000);
+    document.querySelector('[name="nif_adquirente"]')?.dispatchEvent(new Event("blur", { bubbles: true }));
     let municipalityOk = true;
     let roadTypeOk = true;
     if (!existingPerson) {
