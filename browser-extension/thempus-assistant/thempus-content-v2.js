@@ -167,7 +167,14 @@
     setValue("bastidor", vehicle.bastidor);
     setValue("marca", vehicle.marca);
     setValue("modelo", vehicle.modelo);
-    return [...(!municipalityOk ? ["municipio"] : []), ...(!roadTypeOk ? ["tipo de vía"] : [])];
+    const documentsOk = selectByText("documentos", "CAMBIO TITULAR");
+    const reasonOk = selectByText("motivo", "ITP");
+    return [
+      ...(!municipalityOk ? ["municipio"] : []),
+      ...(!roadTypeOk ? ["tipo de vía"] : []),
+      ...(!documentsOk ? ["documentos"] : []),
+      ...(!reasonOk ? ["motivo"] : []),
+    ];
   }
 
   async function fillWithStatus(status, button) {
@@ -177,7 +184,7 @@
       const warnings = await fill(await readPayload());
       status.textContent = warnings.length
         ? `Datos rellenados. Revisa manualmente: ${warnings.join(", ")}.`
-        : "Datos rellenados. Revisa los campos y completa Documento y Motivo antes de enviar.";
+        : "Datos rellenados. Revisa los campos antes de enviar.";
       await chrome.storage.local.remove(STORAGE_KEY);
       status.closest("aside")?.classList.toggle("gestor-warning", warnings.length > 0);
     } catch (error) {
