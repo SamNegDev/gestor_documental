@@ -19,13 +19,18 @@ export interface ThempusJustificantePayload {
 const clean = (value?: string | null): string => value?.trim() ?? "";
 
 export function buildThempusPayload(solicitud: SolicitudDetail): ThempusJustificantePayload {
-  const comprador = solicitud.interesados.find((interesado) => interesado.rol?.toUpperCase() === "COMPRADOR");
-  if (!comprador) throw new Error("La solicitud no tiene un comprador identificado.");
+  const compradores = solicitud.interesados.filter((interesado) => interesado.rol?.toUpperCase() === "COMPRADOR");
+  if (compradores.length === 0) throw new Error("La solicitud no tiene un comprador final identificado.");
+  if (compradores.length > 1) throw new Error("La solicitud tiene varios compradores; revisa cuál es el comprador final.");
+  const comprador = compradores[0];
+  const nif = clean(comprador.dni).toUpperCase().replace(/[\s.-]/g, "");
+  const esEmpresa = Boolean(comprador.personaJuridica || comprador.razonSocial || /^[ABCDEFGHJNPQRSUVW]/.test(nif));
+  const razonSocial = esEmpresa ? clean(comprador.razonSocial || comprador.nombre) : "";
   return {
     kind: THEMPUS_PAYLOAD_KIND, createdAt: new Date().toISOString(), solicitudId: solicitud.id,
     adquirente: {
-      nif: clean(comprador.dni), nombre: clean(comprador.nombrePila), apellido1: clean(comprador.apellido1),
-      apellido2: clean(comprador.apellido2), razonSocial: clean(comprador.razonSocial), provincia: clean(comprador.provincia),
+      nif, nombre: esEmpresa ? "" : clean(comprador.nombrePila), apellido1: esEmpresa ? "" : clean(comprador.apellido1),
+      apellido2: esEmpresa ? "" : clean(comprador.apellido2), razonSocial, provincia: clean(comprador.provincia),
       municipio: clean(comprador.municipio), localidad: clean(comprador.localidad), codigoPostal: clean(comprador.codigoPostal),
       tipoVia: clean(comprador.tipoVia), nombreVia: clean(comprador.nombreVia || comprador.direccion), numeroVia: clean(comprador.numeroVia),
       bloque: clean(comprador.bloque), escalera: clean(comprador.escalera), piso: clean(comprador.piso), puerta: clean(comprador.puerta),

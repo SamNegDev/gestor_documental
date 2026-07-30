@@ -131,7 +131,7 @@
     if (!existingPerson) {
       setValue("apellido1_adquirente", company || buyer.apellido1);
       setValue("apellido2_adquirente", company ? "" : buyer.apellido2);
-      setValue("nombre_adquirente", company || buyer.nombre);
+      setValue("nombre_adquirente", company ? "" : buyer.nombre);
       selectByText("provincia_adquirente", buyer.provincia);
       municipalityOk = await waitForMunicipality(buyer.municipio);
       setValue("pueblo_adquirente", buyer.localidad);

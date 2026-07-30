@@ -9,7 +9,7 @@
 
 ## Uso
 
-1. En una solicitud de traspaso, pulsar **Preparar en Thempus**.
+1. En una solicitud de transferencia o BATECOM, pulsar **Preparar en Thempus**.
 2. La extensión crea y rellena automáticamente un justificante nuevo.
 3. Revisar los datos, escoger **Documento** y **Motivo** y presentar manualmente.
 
