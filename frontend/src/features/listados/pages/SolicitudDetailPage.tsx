@@ -89,20 +89,30 @@ export function SolicitudDetailPage() {
       const payload = buildThempusPayload(solicitud);
       const missing = getMissingThempusFields(payload);
       if (missing.length) {
-        setThempusMessage(`Faltan datos obligatorios: ${missing.join(", ")}.`);
+        const message = `Faltan datos obligatorios: ${missing.join(", ")}.`;
+        setThempusMessage(message);
+        window.alert(message);
         return;
       }
       const thempusWindow = window.open("about:blank", "_blank");
       if (!thempusWindow) {
-        setThempusMessage("Chrome ha bloqueado la pestaña. Permite ventanas emergentes para esta aplicación e inténtalo de nuevo.");
+        await navigator.clipboard.writeText(JSON.stringify(payload));
+        window.location.href = THEMPUS_JUSTIFICANTES_URL;
         return;
       }
-      await navigator.clipboard.writeText(JSON.stringify(payload));
-      thempusWindow.opener = null;
-      thempusWindow.location.href = THEMPUS_JUSTIFICANTES_URL;
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(payload));
+        thempusWindow.opener = null;
+        thempusWindow.location.href = THEMPUS_JUSTIFICANTES_URL;
+      } catch (error) {
+        thempusWindow.close();
+        throw error;
+      }
       setThempusMessage("Datos copiados. Thempus creará y rellenará el borrador automáticamente.");
     } catch (error) {
-      setThempusMessage(error instanceof Error ? error.message : "No se pudieron preparar los datos para Thempus.");
+      const message = error instanceof Error ? error.message : "No se pudieron preparar los datos para Thempus.";
+      setThempusMessage(message);
+      window.alert(`No se pudo abrir Thempus: ${message}`);
     }
   };
 
