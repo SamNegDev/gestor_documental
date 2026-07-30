@@ -51,9 +51,39 @@
     if (!input || value === undefined || value === null || value === "") return false;
     input.value = value;
     input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: value.slice(-1) }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
     input.dispatchEvent(new Event("blur", { bubbles: true }));
     return true;
+  }
+
+  function identityValueFor(input, nif) {
+    const normalized = normalize(nif).replace(/[\s.-]/g, "");
+    if (!input || !normalized) return normalized;
+    const maxLength = Number(input.maxLength);
+    return maxLength > 0 && normalized.length > maxLength ? normalized.slice(0, maxLength) : normalized;
+  }
+
+  function personalValues() {
+    const names = [
+      "apellido1_adquirente", "apellido2_adquirente", "nombre_adquirente",
+      "provincia_adquirente", "municipio_adquirente", "pueblo_adquirente",
+      "cp_adquirente", "calle_adquirente",
+    ];
+    return Object.fromEntries(names.map((name) => [
+      name,
+      document.querySelector(`[name="${CSS.escape(name)}"]`)?.value || "",
+    ]));
+  }
+
+  async function waitForPersonAutofill(previous, timeout = 2500) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeout) {
+      const current = personalValues();
+      if (Object.keys(current).some((name) => current[name] && current[name] !== previous[name])) return true;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return false;
   }
 
   function selectByText(name, text) {
@@ -84,21 +114,28 @@
     const buyer = payload.adquirente || {};
     const vehicle = payload.vehiculo || {};
     const company = buyer.razonSocial;
-    setValue("nif_adquirente", buyer.nif);
-    setValue("apellido1_adquirente", company || buyer.apellido1);
-    setValue("apellido2_adquirente", company ? "" : buyer.apellido2);
-    setValue("nombre_adquirente", company || buyer.nombre);
-    selectByText("provincia_adquirente", buyer.provincia);
-    const municipalityOk = await waitForMunicipality(buyer.municipio);
-    setValue("pueblo_adquirente", buyer.localidad);
-    setValue("cp_adquirente", buyer.codigoPostal);
-    const roadTypeOk = selectByText("siglas_adquirente", buyer.tipoVia);
-    setValue("calle_adquirente", buyer.nombreVia);
-    setValue("num_adquirente", buyer.numeroVia);
-    setValue("bloque_adquirente", buyer.bloque);
-    setValue("escalera_adquirente", buyer.escalera);
-    setValue("piso_adquirente", buyer.piso);
-    setValue("puerta_adquirente", buyer.puerta);
+    const nifInput = document.querySelector('[name="nif_adquirente"]');
+    const beforeLookup = personalValues();
+    setValue("nif_adquirente", identityValueFor(nifInput, buyer.nif));
+    const existingPerson = await waitForPersonAutofill(beforeLookup);
+    let municipalityOk = true;
+    let roadTypeOk = true;
+    if (!existingPerson) {
+      setValue("apellido1_adquirente", company || buyer.apellido1);
+      setValue("apellido2_adquirente", company ? "" : buyer.apellido2);
+      setValue("nombre_adquirente", company || buyer.nombre);
+      selectByText("provincia_adquirente", buyer.provincia);
+      municipalityOk = await waitForMunicipality(buyer.municipio);
+      setValue("pueblo_adquirente", buyer.localidad);
+      setValue("cp_adquirente", buyer.codigoPostal);
+      roadTypeOk = selectByText("siglas_adquirente", buyer.tipoVia);
+      setValue("calle_adquirente", buyer.nombreVia);
+      setValue("num_adquirente", buyer.numeroVia);
+      setValue("bloque_adquirente", buyer.bloque);
+      setValue("escalera_adquirente", buyer.escalera);
+      setValue("piso_adquirente", buyer.piso);
+      setValue("puerta_adquirente", buyer.puerta);
+    }
     setValue("matricula", vehicle.matricula);
     setValue("bastidor", vehicle.bastidor);
     setValue("marca", vehicle.marca);
