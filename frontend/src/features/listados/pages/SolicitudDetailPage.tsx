@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, Building2, CarFront, CheckCircle2, FileSignature, FileText, FileUp, FolderCheck, IdCard, Info, Loader2, MapPin, MessageSquare, Pencil, Phone, RefreshCw, RotateCcw, Scissors, Send, Sparkles, UserPlus, UserRound, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Building2, CarFront, CheckCircle2, Download, ExternalLink, FileSignature, FileText, FileUp, FolderCheck, IdCard, Info, Loader2, MapPin, MessageSquare, Pencil, Phone, RefreshCw, RotateCcw, Scissors, Send, Sparkles, UserPlus, UserRound, X } from "lucide-react";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { ApiError } from "../../../shared/api/http";
@@ -55,6 +55,7 @@ import type {
   SolicitudPreparacionItem,
   SolicitudPreparacionTraspaso,
 } from "../types";
+import { buildThempusPayload, getMissingThempusFields, THEMPUS_JUSTIFICANTES_URL } from "../utils/thempusPayload";
 const COMPLETE_SOLICITUD_JOB_STORAGE_PREFIX = "gestor.solicitudCompleta.job.";
 const COMPLETE_DOCUMENT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 const SOLICITUD_ROLES = ["COMPRADOR", "VENDEDOR", "COMPRAVENTA", "TITULAR"];
@@ -79,8 +80,25 @@ export function SolicitudDetailPage() {
   const [uploadingStandaloneDocument, setUploadingStandaloneDocument] = useState(false);
   const [habitualModalOpen, setHabitualModalOpen] = useState(false);
   const [habitualSearch, setHabitualSearch] = useState("");
+  const [thempusMessage, setThempusMessage] = useState<string | null>(null);
   const { confirm, dialog } = useConfirmDialog();
   const isAdmin = user?.rol === "ADMIN";
+
+  const prepararEnThempus = async (solicitud: SolicitudDetail) => {
+    try {
+      const payload = buildThempusPayload(solicitud);
+      const missing = getMissingThempusFields(payload);
+      if (missing.length) {
+        setThempusMessage(`Faltan datos obligatorios: ${missing.join(", ")}.`);
+        return;
+      }
+      await navigator.clipboard.writeText(JSON.stringify(payload));
+      window.open(THEMPUS_JUSTIFICANTES_URL, "_blank", "noopener,noreferrer");
+      setThempusMessage("Datos copiados. Thempus creará y rellenará el borrador automáticamente.");
+    } catch (error) {
+      setThempusMessage(error instanceof Error ? error.message : "No se pudieron preparar los datos para Thempus.");
+    }
+  };
 
   const solicitudQuery = useQuery({
     queryKey: ["solicitudes", "detalle", id],
@@ -685,7 +703,7 @@ export function SolicitudDetailPage() {
           </div>
         </section>
 
-        {solicitud.tipoTramite === "TRASPASO" ? (
+        {solicitud.tipoTramite === "TRASPASO" ? (<>
           <section className="record-observations provisional-proof" aria-label="Justificante provisional de gestoria">
             <FileSignature size={18} aria-hidden="true" />
             <div>
@@ -694,14 +712,27 @@ export function SolicitudDetailPage() {
               <StatusBadge tone={justificanteQuery.data?.estado === "DISPONIBLE" ? "success" : justificanteQuery.data?.estado === "CANCELADO" ? "danger" : "warning"}>{formatEnum(justificanteQuery.data?.estado || "NO_SOLICITADO")}</StatusBadge>
             </div>
             <div className="provisional-proof__actions">
+              {isAdmin ? <button className="soft-button soft-button--compact" onClick={() => prepararEnThempus(solicitud)} type="button"><ExternalLink size={15}/> Preparar en Thempus</button> : null}
+              {isAdmin ? <a className="soft-button soft-button--compact" download href="/downloads/asistente-thempus-v0.2.0.zip"><Download size={15}/> Descargar asistente</a> : null}
               {!isAdmin && ["NO_SOLICITADO", "CANCELADO"].includes(justificanteQuery.data?.estado || "NO_SOLICITADO") ? <button className="soft-button soft-button--compact" disabled={solicitarJustificanteMutation.isPending} onClick={() => solicitarJustificanteMutation.mutate()} type="button">Solicitar</button> : null}
               {isAdmin && justificanteQuery.data?.estado === "SOLICITADO" ? <button className="soft-button soft-button--compact" onClick={() => estadoJustificanteMutation.mutate("EN_PREPARACION")} type="button">Iniciar preparación</button> : null}
               {isAdmin && ["SOLICITADO", "EN_PREPARACION"].includes(justificanteQuery.data?.estado || "") ? <label className="soft-button soft-button--compact"><FileUp size={15}/> Adjuntar PDF<input hidden type="file" accept="application/pdf" onChange={(event) => { const archivo = event.target.files?.[0]; if (archivo) adjuntarJustificanteMutation.mutate(archivo); }} /></label> : null}
               {isAdmin && ["SOLICITADO", "EN_PREPARACION"].includes(justificanteQuery.data?.estado || "") ? <button className="soft-button soft-button--compact" onClick={() => estadoJustificanteMutation.mutate("CANCELADO")} type="button">Cancelar</button> : null}
               {justificanteQuery.data?.estado === "DISPONIBLE" ? <a className="soft-button soft-button--compact" href={`/api/solicitudes/${id}/justificante-provisional/archivo`} target="_blank" rel="noreferrer"><FileText size={15}/> Ver PDF</a> : null}
+              {thempusMessage ? <small role="status">{thempusMessage}</small> : null}
             </div>
           </section>
-        ) : null}
+          {isAdmin ? <details className="thempus-install-help">
+            <summary>Cómo instalar o actualizar el asistente Thempus</summary>
+            <ol>
+              <li>Descarga el ZIP y extráelo en una carpeta que no vayas a mover.</li>
+              <li>Abre <code>chrome://extensions</code> y activa <strong>Modo de desarrollador</strong>.</li>
+              <li>Pulsa <strong>Cargar descomprimida</strong> y selecciona la carpeta extraída.</li>
+              <li>Para actualizarlo, sustituye la carpeta y pulsa el icono de recarga de la extensión.</li>
+            </ol>
+            <p>Versión disponible: 0.2.0. Solo actúa en Thempus y nunca pulsa «ENVIAR».</p>
+          </details> : null}
+        </>) : null}
         <div className="request-summary-strip">
           <section className="request-summary-block request-summary-block--client" aria-labelledby="solicitud-cliente-title">
             <div className="request-summary-block__head">

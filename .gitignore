@@ -55,6 +55,7 @@ tmp/
 *.tmp
 *.temp
 *.zip
+!frontend/public/downloads/asistente-thempus-v*.zip
 *.tar
 *.tar.gz
 *.tgz
