@@ -108,9 +108,13 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
                     : job.getTotalItems() + " documentos en cola de lectura.");
         }
 
-        SolicitudLecturaIaJob guardado = jobRepository.save(job);
+        SolicitudLecturaIaJob guardado = jobRepository.saveAndFlush(job);
         if (guardado.getEstado().activo()) {
-            programarTrasCommit(guardado.getId());
+            Long jobId = guardado.getId();
+            if (jobId == null) {
+                throw new IllegalStateException("No se pudo identificar el trabajo de lectura IA creado");
+            }
+            programarTrasCommit(jobId);
         }
         return SolicitudLecturaIaJobResponse.from(guardado);
     }
@@ -155,6 +159,10 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
     }
 
     private void procesar(Long jobId) {
+        if (jobId == null) {
+            log.error("Se intento procesar un trabajo de lectura IA sin identificador");
+            return;
+        }
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         try {
             Long usuarioId = tx.execute(status -> iniciarJob(jobId));
@@ -297,6 +305,7 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
     }
 
     private void finalizarConError(Long jobId, String mensaje) {
+        if (jobId == null) return;
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             SolicitudLecturaIaJob job = jobRepository.findById(jobId).orElse(null);
             if (job == null) return;
