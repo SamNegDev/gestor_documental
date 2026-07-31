@@ -14,6 +14,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -133,7 +134,7 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void crearAutomatico(Long solicitudId, Long usuarioId, String origen) {
         if (solicitudId == null || usuarioId == null) return;
         usuarioRepository.findById(usuarioId).ifPresent(usuario -> {
