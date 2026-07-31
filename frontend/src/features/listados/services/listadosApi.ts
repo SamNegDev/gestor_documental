@@ -1,6 +1,6 @@
 import { apiDelete, apiGet, apiGetBlob, apiPostForm, apiPostJson, apiPutJson, apiPutJsonResponse } from "../../../shared/api/http";
 import type { CreacionConProcesamiento } from "../../expedientes/types/expedienteDetail.types";
-import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudDocumentacionIaResponse, SolicitudIdentidadDetectadaInput, SolicitudInteresadoCoincidencia, SolicitudInteresadoHabitual, SolicitudInteresadoHabitualInput, SolicitudListItem, SolicitudPreparacionTraspaso, SolicitudUpsertInput } from "../types";
+import type { DashboardData, ExpedienteListItem, ListCatalogs, ListFilters, PagedResponse, ProductivityData, SolicitudBulkConvertResponse, SolicitudDetail, SolicitudDocumentacionIaResponse, SolicitudIdentidadDetectadaInput, SolicitudInteresadoCoincidencia, SolicitudInteresadoHabitual, SolicitudInteresadoHabitualInput, SolicitudListItem, SolicitudLecturaIaJob, SolicitudPreparacionTraspaso, SolicitudUpsertInput } from "../types";
 
 function buildQuery(filters: ListFilters) {
   const params = new URLSearchParams();
@@ -86,11 +86,13 @@ export function convertirSolicitud(id: number) {
   return apiPostJson<{ id: number }>(`/api/solicitudes/${id}/convertir`, {});
 }
 
-export function procesarSolicitudDocumentacionIa(id: number, options?: { forzarRelectura?: boolean }) {
-  const query = options?.forzarRelectura ? "?forzarRelectura=true" : "";
-  return apiPostJson<SolicitudDocumentacionIaResponse>(`/api/solicitudes/${id}/documentacion-ia/procesar${query}`, {});
+export function procesarSolicitudDocumentacionIa(id: number, options?: { forzarRelectura?: boolean; documentoId?: number }) {
+  const params = new URLSearchParams();
+  if (options?.forzarRelectura) params.set("forzarRelectura", "true");
+  if (options?.documentoId) params.set("documentoId", String(options.documentoId));
+  const query = params.toString();
+  return apiPostJson<SolicitudLecturaIaJob>(`/api/solicitudes/${id}/documentacion-ia/jobs${query ? `?${query}` : ""}`, {});
 }
-
 export function procesarSolicitudDocumentacionIaCliente(id: number) {
   return apiPostJson<SolicitudDocumentacionIaResponse>(`/api/solicitudes/${id}/documentacion-ia/cliente`, {});
 }

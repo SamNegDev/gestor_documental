@@ -111,6 +111,9 @@ public class DocumentoIdentidadLecturaResponse {
     }
 
     private static String mensajeNormalizado(String mensaje, int identidadesDetectadas) {
+        if (mensaje != null && mensaje.startsWith("Se detectaron varias identidades validas")) {
+            return mensaje;
+        }
         if (identidadesDetectadas > 1 && mensaje != null && mensaje.startsWith("Se detectaron ")) {
             return "Se detectaron " + identidadesDetectadas + " identidades en el documento; revisar asignacion si procede.";
         }

@@ -107,8 +107,18 @@ export interface DocumentoExpediente {
   lecturaIdentidad?: DocumentoIdentidadLectura | null;
   lecturaRoles?: DocumentoRolesLectura | null;
   lecturaVehiculo?: DocumentoVehiculoLectura | null;
+  lecturaIa?: DocumentoLecturaIaEstado | null;
 }
 
+export interface DocumentoLecturaIaEstado {
+  tipoLectura?: "IDENTIDAD" | "ROLES" | "VEHICULO" | string | null;
+  estado: "SIN_LEER" | "PENDIENTE" | "PROCESANDO" | "COMPLETADO" | "REQUIERE_REVISION" | "ERROR" | string;
+  mensaje?: string | null;
+  modelo?: string | null;
+  confianza?: number | null;
+  fechaInicio?: string | null;
+  fechaFin?: string | null;
+}
 export interface DocumentoIdentidadLectura {
   id: number;
   documentoId: number;

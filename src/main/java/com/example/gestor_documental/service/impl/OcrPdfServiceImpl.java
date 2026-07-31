@@ -515,10 +515,6 @@ public class OcrPdfServiceImpl implements OcrPdfService {
             return TipoDocumento.AUTORIZACION_SERAFIN;
         }
 
-        TipoDocumento tipoPorPuntuacion = detectarTipoDocumentoPorPuntuacion(t);
-        if (tipoPorPuntuacion != null) {
-            return tipoPorPuntuacion;
-        }
 
         //Factura
         if ((t.contains("factura") || t.contains("factura venta"))){
@@ -567,6 +563,10 @@ public class OcrPdfServiceImpl implements OcrPdfService {
             return TipoDocumento.INFORME_DGT;
         }
 
+        TipoDocumento tipoPorPuntuacion = detectarTipoDocumentoPorPuntuacion(t);
+        if (tipoPorPuntuacion != null) {
+            return tipoPorPuntuacion;
+        }
         if ((t.contains("numero de identificacion") && t.contains("clasificacion del vehiculo")) ||
                 t.contains("tara maxima") ||
                 t.contains("neumaticos") || t.contains("mtma") && t.contains("anchura") ||

@@ -96,6 +96,24 @@ class OcrPdfServiceImplClassificationTest {
                 """));
     }
 
+    @Test
+    void priorizaContratoEstructuradoAunqueContengaVariosDni() throws Exception {
+        assertEquals(TipoDocumento.CONTRATO_COMPRAVENTA, detectar("""
+                CONTRATO DE COMPRAVENTA DE VEHICULO USADO ENTRE PARTICULARES
+                REUNIDOS vendedor DNI 12345678Z comprador DNI 00000000T
+                Nombre y apellidos de ambas partes
+                ESTIPULACIONES precio y entrega del vehiculo
+                """));
+    }
+
+    @Test
+    void priorizaFacturaAunqueIncluyaIdentificacionFiscal() throws Exception {
+        assertEquals(TipoDocumento.FACTURA, detectar("""
+                FACTURA DE VENTA numero 2026-105
+                Emisor CIF B12345678 Cliente DNI 12345678Z
+                Base imponible IVA total factura
+                """));
+    }
     private TipoDocumento detectar(String texto) throws Exception {
         Method method = OcrPdfServiceImpl.class.getDeclaredMethod("detectarTipoDocumento", String.class);
         method.setAccessible(true);

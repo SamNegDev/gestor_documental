@@ -5,6 +5,7 @@ import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
+import com.example.gestor_documental.event.DocumentoLecturaIaSolicitadaEvent;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
@@ -32,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -76,6 +78,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     private final PdfSplitService pdfSplitService;
     private final HistorialCambioService historialCambioService;
     private final TransactionalFileService transactionalFileService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -465,6 +468,7 @@ public class DocumentoServiceImpl implements DocumentoService {
 
             documentoRepository.save(doc);
             registrarCargaDocumentoSolicitud(solicitud, doc, usuario);
+            solicitarLecturaIa(doc, usuario, "AUTO_SUBIDA");
 
 
         } catch (IOException e) {
@@ -654,6 +658,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         documentoRepository.save(doc);
         if (registrarHistorial) {
             registrarCargaDocumentoSolicitud(solicitud, doc, usuario);
+            solicitarLecturaIa(doc, usuario, "AUTO_SUBIDA");
         }
         return doc;
     }
@@ -1684,8 +1689,26 @@ public class DocumentoServiceImpl implements DocumentoService {
         correccion.setOrigen(origen);
         correccion.setNombreArchivoOriginal(documento.getNombreArchivoOriginal());
         correccionClasificacionDocumentoRepository.save(correccion);
+        solicitarLecturaIa(documento, usuario, "AUTO_CLASIFICACION");
     }
 
+    private void solicitarLecturaIa(Documento documento, Usuario usuario, String origen) {
+        if (documento == null || documento.getSolicitud() == null || usuario == null || documento.getTipoDocumento() == null) {
+            return;
+        }
+        TipoDocumento tipo = documento.getTipoDocumento();
+        boolean compatible = tipo == TipoDocumento.DNI
+                || tipo == TipoDocumento.CIF
+                || tipo == TipoDocumento.CONTRATO_COMPRAVENTA
+                || tipo == TipoDocumento.FACTURA
+                || tipo == TipoDocumento.PERMISO_CIRCULACION
+                || tipo == TipoDocumento.FICHA_TECNICA
+                || tipo == TipoDocumento.INFORME_DGT;
+        if (compatible) {
+            applicationEventPublisher.publishEvent(new DocumentoLecturaIaSolicitadaEvent(
+                    documento.getSolicitud().getId(), usuario.getId(), origen));
+        }
+    }
     private void registrarProcesamientoExpedienteCompleto(Expediente expediente, Documento documento, Usuario usuario, int documentosDetectados) {
         String detalle = documentosDetectados > 0
                 ? "Se subio y proceso el expediente completo '" + documento.getNombreArchivoOriginal()

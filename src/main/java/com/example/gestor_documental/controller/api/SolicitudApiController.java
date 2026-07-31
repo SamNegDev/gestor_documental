@@ -6,6 +6,7 @@ import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
 import com.example.gestor_documental.dto.expediente.CreacionConProcesamientoResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoExpedienteResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoIdentidadLecturaResponse;
+import com.example.gestor_documental.dto.expediente.DocumentoLecturaIaEstadoResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaResponse;
 import com.example.gestor_documental.dto.expediente.DocumentoVehiculoLecturaResponse;
 import com.example.gestor_documental.dto.expediente.HistorialExpedienteResponse;
@@ -25,6 +26,7 @@ import com.example.gestor_documental.dto.expediente.SolicitudInteresadoHabitualR
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoHabitualRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudListItemResponse;
+import com.example.gestor_documental.dto.expediente.SolicitudLecturaIaJobResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudPreparacionTraspasoResponse;
 import com.example.gestor_documental.dto.expediente.TipoTramiteResumenResponse;
 import com.example.gestor_documental.dto.expediente.UsuarioResumenResponse;
@@ -45,11 +47,13 @@ import com.example.gestor_documental.model.Incidencia;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Mensaje;
 import com.example.gestor_documental.model.Solicitud;
+import com.example.gestor_documental.model.SolicitudLecturaIaItem;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoVehiculoLecturaRepository;
+import com.example.gestor_documental.repository.SolicitudLecturaIaItemRepository;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteCompletoProcesamientoService;
@@ -59,6 +63,7 @@ import com.example.gestor_documental.service.MensajeService;
 import com.example.gestor_documental.service.SolicitudActuacionService;
 import com.example.gestor_documental.service.SolicitudDocumentacionBasicaService;
 import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
+import com.example.gestor_documental.service.SolicitudLecturaIaJobService;
 import com.example.gestor_documental.service.SolicitudPreparacionTraspasoService;
 import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
@@ -107,10 +112,12 @@ public class SolicitudApiController {
     private final CurrentUserService currentUserService;
     private final CorreoEntranteSolicitudService correoEntranteSolicitudService;
     private final SolicitudDocumentacionIaService solicitudDocumentacionIaService;
+    private final SolicitudLecturaIaJobService solicitudLecturaIaJobService;
     private final SolicitudPreparacionTraspasoService solicitudPreparacionTraspasoService;
     private final DocumentoIdentidadLecturaRepository documentoIdentidadLecturaRepository;
     private final DocumentoRolesLecturaRepository documentoRolesLecturaRepository;
     private final DocumentoVehiculoLecturaRepository documentoVehiculoLecturaRepository;
+    private final SolicitudLecturaIaItemRepository solicitudLecturaIaItemRepository;
     private final ClienteInteresadoRepository clienteInteresadoRepository;
 
     @GetMapping
@@ -204,6 +211,26 @@ public class SolicitudApiController {
         return ResponseEntity.ok(java.util.Map.of("id", expediente.getId()));
     }
 
+    @PostMapping("/{id}/documentacion-ia/jobs")
+    public SolicitudLecturaIaJobResponse crearTrabajoDocumentacionIa(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "false") boolean forzarRelectura,
+            @RequestParam(required = false) Long documentoId,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = requireAdmin(authentication);
+        return solicitudLecturaIaJobService.crear(id, usuarioLogueado, forzarRelectura, "MANUAL", documentoId);
+    }
+
+    @GetMapping("/{id}/documentacion-ia/jobs/ultimo")
+    public ResponseEntity<SolicitudLecturaIaJobResponse> obtenerUltimoTrabajoDocumentacionIa(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Usuario usuarioLogueado = usuario(authentication);
+        return ResponseEntity.of(java.util.Optional.ofNullable(
+                solicitudLecturaIaJobService.obtenerUltimo(id, usuarioLogueado)));
+    }
     @PostMapping("/{id}/documentacion-ia/procesar")
     public SolicitudDocumentacionIaResponse procesarDocumentacionIa(
             @PathVariable Long id,
@@ -650,11 +677,12 @@ public class SolicitudApiController {
                         : null)
                 .creadoPor(mapUsuario(solicitud.getCreadoPor()))
                 .modificadoPor(mapUsuario(solicitud.getModificadoPor()))
+                .ultimoTrabajoIa(solicitudLecturaIaJobService.obtenerUltimo(solicitud.getId(), usuarioLogueado))
                 .lecturaIaCliente(usuarioLogueado.getRolUsuario() == RolUsuario.CLIENTE
                         ? solicitudDocumentacionIaService.obtenerLecturaCliente(solicitud.getId(), usuarioLogueado)
                         : null)
                 .interesados(interesados)
-                .documentos(documentos.stream().map(this::mapDocumento).toList())
+                .documentos(mapDocumentos(documentos))
                 .incidencias(incidenciaService.listarPorSolicitud(solicitud.getId()).stream().map(this::mapIncidencia).toList())
                 .historial(historialCambioService.listarPorSolicitud(solicitud.getId()).stream()
                         .filter(cambio -> !"CARGAR DOCUMENTO".equals(cambio.getAccion()))
@@ -927,16 +955,40 @@ public class SolicitudApiController {
         return value.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
     }
 
-    private DocumentoExpedienteResponse mapDocumento(Documento documento) {
-        DocumentoIdentidadLectura lecturaIdentidad = documento.getId() != null
-                ? documentoIdentidadLecturaRepository.findByDocumentoId(documento.getId()).orElse(null)
-                : null;
-        DocumentoRolesLectura lecturaRoles = documento.getId() != null
-                ? documentoRolesLecturaRepository.findByDocumentoId(documento.getId()).orElse(null)
-                : null;
-        DocumentoVehiculoLectura lecturaVehiculo = documento.getId() != null
-                ? documentoVehiculoLecturaRepository.findByDocumentoId(documento.getId()).orElse(null)
-                : null;
+    private List<DocumentoExpedienteResponse> mapDocumentos(List<Documento> documentos) {
+        if (documentos == null || documentos.isEmpty()) return List.of();
+        List<Long> ids = documentos.stream().map(Documento::getId).filter(java.util.Objects::nonNull).toList();
+        java.util.Map<Long, DocumentoIdentidadLectura> identidades = documentoIdentidadLecturaRepository
+                .findByDocumentoIdIn(ids).stream().collect(java.util.stream.Collectors.toMap(
+                        lectura -> lectura.getDocumento().getId(), java.util.function.Function.identity()));
+        java.util.Map<Long, DocumentoRolesLectura> roles = documentoRolesLecturaRepository
+                .findByDocumentoIdIn(ids).stream().collect(java.util.stream.Collectors.toMap(
+                        lectura -> lectura.getDocumento().getId(), java.util.function.Function.identity()));
+        java.util.Map<Long, DocumentoVehiculoLectura> vehiculos = documentoVehiculoLecturaRepository
+                .findByDocumentoIdIn(ids).stream().collect(java.util.stream.Collectors.toMap(
+                        lectura -> lectura.getDocumento().getId(), java.util.function.Function.identity()));
+        java.util.Map<Long, SolicitudLecturaIaItem> estados = solicitudLecturaIaItemRepository
+                .findUltimosPorDocumento(ids).stream().collect(java.util.stream.Collectors.toMap(
+                        item -> item.getDocumento().getId(), java.util.function.Function.identity()));
+        return documentos.stream().map(documento -> mapDocumento(
+                documento,
+                identidades.get(documento.getId()),
+                roles.get(documento.getId()),
+                vehiculos.get(documento.getId()),
+                estados.get(documento.getId()))).toList();
+    }
+
+    private DocumentoExpedienteResponse mapDocumento(
+            Documento documento,
+            DocumentoIdentidadLectura lecturaIdentidad,
+            DocumentoRolesLectura lecturaRoles,
+            DocumentoVehiculoLectura lecturaVehiculo,
+            SolicitudLecturaIaItem estadoLectura
+    ) {
+        DocumentoLecturaIaEstadoResponse estado = DocumentoLecturaIaEstadoResponse.from(estadoLectura);
+        if (estado == null) {
+            estado = estadoDesdeLecturaExistente(documento, lecturaIdentidad, lecturaRoles, lecturaVehiculo);
+        }
         return DocumentoExpedienteResponse.builder()
                 .id(documento.getId())
                 .nombre(documento.getNombreArchivo())
@@ -953,9 +1005,42 @@ public class SolicitudApiController {
                 .lecturaIdentidad(DocumentoIdentidadLecturaResponse.from(lecturaIdentidad))
                 .lecturaRoles(DocumentoRolesLecturaResponse.from(lecturaRoles))
                 .lecturaVehiculo(DocumentoVehiculoLecturaResponse.from(lecturaVehiculo))
+                .lecturaIa(estado)
                 .build();
     }
 
+    private DocumentoLecturaIaEstadoResponse estadoDesdeLecturaExistente(
+            Documento documento,
+            DocumentoIdentidadLectura identidad,
+            DocumentoRolesLectura roles,
+            DocumentoVehiculoLectura vehiculo
+    ) {
+        if (identidad != null) {
+            return DocumentoLecturaIaEstadoResponse.builder().tipoLectura("IDENTIDAD")
+                    .estado(identidad.isRequiereRevision() ? "REQUIERE_REVISION" : "COMPLETADO")
+                    .mensaje(identidad.getMensaje()).modelo(identidad.getModelo()).confianza(identidad.getConfianzaGlobal()).build();
+        }
+        if (roles != null) {
+            return DocumentoLecturaIaEstadoResponse.builder().tipoLectura("ROLES")
+                    .estado(roles.isRequiereRevision() ? "REQUIERE_REVISION" : "COMPLETADO")
+                    .mensaje(roles.getMensaje()).modelo(roles.getModelo()).confianza(roles.getConfianzaGlobal()).build();
+        }
+        if (vehiculo != null) {
+            return DocumentoLecturaIaEstadoResponse.builder().tipoLectura("VEHICULO")
+                    .estado(vehiculo.isRequiereRevision() ? "REQUIERE_REVISION" : "COMPLETADO")
+                    .mensaje(vehiculo.getMensaje()).modelo(vehiculo.getModelo()).confianza(vehiculo.getConfianzaGlobal()).build();
+        }
+        TipoDocumento tipo = documento.getTipoDocumento();
+        boolean compatible = tipo == TipoDocumento.DNI || tipo == TipoDocumento.CIF
+                || tipo == TipoDocumento.CONTRATO_COMPRAVENTA || tipo == TipoDocumento.FACTURA
+                || tipo == TipoDocumento.PERMISO_CIRCULACION || tipo == TipoDocumento.FICHA_TECNICA
+                || tipo == TipoDocumento.INFORME_DGT;
+        if (!compatible) return null;
+        String tipoLectura = tipo == TipoDocumento.DNI || tipo == TipoDocumento.CIF ? "IDENTIDAD"
+                : tipo == TipoDocumento.CONTRATO_COMPRAVENTA || tipo == TipoDocumento.FACTURA ? "ROLES" : "VEHICULO";
+        return DocumentoLecturaIaEstadoResponse.builder().tipoLectura(tipoLectura).estado("SIN_LEER")
+                .mensaje("Pendiente de lectura automatica").build();
+    }
     private IncidenciaExpedienteResponse mapIncidencia(Incidencia incidencia) {
         return IncidenciaExpedienteResponse.builder()
                 .id(incidencia.getId())

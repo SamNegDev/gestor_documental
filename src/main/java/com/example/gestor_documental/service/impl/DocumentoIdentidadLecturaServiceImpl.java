@@ -56,9 +56,11 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -185,12 +187,14 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             ObjectNode nota = objectMapper.createObjectNode();
             nota.put("type", "input_text");
             nota.put("text", "Documento " + documento.getId() + ", imagen " + imagen.nombre()
-                    + ". Detecta todas las identidades DNI/NIE/CIF visibles en esta imagen.");
+                    + ". Haz una pasada especifica de identificadores y detecta todas las identidades DNI/NIE/CIF visibles, "
+                    + "aunque la tarjeta sea pequena, este girada o solo se vea una de sus caras.");
             content.add(nota);
 
             ObjectNode image = objectMapper.createObjectNode();
             image.put("type", "input_image");
             image.put("image_url", "data:image/png;base64," + Base64.getEncoder().encodeToString(imagen.bytes()));
+            image.put("detail", "high");
             content.add(image);
         }
 
@@ -205,9 +209,16 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 El tipo documental esperado es %s, pero si el contenido muestra otra identidad compatible indicalo.
                 El documento puede contener una o varias tarjetas DNI/NIE, anversos, reversos, CIF o certificados de empresa.
                 No determines comprador, vendedor, titular ni ningun rol de la operacion.
-                Devuelve una entrada por cada identidad distinta visible. Si hay dos DNI en el mismo PDF o pagina, devuelve dos entradas.
-                Identificador: mayusculas, sin espacios, guiones ni puntos.
-                No uses codigos MRZ o codigos de lectura mecanica que empiecen por IDESP como identificador; usa el DNI/NIE/CIF impreso de la persona o empresa.
+                El identificador es el campo prioritario. Antes de devolverlo como null, haz una segunda pasada visual centrada solo en el numero y su letra.
+                Revisa cada tarjeta en orientaciones 0, 90, 180 y 270 grados y lee anverso y reverso por separado.
+                Devuelve una entrada por cada identidad distinta. Une anverso y reverso de la misma tarjeta y no dupliques la identidad.
+                Si hay dos DNI en el mismo PDF o pagina, devuelve dos entradas.
+                Normaliza el identificador en mayusculas, sin espacios, guiones ni puntos.
+                Formatos validos: DNI con 8 digitos y letra; NIE con X, Y o Z, 7 digitos y letra; CIF con letra inicial y 7 digitos mas caracter de control.
+                En DNI/NIE usa la letra de control para resolver confusiones OCR frecuentes (O/0, I/1, B/8, S/5, Z/2 y G/6),
+                pero corrige solo cuando exista una unica alternativa compatible con el formato y el control. Si quedan varias alternativas, no inventes.
+                El identificador impreso es la fuente principal. Puedes usar la zona MRZ para corroborar o recuperar exactamente el DNI/NIE,
+                pero nunca devuelvas como identificador la cadena MRZ completa ni los campos IDESP, CAN o numero de soporte.
                 Personas fisicas: separa nombre, apellido1 y apellido2 exactamente como aparezcan; no cambies el orden.
                 Si el documento tiene campos "Apellidos" y "Nombre", apellido1/apellido2 salen de Apellidos y nombre sale de Nombre.
                 Empresas: usa razonSocial y deja nombre/apellidos en null.
@@ -215,7 +226,10 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 Direccion: devuelve direccionTexto en una sola linea si aparece.
                 Si la direccion aparece clara, separala tambien en tipoVia, nombreVia, numeroVia, bloque, portal, escalera, piso, puerta, codigoPostal, municipio y provincia.
                 No inventes campos de direccion: si una parte no aparece clara, null.
-                No inventes datos ni completes segundos nombres si no se ven. Si un identificador no se lee con seguridad, devuelve null y confianza baja en esa entrada.
+                No inventes datos ni completes segundos nombres si no se ven. Si un identificador no se lee con seguridad tras la segunda pasada, devuelve null y confianza baja.
+                Marca requiereRevision=true cuando el identificador, el tipo o el nombre de la identidad sean dudosos. La ausencia de direccion u otro campo secundario,
+                por si sola, no requiere revisar de nuevo la identidad.
+                Usa confianza alta solo cuando el identificador sea legible y su formato y control sean coherentes; media cuando necesite corroboracion; baja cuando falte o sea ambiguo.
                 Devuelve solo el JSON del esquema.
                 """.formatted(documento.getTipoDocumento() != null ? documento.getTipoDocumento().name() : "");
     }
@@ -252,7 +266,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
 
     private void aplicarResultado(Documento documento, DocumentoIdentidadLectura lectura, JsonNode resultado, Usuario usuario, String modeloUsado) {
         List<IdentidadDetectada> identidades = DocumentoIdentidadLecturaJson.extraer(resultado);
-        IdentidadDetectada principal = identidadPrincipal(identidades);
+        IdentidadDetectada principal = identidadPrincipal(documento, identidades);
         String identificador = principal != null ? normalizarIdentificador(principal.identificador()) : null;
         Double confianza = principal != null ? principal.confianzaGlobal() : null;
         boolean revisionIa = principal == null || principal.requiereRevision();
@@ -263,7 +277,8 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 && confianza != null
                 && confianza >= CONFIANZA_MINIMA_AUTOMATICA
                 && !revisionIa;
-        Interesado interesadoVinculado = !lecturaSegura
+        boolean multiplesIdentidadesSinCoincidencia = multiplesIdentidadesSegurasSinCoincidencia(documento, identidades);
+        Interesado interesadoVinculado = !lecturaSegura || multiplesIdentidadesSinCoincidencia
                 ? null
                 : resolverInteresadoVinculado(documento, identificador, principal, tipoDetectado);
         boolean conflictoInteresado = lecturaSegura
@@ -272,6 +287,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 && !coincideIdentificador(documento.getInteresado(), identificador);
         boolean documentoDeSolicitud = documento.getSolicitud() != null;
         boolean requiereRevision = !lecturaSegura
+                || multiplesIdentidadesSinCoincidencia
                 || (!documentoDeSolicitud && interesadoVinculado == null)
                 || conflictoInteresado;
 
@@ -308,8 +324,8 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         lectura.setModelo(modeloUsado);
         lectura.setFechaLectura(LocalDateTime.now());
         lectura.setResultadoJson(resultado.toString());
-        lectura.setMensaje(mensajeLectura(identificador, identificadorInvalido, interesadoVinculado, conflictoInteresado, requiereRevision,
-                identidades.size()));
+        lectura.setMensaje(mensajeLectura(identificador, identificadorInvalido, interesadoVinculado, conflictoInteresado,
+                requiereRevision, identidades.size(), multiplesIdentidadesSinCoincidencia));
 
         if (!requiereRevision && interesadoVinculado != null) {
             boolean documentoActualizado = false;
@@ -329,18 +345,70 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         }
     }
 
-    private IdentidadDetectada identidadPrincipal(List<IdentidadDetectada> identidades) {
+    private IdentidadDetectada identidadPrincipal(Documento documento, List<IdentidadDetectada> identidades) {
         if (identidades == null || identidades.isEmpty()) {
             return null;
         }
+        Set<String> identificadoresEsperados = identificadoresEsperados(documento);
         return identidades.stream()
                 .sorted((first, second) -> {
+                    int contexto = Boolean.compare(
+                            coincideContexto(second, identificadoresEsperados),
+                            coincideContexto(first, identificadoresEsperados));
+                    if (contexto != 0) return contexto;
                     int seguridad = Boolean.compare(esIdentidadSegura(second), esIdentidadSegura(first));
                     if (seguridad != 0) return seguridad;
                     return Double.compare(confianza(second.confianzaGlobal()), confianza(first.confianzaGlobal()));
                 })
                 .findFirst()
                 .orElse(identidades.get(0));
+    }
+
+    private boolean multiplesIdentidadesSegurasSinCoincidencia(Documento documento, List<IdentidadDetectada> identidades) {
+        if (identidades == null || identidades.isEmpty()) {
+            return false;
+        }
+        Set<String> esperados = identificadoresEsperados(documento);
+        Set<String> seguros = identidades.stream()
+                .filter(this::esIdentidadSegura)
+                .map(IdentidadDetectada::identificador)
+                .map(this::normalizarIdentificador)
+                .filter(valor -> valor != null && !valor.isBlank())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        return seguros.size() > 1 && seguros.stream().noneMatch(esperados::contains);
+    }
+
+    private boolean coincideContexto(IdentidadDetectada identidad, Set<String> identificadoresEsperados) {
+        String identificador = identidad != null ? normalizarIdentificador(identidad.identificador()) : null;
+        return identificador != null && identificadoresEsperados.contains(identificador);
+    }
+
+    private Set<String> identificadoresEsperados(Documento documento) {
+        Set<String> resultado = new LinkedHashSet<>();
+        if (documento == null) {
+            return resultado;
+        }
+        anadirIdentificador(resultado, documento.getInteresado() != null ? documento.getInteresado().getDni() : null);
+        if (documento.getSolicitud() != null) {
+            anadirIdentificador(resultado, documento.getSolicitud().getInteresado1Dni());
+            anadirIdentificador(resultado, documento.getSolicitud().getInteresado2Dni());
+            anadirIdentificador(resultado, documento.getSolicitud().getInteresado3Dni());
+        }
+        if (documento.getExpediente() != null && documento.getExpediente().getInteresados() != null) {
+            documento.getExpediente().getInteresados().stream()
+                    .map(ExpedienteInteresado::getInteresado)
+                    .filter(java.util.Objects::nonNull)
+                    .map(Interesado::getDni)
+                    .forEach(valor -> anadirIdentificador(resultado, valor));
+        }
+        return resultado;
+    }
+
+    private void anadirIdentificador(Set<String> resultado, String valor) {
+        String normalizado = normalizarIdentificador(valor);
+        if (normalizado != null && !normalizado.isBlank()) {
+            resultado.add(normalizado);
+        }
     }
 
     private boolean esIdentidadSegura(IdentidadDetectada identidad) {
@@ -564,8 +632,12 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             Interesado interesado,
             boolean conflictoInteresado,
             boolean requiereRevision,
-            int identidadesDetectadas
+            int identidadesDetectadas,
+            boolean multiplesIdentidadesSinCoincidencia
     ) {
+        if (multiplesIdentidadesSinCoincidencia) {
+            return "Se detectaron varias identidades validas sin coincidencia con los interesados; asignacion manual requerida.";
+        }
         if (identidadesDetectadas > 1) {
             return "Se detectaron " + identidadesDetectadas + " identidades en el documento; revisar asignacion si procede.";
         }
@@ -907,7 +979,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
     }
 
     private boolean debeReintentarIdentidad(JsonNode resultado) {
-        IdentidadDetectada principal = identidadPrincipal(DocumentoIdentidadLecturaJson.extraer(resultado));
+        IdentidadDetectada principal = identidadPrincipal(null, DocumentoIdentidadLecturaJson.extraer(resultado));
         String identificador = principal != null ? normalizarIdentificador(principal.identificador()) : null;
         Double confianza = principal != null ? principal.confianzaGlobal() : null;
         return identificador == null

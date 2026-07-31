@@ -111,6 +111,7 @@ export interface SolicitudDetail {
   creadoPor?: UsuarioResumen | null;
   modificadoPor?: UsuarioResumen | null;
   lecturaIaCliente?: LecturaIaSolicitudCliente | null;
+  ultimoTrabajoIa?: SolicitudLecturaIaJob | null;
   interesados: InteresadoSolicitud[];
   documentos: DocumentoExpediente[];
   incidencias: IncidenciaExpediente[];
@@ -118,6 +119,39 @@ export interface SolicitudDetail {
   mensajes: MensajeExpediente[];
 }
 
+export interface SolicitudLecturaIaJobItem {
+  id: number;
+  documentoId: number;
+  tipoLectura: string;
+  estado: string;
+  intentos: number;
+  modelo?: string | null;
+  versionPrompt?: string | null;
+  confianza?: number | null;
+  mensaje?: string | null;
+  fechaInicio?: string | null;
+  fechaFin?: string | null;
+  duracionMs?: number | null;
+}
+
+export interface SolicitudLecturaIaJob {
+  id: number;
+  solicitudId: number;
+  estado: "PENDIENTE" | "PROCESANDO" | "COMPLETADO" | "REQUIERE_REVISION" | "ERROR" | string;
+  origen: string;
+  forzarRelectura: boolean;
+  totalItems: number;
+  itemsProcesados: number;
+  itemsRevision: number;
+  itemsError: number;
+  progreso: number;
+  faseActual?: string | null;
+  mensaje?: string | null;
+  fechaCreacion?: string | null;
+  fechaInicio?: string | null;
+  fechaFin?: string | null;
+  items: SolicitudLecturaIaJobItem[];
+}
 export interface SolicitudVehiculo {
   matricula?: string | null;
   marca?: string | null;

@@ -19,7 +19,6 @@ import {
   extractDocumentPages,
   getCompleteExpedienteProcessing,
   mergeDocuments,
-  readDocumentIdentity,
   startCompleteSolicitudProcessing,
   updateDocument,
   uploadSolicitudDocument,
@@ -49,6 +48,7 @@ import type {
   SolicitudDocumentacionIaResponse,
   SolicitudIdentidadDetectadaInput,
   SolicitudInteresadoHabitual,
+  SolicitudLecturaIaJob,
   SolicitudPreparacionAccion,
   SolicitudPreparacionBloque,
   SolicitudPreparacionDocumento,
@@ -135,6 +135,10 @@ export function SolicitudDetailPage() {
     queryKey: ["solicitudes", "detalle", id],
     queryFn: () => getSolicitudDetail(id!),
     enabled: Boolean(id),
+    refetchInterval: (query) => {
+      const job = (query.state.data as SolicitudDetail | undefined)?.ultimoTrabajoIa;
+      return job && ["PENDIENTE", "PROCESANDO"].includes(job.estado) ? 2000 : false;
+    },
   });
 
   const justificanteQuery = useQuery({
@@ -195,8 +199,8 @@ export function SolicitudDetailPage() {
   });
 
   const procesarDocumentacionMutation = useMutation({
-    mutationFn: ({ solicitudId, forzarRelectura }: { solicitudId: number; forzarRelectura?: boolean }) =>
-      procesarSolicitudDocumentacionIa(solicitudId, { forzarRelectura }),
+    mutationFn: ({ solicitudId, forzarRelectura, documentoId }: { solicitudId: number; forzarRelectura?: boolean; documentoId?: number }) =>
+      procesarSolicitudDocumentacionIa(solicitudId, { forzarRelectura, documentoId }),
   });
 
   const procesarDocumentacionClienteMutation = useMutation({
@@ -225,18 +229,6 @@ export function SolicitudDetailPage() {
       queryClient.setQueryData(["solicitudes", "detalle", id], actualizada);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
-        queryClient.invalidateQueries({ queryKey: ["solicitudes", "preparacion-traspaso", id] }),
-        queryClient.invalidateQueries({ queryKey: ["tareas"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
-      ]);
-    },
-  });
-
-  const releerIdentidadMutation = useMutation({
-    mutationFn: (documentoId: number) => readDocumentIdentity(documentoId, true),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["solicitudes", "detalle", id] }),
         queryClient.invalidateQueries({ queryKey: ["solicitudes", "preparacion-traspaso", id] }),
         queryClient.invalidateQueries({ queryKey: ["tareas"] }),
         queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
@@ -512,9 +504,8 @@ export function SolicitudDetailPage() {
     try {
       setIaResult(null);
       setIaError(null);
-      const response = await procesarDocumentacionMutation.mutateAsync({ solicitudId: solicitudActual.id, forzarRelectura });
+      await procesarDocumentacionMutation.mutateAsync({ solicitudId: solicitudActual.id, forzarRelectura });
       await refreshSolicitud();
-      setIaResult(response);
     } catch (cause) {
       setIaError(cause instanceof ApiError ? cause.details || "No se pudo procesar la documentacion." : "No se pudo procesar la documentacion.");
     }
@@ -617,7 +608,14 @@ export function SolicitudDetailPage() {
     });
     if (!confirmed) return;
     try {
-      await releerIdentidadMutation.mutateAsync(documento.id);
+      const solicitudActual = solicitudQuery.data;
+      if (!solicitudActual) return;
+      await procesarDocumentacionMutation.mutateAsync({
+        solicitudId: solicitudActual.id,
+        forzarRelectura: true,
+        documentoId: documento.id,
+      });
+      await refreshSolicitud();
     } catch (cause) {
       alert(cause instanceof ApiError ? cause.details || "No se pudo releer la identidad." : "No se pudo releer la identidad.");
     }
@@ -670,12 +668,13 @@ export function SolicitudDetailPage() {
   const hasSolicitudDocuments = solicitud.documentos.some((documento) => documento.id);
   const editSolicitudPath = isAdmin ? `/solicitudes/${solicitud.id}/editar` : `/cliente/solicitudes/${solicitud.id}/editar`;
   const preparationTitle = solicitud.tipoTramite === "TRASPASO" ? "Preparacion del traspaso" : "Preparacion de la solicitud";
-  const preparationIaPending = isAdmin ? procesarDocumentacionMutation.isPending : procesarDocumentacionClienteMutation.isPending;
+  const trabajoIaActivo = Boolean(solicitud.ultimoTrabajoIa && ["PENDIENTE", "PROCESANDO"].includes(solicitud.ultimoTrabajoIa.estado));
+  const preparationIaPending = isAdmin ? procesarDocumentacionMutation.isPending || trabajoIaActivo : procesarDocumentacionClienteMutation.isPending;
   const preparationIaDisabled = isAdmin
-    ? procesarDocumentacionMutation.isPending || !hasSolicitudDocuments
+    ? procesarDocumentacionMutation.isPending || trabajoIaActivo || !hasSolicitudDocuments
     : procesarDocumentacionClienteMutation.isPending || !solicitud.lecturaIaCliente?.puedeSolicitar;
   const preparationIaLabel = isAdmin
-    ? (procesarDocumentacionMutation.isPending ? "Leyendo IA" : "Leer solicitud con IA")
+    ? (preparationIaPending ? "Leyendo en segundo plano" : "Leer solicitud con IA")
     : clienteIaButtonText(solicitud.lecturaIaCliente, procesarDocumentacionClienteMutation.isPending);
   const vehiculo = solicitud.vehiculo;
   const vehicleSummaryFacts = [
@@ -898,11 +897,12 @@ export function SolicitudDetailPage() {
           onResetIaData={() => void handleResetDatosIa()}
           onStateChange={(estado) => estadoMutation.mutate({ solicitudId: solicitud.id, estado })}
           canReadWithIa={hasSolicitudDocuments}
-          iaPending={procesarDocumentacionMutation.isPending}
+          iaPending={procesarDocumentacionMutation.isPending || trabajoIaActivo}
           pending={checkingInteresados || convertirMutation.isPending || estadoMutation.isPending || procesarDocumentacionMutation.isPending || resetDatosIaMutation.isPending}
         />
       ) : null}
 
+      {solicitud.ultimoTrabajoIa ? <SolicitudIaJobPanel job={solicitud.ultimoTrabajoIa} /> : null}
       {iaResult ? <SolicitudIaResultPanel response={iaResult} onDismiss={() => setIaResult(null)} /> : null}
       {iaError ? <SolicitudIaErrorPanel message={iaError} onDismiss={() => setIaError(null)} /> : null}
 
@@ -978,14 +978,17 @@ export function SolicitudDetailPage() {
                 <FileText size={20} />
                 <div className="document-table__main">
                   <strong>{documento.nombreOriginal || documento.nombre}</strong>
-                  <span>{formatDocumentType(documento.tipo)}{documento.interesadoNombre ? ` - ${documento.interesadoNombre}` : ""}</span>
+                  <div className="document-table__meta">
+                    <span>{formatDocumentType(documento.tipo)}{documento.interesadoNombre ? ` - ${documento.interesadoNombre}` : ""}</span>
+                    <DocumentIaStatus status={documento.lecturaIa} />
+                  </div>
                   <DocumentReadingPanel
                     documento={documento}
                     canAddIdentity={!isClosed}
                     canRereadIdentity={!isClosed}
                     existingIdentities={existingSolicitudIdentities}
                     addingIdentity={anadirIdentidadDetectadaMutation.isPending}
-                    rereadingIdentity={releerIdentidadMutation.isPending}
+                    rereadingIdentity={procesarDocumentacionMutation.isPending || trabajoIaActivo}
                     onAddIdentity={handleAddDetectedIdentity}
                     onRereadIdentity={handleRereadIdentity}
                   />
@@ -1101,7 +1104,6 @@ export function SolicitudDetailPage() {
         onClose={() => setTemplateDialogOpen(false)}
         open={templateDialogOpen}
       />
-      {procesarDocumentacionMutation.isPending ? <SolicitudIaProgressModal /> : null}
       {dialog}
     </section>
   );
@@ -1692,46 +1694,54 @@ function AdminActions({
   );
 }
 
-function SolicitudIaProgressModal() {
+function SolicitudIaJobPanel({ job }: { job: SolicitudLecturaIaJob }) {
+  const active = ["PENDIENTE", "PROCESANDO"].includes(job.estado);
+  const tone = job.estado === "ERROR" ? "danger" : job.estado === "REQUIERE_REVISION" ? "warning" : job.estado === "COMPLETADO" ? "success" : "info";
+  const Icon = active ? Loader2 : job.estado === "ERROR" || job.estado === "REQUIERE_REVISION" ? AlertTriangle : CheckCircle2;
   return (
-    <div className="ga-progress-modal" role="status" aria-live="polite">
-      <div className="ga-progress-modal__panel">
-        <div className="ga-progress-modal__heading">
-          <span className="ga-progress-modal__spinner">
-            <Loader2 size={22} />
-          </span>
+    <section className={`solicitud-ia-job solicitud-ia-job--${tone}`} role="status" aria-live="polite">
+      <div className="solicitud-ia-job__icon"><Icon className={active ? "is-spinning" : ""} size={18} /></div>
+      <div className="solicitud-ia-job__body">
+        <div className="solicitud-ia-job__heading">
           <div>
-            <p className="eyebrow">Procesando documentacion</p>
-            <h3>Leyendo DNI/CIF y factura</h3>
+            <strong>{job.faseActual || "Lectura documental"}</strong>
+            <span>{job.mensaje || "Actualizando el estado de los documentos."}</span>
           </div>
-          <strong>IA</strong>
+          <b>{job.progreso}%</b>
         </div>
-        <div className="ga-progress-modal__bar">
-          <span style={{ width: "72%" }} />
+        <div className="solicitud-ia-job__bar" aria-label={`Progreso de lectura: ${job.progreso}%`}>
+          <span style={{ width: `${job.progreso}%` }} />
         </div>
-        <div className="ga-progress-modal__status">
-          <strong>Actualizando solicitud</strong>
-          <span>Reutilizando lecturas validas cuando ya existen</span>
+        <div className="solicitud-ia-job__metrics">
+          <span>{job.itemsProcesados} de {job.totalItems} procesados</span>
+          {job.itemsRevision > 0 ? <span>{job.itemsRevision} para revisar</span> : null}
+          {job.itemsError > 0 ? <span>{job.itemsError} con error</span> : null}
+          {active ? <span>Puedes seguir trabajando</span> : null}
         </div>
-        <ul className="ga-progress-modal__steps">
-          <li className="is-active">
-            <span />
-            Localizar identidades
-          </li>
-          <li className="is-active">
-            <span />
-            Leer factura o contrato
-          </li>
-          <li className="is-active">
-            <span />
-            Aplicar comprador y vendedor
-          </li>
-        </ul>
       </div>
-    </div>
+    </section>
   );
 }
 
+function DocumentIaStatus({ status }: { status?: DocumentoExpediente["lecturaIa"] }) {
+  if (!status) return null;
+  const labels: Record<string, string> = {
+    SIN_LEER: "Pendiente IA",
+    PENDIENTE: "En cola",
+    PROCESANDO: "Leyendo",
+    COMPLETADO: "Leido",
+    REQUIERE_REVISION: "Revisar lectura",
+    ERROR: "Error de lectura",
+  };
+  const active = status.estado === "PENDIENTE" || status.estado === "PROCESANDO";
+  const Icon = active ? Loader2 : status.estado === "COMPLETADO" ? CheckCircle2 : status.estado === "ERROR" || status.estado === "REQUIERE_REVISION" ? AlertTriangle : Sparkles;
+  return (
+    <span className={`document-ia-status document-ia-status--${status.estado.toLowerCase()}`} title={status.mensaje || undefined}>
+      <Icon className={active ? "is-spinning" : ""} size={13} aria-hidden="true" />
+      {labels[status.estado] || formatEnum(status.estado)}
+    </span>
+  );
+}
 function MiniPlate({ value }: { value?: string | null }) {
   if (!value) {
     return <span className="muted-text">Sin matricula</span>;

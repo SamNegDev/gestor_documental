@@ -29,4 +29,5 @@ public class DocumentoExpedienteResponse {
     private DocumentoIdentidadLecturaResponse lecturaIdentidad;
     private DocumentoRolesLecturaResponse lecturaRoles;
     private DocumentoVehiculoLecturaResponse lecturaVehiculo;
+    private DocumentoLecturaIaEstadoResponse lecturaIa;
 }
