@@ -57,7 +57,9 @@ export function ExpedientesListPage() {
   });
 
   function applyFilters(filters: ListFilters) {
-    setAppliedFilters({ ...filters, pagina: filters.pagina || "0", tamanio: filters.tamanio || "25" });
+    const nextFilters = { ...filters, pagina: filters.pagina || "0", tamanio: filters.tamanio || "25" };
+    setDraftFilters(nextFilters);
+    setAppliedFilters(nextFilters);
     setSelectedIds(new Set());
   }
 
