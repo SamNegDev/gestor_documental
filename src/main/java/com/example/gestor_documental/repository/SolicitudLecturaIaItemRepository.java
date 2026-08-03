@@ -4,6 +4,7 @@ import com.example.gestor_documental.enums.EstadoLecturaIaItem;
 import com.example.gestor_documental.model.SolicitudLecturaIaItem;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -28,4 +29,15 @@ public interface SolicitudLecturaIaItemRepository extends JpaRepository<Solicitu
     List<SolicitudLecturaIaItem> findUltimosPorDocumento(@Param("documentoIds") Collection<Long> documentoIds);
 
     boolean existsByDocumentoIdAndEstadoIn(Long documentoId, Collection<EstadoLecturaIaItem> estados);
+
+    @Modifying
+    @Query(value = """
+            update solicitud_lectura_ia_item
+            set documento_id = :documentoDestinoId
+            where documento_id = :documentoOrigenId
+            """, nativeQuery = true)
+    int reasignarDocumento(
+            @Param("documentoOrigenId") Long documentoOrigenId,
+            @Param("documentoDestinoId") Long documentoDestinoId
+    );
 }

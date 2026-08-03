@@ -16,6 +16,7 @@ import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.repository.OperacionExpedienteRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
+import com.example.gestor_documental.repository.SolicitudLecturaIaItemRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
@@ -67,6 +68,7 @@ class DocumentoServiceImplTest {
     @Mock CorreccionClasificacionDocumentoRepository correccionRepository;
     @Mock RequisitoDocumentalExpedienteRepository requisitoRepository;
     @Mock OperacionExpedienteRepository operacionRepository;
+    @Mock SolicitudLecturaIaItemRepository lecturaIaItemRepository;
     @Mock ExpedienteService expedienteService;
     @Mock SolicitudService solicitudService;
     @Mock OcrPdfService ocrPdfService;
@@ -227,6 +229,7 @@ class DocumentoServiceImplTest {
         assertThat(rutaPrincipal).exists();
         assertThat(rutaSecundario).exists();
         assertThat(rutaNueva).exists();
+        verify(lecturaIaItemRepository).reasignarDocumento(2L, 1L);
         verify(correccionRepository).desvincularDocumento(2L);
         verify(documentoRepository).delete(secundario);
 

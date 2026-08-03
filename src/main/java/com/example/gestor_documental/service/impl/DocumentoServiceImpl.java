@@ -26,6 +26,7 @@ import com.example.gestor_documental.repository.CorreccionClasificacionDocumento
 import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.repository.OperacionExpedienteRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
+import com.example.gestor_documental.repository.SolicitudLecturaIaItemRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.*;
 import com.example.gestor_documental.util.TextNormalizer;
@@ -72,6 +73,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     private final CorreccionClasificacionDocumentoRepository correccionClasificacionDocumentoRepository;
     private final RequisitoDocumentalExpedienteRepository requisitoDocumentalRepository;
     private final OperacionExpedienteRepository operacionExpedienteRepository;
+    private final SolicitudLecturaIaItemRepository solicitudLecturaIaItemRepository;
     private final ExpedienteService expedienteService;
     private final SolicitudService solicitudService;
     private final OcrPdfService ocrPdfService;
@@ -1267,7 +1269,7 @@ public class DocumentoServiceImpl implements DocumentoService {
 
             for (Documento documento : documentos.subList(1, documentos.size())) {
                 reasignarRequisitos(documento, principal);
-                eliminarDocumentoFusionado(documento);
+                eliminarDocumentoFusionado(documento, principal);
             }
             documentoRepository.flush();
             if (expedienteCompletoOrigen != null) {
@@ -1571,7 +1573,8 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
     }
 
-    private void eliminarDocumentoFusionado(Documento documento) throws IOException {
+    private void eliminarDocumentoFusionado(Documento documento, Documento destino) throws IOException {
+        solicitudLecturaIaItemRepository.reasignarDocumento(documento.getId(), destino.getId());
         correccionClasificacionDocumentoRepository.desvincularDocumento(documento.getId());
         documentoRepository.delete(documento);
     }
