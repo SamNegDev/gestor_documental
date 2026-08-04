@@ -10,8 +10,10 @@ import com.example.gestor_documental.dto.ia.ExtraccionGaResponse;
 import com.example.gestor_documental.dto.ia.ExtraccionGaRevisionRequest;
 import com.example.gestor_documental.dto.ia.ExtraccionGaRevisionResponse;
 import com.example.gestor_documental.dto.ia.ExtraccionGaSincronizacionResponse;
+import com.example.gestor_documental.security.AuditoriaDocumentoInterceptor;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ExtraccionGaIaService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -115,12 +117,16 @@ public class AdminExtraccionGaIaController {
     @PostMapping("/revisiones/exportar")
     public ResponseEntity<byte[]> exportarPreparadas(
             @RequestBody ExtraccionGaLoteExportRequest request,
-            Authentication authentication
+            Authentication authentication,
+            HttpServletRequest servletRequest
     ) {
         byte[] xml = extraccionGaIaService.exportarPreparadas(
                 request != null ? request.expedienteIds() : List.of(),
                 currentUserService.requireAdmin(authentication)
         );
+        List<Long> expedienteIds = request != null ? request.expedienteIds() : List.of();
+        AuditoriaDocumentoInterceptor.anotarDetalle(servletRequest,
+                "Expedientes: " + expedienteIds + "; Registros: " + expedienteIds.size() + "; Bytes: " + xml.length);
         String filename = "FORMATO_GA_LOTE_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + ".GA.XML";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())

@@ -1,6 +1,7 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.InteresadoFormDto;
+import com.example.gestor_documental.dto.historial.DetalleCambioHistorial;
 import com.example.gestor_documental.dto.expediente.SolicitudIdentidadDetectadaRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoHabitualRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
@@ -635,7 +636,9 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitud, 
                 usuarioLogueado, 
                 "CAMBIO ESTADO", 
-                "El estado cambió de '" + estadoAnterior.name() + "' a '" + nuevoEstado.name() + "'"
+                "El estado cambió de '" + estadoAnterior.name() + "' a '" + nuevoEstado.name() + "'",
+                DetalleCambioHistorial.lista(
+                        DetalleCambioHistorial.de("estado", "Estado", estadoAnterior, nuevoEstado))
         );
     }
 
@@ -679,6 +682,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         String vehiculoBastidorAnterior = solicitudBase.getVehiculoBastidor();
         String operacionPrecioVentaAnterior = solicitudBase.getOperacionPrecioVenta();
         Long tipoTramiteAnterior = solicitudBase.getTipoTramite() != null ? solicitudBase.getTipoTramite().getId() : null;
+        String interesadosAntes = resumenInteresadosSolicitud(solicitudBase);
 
         solicitudBase.setTipoTramite(tipoTramite);
         solicitudBase.setMatricula(TextNormalizer.upperOrNull(solicitudActualizada.getMatricula()));
@@ -778,6 +782,7 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitudActualizada.getInteresado3Provincia()));
 
         solicitudBase.setObservaciones(TextNormalizer.upperOrNull(solicitudActualizada.getObservaciones()));
+        String interesadosDespues = resumenInteresadosSolicitud(solicitudBase);
 
         java.util.List<String> cambios = new java.util.ArrayList<>();
         if (!java.util.Objects.equals(matriculaAnterior, solicitudActualizada.getMatricula())) {
@@ -802,7 +807,13 @@ public class SolicitudServiceImpl implements SolicitudService {
                 solicitudGuardada, 
                 usuarioLogueado, 
                 "EDICIÓN", 
-                cambios.isEmpty() ? "Se editaron interesados u otros datos." : "Se modificaron los campos: " + String.join(", ", cambios)
+                cambios.isEmpty() ? "Se editaron interesados u otros datos." : "Se modificaron los campos: " + String.join(", ", cambios),
+                DetalleCambioHistorial.lista(
+                        DetalleCambioHistorial.de("vehiculo.matricula", "Matrícula", matriculaAnterior, solicitudGuardada.getMatricula()),
+                        DetalleCambioHistorial.de("vehiculo.marca", "Marca", vehiculoMarcaAnterior, solicitudGuardada.getVehiculoMarca()),
+                        DetalleCambioHistorial.de("vehiculo.modelo", "Modelo", vehiculoModeloAnterior, solicitudGuardada.getVehiculoModelo()),
+                        DetalleCambioHistorial.de("vehiculo.bastidor", "Bastidor", vehiculoBastidorAnterior, solicitudGuardada.getVehiculoBastidor()),
+                        DetalleCambioHistorial.de("interesados", "Interesados", interesadosAntes, interesadosDespues))
         );
 
         return solicitudGuardada;
@@ -1682,6 +1693,25 @@ public class SolicitudServiceImpl implements SolicitudService {
         transactionalFileService.eliminarTrasCommit(List.of(rutaArchivo));
     }
 
+    private String resumenInteresadosSolicitud(Solicitud solicitud) {
+        return java.util.stream.IntStream.rangeClosed(1, 3)
+                .mapToObj(slot -> {
+                    RolInteresado rol = rolSlot(solicitud, slot);
+                    String dni = dniSlot(solicitud, slot);
+                    String nombre = nombreSlot(solicitud, slot);
+                    if (rol == null && TextNormalizer.upperOrNull(dni) == null
+                            && TextNormalizer.upperOrNull(nombre) == null) {
+                        return null;
+                    }
+                    return (rol != null ? rol.name() : "SIN ROL") + ": "
+                            + (TextNormalizer.upperOrNull(dni) != null ? dni : "SIN DNI") + " - "
+                            + (TextNormalizer.upperOrNull(nombre) != null ? nombre : "SIN NOMBRE");
+                })
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.collectingAndThen(
+                        java.util.stream.Collectors.joining("; "),
+                        valor -> valor.isEmpty() ? "sin interesados" : valor));
+    }
     private void normalizarSolicitud(Solicitud solicitud) {
         solicitud.setMatricula(TextNormalizer.upperOrNull(solicitud.getMatricula()));
         solicitud.setVehiculoMarca(TextNormalizer.upperOrNull(solicitud.getVehiculoMarca()));

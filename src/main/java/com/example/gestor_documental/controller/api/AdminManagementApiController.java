@@ -18,6 +18,7 @@ import com.example.gestor_documental.model.ClienteInteresado;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.security.AuditoriaDocumentoInterceptor;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.ClienteLogoService;
 import com.example.gestor_documental.service.ClienteService;
@@ -29,6 +30,7 @@ import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.util.ClienteBrandingUrls;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
+import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
@@ -118,7 +120,8 @@ public class AdminManagementApiController {
     @PostMapping("/clientes/{clienteId}/administradores")
     public ClienteAdminResponse guardarAdministrador(@PathVariable Long clienteId,
                                                       @RequestBody AdministradorClienteRequest request,
-                                                      Authentication authentication) {
+                                                      Authentication authentication,
+                                                      HttpServletRequest servletRequest) {
         requireAdmin(authentication);
         Cliente cliente = clienteService.buscarPorId(clienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
@@ -150,13 +153,16 @@ public class AdminManagementApiController {
         relacion.setInteresado(interesado);
         relacion.setRepresentanteLegal(true);
         clienteInteresadoRepository.save(relacion);
+        AuditoriaDocumentoInterceptor.anotarDetalle(servletRequest,
+                "Cliente " + clienteId + "; Interesado " + interesado.getId() + "; Representante legal: SI");
         return mapClienteAdmin(cliente);
     }
 
     @PutMapping("/clientes/{clienteId}/administradores/{interesadoId}")
     public ClienteAdminResponse actualizarAdministrador(@PathVariable Long clienteId, @PathVariable Long interesadoId,
                                                          @RequestBody AdministradorClienteRequest request,
-                                                         Authentication authentication) {
+                                                         Authentication authentication,
+                                                         HttpServletRequest servletRequest) {
         requireAdmin(authentication);
         ClienteInteresado relacion = administrador(clienteId, interesadoId);
         Interesado interesado = relacion.getInteresado();
@@ -181,17 +187,22 @@ public class AdminManagementApiController {
         interesado.setLocalidad(TextNormalizer.upperOrNull(request.localidad()));
         interesado.setProvincia(TextNormalizer.upperOrNull(request.provincia()));
         interesadoRepository.save(interesado);
+        AuditoriaDocumentoInterceptor.anotarDetalle(servletRequest,
+                "Cliente " + clienteId + "; Interesado " + interesadoId + "; Datos identificativos actualizados");
         return mapClienteAdmin(relacion.getCliente());
     }
 
     @DeleteMapping("/clientes/{clienteId}/administradores/{interesadoId}")
     public ClienteAdminResponse desvincularAdministrador(@PathVariable Long clienteId, @PathVariable Long interesadoId,
-                                                          Authentication authentication) {
+                                                          Authentication authentication,
+                                                          HttpServletRequest servletRequest) {
         requireAdmin(authentication);
         ClienteInteresado relacion = administrador(clienteId, interesadoId);
         relacion.setRepresentanteLegal(false);
         if (!Boolean.TRUE.equals(relacion.getHabitual())) clienteInteresadoRepository.delete(relacion);
         else clienteInteresadoRepository.save(relacion);
+        AuditoriaDocumentoInterceptor.anotarDetalle(servletRequest,
+                "Cliente " + clienteId + "; Interesado " + interesadoId + "; Representante legal: NO");
         return mapClienteAdmin(relacion.getCliente());
     }
 
@@ -291,7 +302,8 @@ public class AdminManagementApiController {
     @PostMapping("/usuarios")
     public ResponseEntity<Map<String, Long>> crearUsuario(
             @RequestBody UsuarioUpsertRequest request,
-            Authentication authentication
+            Authentication authentication,
+            HttpServletRequest servletRequest
     ) {
         requireAdmin(authentication);
         validarUsuario(request, true);
@@ -301,6 +313,9 @@ public class AdminManagementApiController {
                 request.getRolUsuario() == RolUsuario.CLIENTE ? clienteIds : List.of(),
                 request.getRolUsuario() == RolUsuario.CLIENTE ? request.getClienteId() : null,
                 request.getPassword());
+        AuditoriaDocumentoInterceptor.anotarDetalle(servletRequest,
+                "Usuario " + creado.getId() + "; Rol: " + request.getRolUsuario()
+                        + "; Activo: " + request.isActivo() + "; Clientes: " + clienteIds);
         return ResponseEntity.created(URI.create("/admin/usuarios/" + creado.getId()))
                 .body(Map.of("id", creado.getId()));
     }
@@ -309,23 +324,41 @@ public class AdminManagementApiController {
     public ResponseEntity<Void> actualizarUsuario(
             @PathVariable Long id,
             @RequestBody UsuarioUpsertRequest request,
-            Authentication authentication
+            Authentication authentication,
+            HttpServletRequest servletRequest
     ) {
         requireAdmin(authentication);
         validarUsuario(request, false);
+        Usuario anterior = usuarioService.buscarPorId(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        RolUsuario rolAnterior = anterior.getRolUsuario();
+        boolean activoAnterior = anterior.isActivo();
         List<Long> clienteIds = clientesSolicitados(request);
         usuarioService.actualizarUsuario(
                 id, mapUsuario(request, new Usuario()),
                 request.getRolUsuario() == RolUsuario.CLIENTE ? clienteIds : List.of(),
                 request.getRolUsuario() == RolUsuario.CLIENTE ? request.getClienteId() : null,
                 request.getPassword());
+        AuditoriaDocumentoInterceptor.anotarDetalle(servletRequest,
+                "Usuario " + id + "; Rol: " + rolAnterior + " -> " + request.getRolUsuario()
+                        + "; Activo: " + activoAnterior + " -> " + request.isActivo()
+                        + "; Clientes posteriores: " + clienteIds);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/usuarios/{id}")
-    public ResponseEntity<Void> eliminarUsuario(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<Void> eliminarUsuario(
+            @PathVariable Long id,
+            Authentication authentication,
+            HttpServletRequest servletRequest
+    ) {
         requireAdmin(authentication);
+        Usuario anterior = usuarioService.buscarPorId(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        String detalle = "Usuario " + id + "; Email: " + anterior.getEmail()
+                + "; Rol: " + anterior.getRolUsuario() + "; Activo: " + anterior.isActivo();
         usuarioService.eliminarUsuarioSeguro(id);
+        AuditoriaDocumentoInterceptor.anotarDetalle(servletRequest, detalle);
         return ResponseEntity.noContent().build();
     }
 

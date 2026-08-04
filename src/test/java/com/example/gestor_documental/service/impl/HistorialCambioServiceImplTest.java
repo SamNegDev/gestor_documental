@@ -1,11 +1,14 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.dto.historial.DetalleCambioHistorial;
 import com.example.gestor_documental.enums.TipoActividadHistorial;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.HistorialCambio;
+import com.example.gestor_documental.model.HistorialCambioDetalle;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.HistorialCambioRepository;
+import com.example.gestor_documental.repository.HistorialCambioDetalleRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -26,6 +30,8 @@ class HistorialCambioServiceImplTest {
 
     @Mock
     private HistorialCambioRepository historialCambioRepository;
+    @Mock
+    private HistorialCambioDetalleRepository historialCambioDetalleRepository;
     @Mock
     private ExpedienteRepository expedienteRepository;
     @Mock
@@ -57,5 +63,29 @@ class HistorialCambioServiceImplTest {
         assertSame(expediente, historial.getExpediente());
         assertSame(usuario, historial.getUsuario());
         assertEquals(fechaOriginal, expediente.getFechaUltimaModificacion());
+    }
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void guardaValoresAnteriorYPosteriorEnLaMismaEntradaDeHistorial() {
+        Expediente expediente = new Expediente();
+        Usuario usuario = new Usuario();
+
+        service.registrarCambioExpediente(
+                expediente,
+                usuario,
+                "CAMBIO ESTADO",
+                "Cambio funcional visible.",
+                DetalleCambioHistorial.lista(
+                        DetalleCambioHistorial.de("estado", "Estado", "EN_TRAMITE", "FINALIZADO"),
+                        DetalleCambioHistorial.de("sin_cambio", "Sin cambio", "A", "A")));
+
+        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        verify(historialCambioDetalleRepository).saveAll(captor.capture());
+        List<HistorialCambioDetalle> detalles = captor.getValue();
+        assertEquals(1, detalles.size());
+        assertEquals("estado", detalles.get(0).getCampo());
+        assertEquals("EN_TRAMITE", detalles.get(0).getValorAnterior());
+        assertEquals("FINALIZADO", detalles.get(0).getValorPosterior());
+        assertSame(expediente, detalles.get(0).getHistorialCambio().getExpediente());
     }
 }

@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.gestor_documental.dto.InteresadoFormDto;
+import com.example.gestor_documental.dto.historial.DetalleCambioHistorial;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.enums.RolInteresado;
@@ -129,7 +130,10 @@ class ExpedienteServiceImplTest {
                 expediente,
                 admin,
                 "DOCUMENTACION COMPLETADA",
-                "Se completaron los requisitos documentales y el expediente retoma su tramitacion.");
+                "Se completaron los requisitos documentales y el expediente retoma su tramitacion.",
+                DetalleCambioHistorial.lista(
+                        DetalleCambioHistorial.de("estado", "Estado",
+                                EstadoExpediente.PENDIENTE_DOCUMENTACION, EstadoExpediente.EN_TRAMITE)));
     }
 
     @Test

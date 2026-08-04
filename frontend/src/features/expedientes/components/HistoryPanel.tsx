@@ -4,6 +4,7 @@ import type { CategoriaHistorial, HistorialExpediente, HistorialPage } from "../
 import { getExpedienteHistory } from "../services/expedienteDetailApi";
 import { getClienteExpedienteHistory } from "../services/clienteExpedienteApi";
 import { HistoryEvent } from "./HistoryEvent";
+import { HistoryExportControls } from "./HistoryExportControls";
 import "./HistoryPanel.css";
 
 type Props = {
@@ -95,6 +96,7 @@ export function HistoryPanel({ expedienteId, initialItems = [], clientView = fal
           <h3 id="history-title">Historial</h3>
           <p>{total} {total === 1 ? "movimiento" : "movimientos"} &middot; M&aacute;s recientes primero</p>
         </div>
+        <HistoryExportControls category={category} clientView={clientView} expedienteId={expedienteId} />
       </header>
 
       <div className="history-filters" aria-label="Filtrar historial">

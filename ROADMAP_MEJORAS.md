@@ -8,6 +8,7 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 - Cuando una mejora quede implantada y verificada, eliminarla de pendientes.
 - Anotar nuevas ideas en el bloque que corresponda.
 - Priorizar reduccion de trabajo manual, seguridad, trazabilidad y escalabilidad.
+- Mantener separado el historial funcional visible de la auditoria interna: los accesos, descargas y operaciones tecnicas sensibles no deben ensuciar la experiencia del usuario.
 
 ### Facturacion Holded
 
@@ -27,11 +28,6 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 - Automatizar el envio programado de avisos por correo cuando falte documentacion o respuesta del cliente.
 - Completar integracion WhatsApp: envio saliente por plantillas aprobadas y seleccion de canal preferido por cliente.
 
-### Ampliacion del historial documental
-
-- Completar el historial existente con consultas, descargas y eliminaciones de documentos que aun no queden registradas.
-- Conservar valores anteriores y posteriores solo en cambios relevantes donde aporte trazabilidad adicional.
-- Permitir exportar el historial ya existente de un expediente.
 
 ## Mejoras operativas
 
@@ -63,4 +59,3 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 - Gestion avanzada de sesiones y dispositivos activos.
 - Politica de conservacion y eliminacion documental.
 - Proteccion adicional de datos personales.
-- Registro de accesos y descargas sensibles.

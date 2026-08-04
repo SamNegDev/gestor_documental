@@ -1,6 +1,7 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.InteresadoFormDto;
+import com.example.gestor_documental.dto.historial.DetalleCambioHistorial;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
@@ -314,7 +315,9 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 expediente,
                 usuarioLogueado,
                 "CAMBIO ESTADO",
-                "El estado cambió de '" + estadoAnterior.name() + "' a '" + nuevoEstado.name() + "'");
+                "El estado cambió de '" + estadoAnterior.name() + "' a '" + nuevoEstado.name() + "'",
+                DetalleCambioHistorial.lista(
+                        DetalleCambioHistorial.de("estado", "Estado", estadoAnterior, nuevoEstado)));
         if (nuevoEstado == EstadoExpediente.FINALIZADO) {
             reanudarTramitesDependientes(expediente, usuarioLogueado);
         } else if (nuevoEstado == EstadoExpediente.CANCELADO) {
@@ -511,12 +514,17 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     }
 
     private void actualizarEstadoPausa(Expediente expediente, EstadoExpediente estado, Usuario usuario, String accion, String descripcion) {
+        EstadoExpediente estadoAnterior = expediente.getEstadoExpediente();
         expediente.setEstadoExpediente(estado);
         expedienteRepository.save(expediente);
-        historialCambioService.registrarCambioExpediente(expediente, usuario, accion, descripcion);
+        historialCambioService.registrarCambioExpediente(
+                expediente, usuario, accion, descripcion,
+                DetalleCambioHistorial.lista(
+                        DetalleCambioHistorial.de("estado", "Estado", estadoAnterior, estado)));
     }
 
     private void reanudar(Expediente expediente, EstadoExpediente estado, Usuario usuario, String accion, String descripcion) {
+        EstadoExpediente estadoAnterior = expediente.getEstadoExpediente();
         boolean limpiaEstadoPrevio = estado != EstadoExpediente.PENDIENTE_DOCUMENTACION
                 && expediente.getEstadoPrevioPausa() != null;
         if (expediente.getEstadoExpediente() == estado && !limpiaEstadoPrevio) {
@@ -527,7 +535,10 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             expediente.setEstadoPrevioPausa(null);
         }
         expedienteRepository.save(expediente);
-        historialCambioService.registrarCambioExpediente(expediente, usuario, accion, descripcion);
+        historialCambioService.registrarCambioExpediente(
+                expediente, usuario, accion, descripcion,
+                DetalleCambioHistorial.lista(
+                        DetalleCambioHistorial.de("estado", "Estado", estadoAnterior, estado)));
     }
 
     private EstadoExpediente estadoReanudacion(Expediente expediente) {
@@ -565,6 +576,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
             documento.setSubidoPor(usuario);
             documentoRepository.save(documento);
         });
+        EstadoExpediente estadoAnterior = dependiente.getEstadoExpediente();
         dependiente.setEstadoExpediente(estadoReanudacion(dependiente));
         dependiente.setEstadoPrevioPausa(null);
         dependiente.setFechaUltimaModificacion(LocalDateTime.now());
@@ -574,7 +586,9 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 dependiente,
                 usuario,
                 "TRAMITE VINCULADO LISTO",
-                "EXP-" + origen.getId() + " finalizo; su justificante DGT se adjunto como permiso de circulacion y el expediente retoma su tramitacion.");
+                "EXP-" + origen.getId() + " finalizo; su justificante DGT se adjunto como permiso de circulacion y el expediente retoma su tramitacion.",
+                DetalleCambioHistorial.lista(
+                        DetalleCambioHistorial.de("estado", "Estado", estadoAnterior, dependiente.getEstadoExpediente())));
         avisoAdminService.crear(
                 "TRAMITE_VINCULADO_LISTO",
                 "Tramite vinculado listo",
@@ -785,6 +799,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         String obsAnterior = expedienteBase.getObservaciones();
         Long tipoTramiteAnterior = expedienteBase.getTipoTramite() != null ? expedienteBase.getTipoTramite().getId()
                 : null;
+        String interesadosAntes = resumenInteresados(expedienteBase.getId());
 
         expedienteBase.setCliente(cliente);
         expedienteBase.setTipoTramite(tipoTramite);
@@ -801,6 +816,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         Expediente expedienteGuardado = expedienteRepository.save(expedienteBase);
 
         interesados.forEach(interesado -> guardarInteresadoSiValido(expedienteGuardado, interesado));
+        String interesadosDespues = resumenInteresados(expedienteGuardado.getId());
 
         if (!java.util.Objects.equals(tipoTramiteAnterior, tipoTramite.getId())) {
             operacionExpedienteService.sincronizarYListar(expedienteGuardado);
@@ -822,7 +838,10 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 usuarioLogueado,
                 "EDICIÓN",
                 cambios.isEmpty() ? "Se editaron interesados u otros datos del expediente."
-                        : "Se modificaron los campos: " + String.join(", ", cambios));
+                        : "Se modificaron los campos: " + String.join(", ", cambios),
+                DetalleCambioHistorial.lista(
+                        DetalleCambioHistorial.de("vehiculo.matricula", "Matrícula", matriculaAnterior, expedienteGuardado.getMatricula()),
+                        DetalleCambioHistorial.de("interesados", "Interesados", interesadosAntes, interesadosDespues)));
 
         return expedienteGuardado;
     }
@@ -851,7 +870,9 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                 expedienteGuardado,
                 admin,
                 "CORRECCION INTERESADOS",
-                "Correccion administrativa de interesados. Antes: " + antes + " | Despues: " + despues
+                "Se corrigieron los interesados del expediente.",
+                DetalleCambioHistorial.lista(
+                        DetalleCambioHistorial.de("interesados", "Interesados", antes, despues))
         );
         return expedienteGuardado;
     }

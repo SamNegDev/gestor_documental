@@ -3,6 +3,7 @@ import { ClienteFormPage } from "../features/admin/pages/ClienteFormPage";
 import { ClientesListPage } from "../features/admin/pages/ClientesListPage";
 import { UsuarioFormPage } from "../features/admin/pages/UsuarioFormPage";
 import { UsuariosListPage } from "../features/admin/pages/UsuariosListPage";
+import { AuditoriaPage } from "../features/auditoria/pages/AuditoriaPage";
 import { AppLayout } from "./shell/AppLayout";
 import { AppErrorPage, AppRouteError } from "./shell/AppErrorPage";
 import { ClienteExpedientePage } from "../features/expedientes/pages/ClienteExpedientePage";
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
       { path: "admin/usuarios", element: <RequireRole allow={["ADMIN"]}><UsuariosListPage /></RequireRole> },
       { path: "admin/usuarios/nuevo", element: <RequireRole allow={["ADMIN"]}><UsuarioFormPage /></RequireRole> },
       { path: "admin/usuarios/:id/editar", element: <RequireRole allow={["ADMIN"]}><UsuarioFormPage /></RequireRole> },
+      { path: "admin/auditoria", element: <RequireRole allow={["ADMIN"]}><AuditoriaPage /></RequireRole> },
       { path: "cliente/dashboard", element: <RequireRole allow={["CLIENTE"]}><DashboardPage /></RequireRole> },
       { path: "expedientes", element: <RequireRole allow={["ADMIN", "CLIENTE"]}><ExpedientesListPage /></RequireRole> },
       { path: "expedientes/nuevo", element: <RequireRole allow={["ADMIN"]}><ExpedienteCreatePage /></RequireRole> },

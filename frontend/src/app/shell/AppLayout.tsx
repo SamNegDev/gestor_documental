@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { BellRing, CarFront, DatabaseSearch, FolderOpen, FolderPlus, Inbox, ReceiptText, LayoutDashboard, LogOut, MessageCircle, Settings2, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
+import { BellRing, CarFront, DatabaseSearch, FolderOpen, FolderPlus, Inbox, ReceiptText, LayoutDashboard, LogOut, MessageCircle, Settings2, ShieldCheck, UserRound, UserRoundCheck, UsersRound, type LucideIcon } from "lucide-react";
 import { SidebarLink } from "./SidebarLink";
 import { Tooltip } from "../../shared/ui/Tooltip";
 import { getSessionUser, selectActiveClient, type SessionUser } from "../../shared/api/sessionApi";
@@ -24,6 +24,7 @@ function pageTitle(pathname: string) {
   if (pathname === "/admin/seguimiento-config") return "Periodos de seguimiento";
   if (pathname === "/admin/whatsapp") return "WhatsApp";
   if (pathname === "/admin/catalogos-gestion") return "Catalogos Gestion Trafico";
+  if (pathname === "/admin/auditoria") return "Auditoría interna";
   if (pathname === "/cliente/tareas") return "Mis tareas";
   if (pathname === "/admin/clientes") return "Clientes";
   if (pathname.includes("/admin/clientes/nuevo")) return "Nuevo cliente";
@@ -73,6 +74,7 @@ const adminMenuItems: MenuItemConfig[] = [
 const adminSettingsItems: MenuItemConfig[] = [
   { id: "seguimiento-config", to: "/admin/seguimiento-config", icon: BellRing, label: "Avisos" },
   { id: "catalogos-gestion", to: "/admin/catalogos-gestion", icon: DatabaseSearch, label: "Datos auxiliares" },
+  { id: "auditoria", to: "/admin/auditoria", icon: ShieldCheck, label: "Auditoría" },
 ];
 
 const clientMenuItems: MenuItemConfig[] = [
