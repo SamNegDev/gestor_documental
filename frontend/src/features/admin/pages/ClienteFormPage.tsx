@@ -44,7 +44,7 @@ const CLIENT_DOCUMENT_TYPES = [
 ];
 
 function emptyCliente(): ClienteInput {
-  return { nif: "", nombre: "", email: "", telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", localidad: "", provincia: "", preferenciaCanal: "AMBOS", avisoIncidenciasActivo: true, horaAvisoIncidencias: "17:00", avisoFinalizadosActivo: true, horaAvisoFinalizados: "17:00" };
+  return { nif: "", nombre: "", email: "", emailNotificaciones: "", emailsCopiaNotificaciones: [], telefono: "", direccion: "", tipoVia: "", nombreVia: "", numeroVia: "", bloque: "", portal: "", escalera: "", piso: "", puerta: "", codigoPostal: "", municipio: "", localidad: "", provincia: "", preferenciaCanal: "AMBOS", avisoIncidenciasActivo: true, horaAvisoIncidencias: "17:00", avisoFinalizadosActivo: true, horaAvisoFinalizados: "17:00" };
 }
 
 function formatAddress(value: AddressValue): string | null {
@@ -64,6 +64,10 @@ function clean(input: ClienteInput): ClienteInput {
     nif: cleanUpperText(input.nif) || "",
     nombre: cleanUpperText(input.nombre) || "",
     email: cleanLowerText(input.email) || "",
+    emailNotificaciones: cleanLowerText(input.emailNotificaciones),
+    emailsCopiaNotificaciones: [...new Set(input.emailsCopiaNotificaciones
+      .map((value) => cleanLowerText(value))
+      .filter((value): value is string => Boolean(value)))],
     telefono: cleanUpperText(input.telefono),
     direccion: formatAddress(input),
     tipoVia: cleanUpperText(input.tipoVia),
@@ -112,6 +116,8 @@ export function ClienteFormPage() {
       setForm({
         ...clienteQuery.data,
         nif: uppercaseInput(clienteQuery.data.nif || ""),
+        emailNotificaciones: clienteQuery.data.emailNotificaciones || "",
+        emailsCopiaNotificaciones: clienteQuery.data.emailsCopiaNotificaciones || [],
         nombre: uppercaseInput(clienteQuery.data.nombre || ""),
         telefono: uppercaseInput(clienteQuery.data.telefono || ""),
         direccion: uppercaseInput(clienteQuery.data.direccion || ""),
@@ -378,6 +384,52 @@ export function ClienteFormPage() {
                 <option value="SIN_AVISOS">Sin avisos automaticos</option>
               </select>
             </label>
+            <div className="notification-routing edit-form-grid__wide">
+              <div className="notification-routing__heading">
+                <div className="row-icon"><Mail size={17} /></div>
+                <div>
+                  <strong>Destinatarios de las notificaciones</strong>
+                  <span>Independientes del correo usado para acceder a la plataforma.</span>
+                </div>
+              </div>
+              <label className="notification-routing__primary">
+                Correo de notificaciones
+                <input
+                  maxLength={250}
+                  placeholder={form.email || "Se usara el email principal"}
+                  type="email"
+                  value={form.emailNotificaciones || ""}
+                  onChange={(event) => setForm({ ...form, emailNotificaciones: event.target.value })}
+                />
+                <small>Si se deja vacio, los avisos se enviaran al email principal.</small>
+              </label>
+              <div className="notification-routing__copies">
+                <div className="notification-routing__copies-heading">
+                  <div><strong>Correos en copia</strong><span>Todos los destinatarios podran ver estas direcciones.</span></div>
+                  <button
+                    className="soft-button soft-button--compact"
+                    disabled={form.emailsCopiaNotificaciones.length >= 10}
+                    type="button"
+                    onClick={() => setForm((current) => ({ ...current, emailsCopiaNotificaciones: [...current.emailsCopiaNotificaciones, ""] }))}
+                  >
+                    <Plus size={15} />Anadir copia
+                  </button>
+                </div>
+                {form.emailsCopiaNotificaciones.map((email, index) => (
+                  <div className="notification-routing__copy-row" key={index}>
+                    <input
+                      aria-label={`Correo en copia ${index + 1}`}
+                      maxLength={250}
+                      placeholder="persona@cliente.com"
+                      type="email"
+                      value={email}
+                      onChange={(event) => setForm((current) => ({ ...current, emailsCopiaNotificaciones: current.emailsCopiaNotificaciones.map((value, itemIndex) => itemIndex === index ? event.target.value : value) }))}
+                    />
+                    <button className="icon-button icon-button--danger" type="button" title="Quitar correo en copia" onClick={() => setForm((current) => ({ ...current, emailsCopiaNotificaciones: current.emailsCopiaNotificaciones.filter((_, itemIndex) => itemIndex !== index) }))}><X size={15} /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div className="notification-schedule edit-form-grid__wide">
               <div className="notification-schedule__heading">
                 <div><strong>Avisos automáticos</strong><span>Configura cada envío de forma independiente.</span></div>

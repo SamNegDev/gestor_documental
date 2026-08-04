@@ -61,7 +61,7 @@ export function SelectedEmailPreviewDialog({ incidenciaIds, open, onClose, onSen
       {preview.isLoading ? <div aria-live="polite" className="selected-mail-preview__loading" role="status"><Eye aria-hidden="true" size={20} /> Preparando el correo real…</div> : null}
       {preview.data ? <>
         <div className="selected-mail-preview__meta">
-          <div><span>Para</span><strong>{preview.data.destinatario}</strong></div>
+          <div><span>Para</span><strong>{preview.data.destinatario}</strong>{preview.data.copias.length ? <small>CC: {preview.data.copias.join(", ")}</small> : null}</div>
           <div><span>Asunto</span><strong>{preview.data.asunto}</strong></div>
           <small>{preview.data.incidencias} {preview.data.incidencias === 1 ? "incidencia" : "incidencias"} · {preview.data.expedientes} {preview.data.expedientes === 1 ? "expediente" : "expedientes"}</small>
         </div>

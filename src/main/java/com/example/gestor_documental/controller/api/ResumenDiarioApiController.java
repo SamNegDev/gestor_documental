@@ -78,8 +78,8 @@ public class ResumenDiarioApiController {
         currentUserService.requireAdmin(authentication);
         var preview = resumenDiarioTramitesService.previsualizarListadoIncidenciasSeleccionadas(
                 request != null ? request.incidenciaIds() : List.of());
-        return new PrevisualizacionAvisoConjuntoResponse(preview.destinatario(), preview.asunto(), preview.texto(),
-                preview.html(), preview.incidencias(), preview.expedientes(), preview.envioReal());
+        return new PrevisualizacionAvisoConjuntoResponse(preview.destinatario(), preview.copias(), preview.asunto(),
+                preview.texto(), preview.html(), preview.incidencias(), preview.expedientes(), preview.envioReal());
     }
     @PostMapping("/incidencias/seleccion/enviar")
     public ResumenDiarioResponse enviarIncidenciasSeleccionadas(
@@ -104,7 +104,7 @@ public class ResumenDiarioApiController {
     public record ResumenDiarioResponse(int clientesEnviados, int cambiosIncluidos, List<String> avisos) {
     }
 
-    public record PrevisualizacionAvisoConjuntoResponse(String destinatario, String asunto, String texto, String html,
+    public record PrevisualizacionAvisoConjuntoResponse(String destinatario, List<String> copias, String asunto, String texto, String html,
                                                         int incidencias, int expedientes, boolean envioReal) {
     }
 

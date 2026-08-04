@@ -30,6 +30,8 @@ import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.util.ClienteBrandingUrls;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
+import jakarta.mail.internet.AddressException;
+import jakarta.mail.internet.InternetAddress;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.time.LocalTime;
@@ -370,6 +372,9 @@ public class AdminManagementApiController {
         if (isBlank(request.getNif()) || isBlank(request.getNombre()) || isBlank(request.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "NIF, nombre y email son obligatorios");
         }
+        String destino = normalizarCorreoOpcional(request.getEmailNotificaciones(), "correo de notificaciones");
+        normalizarCopiasNotificaciones(request.getEmailsCopiaNotificaciones(),
+                destino != null ? destino : TextNormalizer.lowerOrNull(request.getEmail()));
     }
 
     private void validarUsuario(UsuarioUpsertRequest request, boolean creating) {
@@ -416,6 +421,12 @@ public class AdminManagementApiController {
         cliente.setNif(TextNormalizer.upperOrNull(request.getNif()));
         cliente.setNombre(NombrePersonaNormalizer.normalizar(request.getNombre()));
         cliente.setEmail(TextNormalizer.lowerOrNull(request.getEmail()));
+        String destinoNotificaciones = normalizarCorreoOpcional(request.getEmailNotificaciones(), "correo de notificaciones");
+        cliente.setEmailNotificaciones(destinoNotificaciones);
+        List<String> copiasNotificaciones = normalizarCopiasNotificaciones(
+                request.getEmailsCopiaNotificaciones(), destinoNotificaciones != null ? destinoNotificaciones : cliente.getEmail());
+        cliente.getEmailsCopiaNotificaciones().clear();
+        cliente.getEmailsCopiaNotificaciones().addAll(copiasNotificaciones);
         cliente.setDireccion(TextNormalizer.upperOrNull(request.getDireccion()));
         cliente.setTipoVia(TextNormalizer.upperOrNull(request.getTipoVia()));
         cliente.setNombreVia(TextNormalizer.upperOrNull(request.getNombreVia()));
@@ -450,6 +461,8 @@ public class AdminManagementApiController {
     private ClienteAdminResponse mapClienteAdmin(Cliente cliente) {
         return ClienteAdminResponse.builder()
                 .id(cliente.getId()).nif(cliente.getNif()).nombre(cliente.getNombre()).email(cliente.getEmail())
+                .emailNotificaciones(cliente.getEmailNotificaciones())
+                .emailsCopiaNotificaciones(List.copyOf(cliente.getEmailsCopiaNotificaciones()))
                 .direccion(cliente.getDireccion())
                 .tipoVia(cliente.getTipoVia()).nombreVia(cliente.getNombreVia()).numeroVia(cliente.getNumeroVia())
                 .bloque(cliente.getBloque()).portal(cliente.getPortal()).escalera(cliente.getEscalera())
@@ -534,6 +547,37 @@ public class AdminManagementApiController {
         } catch (IllegalArgumentException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Preferencia de canal no valida");
         }
+    }
+
+    private String normalizarCorreoOpcional(String value, String etiqueta) {
+        String correo = TextNormalizer.lowerOrNull(value);
+        if (correo == null) {
+            return null;
+        }
+        try {
+            InternetAddress direccion = new InternetAddress(correo, true);
+            direccion.validate();
+            if (!correo.equalsIgnoreCase(direccion.getAddress())) {
+                throw new AddressException("El correo contiene un nombre visible");
+            }
+            return correo;
+        } catch (AddressException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El " + etiqueta + " no es valido");
+        }
+    }
+
+    private List<String> normalizarCopiasNotificaciones(List<String> values, String principal) {
+        List<String> copias = values == null ? List.of() : values.stream()
+                .map(value -> normalizarCorreoOpcional(value, "correo en copia"))
+                .filter(java.util.Objects::nonNull)
+                .filter(value -> principal == null || !value.equalsIgnoreCase(principal))
+                .distinct()
+                .toList();
+        if (copias.size() > 10) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "No se pueden configurar mas de 10 correos en copia");
+        }
+        return copias;
     }
 
     private String nombreCompleto(Usuario usuario) {

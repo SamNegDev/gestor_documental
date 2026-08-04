@@ -41,6 +41,15 @@ public class Cliente {
     @Column(nullable = false, length = 250, unique = true)
     private String email;
 
+    @Column(name = "email_notificaciones", length = 250)
+    private String emailNotificaciones;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "cliente_email_notificacion_copia", joinColumns = @JoinColumn(name = "cliente_id"))
+    @Column(name = "email", nullable = false, length = 250)
+    @OrderColumn(name = "orden")
+    private List<String> emailsCopiaNotificaciones = new ArrayList<>();
+
     @Column(length = 200)
     private String direccion;
 
@@ -113,6 +122,11 @@ public class Cliente {
 
     @OneToMany(mappedBy = "cliente", fetch = FetchType.LAZY)
     private List<Usuario> usuarios = new ArrayList<>();
+
+
+    public String emailNotificacionesEfectivo() {
+        return emailNotificaciones != null && !emailNotificaciones.isBlank() ? emailNotificaciones : email;
+    }
 
 
     public Cliente(String nif, String nombre, String email) {

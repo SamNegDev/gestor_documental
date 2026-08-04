@@ -54,7 +54,7 @@ export function NotificationEmailDialog({ canal = "email", incidenciaId, onClose
       </header>
       {preview.isLoading ? <div aria-live="polite" className="mail-dialog__loading" role="status">Preparando el mensaje…</div> : null}
       {preview.data ? <div className="mail-dialog__body">
-        <div className="mail-dialog__route"><span>Para</span><strong>{preview.data.destinatario}</strong><small>Aviso {preview.data.numeroAviso} de {preview.data.maxAvisos}</small></div>
+        <div className="mail-dialog__route"><span>Para</span><strong>{preview.data.destinatario}</strong>{!isWhatsapp && preview.data.copias.length ? <small>CC: {preview.data.copias.join(", ")}</small> : null}<small>Aviso {preview.data.numeroAviso} de {preview.data.maxAvisos}</small></div>
         {!preview.data.envioReal ? <div className="mail-dialog__simulation" role="status"><strong>Simulación</strong><span>Se registrará el aviso, pero no se enviará ningún {isWhatsapp ? "WhatsApp" : "correo"} real.</span></div> : null}
         {preview.data.envioReal ? <div className="mail-dialog__delivery" role="status"><strong>Envío real</strong><span>Se utilizará {providerLabel(preview.data.proveedor)}.</span></div> : null}
         {isWhatsapp ? <div className="mail-dialog__delivery"><strong>Condición de WhatsApp</strong><span>Puede requerir una plantilla aprobada si no existe una conversación reciente.</span></div> : null}

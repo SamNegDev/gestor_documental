@@ -21,7 +21,6 @@ import com.example.gestor_documental.util.MensajeAutomaticoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,9 +66,6 @@ public class ResumenDiarioTramitesService {
     private final ConfiguracionSeguimientoService configuracionSeguimientoService;
     private final HistorialCambioService historialCambioService;
 
-    @Value("${app.daily-summary.enabled:false}")
-    private boolean enabled;
-
     @Value("${app.daily-summary.bcc-recipients:samuel.negrin@gestoriacn.com}")
     private String bccRecipients;
 
@@ -81,14 +77,6 @@ public class ResumenDiarioTramitesService {
 
     @Value("${app.public-url:}")
     private String appPublicUrl;
-
-    @Scheduled(cron = "${app.daily-summary.cron:0 0 17 * * *}", zone = "${app.daily-summary.zone:Atlantic/Canary}")
-    public void enviarResumenDiarioProgramado() {
-        if (!enabled) {
-            return;
-        }
-        enviarResumenDiario(false);
-    }
 
     public ResultadoResumenDiario enviarResumenDiarioManual(boolean incluirClientesSinCambios) {
         return enviarResumenDiario(incluirClientesSinCambios);
@@ -113,7 +101,7 @@ public class ResumenDiarioTramitesService {
         if (resultado.exito()) {
             return new ResultadoResumenDiario(1, totalElementos(finalizaciones, incidencias), List.of());
         }
-        return new ResultadoResumenDiario(0, totalElementos(finalizaciones, incidencias), List.of("No se pudo enviar a " + cliente.getEmail() + ": " + resultado.error()));
+        return new ResultadoResumenDiario(0, totalElementos(finalizaciones, incidencias), List.of("No se pudo enviar a " + cliente.emailNotificacionesEfectivo() + ": " + resultado.error()));
     }
 
     public ResultadoResumenDiario enviarListadoIncidenciasManual(Long clienteId, Usuario admin) {
@@ -157,7 +145,7 @@ public class ResumenDiarioTramitesService {
         List<Incidencia> incidencias = cargarYValidarSeleccion(incidenciaIds);
         PrevisualizacionAvisoConjunto aviso = crearAvisoSeleccionado(incidencias);
         CorreoService.ResultadoCorreo resultado = correoService.enviarHtml(aviso.destinatario(), aviso.asunto(),
-                aviso.htmlEnvio(), aviso.texto(), copiasOcultas(aviso.destinatario()), LOGO_SIMBOLO_INLINE);
+                aviso.htmlEnvio(), aviso.texto(), aviso.copias(), copiasOcultas(aviso.destinatario()), LOGO_SIMBOLO_INLINE);
         if (!resultado.exito()) {
             return new ResultadoResumenDiario(0, incidencias.size(), List.of("No se pudo enviar a " + aviso.destinatario() + ": " + resultado.error()));
         }
@@ -197,8 +185,8 @@ public class ResumenDiarioTramitesService {
         String asunto = "Acción requerida en tus trámites (" + incidencias.size() + (incidencias.size() == 1 ? " pendiente)" : " pendientes)");
         String texto = textoAvisoSeleccionado(cliente, grupos);
         String htmlEnvio = htmlAvisoSeleccionado(cliente, grupos);
-        return new PrevisualizacionAvisoConjunto(cliente.getEmail(), asunto, texto,
-                htmlEnvio.replace("cid:" + LOGO_CID, "/assets/logos/casado-negrin-symbol.jpg"),
+        return new PrevisualizacionAvisoConjunto(cliente.emailNotificacionesEfectivo(), List.copyOf(cliente.getEmailsCopiaNotificaciones()),
+                asunto, texto, htmlEnvio.replace("cid:" + LOGO_CID, "/assets/logos/casado-negrin-symbol.jpg"),
                 htmlEnvio, incidencias.size(), grupos.size(), mailEnabled);
     }
     private ResultadoResumenDiario enviarListadoIncidencias(RangoDia rango, List<Incidencia> incidencias, Usuario admin,
@@ -224,7 +212,7 @@ public class ResumenDiarioTramitesService {
                 enviados++;
                 registrarSeguimientoIncidencias(incidenciasCliente, admin, resultado.simulado(), construirTexto(resumen, rango), asuntoAviso);
             } else {
-                avisos.add("No se pudo enviar a " + cliente.getEmail() + ": " + resultado.error());
+                avisos.add("No se pudo enviar a " + cliente.emailNotificacionesEfectivo() + ": " + resultado.error());
             }
         }
         return new ResultadoResumenDiario(enviados, incidencias.size(), avisos);
@@ -256,7 +244,7 @@ public class ResumenDiarioTramitesService {
             if (resultado.exito()) {
                 enviados++;
             } else {
-                avisos.add("No se pudo enviar a " + cliente.getEmail() + ": " + resultado.error());
+                avisos.add("No se pudo enviar a " + cliente.emailNotificacionesEfectivo() + ": " + resultado.error());
             }
         }
         return new ResultadoResumenDiario(enviados, totalElementos(finalizaciones, incidencias), avisos);
@@ -266,13 +254,15 @@ public class ResumenDiarioTramitesService {
         String asunto = "Resumen de tramites - " + rango.fecha().format(FECHA);
         String texto = construirTexto(resumen, rango);
         String html = construirHtml(resumen, rango);
-        CorreoService.ResultadoCorreo resultado = correoService.enviarHtml(cliente.getEmail(), asunto, html, texto, copiasOcultas(cliente.getEmail()), LOGO_INLINE);
+        String destinatario = cliente.emailNotificacionesEfectivo();
+        CorreoService.ResultadoCorreo resultado = correoService.enviarHtml(destinatario, asunto, html, texto,
+                cliente.getEmailsCopiaNotificaciones(), copiasOcultas(destinatario), LOGO_INLINE);
         if (!resultado.exito()) {
-            log.warn("No se pudo enviar el resumen diario de tramites a {}: {}", cliente.getEmail(), resultado.error());
+            log.warn("No se pudo enviar el resumen diario de tramites a {}: {}", destinatario, resultado.error());
         } else if (resultado.simulado()) {
-            log.info("Resumen diario de tramites simulado para {}.", cliente.getEmail());
+            log.info("Resumen diario de tramites simulado para {}.", destinatario);
         } else {
-            log.info("Resumen diario de tramites enviado a {}.", cliente.getEmail());
+            log.info("Resumen diario de tramites enviado a {}.", destinatario);
         }
         return resultado;
     }
@@ -758,18 +748,18 @@ public class ResumenDiarioTramitesService {
                                                 Map<Long, List<HistorialCambio>> finalizacionesPorCliente,
                                                 Map<Long, List<Incidencia>> incidenciasPorCliente) {
         if (incluirClientesSinCambios) {
-            return clienteRepository.findAll().stream().filter(cliente -> StringUtils.hasText(cliente.getEmail())).toList();
+            return clienteRepository.findAll().stream().filter(cliente -> StringUtils.hasText(cliente.emailNotificacionesEfectivo())).toList();
         }
         LinkedHashSet<Cliente> clientes = new LinkedHashSet<>();
         finalizacionesPorCliente.values().stream()
                 .filter(items -> !items.isEmpty())
                 .map(items -> items.get(0).getExpediente().getCliente())
-                .filter(cliente -> cliente != null && StringUtils.hasText(cliente.getEmail()))
+                .filter(cliente -> cliente != null && StringUtils.hasText(cliente.emailNotificacionesEfectivo()))
                 .forEach(clientes::add);
         incidenciasPorCliente.values().stream()
                 .filter(items -> !items.isEmpty())
                 .map(items -> items.get(0).getExpediente().getCliente())
-                .filter(cliente -> cliente != null && StringUtils.hasText(cliente.getEmail()))
+                .filter(cliente -> cliente != null && StringUtils.hasText(cliente.emailNotificacionesEfectivo()))
                 .forEach(clientes::add);
         return List.copyOf(clientes);
     }
@@ -778,7 +768,7 @@ public class ResumenDiarioTramitesService {
         if (cliente == null) {
             throw new OperacionInvalidaException("Las incidencias seleccionadas no tienen cliente asociado.");
         }
-        if (!StringUtils.hasText(cliente.getEmail())) {
+        if (!StringUtils.hasText(cliente.emailNotificacionesEfectivo())) {
             throw new OperacionInvalidaException("El cliente no tiene un correo configurado.");
         }
         PreferenciaCanalCliente preferencia = cliente.getPreferenciaCanal() != null
@@ -793,7 +783,7 @@ public class ResumenDiarioTramitesService {
     }
 
     private boolean permiteAvisoPorEmail(Cliente cliente) {
-        if (cliente == null || !StringUtils.hasText(cliente.getEmail())) {
+        if (cliente == null || !StringUtils.hasText(cliente.emailNotificacionesEfectivo())) {
             return false;
         }
         PreferenciaCanalCliente preferencia = cliente.getPreferenciaCanal() != null
@@ -802,7 +792,7 @@ public class ResumenDiarioTramitesService {
         return preferencia == PreferenciaCanalCliente.EMAIL || preferencia == PreferenciaCanalCliente.AMBOS;
     }
     private String motivoClienteSinAvisoEmail(Cliente cliente) {
-        if (cliente == null || !StringUtils.hasText(cliente.getEmail())) {
+        if (cliente == null || !StringUtils.hasText(cliente.emailNotificacionesEfectivo())) {
             return "El cliente no tiene email configurado.";
         }
         PreferenciaCanalCliente preferencia = cliente.getPreferenciaCanal() != null
@@ -844,7 +834,7 @@ public class ResumenDiarioTramitesService {
             aviso.setNumeroAviso(numero);
             aviso.setEnviadoPor(admin);
             aviso.setMensaje(texto);
-            aviso.setDestinatario(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().getEmail() : null);
+            aviso.setDestinatario(incidencia.getExpediente().getCliente() != null ? incidencia.getExpediente().getCliente().emailNotificacionesEfectivo() : null);
             aviso.setAsunto(asuntoAviso);
             aviso.setCanal("EMAIL_RESUMEN");
             aviso.setEstadoEnvio(simulado ? "SIMULADO" : "ENVIADO");
@@ -954,8 +944,8 @@ public class ResumenDiarioTramitesService {
     private record ResumenCliente(Cliente cliente, List<HistorialCambio> finalizaciones, List<Incidencia> incidencias) {
     }
 
-    public record PrevisualizacionAvisoConjunto(String destinatario, String asunto, String texto, String html,
-                                                String htmlEnvio, int incidencias, int expedientes, boolean envioReal) {
+    public record PrevisualizacionAvisoConjunto(String destinatario, List<String> copias, String asunto, String texto,
+                                                String html, String htmlEnvio, int incidencias, int expedientes, boolean envioReal) {
     }
 
     public record ResultadoResumenDiario(int clientesEnviados, int cambiosIncluidos, List<String> avisos) {

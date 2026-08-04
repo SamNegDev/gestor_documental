@@ -68,6 +68,28 @@ export function SeguimientoConfigPage() {
         </div>
 
         <form className="followup-config__form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(form); }}>
+          <div className="followup-config__automation">
+            <div className="followup-config__automation-heading">
+              <strong>Control del motor automatico</strong>
+              <span>El envio solo se ejecuta si tambien esta habilitado en el entorno del servidor.</span>
+            </div>
+            <div className="followup-config__automation-options">
+              <label>
+                <input type="checkbox" checked={form.automatizacionActiva} onChange={(event) => setForm((current) => ({ ...current, automatizacionActiva: event.target.checked }))} />
+                <span><strong>Automatizacion activa</strong><small>Permite que el planificador procese los avisos pendientes.</small></span>
+              </label>
+              <label>
+                <input type="checkbox" checked={form.modoSupervisado} onChange={(event) => setForm((current) => ({ ...current, modoSupervisado: event.target.checked }))} />
+                <span><strong>Modo supervisado</strong><small>Bloquea todos los envios automaticos; los envios manuales siguen disponibles.</small></span>
+              </label>
+            </div>
+            <p className={`followup-config__automation-status ${form.automatizacionActiva && !form.modoSupervisado ? "is-live" : "is-safe"}`}>
+              {form.automatizacionActiva && !form.modoSupervisado
+                ? "Configuracion preparada para enviar cuando el servidor este habilitado."
+                : "Envio automatico bloqueado por la configuracion interna."}
+            </p>
+          </div>
+
           <div className="followup-config__grid">
             <NumberField label="Antes del primer aviso" min={0} value={form.diasPrimerAviso} onChange={(value) => update("diasPrimerAviso", value)} />
             <NumberField label="Tras aviso 1" value={form.diasAviso1} onChange={(value) => update("diasAviso1", value)} />

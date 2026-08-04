@@ -451,6 +451,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         return new NotificacionIncidenciaPreviewResponse(
                 incidencia.getId(),
                 correoCliente(incidencia),
+                copiasCorreoCliente(incidencia),
                 asuntoPorDefecto(incidencia, numero),
                 mensajePorDefecto(incidencia, numero),
                 numero,
@@ -471,6 +472,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         return new NotificacionIncidenciaPreviewResponse(
                 incidencia.getId(),
                 telefonoCliente(incidencia),
+                List.of(),
                 "",
                 mensajeWhatsappPorDefecto(incidencia, numero),
                 numero,
@@ -493,7 +495,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         String asuntoFinal = asunto != null && !asunto.isBlank() ? asunto.trim() : asuntoPorDefecto(incidencia, numero);
         String texto = mensaje != null && !mensaje.isBlank() ? mensaje.trim() : mensajePorDefecto(incidencia, numero);
         String destinatario = correoCliente(incidencia);
-        CorreoService.ResultadoCorreo resultado = correoService.enviar(destinatario, asuntoFinal, texto);
+        CorreoService.ResultadoCorreo resultado = correoService.enviar(destinatario, asuntoFinal, texto, copiasCorreoCliente(incidencia), List.of());
         AvisoIncidencia aviso = new AvisoIncidencia();
         aviso.setIncidencia(incidencia); aviso.setNumeroAviso(numero); aviso.setEnviadoPor(admin); aviso.setMensaje(texto);
         aviso.setDestinatario(destinatario); aviso.setAsunto(asuntoFinal); aviso.setCanal("EMAIL");
@@ -677,13 +679,18 @@ public class IncidenciaServiceImpl implements IncidenciaService {
 
     private String correoCliente(Incidencia incidencia) {
         if (incidencia.getExpediente().getCliente() == null
-                || incidencia.getExpediente().getCliente().getEmail() == null
-                || incidencia.getExpediente().getCliente().getEmail().isBlank()) {
+                || incidencia.getExpediente().getCliente().emailNotificacionesEfectivo() == null
+                || incidencia.getExpediente().getCliente().emailNotificacionesEfectivo().isBlank()) {
             throw new OperacionInvalidaException("El cliente no tiene un correo configurado.");
         }
-        return incidencia.getExpediente().getCliente().getEmail();
+        return incidencia.getExpediente().getCliente().emailNotificacionesEfectivo();
     }
 
+
+    private List<String> copiasCorreoCliente(Incidencia incidencia) {
+        Cliente cliente = incidencia.getExpediente() != null ? incidencia.getExpediente().getCliente() : null;
+        return cliente != null ? List.copyOf(cliente.getEmailsCopiaNotificaciones()) : List.of();
+    }
     private String telefonoCliente(Incidencia incidencia) {
         if (incidencia.getExpediente().getCliente() == null
                 || incidencia.getExpediente().getCliente().getTelefono() == null

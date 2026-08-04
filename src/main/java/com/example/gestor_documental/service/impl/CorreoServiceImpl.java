@@ -56,30 +56,46 @@ public class CorreoServiceImpl implements CorreoService {
 
     @Override
     public ResultadoCorreo enviar(String destinatario, String asunto, String mensaje, List<String> copiaOculta) {
-        return enviarInterno(destinatario, asunto, mensaje, null, copiaOculta, null);
+        return enviar(destinatario, asunto, mensaje, List.of(), copiaOculta);
+    }
+
+    @Override
+    public ResultadoCorreo enviar(String destinatario, String asunto, String mensaje, List<String> copia, List<String> copiaOculta) {
+        return enviarInterno(destinatario, asunto, mensaje, null, copia, copiaOculta, null);
     }
 
     @Override
     public ResultadoCorreo enviarHtml(String destinatario, String asunto, String html, String textoAlternativo, List<String> copiaOculta) {
-        return enviarInterno(destinatario, asunto, textoAlternativo, html, copiaOculta, null);
+        return enviarInterno(destinatario, asunto, textoAlternativo, html, List.of(), copiaOculta, null);
     }
 
     @Override
     public ResultadoCorreo enviarHtml(String destinatario, String asunto, String html, String textoAlternativo, List<String> copiaOculta, ImagenInline imagenInline) {
-        return enviarInterno(destinatario, asunto, textoAlternativo, html, copiaOculta, imagenInline);
+        return enviarHtml(destinatario, asunto, html, textoAlternativo, List.of(), copiaOculta, imagenInline);
     }
 
-    private ResultadoCorreo enviarInterno(String destinatario, String asunto, String mensaje, String html, List<String> copiaOculta, ImagenInline imagenInline) {
+    @Override
+    public ResultadoCorreo enviarHtml(String destinatario, String asunto, String html, String textoAlternativo,
+                                      List<String> copia, List<String> copiaOculta, ImagenInline imagenInline) {
+        return enviarInterno(destinatario, asunto, textoAlternativo, html, copia, copiaOculta, imagenInline);
+    }
+
+    private ResultadoCorreo enviarInterno(String destinatario, String asunto, String mensaje, String html,
+                                          List<String> copia, List<String> copiaOculta, ImagenInline imagenInline) {
         if (!enabled) return ResultadoCorreo.simulacion();
         if (destinatario == null || destinatario.isBlank()) return ResultadoCorreo.error("El cliente no tiene un correo configurado.");
-        if ("graph".equalsIgnoreCase(provider)) return enviarGraph(destinatario, asunto, mensaje, html, copiaOculta, imagenInline);
+        if ("graph".equalsIgnoreCase(provider)) return enviarGraph(destinatario, asunto, mensaje, html, copia, copiaOculta, imagenInline);
         if (from == null || from.isBlank()) return ResultadoCorreo.error("No se ha configurado el remitente del correo.");
         if (mailSender == null) return ResultadoCorreo.error("No se ha configurado el servicio SMTP.");
         try {
             var correo = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(correo, imagenInline != null, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(correo, StringUtils.hasText(html) || imagenInline != null, "UTF-8");
             helper.setFrom(from, fromName);
             helper.setTo(destinatario);
+            String[] cc = destinatarios(copia);
+            if (cc.length > 0) {
+                helper.setCc(cc);
+            }
             String[] bcc = destinatarios(copiaOculta);
             if (bcc.length > 0) {
                 helper.setBcc(bcc);
@@ -108,7 +124,8 @@ public class CorreoServiceImpl implements CorreoService {
         this.mailSender = mailSender;
     }
 
-    private ResultadoCorreo enviarGraph(String destinatario, String asunto, String mensaje, String html, List<String> copiaOculta, ImagenInline imagenInline) {
+    private ResultadoCorreo enviarGraph(String destinatario, String asunto, String mensaje, String html,
+                                         List<String> copia, List<String> copiaOculta, ImagenInline imagenInline) {
         String remitente = StringUtils.hasText(graphSender) ? graphSender.trim() : trim(from);
         if (!StringUtils.hasText(remitente)) return ResultadoCorreo.error("No se ha configurado el buzon remitente de Microsoft Graph.");
         if (!StringUtils.hasText(graphTenantId) || !StringUtils.hasText(graphClientId) || !StringUtils.hasText(graphClientSecret)) {
@@ -125,6 +142,10 @@ public class CorreoServiceImpl implements CorreoService {
             message.put("toRecipients", List.of(Map.of(
                     "emailAddress", Map.of("address", destinatario.trim())
             )));
+            List<Map<String, Object>> ccRecipients = destinatariosGraph(copia);
+            if (!ccRecipients.isEmpty()) {
+                message.put("ccRecipients", ccRecipients);
+            }
             List<Map<String, Object>> bccRecipients = destinatariosGraph(copiaOculta);
             if (!bccRecipients.isEmpty()) {
                 message.put("bccRecipients", bccRecipients);

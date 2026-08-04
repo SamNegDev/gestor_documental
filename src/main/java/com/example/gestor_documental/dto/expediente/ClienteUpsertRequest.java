@@ -1,5 +1,7 @@
 package com.example.gestor_documental.dto.expediente;
 
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -9,6 +11,8 @@ public class ClienteUpsertRequest {
     private String nif;
     private String nombre;
     private String email;
+    private String emailNotificaciones;
+    private List<String> emailsCopiaNotificaciones = new ArrayList<>();
     private String direccion;
     private String tipoVia;
     private String nombreVia;

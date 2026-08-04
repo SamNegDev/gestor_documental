@@ -18,6 +18,9 @@ public class ClienteAdminResponse {
     private String nif;
     private String nombre;
     private String email;
+    private String emailNotificaciones;
+    @Builder.Default
+    private List<String> emailsCopiaNotificaciones = new ArrayList<>();
     private String direccion;
     private String tipoVia;
     private String nombreVia;

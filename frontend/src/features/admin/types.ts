@@ -7,6 +7,8 @@ export interface ClienteAdmin extends AddressValue {
   nif: string;
   nombre: string;
   email: string;
+  emailNotificaciones?: string | null;
+  emailsCopiaNotificaciones: string[];
   direccion?: string | null;
   telefono?: string | null;
   preferenciaCanal?: "EMAIL" | "WHATSAPP" | "AMBOS" | "SIN_AVISOS" | null;
@@ -26,6 +28,8 @@ export type AdministradorClienteInput = Omit<AdministradorCliente, "id">;
 export interface ClienteInput extends AddressValue {
   nif: string;
   nombre: string;
+  emailNotificaciones?: string | null;
+  emailsCopiaNotificaciones: string[];
   email: string;
   direccion?: string | null;
   telefono?: string | null;
