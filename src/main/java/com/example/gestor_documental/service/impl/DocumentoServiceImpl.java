@@ -1148,6 +1148,10 @@ public class DocumentoServiceImpl implements DocumentoService {
                         : generarNombreAutomatico(documentoOriginal, nuevoTipo, null);
                 generado = guardarDocumentoGeneradoParaSolicitud(
                         documentoOriginal.getSolicitud(), pdfExtraido, nuevoTipo, usuario, nombreNuevo, false);
+                if (documentoOriginal.getExpedienteCompletoOrigen() != null) {
+                    generado.setExpedienteCompletoOrigen(documentoOriginal.getExpedienteCompletoOrigen());
+                    documentoRepository.save(generado);
+                }
                 registrarCorreccionClasificacion(generado, documentoOriginal.getTipoDocumento(), nuevoTipo, usuario, "EXTRACCION_PAGINAS");
             }
 

@@ -7,6 +7,7 @@ import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.CorreccionClasificacionDocumentoRepository;
@@ -43,6 +44,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -238,6 +240,147 @@ class DocumentoServiceImplTest {
         assertThat(rutaPrincipal).exists();
         assertThat(rutaSecundario).exists();
         assertThat(rutaNueva).doesNotExist();
+    }
+
+    @Test
+    void extraerPaginasEnSolicitudConservaElDocumentoEnElExpedienteCompleto() throws Exception {
+        Solicitud solicitud = new Solicitud();
+        solicitud.setId(40L);
+        solicitud.setMatricula("3213BPP");
+        Documento completo = documento(41L, "completo-solicitud.pdf", "3213BPP.PDF");
+        completo.setTipoDocumento(TipoDocumento.EXPEDIENTE_COMPLETO);
+        completo.setSolicitud(solicitud);
+        Documento original = documento(42L, "dos-identidades.pdf", "DOS_IDENTIDADES.PDF");
+        original.setSolicitud(solicitud);
+        original.setExpedienteCompletoOrigen(completo);
+        original.setPaginasExpedienteCompleto("0,1");
+        Files.write(tempDir.resolve(completo.getNombreArchivo()), pdfConPaginas(2));
+        Files.write(tempDir.resolve(original.getNombreArchivo()), pdfConPaginas(2));
+        AtomicReference<Documento> generadoRef = new AtomicReference<>();
+        when(documentoRepository.findByIdConRelaciones(42L)).thenReturn(Optional.of(original));
+        when(solicitudService.tienePermisoSolicitud(solicitud, null)).thenReturn(true);
+        when(pdfSplitService.parseRangoPaginas("2", 2)).thenReturn(List.of(1));
+        when(pdfSplitService.extraerPaginas(any(), anyList())).thenReturn(pdfConPaginas(1));
+        when(pdfSplitService.eliminarPaginas(any(), anyList())).thenReturn(pdfConPaginas(1));
+        when(pdfSplitService.unirDocumentos(anyList())).thenReturn(pdfConPaginas(2));
+        when(documentoRepository.save(any(Documento.class))).thenAnswer(invocation -> {
+            Documento guardado = invocation.getArgument(0);
+            if (guardado.getId() == null) {
+                guardado.setId(43L);
+                generadoRef.set(guardado);
+            }
+            return guardado;
+        });
+        when(documentoRepository.findByExpedienteCompletoOrigenIdOrderById(41L))
+                .thenAnswer(invocation -> List.of(original, generadoRef.get()));
+        iniciarTransaccion();
+
+        service.extraerPaginasDocumento(42L, "2", TipoDocumento.DNI, "DNI_DELFINO.PDF", null, null);
+
+        Documento generado = generadoRef.get();
+        assertThat(generado).isNotNull();
+        assertThat(generado.getExpedienteCompletoOrigen()).isSameAs(completo);
+        assertThat(original.getPaginasExpedienteCompleto()).isEqualTo("0");
+        assertThat(generado.getPaginasExpedienteCompleto()).isEqualTo("1");
+        assertThat(contarPaginas(Files.readAllBytes(tempDir.resolve(completo.getNombreArchivo())))).isEqualTo(2);
+
+        completar(TransactionSynchronization.STATUS_ROLLED_BACK);
+    }
+
+    @Test
+    void recortarUnDocumentoReconstruyeElExpedienteCompletoConLasPaginasRestantes() throws Exception {
+        Documento completo = documento(50L, "completo-recorte.pdf", "RECORTE_COMPLETO.PDF");
+        completo.setTipoDocumento(TipoDocumento.EXPEDIENTE_COMPLETO);
+        Documento recortado = documento(51L, "recortado.pdf", "RECORTADO.PDF");
+        recortado.setExpedienteCompletoOrigen(completo);
+        recortado.setPaginasExpedienteCompleto("0,1,2");
+        Documento posterior = documento(52L, "posterior-recorte.pdf", "DNI.PDF");
+        posterior.setTipoDocumento(TipoDocumento.DNI);
+        posterior.setExpedienteCompletoOrigen(completo);
+        posterior.setPaginasExpedienteCompleto("3");
+        Files.write(tempDir.resolve(completo.getNombreArchivo()), pdfConPaginas(4));
+        Files.write(tempDir.resolve(recortado.getNombreArchivo()), pdfConPaginas(3));
+        Files.write(tempDir.resolve(posterior.getNombreArchivo()), pdfConPaginas(1));
+        when(documentoRepository.findByIdConRelaciones(51L)).thenReturn(Optional.of(recortado));
+        when(pdfSplitService.parseRangoPaginas("2", 3)).thenReturn(List.of(1));
+        when(pdfSplitService.eliminarPaginas(any(), anyList())).thenReturn(pdfConPaginas(2));
+        when(pdfSplitService.unirDocumentos(anyList())).thenReturn(pdfConPaginas(3));
+        when(documentoRepository.findByExpedienteCompletoOrigenIdOrderById(50L))
+                .thenReturn(List.of(recortado, posterior));
+        when(documentoRepository.save(any(Documento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        iniciarTransaccion();
+
+        service.eliminarPaginasDocumento(51L, "2", null);
+
+        assertThat(recortado.getPaginasExpedienteCompleto()).isEqualTo("0,1");
+        assertThat(posterior.getPaginasExpedienteCompleto()).isEqualTo("2");
+        assertThat(contarPaginas(Files.readAllBytes(tempDir.resolve(recortado.getNombreArchivo())))).isEqualTo(2);
+        assertThat(contarPaginas(Files.readAllBytes(tempDir.resolve(completo.getNombreArchivo())))).isEqualTo(3);
+
+        completar(TransactionSynchronization.STATUS_ROLLED_BACK);
+    }
+
+    @Test
+    void unirDocumentosVinculadosReconstruyeElCompletoYConservaLosTrabajosIa() throws Exception {
+        Documento completo = documento(60L, "completo-union.pdf", "UNION_COMPLETO.PDF");
+        completo.setTipoDocumento(TipoDocumento.EXPEDIENTE_COMPLETO);
+        Documento principal = documento(61L, "principal-union.pdf", "PRINCIPAL.PDF");
+        principal.setExpedienteCompletoOrigen(completo);
+        principal.setPaginasExpedienteCompleto("0");
+        Documento secundario = documento(62L, "secundario-union.pdf", "SECUNDARIO.PDF");
+        secundario.setTipoDocumento(TipoDocumento.DNI);
+        secundario.setExpedienteCompletoOrigen(completo);
+        secundario.setPaginasExpedienteCompleto("1");
+        Files.write(tempDir.resolve(completo.getNombreArchivo()), pdfConPaginas(2));
+        Files.write(tempDir.resolve(principal.getNombreArchivo()), pdfConPaginas(1));
+        Files.write(tempDir.resolve(secundario.getNombreArchivo()), pdfConPaginas(1));
+        when(documentoRepository.findByIdConRelaciones(61L)).thenReturn(Optional.of(principal));
+        when(documentoRepository.findByIdConRelaciones(62L)).thenReturn(Optional.of(secundario));
+        when(documentoRepository.findByExpedienteCompletoOrigenIdOrderById(60L)).thenReturn(List.of(principal));
+        when(pdfSplitService.unirDocumentos(anyList())).thenReturn(pdfConPaginas(2));
+        when(documentoRepository.save(any(Documento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        iniciarTransaccion();
+
+        service.unirDocumentos(61L, List.of(62L), TipoDocumento.DNI, "DNI_UNIDO.PDF", null, null);
+
+        assertThat(principal.getExpedienteCompletoOrigen()).isSameAs(completo);
+        assertThat(principal.getPaginasExpedienteCompleto()).isEqualTo("0,1");
+        assertThat(contarPaginas(Files.readAllBytes(tempDir.resolve(principal.getNombreArchivo())))).isEqualTo(2);
+        assertThat(contarPaginas(Files.readAllBytes(tempDir.resolve(completo.getNombreArchivo())))).isEqualTo(2);
+        verify(lecturaIaItemRepository).reasignarDocumento(62L, 61L);
+        verify(documentoRepository).delete(secundario);
+
+        completar(TransactionSynchronization.STATUS_ROLLED_BACK);
+    }
+
+    @Test
+    void reclasificarDocumentoReordenaLasPaginasDelExpedienteCompleto() throws Exception {
+        Documento completo = documento(70L, "completo-clasificacion.pdf", "CLASIFICACION_COMPLETO.PDF");
+        completo.setTipoDocumento(TipoDocumento.EXPEDIENTE_COMPLETO);
+        Documento reclasificado = documento(71L, "reclasificado.pdf", "OTROS.PDF");
+        reclasificado.setExpedienteCompletoOrigen(completo);
+        reclasificado.setPaginasExpedienteCompleto("0");
+        Documento dni = documento(72L, "dni-clasificacion.pdf", "DNI.PDF");
+        dni.setTipoDocumento(TipoDocumento.DNI);
+        dni.setExpedienteCompletoOrigen(completo);
+        dni.setPaginasExpedienteCompleto("1");
+        Files.write(tempDir.resolve(completo.getNombreArchivo()), pdfConPaginas(2));
+        Files.write(tempDir.resolve(reclasificado.getNombreArchivo()), pdfConPaginas(1));
+        Files.write(tempDir.resolve(dni.getNombreArchivo()), pdfConPaginas(1));
+        when(documentoRepository.findByIdConRelaciones(71L)).thenReturn(Optional.of(reclasificado));
+        when(documentoRepository.findByExpedienteCompletoOrigenIdOrderById(70L))
+                .thenReturn(List.of(reclasificado, dni));
+        when(pdfSplitService.unirDocumentos(anyList())).thenReturn(pdfConPaginas(2));
+        when(documentoRepository.save(any(Documento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        iniciarTransaccion();
+
+        service.actualizarDocumento(71L, TipoDocumento.PERMISO_CIRCULACION, null, null, null);
+
+        assertThat(dni.getPaginasExpedienteCompleto()).isEqualTo("0");
+        assertThat(reclasificado.getPaginasExpedienteCompleto()).isEqualTo("1");
+        assertThat(contarPaginas(Files.readAllBytes(tempDir.resolve(completo.getNombreArchivo())))).isEqualTo(2);
+
+        completar(TransactionSynchronization.STATUS_ROLLED_BACK);
     }
 
     @Test

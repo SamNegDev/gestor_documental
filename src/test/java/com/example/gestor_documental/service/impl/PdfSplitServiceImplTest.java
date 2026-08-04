@@ -36,12 +36,45 @@ class PdfSplitServiceImplTest {
         }
     }
 
+    @Test
+    void extraeYRecortaLasPaginasIndicadasSinDesplazarIndices() throws Exception {
+        byte[] original = pdfConPaginas(4);
+
+        byte[] extraidas = service.extraerPaginas(original, List.of(1, 3));
+        byte[] restante = service.eliminarPaginas(original, List.of(1, 3));
+
+        assertEquals(2, contarPaginas(extraidas));
+        assertEquals(2, contarPaginas(restante));
+    }
+
+    @Test
+    void interpretaRangosHumanosEliminandoDuplicadosYPaginasFueraDeRango() {
+        assertEquals(List.of(0, 2, 3), service.parseRangoPaginas("1, 3-4, 3, 9", 4));
+    }
+
     private byte[] pdfSimple() throws IOException {
         try (PDDocument documento = new PDDocument();
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             documento.addPage(new PDPage(PDRectangle.A4));
             documento.save(baos);
             return baos.toByteArray();
+        }
+    }
+
+    private byte[] pdfConPaginas(int totalPaginas) throws IOException {
+        try (PDDocument documento = new PDDocument();
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            for (int pagina = 0; pagina < totalPaginas; pagina++) {
+                documento.addPage(new PDPage(PDRectangle.A4));
+            }
+            documento.save(baos);
+            return baos.toByteArray();
+        }
+    }
+
+    private int contarPaginas(byte[] contenido) throws IOException {
+        try (PDDocument documento = PDDocument.load(contenido)) {
+            return documento.getNumberOfPages();
         }
     }
 
