@@ -10,41 +10,43 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 - Priorizar reduccion de trabajo manual, seguridad, trazabilidad y escalabilidad.
 - Mantener separado el historial funcional visible de la auditoria interna: los accesos, descargas y operaciones tecnicas sensibles no deben ensuciar la experiencia del usuario.
 
-### Facturacion Holded
+## Cierre de version para presentacion oficial
 
-- Integrar en modo solo lectura las facturas de Holded como fuente de verdad contable: sincronizacion manual y periodica, webhooks firmados e idempotentes, estados de cobro, listado paginado y filtrado, descarga PDF/ZIP y permisos multicliente aplicados en backend.
-- Permitir aportar comprobantes de pago asociados a facturas, con verificacion administrativa y tareas derivadas del estado real, sin alterar nunca el estado contable confirmado por Holded.
-- Incorporar modalidades de facturacion por expediente, lote quincenal y lote mensual, con una modalidad predeterminada por referencia y posibilidad de sobrescribirla por factura.
+### Integridad y estabilizacion
 
-### Justificantes provisionales
+- Ejecutar una prueba funcional completa con perfiles ADMIN y CLIENTE: solicitud, carga y separacion documental, lectura IA, preparacion de PDF, creacion de expediente, requisitos, incidencias, hitos, justificantes y facturacion.
+- Revisar logs, tareas automaticas, copias de seguridad y restauracion; corregir cualquier error antes de fijar la version candidata a presentacion.
 
-- Permitir solicitar, preparar, adjuntar y descargar el justificante provisional de gestoria en solicitudes de traspaso, claramente diferenciado del justificante final de la DGT y con tareas derivadas de su estado real.
+### Activaciones controladas en produccion
 
+- Reactivar gradualmente el envio programado de avisos por correo: comenzar con un unico cliente y limites de un envio por ejecucion y por dia, revisar destinatarios y registros, y ampliar solo tras validar el comportamiento.
+- Configurar las credenciales y el webhook de Holded en produccion; validar una sincronizacion manual y un evento real antes de habilitar la sincronizacion periodica.
+- Configurar y validar plantillas de WhatsApp aprobadas por Meta para iniciar avisos fuera de la ventana de 24 horas.
 
-## Pendientes prioritarios
+### Preparacion de la presentacion
 
-### Notificaciones y recordatorios
+- Preparar datos de demostracion anonimizados y cuentas de prueba ADMIN y CLIENTE que permitan recorrer el flujo completo sin tocar expedientes reales.
+- Actualizar los manuales de usuario y administrador, preparar un guion de demostracion y documentar las funcionalidades principales y sus limites actuales.
+- Publicar una version identificable, con notas de version, fecha, copia de seguridad previa y procedimiento de vuelta atras verificado.
 
-- Automatizar el envio programado de avisos por correo cuando falte documentacion o respuesta del cliente.
-- Completar integracion WhatsApp: envio saliente por plantillas aprobadas y seleccion de canal preferido por cliente.
+## Seguridad antes de apertura general
 
+- Segundo factor para administradores.
+- Gestion avanzada de sesiones y dispositivos activos.
+- Politica de conservacion y eliminacion documental.
+- Revisar proteccion de datos personales, permisos, exportaciones, copias de seguridad y registros de auditoria antes de ampliar el acceso a nuevos clientes.
 
-## Mejoras operativas
+## Mejoras posteriores al cierre
 
 ### Plantillas documentales
 
-- Completar la interfaz guiada de preparacion de traspaso en solicitud usando el estado backend del asistente, con acciones directas para corregir datos y generar documentos.
 - Incorporar nuevos modelos oficiales cuando sean necesarios.
-- Completar cotejo y enriquecimiento de marca, modelo y bastidor desde el registro ampliado de vehiculos, e incorporar precio cuando quede modelado como dato estructurado.
+- Modelar el precio como dato estructurado y reutilizarlo en plantillas, facturacion y extracciones donde corresponda.
 
 ### Gestion documental avanzada
 
 - Extender la edicion de administradores ya disponible en la ficha de cliente a expediente y ficha de interesado; migrar las marcas genericas existentes despues de revision.
-- Evaluar extraccion IA de datos FORMATO_GA sobre documentacion relevante del expediente, con validacion humana antes de persistir.
-- Guardar datos estructurados validados de clientes y representantes para reutilizarlos sin nueva extraccion IA.
 - Registrar decisiones validadas en revision GA como memoria auxiliar trazable para reutilizar correcciones de personas, direcciones y vehiculos en futuras extracciones.
-- Importar catalogo historico de personas de Gestion Trafico como base auxiliar de autocompletado y deduplicacion.
-- Importar catalogo historico de vehiculos de Gestion Trafico como base auxiliar de cotejo por matricula, bastidor y modelo.
 - Versiones de documentos.
 - Deteccion de duplicados.
 - Fechas de caducidad documental.
@@ -52,10 +54,3 @@ Documento vivo para conservar el contexto de evolucion del sistema.
 ### Registro ampliado de vehiculos
 
 - Auditar inconsistencias entre la matricula del expediente y la ficha consolidada del vehiculo.
-
-## Seguridad
-
-- Segundo factor para administradores.
-- Gestion avanzada de sesiones y dispositivos activos.
-- Politica de conservacion y eliminacion documental.
-- Proteccion adicional de datos personales.
