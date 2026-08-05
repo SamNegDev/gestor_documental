@@ -30,6 +30,7 @@ import com.example.gestor_documental.service.DocumentoRolesLecturaService;
 import com.example.gestor_documental.service.DocumentoVehiculoLecturaService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
+import com.example.gestor_documental.util.BastidorUtils;
 import com.example.gestor_documental.util.DireccionEstructurada;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson.IdentidadDetectada;
@@ -791,9 +792,11 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     }
 
     private boolean vehiculoUsable(DocumentoVehiculoLectura lectura) {
+        String bastidor = lectura != null ? BastidorUtils.normalizar(lectura.getBastidor()) : null;
         return lectura != null
                 && !lectura.isRequiereRevision()
                 && confianza(lectura.getConfianzaGlobal()) >= 0.75
+                && (bastidor == null || BastidorUtils.esLecturaAutomaticaPlausible(bastidor))
                 && vehiculoScore(lectura) > 0;
     }
 
@@ -812,7 +815,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             score += 2;
         }
         String bastidor = normalizarIdentificador(lectura.getBastidor());
-        if (bastidor != null && bastidor.length() >= 6) {
+        if (BastidorUtils.esLecturaAutomaticaPlausible(bastidor)) {
             score += 3;
         }
         return score;
@@ -1137,13 +1140,15 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             detalles.add("El modelo de " + origen + " (" + modeloLeido + ") no coincide con el guardado (" + modeloSolicitud + ").");
         }
 
-        String bastidorLeido = normalizarIdentificador(lecturaVehiculo.getBastidor());
-        String bastidorSolicitud = normalizarIdentificador(solicitud.getVehiculoBastidor());
-        if (bastidorLeido != null && bastidorLeido.length() >= 6 && bastidorSolicitud == null) {
+        String bastidorLeido = BastidorUtils.normalizar(lecturaVehiculo.getBastidor());
+        String bastidorSolicitud = BastidorUtils.normalizar(solicitud.getVehiculoBastidor());
+        if (BastidorUtils.esLecturaAutomaticaPlausible(bastidorLeido) && bastidorSolicitud == null) {
             solicitud.setVehiculoBastidor(bastidorLeido);
             actualizado = true;
-        } else if (bastidorLeido != null && bastidorLeido.length() >= 6 && !bastidorSolicitud.equals(bastidorLeido)) {
+        } else if (BastidorUtils.esLecturaAutomaticaPlausible(bastidorLeido) && !bastidorSolicitud.equals(bastidorLeido)) {
             detalles.add("El bastidor de " + origen + " (" + bastidorLeido + ") no coincide con el guardado (" + bastidorSolicitud + ").");
+        } else if (bastidorLeido != null && !BastidorUtils.esLecturaAutomaticaPlausible(bastidorLeido)) {
+            detalles.add("El posible bastidor de " + origen + " tiene un formato atipico y requiere revision manual.");
         }
 
         if (actualizado) {
@@ -1166,14 +1171,16 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             detalles.add("La matricula de factura/contrato (" + matriculaLeida + ") no coincide con la solicitud (" + matriculaSolicitud + ").");
         }
 
-        String bastidorLeido = normalizarIdentificador(lecturaRoles.getBastidor());
-        String bastidorSolicitud = normalizarIdentificador(solicitud.getVehiculoBastidor());
-        if (bastidorLeido != null && bastidorLeido.length() >= 6 && bastidorSolicitud == null) {
+        String bastidorLeido = BastidorUtils.normalizar(lecturaRoles.getBastidor());
+        String bastidorSolicitud = BastidorUtils.normalizar(solicitud.getVehiculoBastidor());
+        if (BastidorUtils.esLecturaAutomaticaPlausible(bastidorLeido) && bastidorSolicitud == null) {
             solicitud.setVehiculoBastidor(bastidorLeido);
             detalles.add("Bastidor detectado y guardado en la solicitud: " + bastidorLeido + ".");
             actualizado = true;
-        } else if (bastidorLeido != null && bastidorLeido.length() >= 6 && !bastidorSolicitud.equals(bastidorLeido)) {
+        } else if (BastidorUtils.esLecturaAutomaticaPlausible(bastidorLeido) && !bastidorSolicitud.equals(bastidorLeido)) {
             detalles.add("El bastidor de factura/contrato (" + bastidorLeido + ") no coincide con el guardado (" + bastidorSolicitud + ").");
+        } else if (bastidorLeido != null && !BastidorUtils.esLecturaAutomaticaPlausible(bastidorLeido)) {
+            detalles.add("El posible bastidor de factura/contrato tiene un formato atipico y requiere revision manual.");
         }
         String precioLeido = TextNormalizer.upperOrNull(lecturaRoles.getValorDeclarado());
         String precioSolicitud = TextNormalizer.upperOrNull(solicitud.getOperacionPrecioVenta());

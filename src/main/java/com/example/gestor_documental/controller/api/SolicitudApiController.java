@@ -69,6 +69,7 @@ import com.example.gestor_documental.service.SolicitudService;
 import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.service.impl.CorreoEntranteSolicitudService;
 import com.example.gestor_documental.security.CurrentUserService;
+import com.example.gestor_documental.util.BastidorUtils;
 import com.example.gestor_documental.util.TextNormalizer;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
@@ -495,6 +496,10 @@ public class SolicitudApiController {
         if (request.getMatricula() == null || request.getMatricula().trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La matricula es obligatoria");
         }
+        if (BastidorUtils.excedeLongitudMaxima(request.getVehiculoBastidor())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El bastidor no puede superar " + BastidorUtils.MAX_LENGTH + " caracteres");
+        }
     }
 
     private Solicitud mapSolicitudRequest(SolicitudUpsertRequest request) {
@@ -502,7 +507,7 @@ public class SolicitudApiController {
         solicitud.setMatricula(TextNormalizer.upperOrNull(request.getMatricula()));
         solicitud.setVehiculoMarca(TextNormalizer.upperOrNull(request.getVehiculoMarca()));
         solicitud.setVehiculoModelo(TextNormalizer.upperOrNull(request.getVehiculoModelo()));
-        solicitud.setVehiculoBastidor(TextNormalizer.upperOrNull(request.getVehiculoBastidor()));
+        solicitud.setVehiculoBastidor(BastidorUtils.normalizar(request.getVehiculoBastidor()));
         solicitud.setOperacionPrecioVenta(TextNormalizer.upperOrNull(request.getOperacionPrecioVenta()));
         solicitud.setObservaciones(TextNormalizer.upperOrNull(request.getObservaciones()));
         solicitud.setInteresado1Rol(request.getInteresado1Rol());

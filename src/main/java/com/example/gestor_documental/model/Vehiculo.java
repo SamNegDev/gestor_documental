@@ -30,7 +30,7 @@ public class Vehiculo {
     @Column(nullable = false, length = 20)
     private String matricula;
 
-    @Column(length = 30)
+    @Column(length = 40)
     private String bastidor;
 
     @Column(length = 80)

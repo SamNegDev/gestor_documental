@@ -11,6 +11,7 @@ import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoVehiculoLecturaRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.DocumentoVehiculoLecturaService;
+import com.example.gestor_documental.util.BastidorUtils;
 import com.example.gestor_documental.util.TextNormalizer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -187,7 +188,7 @@ public class DocumentoVehiculoLecturaServiceImpl implements DocumentoVehiculoLec
                 Tipo documental esperado: %s.
                 El documento puede estar escaneado, fotografiado o girado en horizontal.
                 Matricula: normalizala sin espacios ni guiones.
-                Bastidor/VIN: suele aparecer como campo E en permiso/ficha o como Bastidor en Informe DGT. No lo confundas con contrasena de homologacion, numero de expediente, CSV, codigo seguro ni numero de permiso.
+                Bastidor/VIN: suele aparecer como campo E en permiso/ficha o como Bastidor en Informe DGT. Normalmente tiene 17 caracteres. No uses el campo C.4 ni lo confundas con contrasena de homologacion, numero de expediente, CSV, codigo seguro ni numero de permiso.
                 Marca: fabricante o marca comercial visible.
                 Modelo: modelo, denominacion comercial, version o tipo comercial visible. No uses la marca como modelo si no hay modelo claro.
                 Fechas: formato dd/MM/yyyy.
@@ -232,12 +233,13 @@ public class DocumentoVehiculoLecturaServiceImpl implements DocumentoVehiculoLec
         String matricula = limitar(normalizarMatricula(texto(resultado, "matricula")), 20);
         String marca = limitar(TextNormalizer.upperOrNull(texto(resultado, "marca")), 80);
         String modeloVehiculo = limitar(TextNormalizer.upperOrNull(texto(resultado, "modeloVehiculo")), 120);
-        String bastidor = limitar(normalizarBastidor(texto(resultado, "bastidor")), 40);
+        String bastidor = limitar(normalizarBastidor(texto(resultado, "bastidor")), BastidorUtils.MAX_LENGTH);
         Double confianza = numero(resultado, "confianzaGlobal");
         boolean tieneDatos = matricula != null || marca != null || modeloVehiculo != null || bastidor != null;
         boolean requiereRevision = booleano(resultado, "requiereRevision")
                 || confianza == null
                 || confianza < CONFIANZA_MINIMA_AUTOMATICA
+                || (bastidor != null && !BastidorUtils.esLecturaAutomaticaPlausible(bastidor))
                 || !tieneDatos;
 
         lectura.setTipoDocumentoDetectado(tipoDetectado(texto(resultado, "tipoDocumento"), documento.getTipoDocumento()));
@@ -411,11 +413,7 @@ public class DocumentoVehiculoLecturaServiceImpl implements DocumentoVehiculoLec
     }
 
     private String normalizarBastidor(String value) {
-        if (value == null) {
-            return null;
-        }
-        String normalizado = value.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
-        return normalizado.isBlank() ? null : normalizado;
+        return BastidorUtils.normalizar(value);
     }
 
     private String limitar(String value, int max) {
@@ -556,6 +554,7 @@ public class DocumentoVehiculoLecturaServiceImpl implements DocumentoVehiculoLec
         return booleano(resultado, "requiereRevision")
                 || confianza == null
                 || confianza < CONFIANZA_MINIMA_AUTOMATICA
+                || (bastidor != null && !BastidorUtils.esLecturaAutomaticaPlausible(bastidor))
                 || (matricula == null && marca == null && modeloVehiculo == null && bastidor == null);
     }
 

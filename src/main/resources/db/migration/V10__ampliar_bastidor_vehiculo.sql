@@ -1,0 +1,1 @@
+ALTER TABLE vehiculo MODIFY bastidor VARCHAR(40) NULL;

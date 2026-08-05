@@ -450,7 +450,7 @@ export function SolicitudFormPage() {
             </label>
             <label className={fieldClassName("vehiculoBastidor")} data-field="vehiculoBastidor">
               Bastidor
-              <input value={form.vehiculoBastidor || ""} onChange={(event) => updateInput("vehiculoBastidor", event)} />
+              <input maxLength={40} value={form.vehiculoBastidor || ""} onChange={(event) => updateInput("vehiculoBastidor", event)} />
             </label>
             <label className={fieldClassName("operacionPrecioVenta")} data-field="operacionPrecioVenta">
               Precio de venta

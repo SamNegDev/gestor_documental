@@ -163,6 +163,36 @@ class SolicitudDocumentacionIaServiceImplTest {
         assertThat(solicitud.getVehiculoBastidor()).isEqualTo("VSSZZZ1PZ9R000001");
     }
 
+    @Test
+    void noAplicaLecturaConCodigoLargoConfundidoConBastidor() {
+        Solicitud solicitud = solicitudCliente(33L);
+        Documento dni = documento(9L, TipoDocumento.DNI);
+        Documento permiso = documento(10L, TipoDocumento.PERMISO_CIRCULACION);
+        Documento ficha = documento(11L, TipoDocumento.FICHA_TECNICA);
+        DocumentoVehiculoLectura lectura = new DocumentoVehiculoLectura();
+        lectura.setDocumento(permiso);
+        lectura.setMatricula("3900JXR");
+        lectura.setMarca("NISSAN");
+        lectura.setModeloVehiculo("JUKE");
+        lectura.setBastidor("647E2D452A0F4F1281667A6257798850");
+        lectura.setConfianzaGlobal(0.95);
+        lectura.setRequiereRevision(false);
+
+        when(solicitudRepository.findById(33L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(33L)).thenReturn(List.of(dni, permiso, ficha));
+        when(historialCambioRepository.countBySolicitudIdAndAccion(33L, "IA DOCUMENTACION CLIENTE")).thenReturn(0L);
+        when(identidadLecturaRepository.findByDocumentoId(9L)).thenReturn(Optional.empty());
+        when(vehiculoLecturaRepository.findByDocumentoId(10L)).thenReturn(Optional.empty());
+        when(vehiculoLecturaRepository.findByDocumentoId(11L)).thenReturn(Optional.empty());
+        when(vehiculoLecturaRepository.findByDocumentoIdIn(List.of(10L, 11L))).thenReturn(List.of(lectura));
+
+        SolicitudDocumentacionIaResponse response = service.procesarDocumentacionCliente(33L, usuarioCliente);
+
+        assertThat(response.isDatosAplicados()).isFalse();
+        assertThat(response.isRequiereRevision()).isTrue();
+        assertThat(solicitud.getMatricula()).isNull();
+        assertThat(solicitud.getVehiculoBastidor()).isNull();
+    }
     private Solicitud solicitudCliente(Long id) {
         Solicitud solicitud = new Solicitud();
         solicitud.setId(id);
