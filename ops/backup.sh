@@ -24,8 +24,10 @@ read_env_value() {
 
 BACKUP_DIR="${BACKUP_DIR:-$(read_env_value BACKUP_DIR)}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/gestor_documental}"
-BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-$(read_env_value BACKUP_RETENTION_DAYS)}"
-BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
+BACKUP_DAILY_COPIES="${BACKUP_DAILY_COPIES:-$(read_env_value BACKUP_DAILY_COPIES)}"
+BACKUP_DAILY_COPIES="${BACKUP_DAILY_COPIES:-7}"
+BACKUP_WEEKLY_COPIES="${BACKUP_WEEKLY_COPIES:-$(read_env_value BACKUP_WEEKLY_COPIES)}"
+BACKUP_WEEKLY_COPIES="${BACKUP_WEEKLY_COPIES:-4}"
 BACKUP_RCLONE_REMOTE="${BACKUP_RCLONE_REMOTE:-$(read_env_value BACKUP_RCLONE_REMOTE)}"
 MONITOR_FAILURE_URL="${MONITOR_FAILURE_URL:-$(read_env_value MONITOR_FAILURE_URL)}"
 MYSQL_DATABASE_NAME="${MYSQL_DATABASE:-$(read_env_value MYSQL_DATABASE)}"
@@ -49,6 +51,14 @@ trap notify_failure ERR
 
 if [[ "$BACKUP_DIR" == "/" || ${#BACKUP_DIR} -lt 8 ]]; then
   echo "BACKUP_DIR no es una ruta segura: $BACKUP_DIR" >&2
+  exit 1
+fi
+if [[ ! "$BACKUP_DAILY_COPIES" =~ ^[1-9][0-9]*$ ]]; then
+  echo "BACKUP_DAILY_COPIES debe ser un entero mayor que cero." >&2
+  exit 1
+fi
+if [[ ! "$BACKUP_WEEKLY_COPIES" =~ ^[0-9]+$ ]]; then
+  echo "BACKUP_WEEKLY_COPIES debe ser un entero igual o mayor que cero." >&2
   exit 1
 fi
 
@@ -98,8 +108,56 @@ if [[ -n "$BACKUP_RCLONE_REMOTE" ]]; then
   rclone copy "$FINAL_DIR" "${BACKUP_RCLONE_REMOTE%/}/$TIMESTAMP" --checksum
 fi
 
-find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d \
-  -name '20??????T??????Z' -mtime "+$BACKUP_RETENTION_DAYS" -exec rm -rf -- {} +
+mapfile -t backups < <(
+  find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d \
+    -name '20??????T??????Z' -printf '%f\n' | sort -r
+)
+declare -A conservar=()
+declare -A fechas_diarias=()
+diarias=0
+for nombre in "${backups[@]}"; do
+  fecha="${nombre:0:8}"
+  if [[ -z "${fechas_diarias[$fecha]:-}" && "$diarias" -lt "$BACKUP_DAILY_COPIES" ]]; then
+    conservar["$nombre"]=1
+    fechas_diarias["$fecha"]=1
+    diarias=$((diarias + 1))
+  fi
+done
+
+fecha_diaria_mas_antigua="$(printf '%s\n' "${!fechas_diarias[@]}" | sort | head -n 1)"
+declare -A semanas=()
+semanales=0
+if [[ "$BACKUP_WEEKLY_COPIES" -gt 0 ]]; then
+  for nombre in "${backups[@]}"; do
+    fecha="${nombre:0:8}"
+    if [[ "$fecha" < "$fecha_diaria_mas_antigua" ]]; then
+      semana="$(date -u -d "${fecha:0:4}-${fecha:4:2}-${fecha:6:2}" +%G-%V)"
+      if [[ -z "${semanas[$semana]:-}" && "$semanales" -lt "$BACKUP_WEEKLY_COPIES" ]]; then
+        conservar["$nombre"]=1
+        semanas["$semana"]=1
+        semanales=$((semanales + 1))
+      fi
+    fi
+  done
+fi
+
+eliminadas=0
+for nombre in "${backups[@]}"; do
+  [[ -n "${conservar[$nombre]:-}" ]] && continue
+  [[ "$nombre" =~ ^20[0-9]{6}T[0-9]{6}Z$ ]] || {
+    echo "Nombre de copia no seguro: $nombre" >&2
+    exit 1
+  }
+  objetivo="$(readlink -f "$BACKUP_DIR/$nombre")"
+  [[ "$objetivo" == "$BACKUP_DIR/"* && "$objetivo" != "$BACKUP_DIR" ]] || {
+    echo "Ruta de copia no segura: $objetivo" >&2
+    exit 1
+  }
+  rm -rf -- "$objetivo"
+  eliminadas=$((eliminadas + 1))
+done
+
+echo "Retencion aplicada: $diarias copias diarias, $semanales semanales y $eliminadas eliminadas."
 
 trap - ERR
 echo "Copia completada: $FINAL_DIR"
