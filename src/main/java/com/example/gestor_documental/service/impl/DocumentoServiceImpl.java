@@ -551,8 +551,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (completo == null || completo.getId() == null) {
             return;
         }
-        List<Documento> vinculados = new ArrayList<>(
-                documentoRepository.findByExpedienteCompletoOrigenIdOrderById(completo.getId()));
+        List<Documento> vinculados = obtenerVinculadosValidos(completo);
         if (vinculados.isEmpty()) {
             return;
         }
@@ -591,6 +590,10 @@ public class DocumentoServiceImpl implements DocumentoService {
     private void vincularPaginasDossier(Documento documento, Documento completo, int paginaInicio, int totalPaginas) {
         if (totalPaginas <= 0) {
             throw new OperacionInvalidaException("El documento individual no contiene paginas validas");
+        }
+        if (esMismoDocumento(documento, completo)) {
+            throw new OperacionInvalidaException(
+                    "El expediente completo no puede vincularse como documento de si mismo");
         }
         List<Integer> paginas = java.util.stream.IntStream.range(paginaInicio, paginaInicio + totalPaginas)
                 .boxed()
@@ -816,7 +819,10 @@ public class DocumentoServiceImpl implements DocumentoService {
             }
 
             List<Documento> vinculados = documentoRepository
-                    .findByExpedienteCompletoOrigenIdOrderById(completo.getId());
+                    .findByExpedienteCompletoOrigenIdOrderById(completo.getId())
+                    .stream()
+                    .filter(vinculado -> !esMismoDocumento(vinculado, completo))
+                    .toList();
             if (paginasValidas.size() >= totalPaginas) {
                 desvincularDocumentosDelDossier(completo);
                 desvincularRequisitos(completo);
@@ -1231,6 +1237,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                 validarMismoContenedor(principal, documento);
                 documentos.add(documento);
             }
+            validarUnionSinExpedienteCompletoYDerivados(documentos);
 
             List<byte[]> contenidos = new java.util.ArrayList<>();
             List<Path> rutasOriginales = new java.util.ArrayList<>();
@@ -1323,6 +1330,48 @@ public class DocumentoServiceImpl implements DocumentoService {
                 || !java.util.Objects.equals(clientePrincipal, clienteDocumento)) {
             throw new OperacionInvalidaException("Solo se pueden unir documentos del mismo expediente o solicitud");
         }
+    }
+
+    private void validarUnionSinExpedienteCompletoYDerivados(List<Documento> documentos) {
+        Set<Long> ids = documentos.stream()
+                .map(Documento::getId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        boolean contieneMaestroYDerivado = documentos.stream()
+                .map(Documento::getExpedienteCompletoOrigen)
+                .filter(java.util.Objects::nonNull)
+                .map(Documento::getId)
+                .filter(java.util.Objects::nonNull)
+                .anyMatch(ids::contains);
+        if (contieneMaestroYDerivado) {
+            throw new OperacionInvalidaException(
+                    "No se puede unir un expediente completo con uno de sus documentos separados");
+        }
+    }
+
+    private List<Documento> obtenerVinculadosValidos(Documento completo) {
+        List<Documento> vinculados = new ArrayList<>(
+                documentoRepository.findByExpedienteCompletoOrigenIdOrderById(completo.getId()));
+        boolean maestroIncluido = vinculados.removeIf(vinculado -> esMismoDocumento(vinculado, completo));
+        boolean autorreferencia = esMismoDocumento(completo, completo.getExpedienteCompletoOrigen());
+        if (maestroIncluido || autorreferencia) {
+            log.error("Integridad de expediente completo corregida: documento {} estaba vinculado consigo mismo",
+                    completo.getId());
+            completo.setExpedienteCompletoOrigen(null);
+            completo.setPaginasExpedienteCompleto(null);
+            documentoRepository.save(completo);
+        }
+        return vinculados;
+    }
+
+    private boolean esMismoDocumento(Documento primero, Documento segundo) {
+        if (primero == null || segundo == null) {
+            return false;
+        }
+        if (primero == segundo) {
+            return true;
+        }
+        return primero.getId() != null && primero.getId().equals(segundo.getId());
     }
 
     @Override

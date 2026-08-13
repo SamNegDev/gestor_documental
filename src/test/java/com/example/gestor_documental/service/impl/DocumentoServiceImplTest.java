@@ -354,6 +354,54 @@ class DocumentoServiceImplTest {
     }
 
     @Test
+    void recomponerExcluyeYDesvinculaElExpedienteCompletoAutorreferenciado() throws Exception {
+        Documento completo = documento(80L, "completo-corrupto.pdf", "COMPLETO_CORRUPTO.PDF");
+        completo.setTipoDocumento(TipoDocumento.EXPEDIENTE_COMPLETO);
+        completo.setExpedienteCompletoOrigen(completo);
+        completo.setPaginasExpedienteCompleto("0,1");
+        Documento dni = documento(81L, "dni-valido.pdf", "DNI_VALIDO.PDF");
+        dni.setTipoDocumento(TipoDocumento.OTROS);
+        dni.setExpedienteCompletoOrigen(completo);
+        dni.setPaginasExpedienteCompleto("2");
+        Files.write(tempDir.resolve(completo.getNombreArchivo()), pdfConPaginas(2));
+        Files.write(tempDir.resolve(dni.getNombreArchivo()), pdfConPaginas(1));
+        when(documentoRepository.findByIdConRelaciones(81L)).thenReturn(Optional.of(dni));
+        when(documentoRepository.findByExpedienteCompletoOrigenIdOrderById(80L))
+                .thenReturn(List.of(completo, dni));
+        when(pdfSplitService.unirDocumentos(anyList())).thenReturn(pdfConPaginas(1));
+        when(documentoRepository.save(any(Documento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        iniciarTransaccion();
+
+        service.actualizarDocumento(81L, TipoDocumento.DNI, null, null, null);
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<List<byte[]>> contenidos = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(pdfSplitService).unirDocumentos(contenidos.capture());
+        assertThat(contenidos.getValue()).hasSize(1);
+        assertThat(completo.getExpedienteCompletoOrigen()).isNull();
+        assertThat(completo.getPaginasExpedienteCompleto()).isNull();
+        assertThat(dni.getPaginasExpedienteCompleto()).isEqualTo("0");
+        assertThat(contarPaginas(Files.readAllBytes(tempDir.resolve(completo.getNombreArchivo())))).isEqualTo(1);
+
+        completar(TransactionSynchronization.STATUS_ROLLED_BACK);
+        assertThat(tempDir.resolve("completo-corrupto.pdf")).exists();
+    }
+
+    @Test
+    void rechazaUnirElExpedienteCompletoConUnoDeSusDerivados() {
+        Documento completo = documento(90L, "completo.pdf", "COMPLETO.PDF");
+        completo.setTipoDocumento(TipoDocumento.EXPEDIENTE_COMPLETO);
+        Documento derivado = documento(91L, "derivado.pdf", "DERIVADO.PDF");
+        derivado.setExpedienteCompletoOrigen(completo);
+        when(documentoRepository.findByIdConRelaciones(90L)).thenReturn(Optional.of(completo));
+        when(documentoRepository.findByIdConRelaciones(91L)).thenReturn(Optional.of(derivado));
+
+        assertThatThrownBy(() -> service.unirDocumentos(90L, List.of(91L), null, null, null, null))
+                .isInstanceOf(com.example.gestor_documental.exception.OperacionInvalidaException.class)
+                .hasMessageContaining("expediente completo");
+    }
+
+    @Test
     void reclasificarDocumentoReordenaLasPaginasDelExpedienteCompleto() throws Exception {
         Documento completo = documento(70L, "completo-clasificacion.pdf", "CLASIFICACION_COMPLETO.PDF");
         completo.setTipoDocumento(TipoDocumento.EXPEDIENTE_COMPLETO);

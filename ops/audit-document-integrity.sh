@@ -126,6 +126,10 @@ END {
       continue
     }
     p = parent[id]
+    if (p == id) {
+      issue("AUTORREFERENCIA_COMPLETO", id, exp_id, "expediente_completo_origen_id=" p)
+      continue
+    }
     if (!(p in tipo)) {
       issue("PADRE_INEXISTENTE", id, exp_id, "expediente_completo_origen_id=" p)
       continue
