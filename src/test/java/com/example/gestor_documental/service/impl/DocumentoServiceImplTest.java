@@ -7,6 +7,7 @@ import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.ClienteRepository;
@@ -201,15 +202,17 @@ class DocumentoServiceImplTest {
         assertThat(tempDir.resolve("completo-3.pdf")).exists();
     }
     @Test
-    void listarPorClienteDevuelveSoloDocumentacionRecurrentePropia() {
+    void listarPorClienteConservaDocumentacionRecurrenteTrasVincularIdentidad() {
         Documento recurrente = documento(10L, "cif.pdf", "CIF.PDF");
-        when(documentoRepository.findByClienteIdAndExpedienteIsNullAndSolicitudIsNullAndInteresadoIsNullOrderByFechaSubidaDesc(4L))
+        recurrente.setInteresado(new Interesado("B38436556", "EMPRESA CLIENTE"));
+        when(documentoRepository.findByClienteIdAndExpedienteIsNullAndSolicitudIsNullOrderByFechaSubidaDesc(4L))
                 .thenReturn(List.of(recurrente));
 
         List<Documento> resultado = service.listarPorCliente(4L);
 
         assertThat(resultado).containsExactly(recurrente);
-        verify(documentoRepository).findByClienteIdAndExpedienteIsNullAndSolicitudIsNullAndInteresadoIsNullOrderByFechaSubidaDesc(4L);
+        assertThat(resultado.get(0).getInteresado()).isNotNull();
+        verify(documentoRepository).findByClienteIdAndExpedienteIsNullAndSolicitudIsNullOrderByFechaSubidaDesc(4L);
     }
 
     @Test

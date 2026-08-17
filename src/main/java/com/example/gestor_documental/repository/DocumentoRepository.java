@@ -71,7 +71,7 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long> {
     List<Documento> findByClienteIdAndInteresadoIsNullOrderByFechaSubidaDesc(Long clienteId);
 
     @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
-    List<Documento> findByClienteIdAndExpedienteIsNullAndSolicitudIsNullAndInteresadoIsNullOrderByFechaSubidaDesc(Long clienteId);
+    List<Documento> findByClienteIdAndExpedienteIsNullAndSolicitudIsNullOrderByFechaSubidaDesc(Long clienteId);
 
     @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
     List<Documento> findByClienteIdAndInteresadoIdOrderByFechaSubidaDesc(Long clienteId, Long interesadoId);
