@@ -42,6 +42,7 @@ import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson.Identida
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -60,6 +61,7 @@ import java.util.Optional;
 public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocumentalExpedienteService {
 
     private static final double CONFIANZA_MINIMA_IDENTIDAD = 0.80;
+    private static final int MAX_DOCUMENTOS_CLIENTE_REUTILIZABLES = 100;
 
     private final RequisitoDocumentalExpedienteRepository requisitoRepository;
     private final ExpedienteService expedienteService;
@@ -260,9 +262,6 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     }
 
     private void reconciliarConDocumentos(Expediente expediente, List<Documento> documentos, Usuario usuario) {
-        if (expediente.getEstadoExpediente() == EstadoExpediente.PENDIENTE_DOCUMENTACION) {
-            return;
-        }
         List<RequisitoDocumentalExpediente> requisitos = requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId());
         Map<String, Documento> identidadesGa = identidadesGaPorDocumento(expediente, documentos);
 
@@ -318,27 +317,39 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
     }
 
     private void generarRequisitosBaseBatecom(Expediente expediente, List<ExpedienteInteresado> interesados, Usuario usuario) {
+        normalizarIdentificacionesPendientesBatecom(expediente);
         OperacionExpediente bate = operacionRepository.findByExpedienteIdAndTipo(expediente.getId(), TipoOperacionExpediente.ENTREGA_COMPRAVENTA_BATE)
                 .orElse(null);
         OperacionExpediente com = operacionRepository.findByExpedienteIdAndTipo(expediente.getId(), TipoOperacionExpediente.FINALIZACION_ENTREGA_COMPRAVENTA_COM)
                 .orElse(null);
 
         if (bate != null) {
-            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.VENDEDOR), RolInteresado.VENDEDOR, bate, usuario);
-            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.COMPRAVENTA), RolInteresado.COMPRAVENTA, bate, usuario);
+            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.VENDEDOR), RolInteresado.VENDEDOR, null, usuario);
+            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.COMPRAVENTA), RolInteresado.COMPRAVENTA, null, usuario);
             crearPorOperacionSiNoExiste(expediente, TipoDocumento.CONTRATO_COMPRAVENTA, bate, "Contrato o factura de Entrega a compraventa (BATE)", EstadoRequisitoDocumental.REQUERIDO, usuario);
             crearPorOperacionSiNoExiste(expediente, TipoDocumento.PERMISO_CIRCULACION, bate, "Permiso de circulacion o Informe DGT (BATE)", EstadoRequisitoDocumental.REQUERIDO, usuario);
             crearPorOperacionSiNoExiste(expediente, TipoDocumento.FICHA_TECNICA, bate, "Ficha tecnica o Informe DGT (BATE)", EstadoRequisitoDocumental.REQUERIDO, usuario);
             crearPorOperacionSiNoExiste(expediente, TipoDocumento.MANDATO, bate, "Mandato o autorizacion de gestion (BATE)", EstadoRequisitoDocumental.REQUERIDO, usuario);
         }
         if (com != null) {
-            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.COMPRAVENTA), RolInteresado.COMPRAVENTA, com, usuario);
-            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.COMPRADOR), RolInteresado.COMPRADOR, com, usuario);
+            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.COMPRAVENTA), RolInteresado.COMPRAVENTA, null, usuario);
+            generarIdentificacionRol(expediente, interesadoPorRol(interesados, RolInteresado.COMPRADOR), RolInteresado.COMPRADOR, null, usuario);
             crearPorOperacionSiNoExiste(expediente, TipoDocumento.CONTRATO_COMPRAVENTA, com, "Contrato o factura de Finalizacion entrega a compraventa (COM)", EstadoRequisitoDocumental.REQUERIDO, usuario);
             crearPorOperacionSiNoExiste(expediente, TipoDocumento.PERMISO_CIRCULACION, com, "Permiso de circulacion o Informe DGT (COM)", EstadoRequisitoDocumental.REQUERIDO, usuario);
             crearPorOperacionSiNoExiste(expediente, TipoDocumento.FICHA_TECNICA, com, "Ficha tecnica o Informe DGT (COM)", EstadoRequisitoDocumental.REQUERIDO, usuario);
             crearPorOperacionSiNoExiste(expediente, TipoDocumento.MANDATO, com, "Mandato o autorizacion de gestion (COM)", EstadoRequisitoDocumental.REQUERIDO, usuario);
         }
+    }
+
+    private void normalizarIdentificacionesPendientesBatecom(Expediente expediente) {
+        requisitoRepository.findByExpedienteIdOrderByIdAsc(expediente.getId()).stream()
+                .filter(this::esRequisitoAutomaticoPendienteSinDocumento)
+                .filter(requisito -> esDocumentoIdentidad(requisito.getTipoDocumento()))
+                .filter(requisito -> requisito.getOperacion() != null)
+                .forEach(requisito -> {
+                    requisito.setOperacion(null);
+                    requisitoRepository.save(requisito);
+                });
     }
 
     private List<RolInteresado> rolesEsperadosIdentificacion(TipoTramiteEnum tramite) {
@@ -1332,8 +1343,9 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                     nueva.setCliente(expediente.getCliente());
                     nueva.setInteresado(representante);
                     return nueva;
-                });
+        });
         relacion.setRepresentanteLegal(true);
+        relacion.setHabitual(true);
         clienteInteresadoRepository.save(relacion);
     }
 
@@ -1390,7 +1402,9 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             return java.util.Optional.empty();
         }
 
-        return documentoRepository.findByClienteIdOrderByFechaSubidaDesc(expediente.getCliente().getId()).stream()
+        return documentoRepository.findByClienteIdOrderByFechaSubidaDesc(
+                        expediente.getCliente().getId(),
+                        PageRequest.of(0, MAX_DOCUMENTOS_CLIENTE_REUTILIZABLES)).stream()
                 .filter(documento -> documento.getInteresado() == null
                         || esRequisitoRepresentanteEmpresa(requisito)
                         || (requisito.getInteresado() != null
@@ -1413,7 +1427,8 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         }
         return documentoRepository.findByClienteIdAndInteresadoIdOrderByFechaSubidaDesc(
                         expediente.getCliente().getId(),
-                        requisito.getInteresado().getId()
+                        requisito.getInteresado().getId(),
+                        PageRequest.of(0, MAX_DOCUMENTOS_CLIENTE_REUTILIZABLES)
                 ).stream()
                 .filter(documento -> documentoCubreRequisito(documento, requisito))
                 .findFirst();

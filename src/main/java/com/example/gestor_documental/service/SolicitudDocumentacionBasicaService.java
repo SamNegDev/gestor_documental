@@ -12,6 +12,7 @@ import com.example.gestor_documental.repository.DocumentoIdentidadLecturaReposit
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
 import com.example.gestor_documental.validation.DniNieValidator;
+import com.example.gestor_documental.validation.IdentificadorFiscalValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -315,14 +316,7 @@ public class SolicitudDocumentacionBasicaService {
     }
 
     private boolean identificadorValido(String value) {
-        String identificador = normalizarIdentificador(value);
-        if (identificador == null) {
-            return false;
-        }
-        if (identificador.matches("[0-9]{8}[A-Z]") || identificador.matches("[XYZ][0-9]{7}[A-Z]")) {
-            return dniNieValidator.esValido(identificador);
-        }
-        return identificador.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
+        return IdentificadorFiscalValidator.esValido(value);
     }
 
     private String normalizarIdentificador(String value) {

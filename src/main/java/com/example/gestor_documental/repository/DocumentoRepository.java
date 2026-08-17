@@ -62,6 +62,9 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long> {
     List<Documento> findByClienteIdOrderByFechaSubidaDesc(Long clienteId);
 
     @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
+    List<Documento> findByClienteIdOrderByFechaSubidaDesc(Long clienteId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
     List<Documento> findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(Long clienteId, Collection<TipoDocumento> tipos);
 
     @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
@@ -72,6 +75,12 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long> {
 
     @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
     List<Documento> findByClienteIdAndInteresadoIdOrderByFechaSubidaDesc(Long clienteId, Long interesadoId);
+
+    @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
+    List<Documento> findByClienteIdAndInteresadoIdOrderByFechaSubidaDesc(
+            Long clienteId,
+            Long interesadoId,
+            Pageable pageable);
 
     @Query("""
             select d from Documento d

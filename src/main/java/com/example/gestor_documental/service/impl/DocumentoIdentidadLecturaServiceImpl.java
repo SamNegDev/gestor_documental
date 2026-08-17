@@ -27,6 +27,7 @@ import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson.Identida
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
 import com.example.gestor_documental.validation.DniNieValidator;
+import com.example.gestor_documental.validation.IdentificadorFiscalValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -389,6 +390,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             return resultado;
         }
         anadirIdentificador(resultado, documento.getInteresado() != null ? documento.getInteresado().getDni() : null);
+        anadirIdentificador(resultado, clienteContexto(documento) != null ? clienteContexto(documento).getNif() : null);
         if (documento.getSolicitud() != null) {
             anadirIdentificador(resultado, documento.getSolicitud().getInteresado1Dni());
             anadirIdentificador(resultado, documento.getSolicitud().getInteresado2Dni());
@@ -520,11 +522,18 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 .filter(interesado -> coincideIdentificador(interesado, identificador))
                 .distinct()
                 .toList();
-        return coincidencias.size() == 1 ? coincidencias.get(0) : null;
+        if (coincidencias.size() == 1) {
+            return coincidencias.get(0);
+        }
+        Cliente cliente = clienteContexto(documento);
+        if (cliente != null && normalizarIdentificador(cliente.getNif()).equals(identificador)) {
+            return resolverInteresadoCliente(documento, identificador, resultado, tipoDetectado);
+        }
+        return null;
     }
 
     private Interesado resolverInteresadoCliente(Documento documento, String identificador, IdentidadDetectada resultado, TipoDocumento tipoDetectado) {
-        Cliente cliente = documento.getCliente();
+        Cliente cliente = clienteContexto(documento);
         if (cliente == null || cliente.getId() == null) {
             return null;
         }
@@ -535,8 +544,27 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             interesado.setNombre(nombreCompletoResultado(resultado, identificador));
             aplicarNombreEstructurado(interesado, resultado);
             interesado.setTipoPersona(inferirTipoPersona(identificador, tipoDetectado));
+            if (interesado.getTipoPersona() == TipoPersona.EMPRESA) {
+                interesado.setRazonSocial(NombrePersonaNormalizer.normalizar(
+                        resultado != null && resultado.razonSocial() != null
+                                ? resultado.razonSocial()
+                                : interesado.getNombre()));
+            }
             interesado.setDireccion(normalizarDireccionCompleta(resultado != null ? resultado.direccionTexto() : null));
             aplicarDireccionEstructurada(interesado, resultado);
+            interesado = interesadoRepository.save(interesado);
+        }
+        boolean empresaCliente = normalizarIdentificador(cliente.getNif()).equals(identificador);
+        boolean interesadoActualizado = false;
+        if (empresaCliente && interesado.getTipoPersona() != TipoPersona.EMPRESA) {
+            interesado.setTipoPersona(TipoPersona.EMPRESA);
+            interesadoActualizado = true;
+        }
+        if (empresaCliente && TextNormalizer.upperOrNull(interesado.getRazonSocial()) == null) {
+            interesado.setRazonSocial(interesado.getNombre());
+            interesadoActualizado = true;
+        }
+        if (interesadoActualizado) {
             interesado = interesadoRepository.save(interesado);
         }
         Interesado interesadoFinal = interesado;
@@ -551,10 +579,32 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         // Un DNI aportado por un cliente empresa no demuestra por si solo que su titular
         // sea el representante legal. Puede pertenecer a la otra parte de la operacion.
         // La representacion solo se confirma desde catalogo o mediante validacion explicita.
-        if (relacion.getId() == null) {
+        boolean relacionActualizada = relacion.getId() == null;
+        if (empresaCliente && !Boolean.TRUE.equals(relacion.getHabitual())) {
+            relacion.setHabitual(true);
+            relacionActualizada = true;
+        }
+        if (empresaCliente && !Boolean.FALSE.equals(relacion.getRepresentanteLegal())) {
+            relacion.setRepresentanteLegal(false);
+            relacionActualizada = true;
+        }
+        if (relacionActualizada) {
             clienteInteresadoRepository.save(relacion);
         }
         return interesado;
+    }
+
+    private Cliente clienteContexto(Documento documento) {
+        if (documento == null) {
+            return null;
+        }
+        if (documento.getCliente() != null) {
+            return documento.getCliente();
+        }
+        if (documento.getSolicitud() != null && documento.getSolicitud().getCliente() != null) {
+            return documento.getSolicitud().getCliente();
+        }
+        return documento.getExpediente() != null ? documento.getExpediente().getCliente() : null;
     }
 
     private void aplicarDireccionEstructurada(Interesado interesado, IdentidadDetectada resultado) {
@@ -836,14 +886,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
     }
 
     private boolean identificadorValido(String value) {
-        String identificador = normalizarIdentificador(value);
-        if (identificador == null) {
-            return false;
-        }
-        if (identificador.matches("[0-9]{8}[A-Z]") || identificador.matches("[XYZ][0-9]{7}[A-Z]")) {
-            return dniNieValidator.esValido(identificador);
-        }
-        return identificador.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
+        return IdentificadorFiscalValidator.esValido(value);
     }
 
     private String limitar(String value, int max) {

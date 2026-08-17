@@ -11,10 +11,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
 class InteresadoServiceImplTest {
@@ -31,7 +33,7 @@ class InteresadoServiceImplTest {
         interesado.setRazonSocial("CLIENTE INCORRECTO");
         interesado.setTipoPersona(TipoPersona.PARTICULAR);
         when(interesadoRepository.findById(580L)).thenReturn(Optional.of(interesado));
-        when(interesadoRepository.findByDni("45551127H")).thenReturn(Optional.of(interesado));
+        when(interesadoRepository.findByIdentificadorNormalizado(any(), any())).thenReturn(List.of(interesado));
         when(interesadoRepository.save(interesado)).thenReturn(interesado);
 
         Interesado actualizado = service.actualizar(580L, request("Vanesa", "CLIENTE INCORRECTO", TipoPersona.PARTICULAR));
@@ -45,7 +47,7 @@ class InteresadoServiceImplTest {
         Interesado interesado = new Interesado("B38436556", "NOMBRE ANTERIOR");
         interesado.setId(555L);
         when(interesadoRepository.findById(555L)).thenReturn(Optional.of(interesado));
-        when(interesadoRepository.findByDni("B38436556")).thenReturn(Optional.of(interesado));
+        when(interesadoRepository.findByIdentificadorNormalizado(any(), any())).thenReturn(List.of(interesado));
         when(interesadoRepository.save(interesado)).thenReturn(interesado);
 
         Interesado actualizado = service.actualizar(555L, request("Nombre manual", "Empresa correcta SL", TipoPersona.EMPRESA));

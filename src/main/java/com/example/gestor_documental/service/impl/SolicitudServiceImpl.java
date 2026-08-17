@@ -38,6 +38,7 @@ import com.example.gestor_documental.util.DireccionNormalizer;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
 import com.example.gestor_documental.validation.DniNieValidator;
+import com.example.gestor_documental.validation.IdentificadorFiscalValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -1167,18 +1168,11 @@ public class SolicitudServiceImpl implements SolicitudService {
     }
 
     private boolean identificadorDocumentoValido(String value) {
-        String identificador = normalizarIdentificadorDocumento(value);
-        if (identificador == null) {
-            return false;
-        }
-        if (identificador.matches("[0-9]{8}[A-Z]") || identificador.matches("[XYZ][0-9]{7}[A-Z]")) {
-            return dniNieValidator.esValido(identificador);
-        }
-        return esCif(identificador);
+        return IdentificadorFiscalValidator.esValido(value);
     }
 
     private boolean esCif(String identificador) {
-        return identificador != null && identificador.matches("[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]");
+        return IdentificadorFiscalValidator.esCifValido(identificador);
     }
 
     private String normalizarIdentificadorDocumento(String value) {
@@ -1975,4 +1969,3 @@ public class SolicitudServiceImpl implements SolicitudService {
         return normalizado.isBlank() ? null : normalizado;
     }
 }
-

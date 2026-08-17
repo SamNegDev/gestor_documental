@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -17,9 +18,11 @@ import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
+import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.model.Cliente;
+import com.example.gestor_documental.model.ClienteInteresado;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.ExpedienteInteresado;
@@ -30,6 +33,7 @@ import com.example.gestor_documental.model.TipoIncidencia;
 import com.example.gestor_documental.model.TipoTramite;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
 import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
@@ -57,6 +61,7 @@ class ExpedienteServiceImplTest {
     @Mock private ExpedienteRepository expedienteRepository;
     @Mock private InteresadoService interesadoService;
     @Mock private ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    @Mock private ClienteInteresadoRepository clienteInteresadoRepository;
     @Mock private ClienteService clienteService;
     @Mock private TipoTramiteService tipoTramiteService;
     @Mock private IncidenciaRepository incidenciaRepository;
@@ -76,6 +81,7 @@ class ExpedienteServiceImplTest {
                 expedienteRepository,
                 interesadoService,
                 expedienteInteresadoRepository,
+                clienteInteresadoRepository,
                 clienteService,
                 tipoTramiteService,
                 incidenciaRepository,
@@ -86,6 +92,13 @@ class ExpedienteServiceImplTest {
                 new ExpedienteTipoTramitePolicyService(),
                 avisoAdminService,
                 operacionExpedienteService);
+        lenient().when(interesadoService.guardar(any(Interesado.class))).thenAnswer(invocation -> {
+            Interesado interesado = invocation.getArgument(0);
+            if (interesado.getId() == null) {
+                interesado.setId(999L);
+            }
+            return interesado;
+        });
         admin = new Usuario("Admin", "Test", "admin@test.local", "secret", RolUsuario.ADMIN, true);
     }
 
@@ -246,10 +259,10 @@ class ExpedienteServiceImplTest {
     @Test
     void rechazaDniExistenteCuandoElNombrePerteneceAOtraPersona() {
         Expediente expediente = expediente(EstadoExpediente.EN_TRAMITE, TipoTramiteEnum.TRASPASO);
-        Interesado existente = new Interesado("12345678A", "MARIA LOPEZ");
+        Interesado existente = new Interesado("12345678Z", "MARIA LOPEZ");
         existente.setId(22L);
-        InteresadoFormDto recibido = interesado("12345678A", "PEDRO MARTIN", RolInteresado.COMPRADOR);
-        when(interesadoService.buscarInteresadoPorDNI("12345678A")).thenReturn(Optional.of(existente));
+        InteresadoFormDto recibido = interesado("12345678Z", "PEDRO MARTIN", RolInteresado.COMPRADOR);
+        when(interesadoService.buscarInteresadoPorDNI("12345678Z")).thenReturn(Optional.of(existente));
 
         OperacionInvalidaException error = assertThrows(
                 OperacionInvalidaException.class,
@@ -262,10 +275,10 @@ class ExpedienteServiceImplTest {
     @Test
     void aceptaElMismoNombreAunqueCambienLosAcentos() {
         Expediente expediente = expediente(EstadoExpediente.EN_TRAMITE, TipoTramiteEnum.TRASPASO);
-        Interesado existente = new Interesado("12345678A", "RAÚL POUQUET");
+        Interesado existente = new Interesado("12345678Z", "RAÚL POUQUET");
         existente.setId(22L);
-        InteresadoFormDto recibido = interesado("12345678A", "RAUL POUQUET", RolInteresado.COMPRADOR);
-        when(interesadoService.buscarInteresadoPorDNI("12345678A")).thenReturn(Optional.of(existente));
+        InteresadoFormDto recibido = interesado("12345678Z", "RAUL POUQUET", RolInteresado.COMPRADOR);
+        when(interesadoService.buscarInteresadoPorDNI("12345678Z")).thenReturn(Optional.of(existente));
 
         service.guardarInteresadoSiValido(expediente, recibido);
 
@@ -273,9 +286,47 @@ class ExpedienteServiceImplTest {
     }
 
     @Test
+    void registraUnCifNuevoComoEmpresaConRazonSocial() {
+        Expediente expediente = expediente(EstadoExpediente.EN_TRAMITE, TipoTramiteEnum.TRASPASO);
+        InteresadoFormDto recibido = interesado("B38436556", "CANARIOALEMANA DE AUTOMOVILES", RolInteresado.VENDEDOR);
+        when(interesadoService.buscarInteresadoPorDNI("B38436556")).thenReturn(Optional.empty());
+
+        service.guardarInteresadoSiValido(expediente, recibido);
+
+        ArgumentCaptor<Interesado> interesadoCaptor = ArgumentCaptor.forClass(Interesado.class);
+        verify(interesadoService).guardar(interesadoCaptor.capture());
+        assertEquals(TipoPersona.EMPRESA, interesadoCaptor.getValue().getTipoPersona());
+        assertEquals("CANARIOALEMANA DE AUTOMOVILES", interesadoCaptor.getValue().getRazonSocial());
+    }
+
+    @Test
+    void aceptaElCifDelClienteAunqueVengaConOtraVarianteDeNombreYLoMarcaHabitual() {
+        Cliente cliente = new Cliente();
+        cliente.setId(4L);
+        cliente.setNif("B38436556");
+        Expediente expediente = expediente(EstadoExpediente.EN_TRAMITE, TipoTramiteEnum.TRASPASO);
+        expediente.setCliente(cliente);
+        Interesado existente = new Interesado("B38436556", "CANARIOALEMANA DE AUTOMÓVILES SL");
+        existente.setId(555L);
+        existente.setTipoPersona(TipoPersona.PARTICULAR);
+        InteresadoFormDto recibido = interesado("B38436556", "CANARIOALEMANA DE AUTOMOVILES", RolInteresado.VENDEDOR);
+        when(interesadoService.buscarInteresadoPorDNI("B38436556")).thenReturn(Optional.of(existente));
+        when(clienteInteresadoRepository.findByClienteIdAndInteresadoId(4L, 555L)).thenReturn(Optional.empty());
+
+        service.guardarInteresadoSiValido(expediente, recibido);
+
+        assertEquals(TipoPersona.EMPRESA, existente.getTipoPersona());
+        ArgumentCaptor<ClienteInteresado> relacionCaptor = ArgumentCaptor.forClass(ClienteInteresado.class);
+        verify(clienteInteresadoRepository).save(relacionCaptor.capture());
+        assertTrue(relacionCaptor.getValue().getHabitual());
+        assertFalse(relacionCaptor.getValue().getRepresentanteLegal());
+        verify(expedienteInteresadoRepository).save(any(ExpedienteInteresado.class));
+    }
+
+    @Test
     void rechazaDosInteresadosConElMismoRol() {
-        InteresadoFormDto primero = interesado("12345678A", "MARIA LOPEZ", RolInteresado.COMPRADOR);
-        InteresadoFormDto segundo = interesado("87654321B", "PEDRO MARTIN", RolInteresado.COMPRADOR);
+        InteresadoFormDto primero = interesado("12345678Z", "MARIA LOPEZ", RolInteresado.COMPRADOR);
+        InteresadoFormDto segundo = interesado("00000000T", "PEDRO MARTIN", RolInteresado.COMPRADOR);
 
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,

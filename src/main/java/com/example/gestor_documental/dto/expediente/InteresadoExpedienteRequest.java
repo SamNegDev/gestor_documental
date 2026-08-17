@@ -1,8 +1,15 @@
 package com.example.gestor_documental.dto.expediente;
 
 import com.example.gestor_documental.enums.RolInteresado;
+import com.example.gestor_documental.util.TextNormalizer;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.io.IOException;
 
 @Getter
 @Setter
@@ -27,5 +34,21 @@ public class InteresadoExpedienteRequest {
     private String municipio;
     private String localidad;
     private String provincia;
+    @JsonDeserialize(using = RolInteresadoFlexibleDeserializer.class)
     private RolInteresado rol;
+
+    public static class RolInteresadoFlexibleDeserializer extends JsonDeserializer<RolInteresado> {
+        @Override
+        public RolInteresado deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+            String valor = TextNormalizer.upperOrNull(parser.getValueAsString());
+            if (valor == null) {
+                return null;
+            }
+            try {
+                return RolInteresado.valueOf(valor);
+            } catch (IllegalArgumentException error) {
+                throw context.weirdStringException(valor, RolInteresado.class, "Rol de interesado no valido");
+            }
+        }
+    }
 }

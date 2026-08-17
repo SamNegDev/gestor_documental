@@ -13,6 +13,7 @@ import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.PreferenciaCanalCliente;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoLogoCliente;
+import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.ClienteInteresado;
 import com.example.gestor_documental.model.Documento;
@@ -30,6 +31,7 @@ import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.util.ClienteBrandingUrls;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
+import com.example.gestor_documental.validation.IdentificadorFiscalValidator;
 import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,6 +41,7 @@ import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.domain.PageRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -127,13 +130,19 @@ public class AdminManagementApiController {
         requireAdmin(authentication);
         Cliente cliente = clienteService.buscarPorId(clienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
-        String dni = TextNormalizer.upperOrNull(request.dni());
+        String dni = IdentificadorFiscalValidator.normalizar(request.dni());
         if (isBlank(dni) || isBlank(request.nombre())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "DNI/NIE y nombre son obligatorios");
         }
-        Interesado interesado = interesadoRepository.findByDni(dni).orElseGet(Interesado::new);
+        validarRepresentante(cliente, dni);
+        Interesado interesado = interesadoRepository
+                .findByIdentificadorNormalizado(dni, PageRequest.of(0, 1)).stream()
+                .findFirst()
+                .orElseGet(Interesado::new);
+        validarNombreRepresentanteExistente(interesado, request.nombre());
         interesado.setDni(dni);
         interesado.setNombre(NombrePersonaNormalizer.normalizar(request.nombre()));
+        interesado.setTipoPersona(TipoPersona.PARTICULAR);
         interesado.setTelefono(TextNormalizer.upperOrNull(request.telefono()));
         interesado.setDireccion(TextNormalizer.upperOrNull(request.direccion()));
         interesado.setTipoVia(TextNormalizer.upperOrNull(request.tipoVia()));
@@ -154,6 +163,7 @@ public class AdminManagementApiController {
         relacion.setCliente(cliente);
         relacion.setInteresado(interesado);
         relacion.setRepresentanteLegal(true);
+        relacion.setHabitual(true);
         clienteInteresadoRepository.save(relacion);
         AuditoriaDocumentoInterceptor.anotarDetalle(servletRequest,
                 "Cliente " + clienteId + "; Interesado " + interesado.getId() + "; Representante legal: SI");
@@ -168,12 +178,15 @@ public class AdminManagementApiController {
         requireAdmin(authentication);
         ClienteInteresado relacion = administrador(clienteId, interesadoId);
         Interesado interesado = relacion.getInteresado();
-        String dni = TextNormalizer.upperOrNull(request.dni());
+        String dni = IdentificadorFiscalValidator.normalizar(request.dni());
         if (isBlank(dni) || isBlank(request.nombre())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "DNI/NIE y nombre son obligatorios");
-        interesadoRepository.findByDni(dni).filter(otro -> !otro.getId().equals(interesadoId))
+        validarRepresentante(relacion.getCliente(), dni);
+        interesadoRepository.findByIdentificadorNormalizado(dni, PageRequest.of(0, 2)).stream()
+                .filter(otro -> !otro.getId().equals(interesadoId)).findFirst()
                 .ifPresent(otro -> { throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe otro interesado con ese DNI/NIE"); });
         interesado.setDni(dni);
         interesado.setNombre(NombrePersonaNormalizer.normalizar(request.nombre()));
+        interesado.setTipoPersona(TipoPersona.PARTICULAR);
         interesado.setTelefono(TextNormalizer.upperOrNull(request.telefono()));
         interesado.setDireccion(TextNormalizer.upperOrNull(request.direccion()));
         interesado.setTipoVia(TextNormalizer.upperOrNull(request.tipoVia()));
@@ -212,6 +225,40 @@ public class AdminManagementApiController {
         return clienteInteresadoRepository.findByClienteIdAndInteresadoId(clienteId, interesadoId)
                 .filter(relacion -> Boolean.TRUE.equals(relacion.getRepresentanteLegal()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Administrador no encontrado"));
+    }
+
+    private void validarRepresentante(Cliente cliente, String dni) {
+        if (!IdentificadorFiscalValidator.esCifValido(cliente != null ? cliente.getNif() : null)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Solo se pueden asignar representantes legales a clientes empresa con un CIF valido");
+        }
+        if (!IdentificadorFiscalValidator.esDniNieValido(dni)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El representante debe tener un DNI o NIE valido");
+        }
+    }
+
+    private void validarNombreRepresentanteExistente(Interesado interesado, String nombreRecibido) {
+        if (interesado.getId() == null) {
+            return;
+        }
+        String existente = normalizarNombreComparacion(interesado.getNombre());
+        String recibido = normalizarNombreComparacion(nombreRecibido);
+        if (existente != null && recibido != null && !existente.equals(recibido)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "El DNI/NIE ya pertenece a " + interesado.getNombre() + ". Selecciona esa persona o revisa el documento");
+        }
+    }
+
+    private String normalizarNombreComparacion(String nombre) {
+        String normalizado = NombrePersonaNormalizer.normalizar(nombre);
+        return normalizado == null
+                ? null
+                : java.text.Normalizer.normalize(normalizado, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "");
     }
 
     @PostMapping(value = "/clientes/{id}/logos/{tipo}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -372,6 +419,9 @@ public class AdminManagementApiController {
         if (isBlank(request.getNif()) || isBlank(request.getNombre()) || isBlank(request.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "NIF, nombre y email son obligatorios");
         }
+        if (!IdentificadorFiscalValidator.esValido(request.getNif())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El NIF/CIF del cliente no es valido");
+        }
         String destino = normalizarCorreoOpcional(request.getEmailNotificaciones(), "correo de notificaciones");
         normalizarCopiasNotificaciones(request.getEmailsCopiaNotificaciones(),
                 destino != null ? destino : TextNormalizer.lowerOrNull(request.getEmail()));
@@ -418,7 +468,7 @@ public class AdminManagementApiController {
     }
 
     private Cliente mapCliente(ClienteUpsertRequest request, Cliente cliente) {
-        cliente.setNif(TextNormalizer.upperOrNull(request.getNif()));
+        cliente.setNif(IdentificadorFiscalValidator.normalizar(request.getNif()));
         cliente.setNombre(NombrePersonaNormalizer.normalizar(request.getNombre()));
         cliente.setEmail(TextNormalizer.lowerOrNull(request.getEmail()));
         String destinoNotificaciones = normalizarCorreoOpcional(request.getEmailNotificaciones(), "correo de notificaciones");

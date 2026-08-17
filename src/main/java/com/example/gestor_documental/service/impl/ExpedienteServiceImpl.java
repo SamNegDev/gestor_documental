@@ -6,6 +6,7 @@ import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoIncidenciaEnum;
+import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
@@ -15,6 +16,7 @@ import com.example.gestor_documental.repository.ExpedienteRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.RequisitoDocumentalExpedienteRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
+import com.example.gestor_documental.repository.ClienteInteresadoRepository;
 import com.example.gestor_documental.service.AvisoAdminService;
 import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteService;
@@ -27,6 +29,7 @@ import com.example.gestor_documental.service.VehiculoService;
 import com.example.gestor_documental.util.DireccionFormatter;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
+import com.example.gestor_documental.validation.IdentificadorFiscalValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -44,6 +48,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     private final ExpedienteRepository expedienteRepository;
     private final InteresadoService interesadoService;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final ClienteInteresadoRepository clienteInteresadoRepository;
     private final ClienteService clienteService;
     private final TipoTramiteService tipoTramiteService;
     private final IncidenciaRepository incidenciaRepository;
@@ -157,17 +162,29 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         if (interesadoVacio(dto)) {
             return;
         }
+        String identificador = IdentificadorFiscalValidator.normalizar(dto.getDni());
+        if (!IdentificadorFiscalValidator.esValido(identificador)) {
+            throw new OperacionInvalidaException(
+                    "El DNI/NIE/CIF " + dto.getDni() + " no es valido. Revisa su formato y letra de control.");
+        }
+        dto.setDni(identificador);
 
+        boolean empresa = esCif(dto.getDni());
+        boolean empresaPrincipalCliente = empresa && empresaPrincipalCliente(expediente, dto.getDni());
         Optional<Interesado> interesadoExistente = interesadoService.buscarInteresadoPorDNI(dto.getDni());
-        interesadoExistente.ifPresent(interesado -> validarIdentidadCoincidente(interesado, dto));
+        interesadoExistente.ifPresent(interesado -> validarIdentidadCoincidente(interesado, dto, empresaPrincipalCliente));
         Interesado interesado = interesadoExistente.orElseGet(() -> {
                     Interesado nuevoInteresado = new Interesado();
                     nuevoInteresado.setNombre(NombrePersonaNormalizer.normalizar(dto.getNombre()));
                     nuevoInteresado.setNombrePila(TextNormalizer.upperOrNull(dto.getNombrePila()));
                     nuevoInteresado.setApellido1(TextNormalizer.upperOrNull(dto.getApellido1()));
                     nuevoInteresado.setApellido2(TextNormalizer.upperOrNull(dto.getApellido2()));
-                    nuevoInteresado.setRazonSocial(NombrePersonaNormalizer.normalizar(dto.getRazonSocial()));
+                    String razonSocial = NombrePersonaNormalizer.normalizar(dto.getRazonSocial());
+                    nuevoInteresado.setRazonSocial(razonSocial != null
+                            ? razonSocial
+                            : empresa ? NombrePersonaNormalizer.normalizar(dto.getNombre()) : null);
                     nuevoInteresado.setDni(TextNormalizer.upperOrNull(dto.getDni()));
+                    nuevoInteresado.setTipoPersona(empresa ? TipoPersona.EMPRESA : TipoPersona.PARTICULAR);
                     nuevoInteresado.setTelefono(TextNormalizer.upperOrNull(dto.getTelefono()));
                     nuevoInteresado.setTipoVia(TextNormalizer.upperOrNull(dto.getTipoVia()));
                     nuevoInteresado.setNombreVia(TextNormalizer.upperOrNull(dto.getNombreVia()));
@@ -189,6 +206,8 @@ public class ExpedienteServiceImpl implements ExpedienteService {
                                     dto.getCodigoPostal(), dto.getMunicipio(), dto.getProvincia()));
                     return interesadoService.guardar(nuevoInteresado);
                 });
+        normalizarEmpresaSiProcede(interesado, dto, empresa);
+        registrarEmpresaPrincipalComoHabitual(expediente, interesado, empresaPrincipalCliente);
         completarNombreEstructuradoSiVacio(interesado, dto);
 
         boolean yaRelacionado = expedienteInteresadoRepository
@@ -222,14 +241,87 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         expedienteInteresadoRepository.save(relacion);
     }
 
-    private void validarIdentidadCoincidente(Interesado existente, InteresadoFormDto recibido) {
+    private void validarIdentidadCoincidente(
+            Interesado existente,
+            InteresadoFormDto recibido,
+            boolean empresaPrincipalCliente
+    ) {
+        if (empresaPrincipalCliente) {
+            return;
+        }
         String nombreExistente = normalizarNombreComparacion(existente.getNombre());
         String nombreRecibido = normalizarNombreComparacion(recibido.getNombre());
         if (nombreExistente != null && nombreRecibido != null && !nombreExistente.equals(nombreRecibido)) {
             throw new OperacionInvalidaException(
-                    "El DNI " + recibido.getDni() + " ya pertenece a " + existente.getNombre()
-                            + ". Revisa el DNI o selecciona el interesado registrado.");
+                    "El identificador " + recibido.getDni() + " ya pertenece a " + existente.getNombre()
+                            + ". Revisa el identificador o selecciona el interesado registrado.");
         }
+    }
+
+    private void normalizarEmpresaSiProcede(Interesado interesado, InteresadoFormDto dto, boolean empresa) {
+        if (!empresa) {
+            return;
+        }
+        boolean cambiado = false;
+        if (interesado.getTipoPersona() != TipoPersona.EMPRESA) {
+            interesado.setTipoPersona(TipoPersona.EMPRESA);
+            cambiado = true;
+        }
+        if (TextNormalizer.upperOrNull(interesado.getRazonSocial()) == null) {
+            String razonSocial = NombrePersonaNormalizer.normalizar(dto.getRazonSocial());
+            interesado.setRazonSocial(razonSocial != null ? razonSocial : interesado.getNombre());
+            cambiado = true;
+        }
+        if (cambiado) {
+            interesadoService.guardar(interesado);
+        }
+    }
+
+    private void registrarEmpresaPrincipalComoHabitual(
+            Expediente expediente,
+            Interesado interesado,
+            boolean empresaPrincipalCliente
+    ) {
+        if (!empresaPrincipalCliente || expediente.getCliente() == null || expediente.getCliente().getId() == null) {
+            return;
+        }
+        ClienteInteresado relacion = clienteInteresadoRepository
+                .findByClienteIdAndInteresadoId(expediente.getCliente().getId(), interesado.getId())
+                .orElseGet(() -> {
+                    ClienteInteresado nueva = new ClienteInteresado();
+                    nueva.setCliente(expediente.getCliente());
+                    nueva.setInteresado(interesado);
+                    return nueva;
+                });
+        boolean cambiado = relacion.getId() == null;
+        if (!Boolean.TRUE.equals(relacion.getHabitual())) {
+            relacion.setHabitual(true);
+            cambiado = true;
+        }
+        if (!Boolean.FALSE.equals(relacion.getRepresentanteLegal())) {
+            relacion.setRepresentanteLegal(false);
+            cambiado = true;
+        }
+        if (cambiado) {
+            clienteInteresadoRepository.save(relacion);
+        }
+    }
+
+    private boolean empresaPrincipalCliente(Expediente expediente, String identificador) {
+        return expediente != null
+                && expediente.getCliente() != null
+                && !normalizarIdentificador(identificador).isBlank()
+                && normalizarIdentificador(identificador)
+                .equals(normalizarIdentificador(expediente.getCliente().getNif()));
+    }
+
+    private boolean esCif(String identificador) {
+        return IdentificadorFiscalValidator.esCifValido(identificador);
+    }
+
+    private String normalizarIdentificador(String identificador) {
+        String normalizado = IdentificadorFiscalValidator.normalizar(identificador);
+        return normalizado != null ? normalizado : "";
     }
 
     private String normalizarNombreComparacion(String nombre) {
@@ -631,6 +723,7 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         return dto != null
                 && dto.getNombre() != null && !dto.getNombre().isBlank()
                 && dto.getDni() != null && !dto.getDni().isBlank()
+                && IdentificadorFiscalValidator.esValido(dto.getDni())
                 && dto.getRol() != null;
     }
 
@@ -693,7 +786,9 @@ public class ExpedienteServiceImpl implements ExpedienteService {
 
         for (int i = 0; i < informados.size(); i++) {
             for (int j = i + 1; j < informados.size(); j++) {
-                if (informados.get(i).getDni().equalsIgnoreCase(informados.get(j).getDni())) {
+                if (Objects.equals(
+                        IdentificadorFiscalValidator.normalizar(informados.get(i).getDni()),
+                        IdentificadorFiscalValidator.normalizar(informados.get(j).getDni()))) {
                     throw new IllegalArgumentException("Los interesados no pueden tener el mismo DNI.");
                 }
                 if (informados.get(i).getRol() == informados.get(j).getRol()) {

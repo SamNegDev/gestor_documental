@@ -1,6 +1,7 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.config.OpenAiProperties;
+import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.repository.*;
@@ -47,6 +48,25 @@ class DocumentoIdentidadLecturaServiceImplSelectionTest {
                 service, "identidadPrincipal", documento, List.of(ajena, esperada));
 
         assertEquals("12345678Z", seleccionada.identificador());
+    }
+
+    @Test
+    void seleccionaElCifDelClienteAunqueTengaMenorConfianza() {
+        Cliente cliente = new Cliente();
+        cliente.setId(4L);
+        cliente.setNif("B38436556");
+        Solicitud solicitud = new Solicitud();
+        solicitud.setCliente(cliente);
+        Documento documento = new Documento();
+        documento.setSolicitud(solicitud);
+
+        IdentidadDetectada ajena = identidad("00000000T", 0.99);
+        IdentidadDetectada esperada = identidad("B38436556", 0.82);
+
+        IdentidadDetectada seleccionada = ReflectionTestUtils.invokeMethod(
+                service, "identidadPrincipal", documento, List.of(ajena, esperada));
+
+        assertEquals("B38436556", seleccionada.identificador());
     }
 
     private IdentidadDetectada identidad(String identificador, double confianza) {

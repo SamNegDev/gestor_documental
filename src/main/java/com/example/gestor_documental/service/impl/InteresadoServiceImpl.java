@@ -10,8 +10,10 @@ import com.example.gestor_documental.service.InteresadoService;
 import com.example.gestor_documental.util.DireccionFormatter;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
 import com.example.gestor_documental.util.TextNormalizer;
+import com.example.gestor_documental.validation.IdentificadorFiscalValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.Optional;
 
@@ -24,17 +26,25 @@ public class InteresadoServiceImpl implements InteresadoService {
 
     @Override
     public Optional<Interesado> buscarInteresadoPorDNI(String dni) {
-        return interesadoRepository.findByDni(TextNormalizer.upperOrNull(dni));
+        String identificador = IdentificadorFiscalValidator.normalizar(dni);
+        if (identificador == null) {
+            return Optional.empty();
+        }
+        return interesadoRepository.findByIdentificadorNormalizado(identificador, PageRequest.of(0, 1)).stream().findFirst();
     }
 
     @Override
     public Interesado guardar(Interesado nuevoInteresado) {
+        String identificador = IdentificadorFiscalValidator.normalizar(nuevoInteresado.getDni());
+        if (!IdentificadorFiscalValidator.esValido(identificador)) {
+            throw new OperacionInvalidaException("El DNI/NIE/CIF indicado no es valido");
+        }
         normalizarNombreEstructurado(nuevoInteresado);
         nuevoInteresado.setNombre(NombrePersonaNormalizer.normalizar(nuevoInteresado.getNombre()));
         if (nuevoInteresado.getNombre() == null) {
             nuevoInteresado.setNombre(nombreVisible(nuevoInteresado));
         }
-        nuevoInteresado.setDni(TextNormalizer.upperOrNull(nuevoInteresado.getDni()));
+        nuevoInteresado.setDni(identificador);
         nuevoInteresado.setTelefono(TextNormalizer.upperOrNull(nuevoInteresado.getTelefono()));
         nuevoInteresado.setTipoVia(TextNormalizer.upperOrNull(nuevoInteresado.getTipoVia()));
         nuevoInteresado.setNombreVia(TextNormalizer.upperOrNull(nuevoInteresado.getNombreVia()));
@@ -70,13 +80,17 @@ public class InteresadoServiceImpl implements InteresadoService {
     public Interesado actualizar(Long id, InteresadoUpdateRequest request) {
         Interesado interesado = interesadoRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Interesado no encontrado"));
-        String dni = TextNormalizer.upperOrNull(request.dni());
+        String dni = IdentificadorFiscalValidator.normalizar(request.dni());
         String nombre = NombrePersonaNormalizer.normalizar(request.nombre());
         if (dni == null || nombre == null) {
             throw new OperacionInvalidaException("DNI y nombre son obligatorios");
         }
-        interesadoRepository.findByDni(dni)
+        if (!IdentificadorFiscalValidator.esValido(dni)) {
+            throw new OperacionInvalidaException("El DNI/NIE/CIF indicado no es valido");
+        }
+        interesadoRepository.findByIdentificadorNormalizado(dni, PageRequest.of(0, 2)).stream()
                 .filter(existente -> !existente.getId().equals(id))
+                .findFirst()
                 .ifPresent(existente -> {
                     throw new OperacionInvalidaException("Ya existe otro interesado con ese DNI");
                 });

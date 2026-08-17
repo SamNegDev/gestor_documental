@@ -14,6 +14,15 @@ public interface InteresadoRepository extends JpaRepository<Interesado, Long> {
 
     Optional<Interesado> findByDni(String dni);
 
+    @Query("""
+            select i from Interesado i
+            where upper(replace(replace(replace(coalesce(i.dni, ''), ' ', ''), '-', ''), '.', '')) = :identificador
+            order by i.id asc
+            """)
+    List<Interesado> findByIdentificadorNormalizado(
+            @Param("identificador") String identificador,
+            Pageable pageable);
+
     List<Interesado> findByDniContainingIgnoreCaseOrNombreContainingIgnoreCaseOrderByNombreAsc(
             String dni,
             String nombre,
