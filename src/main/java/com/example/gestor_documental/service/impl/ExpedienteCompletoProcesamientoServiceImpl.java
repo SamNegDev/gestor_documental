@@ -1,7 +1,6 @@
 package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.expediente.ProcesamientoExpedienteCompletoResponse;
-import com.example.gestor_documental.dto.ia.ExtraccionGaJobResponse;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
@@ -15,7 +14,6 @@ import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteCompletoProcesamientoService;
 import com.example.gestor_documental.service.ExpedienteService;
-import com.example.gestor_documental.service.ExtraccionGaIaService;
 import com.example.gestor_documental.service.SolicitudService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -43,7 +41,6 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
     private final SolicitudRepository solicitudRepository;
     private final ExpedienteService expedienteService;
     private final SolicitudService solicitudService;
-    private final ExtraccionGaIaService extraccionGaIaService;
 
     private final ConcurrentMap<String, JobState> jobs = new ConcurrentHashMap<>();
 
@@ -170,12 +167,12 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
             int generados = job.target() == JobTarget.SOLICITUD
                     ? documentoService.procesarExpedienteCompletoSolicitudDocumento(job.documentoId(), job.reordenarPorTipo(), usuario)
                     : documentoService.procesarExpedienteCompletoDocumento(job.documentoId(), job.reordenarPorTipo(), usuario);
-            ExtraccionGaJobResponse lecturaInicial = programarLecturaInicialSiProcede(job, generados, usuario);
+            boolean lecturaInicial = programarLecturaInicialSiProcede(job, generados);
             actualizar(
                     jobId,
                     EstadoJob.COMPLETADO,
                     generados,
-                    lecturaInicial != null
+                    lecturaInicial
                             ? "Separacion completada. Documentos generados: " + generados + ". Lectura IA inicial en cola."
                             : generados > 0
                             ? "Separacion completada. Documentos generados: " + generados + "."
@@ -194,17 +191,13 @@ public class ExpedienteCompletoProcesamientoServiceImpl implements ExpedienteCom
         }
     }
 
-    private ExtraccionGaJobResponse programarLecturaInicialSiProcede(JobState job, int generados, Usuario usuario) {
-        if (job == null || job.target() != JobTarget.EXPEDIENTE || job.expedienteId() == null || generados <= 0) {
-            return null;
+    private boolean programarLecturaInicialSiProcede(JobState job, int generados) {
+        if (job == null || generados <= 0) {
+            return false;
         }
-        try {
-            return extraccionGaIaService.crearLecturaInicialSiProcede(job.expedienteId(), usuario);
-        } catch (Exception exception) {
-            log.warn("No se pudo programar lectura IA inicial para expediente {} tras separar documento {}",
-                    job.expedienteId(), job.documentoId(), exception);
-            return null;
-        }
+        return job.target() == JobTarget.SOLICITUD
+                ? job.solicitudId() != null
+                : job.expedienteId() != null;
     }
 
     private void actualizar(String jobId, EstadoJob estado, int documentosGenerados, String mensaje) {

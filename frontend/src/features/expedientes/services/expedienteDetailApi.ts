@@ -1,11 +1,11 @@
 import { apiGet, apiPost, apiPostForm, apiPostJson, apiPutJson } from "../../../shared/api/http";
 import type {
-  ActualizacionDocumentalExpediente,
   CategoriaHistorial,
   CreacionConProcesamiento,
   ExpedienteDetail,
   ExpedienteEditCatalogs,
   ExpedienteEditInput,
+  ExpedienteLecturaIaJob,
   HistorialPage,
   InteresadoSearchResult,
   TipoIncidencia,
@@ -50,9 +50,9 @@ export function unlinkDependentExpediente(id: string | number): Promise<void> {
 export function updateExpedienteFromExistingDocuments(
   id: string | number,
   options?: { forzarRelectura?: boolean },
-): Promise<ActualizacionDocumentalExpediente> {
+): Promise<ExpedienteLecturaIaJob> {
   const query = options?.forzarRelectura ? "?forzarRelectura=true" : "";
-  return apiPostJson<ActualizacionDocumentalExpediente>(`/api/expedientes/${id}/documentacion/actualizar${query}`, {});
+  return apiPostJson<ExpedienteLecturaIaJob>(`/api/expedientes/${id}/documentacion/actualizar${query}`, {});
 }
 
 export function createExpediente(input: ExpedienteEditInput): Promise<{ id: number }> {

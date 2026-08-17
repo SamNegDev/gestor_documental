@@ -4,7 +4,7 @@ import com.example.gestor_documental.dto.InteresadoFormDto;
 import com.example.gestor_documental.dto.PagedResponse;
 import com.example.gestor_documental.dto.expediente.AccionMasivaExpedienteRequest;
 import com.example.gestor_documental.dto.expediente.AccionMasivaExpedienteResponse;
-import com.example.gestor_documental.dto.expediente.ActualizacionDocumentalExpedienteResponse;
+import com.example.gestor_documental.dto.expediente.ExpedienteLecturaIaJobResponse;
 import com.example.gestor_documental.dto.expediente.ActualizarInteresadosExpedienteRequest;
 import com.example.gestor_documental.dto.expediente.ActualizarExpedienteRequest;
 import com.example.gestor_documental.dto.expediente.ClienteResumenResponse;
@@ -31,6 +31,7 @@ import com.example.gestor_documental.service.ClienteService;
 import com.example.gestor_documental.service.ExpedienteCompletoProcesamientoService;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.ExpedienteLecturaIaJobService;
 import com.example.gestor_documental.service.HitoExpedienteService;
 import com.example.gestor_documental.service.MensajeService;
 import com.example.gestor_documental.service.TipoIncidenciaService;
@@ -38,7 +39,6 @@ import com.example.gestor_documental.service.TipoTramiteService;
 import com.example.gestor_documental.security.CurrentUserService;
 import com.example.gestor_documental.service.impl.ExpedienteJustificanteFinalService;
 import com.example.gestor_documental.service.impl.ExpedienteHaciendaDocumentacionService;
-import com.example.gestor_documental.service.impl.ExpedienteDocumentacionActualizacionService;
 import com.example.gestor_documental.service.impl.ExpedienteLoteImpresionService;
 import com.example.gestor_documental.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
@@ -88,7 +88,7 @@ public class ExpedienteApiController {
     private final CurrentUserService currentUserService;
     private final ExpedienteJustificanteFinalService justificanteFinalService;
     private final ExpedienteHaciendaDocumentacionService haciendaDocumentacionService;
-    private final ExpedienteDocumentacionActualizacionService documentacionActualizacionService;
+    private final ExpedienteLecturaIaJobService expedienteLecturaIaJobService;
     private final ExpedienteLoteImpresionService loteImpresionService;
 
     @GetMapping
@@ -381,12 +381,12 @@ public class ExpedienteApiController {
     }
 
     @PostMapping("/{id}/documentacion/actualizar")
-    public ActualizacionDocumentalExpedienteResponse actualizarDocumentacionExistente(
+    public ExpedienteLecturaIaJobResponse actualizarDocumentacionExistente(
             @PathVariable Long id,
             @RequestParam(defaultValue = "false") boolean forzarRelectura,
             Authentication authentication
     ) {
-        return documentacionActualizacionService.actualizarDesdeDocumentos(id, requireAdmin(authentication), forzarRelectura);
+        return expedienteLecturaIaJobService.crear(id, requireAdmin(authentication), forzarRelectura, "MANUAL");
     }
 
     @PostMapping("/{id}/hitos/{codigo}/completar")

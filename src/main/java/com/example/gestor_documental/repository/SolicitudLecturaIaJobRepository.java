@@ -11,10 +11,10 @@ import java.util.Optional;
 
 public interface SolicitudLecturaIaJobRepository extends JpaRepository<SolicitudLecturaIaJob, Long> {
 
-    @EntityGraph(attributePaths = {"solicitud", "creadoPor", "items", "items.documento"})
+    @EntityGraph(attributePaths = {"solicitud", "creadoPor"})
     Optional<SolicitudLecturaIaJob> findTopBySolicitudIdOrderByFechaCreacionDescIdDesc(Long solicitudId);
 
-    @EntityGraph(attributePaths = {"solicitud", "creadoPor", "items", "items.documento"})
+    @EntityGraph(attributePaths = {"solicitud", "creadoPor"})
     Optional<SolicitudLecturaIaJob> findTopBySolicitudIdAndEstadoInOrderByFechaCreacionDescIdDesc(
             Long solicitudId, Collection<EstadoLecturaIaJob> estados);
 

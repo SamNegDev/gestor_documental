@@ -15,6 +15,40 @@ export type DocumentoEstado = "SUBIDO" | "PENDIENTE" | "POSTERIOR" | "INCIDENCIA
 export type HitoEstado = "COMPLETADO" | "ACTUAL" | "BLOQUEADO" | "PENDIENTE";
 export type RequisitoDocumentalEstado = "REQUERIDO" | "APORTADO" | "OMITIDO" | "POSTERIOR";
 
+export interface ExpedienteLecturaIaJobItem {
+  id: number;
+  documentoId: number;
+  tipoLectura: string;
+  estado: string;
+  intentos: number;
+  modelo?: string | null;
+  versionPrompt?: string | null;
+  confianza?: number | null;
+  mensaje?: string | null;
+  fechaInicio?: string | null;
+  fechaFin?: string | null;
+  duracionMs?: number | null;
+}
+
+export interface ExpedienteLecturaIaJob {
+  id: number;
+  expedienteId: number;
+  estado: "PENDIENTE" | "PROCESANDO" | "COMPLETADO" | "REQUIERE_REVISION" | "ERROR" | string;
+  origen: string;
+  forzarRelectura: boolean;
+  totalItems: number;
+  itemsProcesados: number;
+  itemsRevision: number;
+  itemsError: number;
+  progreso: number;
+  faseActual?: string | null;
+  mensaje?: string | null;
+  fechaCreacion?: string | null;
+  fechaInicio?: string | null;
+  fechaFin?: string | null;
+  items: ExpedienteLecturaIaJobItem[];
+}
+
 export interface HitoAccion {
   tipo: "COMPLETAR_HITO" | "FINALIZAR" | "ABRIR_INCIDENCIA" | string;
   label: string;
@@ -528,6 +562,7 @@ export interface ExpedienteDetail {
     estadoVinculacion: "PROPUESTA" | "CONFIRMADA" | "REQUIERE_REVISION";
     confianza: number;
   } | null;
+  ultimoTrabajoIa?: ExpedienteLecturaIaJob | null;
   cliente?: ClienteResumen | null;
   creadoPor?: UsuarioResumen | null;
   modificadoPor?: UsuarioResumen | null;

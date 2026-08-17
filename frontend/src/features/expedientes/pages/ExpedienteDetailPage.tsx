@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type DragEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Download, FilePlus2, FileText, Info, Link2, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ReceiptText, ShieldAlert, ShieldCheck, Trash2, Unlink, Upload, UserRound, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Download, FilePlus2, FileText, Link2, Loader2, MessageCircle, Plus, RefreshCw, Route, Save, ReceiptText, ShieldAlert, ShieldCheck, Trash2, Unlink, Upload, UserRound, X } from "lucide-react";
 import { CompleteExpedienteUploadPanel } from "../components/CompleteExpedienteUploadPanel";
 import { DocumentChecklistDialog } from "../components/DocumentChecklistDialog";
 import { DocumentEditDialog, type DocumentEditSubmit } from "../components/DocumentEditDialog";
@@ -57,11 +57,11 @@ import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
 import { uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import type {
-  ActualizacionDocumentalExpediente,
   DocumentoIdentidadDetectada,
   DocumentoExpediente,
   ExpedienteDetail,
   ExpedienteEditInput,
+  ExpedienteLecturaIaJob,
   HitoAccion,
   HitoExpediente,
   IncidenciaExpediente,
@@ -757,38 +757,31 @@ function ExpedienteIaErrorPanel({ message, onDismiss }: { message: string; onDis
   );
 }
 
-function ExpedienteIaResultPanel({ response, onDismiss }: { response: ActualizacionDocumentalExpediente; onDismiss: () => void }) {
-  const tone = response.requiereRevision ? "warning" : response.datosAplicados || response.yaEstabaCorrecta ? "success" : "info";
-  const title = response.requiereRevision
-    ? "Lectura completada con revision pendiente"
-    : response.yaEstabaCorrecta
-      ? "El expediente ya estaba correcto"
-      : response.datosAplicados
-        ? "Datos aplicados al expediente"
-        : "Lectura completada";
-  const detalles = response.detalles?.length ? response.detalles : response.avisos ?? [];
-
+function ExpedienteIaJobPanel({ job }: { job: ExpedienteLecturaIaJob }) {
+  const active = ["PENDIENTE", "PROCESANDO"].includes(job.estado);
+  const tone = job.estado === "ERROR" ? "danger" : job.estado === "REQUIERE_REVISION" ? "warning" : job.estado === "COMPLETADO" ? "success" : "info";
+  const Icon = active ? Loader2 : job.estado === "ERROR" || job.estado === "REQUIERE_REVISION" ? AlertTriangle : CheckCircle2;
   return (
-    <section className={`solicitud-ia-result solicitud-ia-result--${tone}`} role="status" aria-live="polite">
-      <div className="solicitud-ia-result__heading">
-        {tone === "warning" ? <AlertTriangle size={20} /> : tone === "success" ? <CheckCircle2 size={20} /> : <Info size={20} />}
-        <div>
-          <strong>{title}</strong>
-          <span>{response.mensaje || "Proceso finalizado."}</span>
+    <section className={`solicitud-ia-job solicitud-ia-job--${tone}`} role="status" aria-live="polite">
+      <div className="solicitud-ia-job__icon"><Icon className={active ? "is-spinning" : ""} size={18} /></div>
+      <div className="solicitud-ia-job__body">
+        <div className="solicitud-ia-job__heading">
+          <div>
+            <strong>{job.faseActual || "Lectura documental"}</strong>
+            <span>{job.mensaje || "Actualizando el estado de los documentos."}</span>
+          </div>
+          <b>{job.progreso}%</b>
         </div>
-        <button className="soft-button soft-button--compact" type="button" onClick={onDismiss}>Cerrar</button>
+        <div className="solicitud-ia-job__bar" aria-label={`Progreso de lectura: ${job.progreso}%`}>
+          <span style={{ width: `${job.progreso}%` }} />
+        </div>
+        <div className="solicitud-ia-job__metrics">
+          <span>{job.itemsProcesados} de {job.totalItems} procesados</span>
+          {job.itemsRevision > 0 ? <span>{job.itemsRevision} para revisar</span> : null}
+          {job.itemsError > 0 ? <span>{job.itemsError} con error</span> : null}
+          {active ? <span>Puedes seguir trabajando</span> : null}
+        </div>
       </div>
-      <div className="solicitud-ia-result__metrics">
-        <span>Identidades: {response.lecturasIdentidadNuevas} nuevas / {response.lecturasIdentidadReutilizadas} reutilizadas</span>
-        <span>Vehiculo: {response.lecturasVehiculoNuevas} nuevas / {response.lecturasVehiculoReutilizadas} reutilizadas</span>
-        <span>Roles: {response.lecturasRolesNuevas} nuevas / {response.lecturasRolesReutilizadas} reutilizadas</span>
-        <span>Aplicaciones: {response.datosAplicados}</span>
-      </div>
-      {detalles.length ? (
-        <ul>
-          {detalles.slice(0, 6).map((detalle) => <li key={detalle}>{detalle}</li>)}
-        </ul>
-      ) : null}
     </section>
   );
 }
@@ -834,7 +827,6 @@ export function ExpedienteDetailPage() {
   const [addingIdentityDocumentId, setAddingIdentityDocumentId] = useState<number | null>(null);
   const [readingRolesId, setReadingRolesId] = useState<number | null>(null);
   const [updatingDocuments, setUpdatingDocuments] = useState(false);
-  const [iaResult, setIaResult] = useState<ActualizacionDocumentalExpediente | null>(null);
   const [iaError, setIaError] = useState<string | null>(null);
   const [linkedSourceId, setLinkedSourceId] = useState("");
   const [linkedReason, setLinkedReason] = useState("");
@@ -915,6 +907,15 @@ export function ExpedienteDetailPage() {
       return data;
     });
   }, [activeOperationId, id, refreshRelatedData]);
+
+  const trabajoIaActivo = Boolean(expediente?.ultimoTrabajoIa
+    && ["PENDIENTE", "PROCESANDO"].includes(expediente.ultimoTrabajoIa.estado));
+
+  useEffect(() => {
+    if (!trabajoIaActivo) return;
+    const intervalId = window.setInterval(() => void refreshExpediente(), 2000);
+    return () => window.clearInterval(intervalId);
+  }, [refreshExpediente, trabajoIaActivo]);
 
   useEffect(() => {
     const documentos = expediente?.documentos ?? [];
@@ -1072,11 +1073,9 @@ export function ExpedienteDetailPage() {
     setUpdatingDocuments(true);
     setIaError(null);
     try {
-      const result = await updateExpedienteFromExistingDocuments(expediente.id, { forzarRelectura: force });
+      await updateExpedienteFromExistingDocuments(expediente.id, { forzarRelectura: force });
       await refreshExpediente();
-      setIaResult(result);
     } catch (cause) {
-      setIaResult(null);
       setIaError(cause instanceof ApiError ? cause.details || "No se pudo actualizar con IA." : "No se pudo actualizar con IA.");
     } finally {
       setUpdatingDocuments(false);
@@ -1676,16 +1675,16 @@ export function ExpedienteDetailPage() {
         <div className="exp-quick-actions__buttons">
           <button
             className="primary-button"
-            disabled={updatingDocuments || !hasExpedienteDocuments || expedienteCerrado}
+            disabled={updatingDocuments || trabajoIaActivo || !hasExpedienteDocuments || expedienteCerrado}
             onClick={() => handleUpdateFromExistingDocuments()}
             type="button"
           >
-            {updatingDocuments ? <Loader2 className="button-spinner" size={16} /> : <FileText size={16} />}
-            {updatingDocuments ? "Leyendo IA" : "Leer expediente con IA"}
+            {updatingDocuments || trabajoIaActivo ? <Loader2 className="button-spinner" size={16} /> : <FileText size={16} />}
+            {updatingDocuments || trabajoIaActivo ? "Leyendo IA" : "Leer expediente con IA"}
           </button>
           <button
             className="soft-button"
-            disabled={updatingDocuments || !hasExpedienteDocuments || expedienteCerrado}
+            disabled={updatingDocuments || trabajoIaActivo || !hasExpedienteDocuments || expedienteCerrado}
             onClick={() => handleUpdateFromExistingDocuments({ forzarRelectura: true })}
             type="button"
           >
@@ -1694,6 +1693,7 @@ export function ExpedienteDetailPage() {
           </button>
         </div>
       </section>
+      {expediente.ultimoTrabajoIa ? <ExpedienteIaJobPanel job={expediente.ultimoTrabajoIa} /> : null}
       <IncidentAlertPanel
         incidencias={expediente.incidencias}
         onCreateIncident={canOpenIncident ? openIncidentDialog : undefined}
@@ -1813,7 +1813,6 @@ export function ExpedienteDetailPage() {
         </section>
       ) : null}
       {iaError ? <ExpedienteIaErrorPanel message={iaError} onDismiss={() => setIaError(null)} /> : null}
-      {iaResult ? <ExpedienteIaResultPanel response={iaResult} onDismiss={() => setIaResult(null)} /> : null}
 
       <div className="exp-process-layout">
         <div className="exp-process-main">

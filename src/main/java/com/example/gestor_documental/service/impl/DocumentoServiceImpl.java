@@ -6,6 +6,7 @@ import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.event.DocumentoLecturaIaSolicitadaEvent;
+import com.example.gestor_documental.event.ExpedienteLecturaIaSolicitadaEvent;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
@@ -140,6 +141,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             documentoRepository.save(doc);
             incorporarAlExpedienteCompleto(expediente, doc, usuario);
             registrarCargaDocumentoExpediente(expediente, doc, usuario);
+            solicitarLecturaIa(doc, usuario, "AUTO_SUBIDA");
             notificarJustificanteDgtFinal(doc, usuario);
             return doc;
 
@@ -302,6 +304,10 @@ public class DocumentoServiceImpl implements DocumentoService {
                 generados++;
             }
             registrarProcesamientoExpedienteCompleto(docOriginal.getExpediente(), docOriginal, usuario, generados);
+            if (generados > 0 && preparacion.documentos().stream()
+                    .anyMatch(documento -> esCompatibleLecturaIa(documento.tipoDocumento()))) {
+                solicitarLecturaIa(docOriginal.getExpediente(), usuario, "AUTO_SEPARACION");
+            }
             return generados;
         } catch (IOException e) {
             throw new RuntimeException("Error al procesar el expediente completo", e);
@@ -689,6 +695,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         documentoRepository.save(doc);
         if (registrarHistorial) {
             registrarCargaDocumentoExpediente(expediente, doc, usuario);
+            solicitarLecturaIa(doc, usuario, "AUTO_SUBIDA");
         }
         notificarJustificanteDgtFinal(doc, usuario);
         return doc;
@@ -1472,6 +1479,10 @@ public class DocumentoServiceImpl implements DocumentoService {
                 generados++;
             }
             registrarProcesamientoExpedienteCompleto(docOriginal.getSolicitud(), docOriginal, usuario, generados);
+            if (generados > 0 && preparacion.documentos().stream()
+                    .anyMatch(documento -> esCompatibleLecturaIa(documento.tipoDocumento()))) {
+                solicitarLecturaIa(docOriginal.getSolicitud(), usuario, "AUTO_SEPARACION");
+            }
             return generados;
         } catch (IOException e) {
             throw new RuntimeException("Error al procesar el expediente completo", e);
@@ -1749,21 +1760,41 @@ public class DocumentoServiceImpl implements DocumentoService {
     }
 
     private void solicitarLecturaIa(Documento documento, Usuario usuario, String origen) {
-        if (documento == null || documento.getSolicitud() == null || usuario == null || documento.getTipoDocumento() == null) {
+        if (documento == null || usuario == null || documento.getTipoDocumento() == null
+                || !esCompatibleLecturaIa(documento.getTipoDocumento())) {
             return;
         }
-        TipoDocumento tipo = documento.getTipoDocumento();
-        boolean compatible = tipo == TipoDocumento.DNI
+        if (documento.getSolicitud() != null) {
+            applicationEventPublisher.publishEvent(new DocumentoLecturaIaSolicitadaEvent(
+                    documento.getSolicitud().getId(), usuario.getId(), origen));
+        } else if (documento.getExpediente() != null) {
+            applicationEventPublisher.publishEvent(new ExpedienteLecturaIaSolicitadaEvent(
+                    documento.getExpediente().getId(), usuario.getId(), origen));
+        }
+    }
+
+    private void solicitarLecturaIa(Solicitud solicitud, Usuario usuario, String origen) {
+        if (solicitud != null && usuario != null) {
+            applicationEventPublisher.publishEvent(new DocumentoLecturaIaSolicitadaEvent(
+                    solicitud.getId(), usuario.getId(), origen));
+        }
+    }
+
+    private void solicitarLecturaIa(Expediente expediente, Usuario usuario, String origen) {
+        if (expediente != null && usuario != null) {
+            applicationEventPublisher.publishEvent(new ExpedienteLecturaIaSolicitadaEvent(
+                    expediente.getId(), usuario.getId(), origen));
+        }
+    }
+
+    private boolean esCompatibleLecturaIa(TipoDocumento tipo) {
+        return tipo == TipoDocumento.DNI
                 || tipo == TipoDocumento.CIF
                 || tipo == TipoDocumento.CONTRATO_COMPRAVENTA
                 || tipo == TipoDocumento.FACTURA
                 || tipo == TipoDocumento.PERMISO_CIRCULACION
                 || tipo == TipoDocumento.FICHA_TECNICA
                 || tipo == TipoDocumento.INFORME_DGT;
-        if (compatible) {
-            applicationEventPublisher.publishEvent(new DocumentoLecturaIaSolicitadaEvent(
-                    documento.getSolicitud().getId(), usuario.getId(), origen));
-        }
     }
     private void registrarProcesamientoExpedienteCompleto(Expediente expediente, Documento documento, Usuario usuario, int documentosDetectados) {
         String detalle = documentosDetectados > 0

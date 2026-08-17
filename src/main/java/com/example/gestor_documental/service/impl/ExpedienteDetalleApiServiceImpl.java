@@ -34,6 +34,7 @@ import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
 import com.example.gestor_documental.model.DocumentoVehiculoLectura;
 import com.example.gestor_documental.model.Expediente;
+import com.example.gestor_documental.model.ExpedienteLecturaIaItem;
 import com.example.gestor_documental.model.ExpedienteInteresado;
 import com.example.gestor_documental.model.FacturaExpediente;
 import com.example.gestor_documental.model.HistorialCambio;
@@ -49,11 +50,13 @@ import com.example.gestor_documental.repository.DocumentoIdentidadLecturaReposit
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoVehiculoLecturaRepository;
 import com.example.gestor_documental.repository.ExpedienteInteresadoRepository;
+import com.example.gestor_documental.repository.ExpedienteLecturaIaItemRepository;
 import com.example.gestor_documental.repository.FacturaExpedienteRepository;
 import com.example.gestor_documental.repository.WhatsappWebhookEventoRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.ExpedienteDetalleApiService;
 import com.example.gestor_documental.service.ExpedienteService;
+import com.example.gestor_documental.service.ExpedienteLecturaIaJobService;
 import com.example.gestor_documental.service.ExpedienteTipoTramitePolicyService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.HitoExpedienteService;
@@ -96,7 +99,9 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
     private final RequisitoDocumentalExpedienteService requisitoDocumentalService;
     private final HitoExpedienteService hitoExpedienteService;
     private final ExpedienteTipoTramitePolicyService tipoTramitePolicyService;
+    private final ExpedienteLecturaIaJobService expedienteLecturaIaJobService;
     private final ExpedienteInteresadoRepository expedienteInteresadoRepository;
+    private final ExpedienteLecturaIaItemRepository expedienteLecturaIaItemRepository;
     private final FacturaExpedienteRepository facturaExpedienteRepository;
     private final DocumentoIdentidadLecturaRepository documentoIdentidadLecturaRepository;
     private final DocumentoRolesLecturaRepository documentoRolesLecturaRepository;
@@ -153,6 +158,7 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .siguientePaso(calcularSiguientePaso(estadoDetalle, hitosSiguientePaso))
                 .mensajesNoLeidos((int) mensajeService.contarNoLeidosExpediente(expedienteId, usuarioLogueado))
                 .factura(facturaExpedienteRepository.findByExpedienteId(expedienteId).map(this::mapFactura).orElse(null))
+                .ultimoTrabajoIa(expedienteLecturaIaJobService.obtenerUltimo(expedienteId, usuarioLogueado))
                 .cliente(mapCliente(expediente.getCliente()))
                 .creadoPor(mapUsuario(expediente.getCreadoPor()))
                 .modificadoPor(mapUsuario(expediente.getModificadoPor()))
@@ -829,6 +835,10 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .stream()
                 .filter(lectura -> lectura.getDocumento() != null && lectura.getDocumento().getId() != null)
                 .collect(Collectors.toMap(lectura -> lectura.getDocumento().getId(), lectura -> lectura, (actual, repetida) -> actual));
+        Map<Long, ExpedienteLecturaIaItem> estadosPorDocumento = documentoIds.isEmpty()
+                ? Map.of()
+                : expedienteLecturaIaItemRepository.findUltimosPorDocumento(documentoIds).stream()
+                .collect(Collectors.toMap(item -> item.getDocumento().getId(), item -> item, (actual, repetido) -> actual));
 
         documentos.stream()
                 .sorted(Comparator.comparing(Documento::getFechaSubida, Comparator.nullsLast(Comparator.reverseOrder())))
@@ -836,22 +846,29 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                         documento,
                         lecturasPorDocumento.get(documento.getId()),
                         lecturasRolesPorDocumento.get(documento.getId()),
-                        lecturasVehiculoPorDocumento.get(documento.getId())))
+                        lecturasVehiculoPorDocumento.get(documento.getId()),
+                        estadosPorDocumento.get(documento.getId())))
                 .forEach(resultado::add);
 
         return resultado;
     }
 
     private DocumentoExpedienteResponse mapDocumentoSubido(Documento documento) {
-        return mapDocumentoSubido(documento, null, null, null);
+        return mapDocumentoSubido(documento, null, null, null, null);
     }
 
     private DocumentoExpedienteResponse mapDocumentoSubido(
             Documento documento,
             DocumentoIdentidadLectura lecturaIdentidad,
             DocumentoRolesLectura lecturaRoles,
-            DocumentoVehiculoLectura lecturaVehiculo
+            DocumentoVehiculoLectura lecturaVehiculo,
+            ExpedienteLecturaIaItem estadoLectura
     ) {
+        com.example.gestor_documental.dto.expediente.DocumentoLecturaIaEstadoResponse estadoIa =
+                com.example.gestor_documental.dto.expediente.DocumentoLecturaIaEstadoResponse.from(estadoLectura);
+        if (estadoIa == null) {
+            estadoIa = estadoLecturaIaExistente(documento, lecturaIdentidad, lecturaRoles, lecturaVehiculo);
+        }
         return DocumentoExpedienteResponse.builder()
                 .id(documento.getId())
                 .nombre(documento.getNombreArchivo())
@@ -872,7 +889,40 @@ public class ExpedienteDetalleApiServiceImpl implements ExpedienteDetalleApiServ
                 .lecturaIdentidad(com.example.gestor_documental.dto.expediente.DocumentoIdentidadLecturaResponse.from(lecturaIdentidad))
                 .lecturaRoles(com.example.gestor_documental.dto.expediente.DocumentoRolesLecturaResponse.from(lecturaRoles))
                 .lecturaVehiculo(com.example.gestor_documental.dto.expediente.DocumentoVehiculoLecturaResponse.from(lecturaVehiculo))
+                .lecturaIa(estadoIa)
                 .build();
+    }
+
+    private com.example.gestor_documental.dto.expediente.DocumentoLecturaIaEstadoResponse estadoLecturaIaExistente(
+            Documento documento,
+            DocumentoIdentidadLectura identidad,
+            DocumentoRolesLectura roles,
+            DocumentoVehiculoLectura vehiculo
+    ) {
+        var builder = com.example.gestor_documental.dto.expediente.DocumentoLecturaIaEstadoResponse.builder();
+        if (identidad != null) {
+            return builder.tipoLectura("IDENTIDAD")
+                    .estado(identidad.isRequiereRevision() ? "REQUIERE_REVISION" : "COMPLETADO")
+                    .mensaje(identidad.getMensaje()).modelo(identidad.getModelo()).confianza(identidad.getConfianzaGlobal()).build();
+        }
+        if (roles != null) {
+            return builder.tipoLectura("ROLES")
+                    .estado(roles.isRequiereRevision() ? "REQUIERE_REVISION" : "COMPLETADO")
+                    .mensaje(roles.getMensaje()).modelo(roles.getModelo()).confianza(roles.getConfianzaGlobal()).build();
+        }
+        if (vehiculo != null) {
+            return builder.tipoLectura("VEHICULO")
+                    .estado(vehiculo.isRequiereRevision() ? "REQUIERE_REVISION" : "COMPLETADO")
+                    .mensaje(vehiculo.getMensaje()).modelo(vehiculo.getModelo()).confianza(vehiculo.getConfianzaGlobal()).build();
+        }
+        TipoDocumento tipo = documento.getTipoDocumento();
+        boolean identidadCompatible = tipo == TipoDocumento.DNI || tipo == TipoDocumento.CIF;
+        boolean rolesCompatible = tipo == TipoDocumento.CONTRATO_COMPRAVENTA || tipo == TipoDocumento.FACTURA;
+        boolean vehiculoCompatible = tipo == TipoDocumento.PERMISO_CIRCULACION
+                || tipo == TipoDocumento.FICHA_TECNICA || tipo == TipoDocumento.INFORME_DGT;
+        if (!identidadCompatible && !rolesCompatible && !vehiculoCompatible) return null;
+        return builder.tipoLectura(identidadCompatible ? "IDENTIDAD" : rolesCompatible ? "ROLES" : "VEHICULO")
+                .estado("SIN_LEER").mensaje("Pendiente de lectura automatica").build();
     }
 
     private RequisitoDocumentalResponse mapRequisitoDocumental(RequisitoDocumentalExpediente requisito) {

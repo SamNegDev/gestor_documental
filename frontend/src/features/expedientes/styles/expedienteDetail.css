@@ -374,6 +374,70 @@
   background: oklch(98% 0.018 220);
 }
 
+.document-table--expediente {
+  container-name: expediente-document-table;
+  container-type: inline-size;
+}
+
+.document-table--expediente .document-table__row {
+  grid-template-columns: auto minmax(0, 1fr) minmax(112px, auto) auto;
+  align-items: start;
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: none;
+}
+
+.document-table--expediente .document-table__row > svg {
+  margin-top: 2px;
+  color: var(--danger);
+}
+
+.document-table__uploaded {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.document-table__uploaded span {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.document-table__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.document-table__actions .icon-button,
+.document-table__actions .soft-button {
+  flex: 0 0 auto;
+}
+
+@container expediente-document-table (max-width: 760px) {
+  .document-table--expediente .document-table__row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .document-table__uploaded,
+  .document-table__actions {
+    grid-column: 2;
+    justify-items: start;
+    justify-content: flex-start;
+    text-align: left;
+  }
+}
+
 .exp-quick-actions--workflow {
   grid-template-areas:
     "copy buttons"

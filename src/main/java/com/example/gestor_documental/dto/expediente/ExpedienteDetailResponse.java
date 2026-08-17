@@ -30,6 +30,7 @@ public class ExpedienteDetailResponse {
     private HitoExpedienteResponse siguientePaso;
     private int mensajesNoLeidos;
     private FacturaExpedienteResumenResponse factura;
+    private ExpedienteLecturaIaJobResponse ultimoTrabajoIa;
 
     private ClienteResumenResponse cliente;
     private UsuarioResumenResponse creadoPor;

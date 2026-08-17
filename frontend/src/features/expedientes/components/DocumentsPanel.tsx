@@ -1,4 +1,4 @@
-import { Eye, FilePlus2, FileText, IdCard, Loader2, Pencil, Scissors, Trash2, Upload, UsersRound } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, FilePlus2, FileText, IdCard, Loader2, Pencil, Scissors, Sparkles, Trash2, Upload, UsersRound } from "lucide-react";
 import { DocumentReadingPanel, type DocumentReadingExistingIdentity } from "./DocumentReadingPanel";
 import { useDocumentDropZone } from "./useDocumentDropZone";
 import type { DocumentoExpediente, DocumentoIdentidadDetectada } from "../types/expedienteDetail.types";
@@ -57,15 +57,15 @@ export function DocumentsPanel({
           <h3>Documentos del expediente</h3>
         </div>
         <div className="exp-panel__heading-actions">
-          <button className="soft-button" onClick={onOpenUpload} type="button">
+          <button className="soft-button soft-button--compact" onClick={onOpenUpload} type="button">
             <Upload size={16} />
             Subir documento suelto
           </button>
-          <button className="soft-button" disabled={!hasEditableDocuments} onClick={onOpenReview} type="button">
+          <button className="soft-button soft-button--compact" disabled={!hasEditableDocuments} onClick={onOpenReview} type="button">
             <Scissors size={16} />
             Revisar documentos
           </button>
-          <button className="primary-button" onClick={onOpenTemplates} type="button">
+          <button className="soft-button soft-button--compact" onClick={onOpenTemplates} type="button">
             <FilePlus2 size={16} />
             Preparar PDF
           </button>
@@ -83,7 +83,8 @@ export function DocumentsPanel({
         <span>Suelta el archivo para elegir el tipo documental</span>
       </div>
 
-      <div className="documents-list">
+      <div className="document-table document-table--expediente">
+        {documentos.length === 0 ? <div className="document-table__empty">No hay documentos asociados.</div> : null}
         {documentos.map((documento, index) => {
           const canReadIdentity = Boolean(documento.id && (documento.tipo === "DNI" || documento.tipo === "CIF"));
           const canReadRoles = Boolean(documento.id && (documento.tipo === "CONTRATO_COMPRAVENTA" || documento.tipo === "FACTURA"));
@@ -91,26 +92,19 @@ export function DocumentsPanel({
           const addingIdentity = Boolean(documento.id && addingIdentityDocumentId === documento.id);
           const readingRoles = Boolean(documento.id && readingRolesId === documento.id);
           return (
-            <article className={`document-row document-row--${documento.estado.toLowerCase()}`} key={`${documento.tipo}-${documento.id ?? index}`}>
-              <div className="pdf-icon">
-                <FileText size={18} />
-                <strong>PDF</strong>
-              </div>
+            <article className="document-table__row document-table__row--expediente" key={`${documento.tipo}-${documento.id ?? index}`}>
+              <FileText aria-hidden="true" size={20} />
 
-              <div className="document-row__body">
-                <div className="document-row__heading">
-                  <strong>{documento.nombreOriginal || documento.nombre}</strong>
-                  <span className="document-state">{humanizeEnum(documento.estado)}</span>
+              <div className="document-table__main">
+                <strong>{documento.nombreOriginal || documento.nombre}</strong>
+                <div className="document-table__meta">
+                  <span>
+                    {formatDocumentType(documento.tipo)}
+                    {documento.operacionLabel ? ` · ${documento.operacionLabel}` : ""}
+                    {documento.interesadoNombre ? ` · ${documento.interesadoNombre}` : ""}
+                  </span>
+                  <DocumentIaStatus status={documento.lecturaIa} />
                 </div>
-                <span>
-                  {formatDocumentType(documento.tipo)}
-                  {documento.operacionLabel ? ` · ${documento.operacionLabel}` : ""}
-                </span>
-                <small>
-                  {documento.subido
-                    ? `Subido ${formatDateTime(documento.fechaSubida)}${documento.subidoPor ? ` por ${documento.subidoPor}` : ""}`
-                    : documento.descripcion || "Documento pendiente"}
-                </small>
                 <DocumentReadingPanel
                   addingIdentity={addingIdentity}
                   canAddIdentity={Boolean(documento.lecturaIdentidad)}
@@ -123,16 +117,18 @@ export function DocumentsPanel({
                 />
               </div>
 
-              <div className="document-row__actions">
-                <button
-                  className="icon-button"
-                  disabled={!documento.id}
-                  onClick={() => documento.id && window.open(`/documentos/ver/${documento.id}`, "_blank", "noopener,noreferrer")}
-                  title="Ver documento"
-                  type="button"
-                >
-                  <Eye size={16} />
-                </button>
+              <small className="document-table__uploaded">
+                {documento.subido ? formatDateTime(documento.fechaSubida) : documento.descripcion || "Pendiente"}
+                {documento.subidoPor ? <span>{documento.subidoPor}</span> : null}
+              </small>
+
+              <div className="document-table__actions">
+                {documento.id ? (
+                  <a className="soft-button soft-button--compact" href={`/documentos/ver/${documento.id}`} target="_blank" rel="noreferrer">
+                    <ExternalLink size={15} />
+                    Ver
+                  </a>
+                ) : null}
                 {canReadIdentity ? (
                   <button
                     className="icon-button"
@@ -155,7 +151,7 @@ export function DocumentsPanel({
                     {readingRoles ? <Loader2 className="document-row__identity-spinner" size={16} /> : <UsersRound size={16} />}
                   </button>
                 ) : null}
-                <label className="icon-button" title="Subir este documento">
+                <label className="icon-button" title="Subir una nueva version del documento">
                   <Upload size={16} />
                   <input
                     hidden
@@ -186,5 +182,25 @@ export function DocumentsPanel({
         })}
       </div>
     </section>
+  );
+}
+
+function DocumentIaStatus({ status }: { status?: DocumentoExpediente["lecturaIa"] }) {
+  if (!status) return null;
+  const labels: Record<string, string> = {
+    SIN_LEER: "Pendiente IA",
+    PENDIENTE: "En cola",
+    PROCESANDO: "Leyendo",
+    COMPLETADO: "Leido",
+    REQUIERE_REVISION: "Revisar lectura",
+    ERROR: "Error de lectura",
+  };
+  const active = status.estado === "PENDIENTE" || status.estado === "PROCESANDO";
+  const Icon = active ? Loader2 : status.estado === "COMPLETADO" ? CheckCircle2 : status.estado === "ERROR" || status.estado === "REQUIERE_REVISION" ? AlertTriangle : Sparkles;
+  return (
+    <span className={`document-ia-status document-ia-status--${status.estado.toLowerCase()}`} title={status.mensaje || undefined}>
+      <Icon className={active ? "is-spinning" : ""} size={13} aria-hidden="true" />
+      {labels[status.estado] || humanizeEnum(status.estado)}
+    </span>
   );
 }
