@@ -559,7 +559,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         identidadLecturaRepository.findByDocumentoIdIn(documentoIds).stream()
                 .forEach(lectura -> {
                     agregarIdentidad(result, identidadDesdeLecturaPrincipal(lectura));
-                    DocumentoIdentidadLecturaJson.extraer(lectura).stream()
+                    DocumentoIdentidadLecturaJson.extraerValidas(lectura).stream()
                             .map(identidad -> identidadDesdeDetectada(lectura, identidad))
                             .forEach(identidad -> agregarIdentidad(result, identidad));
                 });
@@ -630,7 +630,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 normalizarTexto(identidad.direccionTexto()),
                 identidad.direccion(),
                 identidad.confianzaGlobal(),
-                identidad.requiereRevision(),
+                (lectura != null && lectura.isRequiereRevision()) || identidad.requiereRevision(),
                 mismaIdentidad(lectura, identidad) ? lectura : null
         );
     }
@@ -764,14 +764,16 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return lectura != null
                 && normalizarIdentificador(lectura.getIdentificador()) != null
                 && identificadorValido(normalizarIdentificador(lectura.getIdentificador()))
-                && confianza(lectura.getConfianzaGlobal()) >= CONFIANZA_MINIMA_IDENTIDAD;
+                && confianza(lectura.getConfianzaGlobal()) >= CONFIANZA_MINIMA_IDENTIDAD
+                && !lectura.isRequiereRevision();
     }
 
     private boolean identidadUsable(IdentidadSolicitud identidad) {
         return identidad != null
                 && identidad.identificador() != null
                 && identificadorValido(identidad.identificador())
-                && confianza(identidad.confianzaGlobal()) >= CONFIANZA_MINIMA_IDENTIDAD;
+                && confianza(identidad.confianzaGlobal()) >= CONFIANZA_MINIMA_IDENTIDAD
+                && !identidad.requiereRevision();
     }
 
     private boolean rolesUsables(DocumentoRolesLectura lectura) {

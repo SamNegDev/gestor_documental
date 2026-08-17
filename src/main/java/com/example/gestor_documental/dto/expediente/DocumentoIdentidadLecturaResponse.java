@@ -1,6 +1,7 @@
 package com.example.gestor_documental.dto.expediente;
 
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
+import com.example.gestor_documental.util.DocumentoIdentidadCalidad;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -55,12 +56,19 @@ public class DocumentoIdentidadLecturaResponse {
     private String fechaLectura;
     private int identidadesDetectadasTotal;
     private List<DocumentoIdentidadDetectadaResponse> identidadesDetectadas;
+    private String calidadLectura;
+    private String calidadLecturaEtiqueta;
+    private List<String> indicadoresCalidad;
+    private List<String> advertenciasCalidad;
+    private boolean datosDifierenInteresado;
+    private boolean validadaManualmente;
 
     public static DocumentoIdentidadLecturaResponse from(DocumentoIdentidadLectura lectura) {
         if (lectura == null) {
             return null;
         }
-        var identidadesDetectadas = DocumentoIdentidadLecturaJson.extraer(lectura);
+        var identidadesDetectadas = DocumentoIdentidadLecturaJson.extraerValidas(lectura);
+        var calidad = DocumentoIdentidadCalidad.evaluar(lectura, identidadesDetectadas);
         return DocumentoIdentidadLecturaResponse.builder()
                 .id(lectura.getId())
                 .documentoId(lectura.getDocumento() != null ? lectura.getDocumento().getId() : null)
@@ -97,6 +105,12 @@ public class DocumentoIdentidadLecturaResponse {
                 .identidadesDetectadas(identidadesDetectadas.stream()
                         .map(DocumentoIdentidadDetectadaResponse::from)
                         .toList())
+                .calidadLectura(calidad.nivel())
+                .calidadLecturaEtiqueta(calidad.etiqueta())
+                .indicadoresCalidad(calidad.indicadores())
+                .advertenciasCalidad(calidad.advertencias())
+                .datosDifierenInteresado(calidad.datosDifierenInteresado())
+                .validadaManualmente(calidad.validadaManualmente())
                 .build();
     }
 

@@ -22,6 +22,7 @@ import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.RequisitoDocumentalExpedienteService;
 import com.example.gestor_documental.util.DireccionEstructurada;
+import com.example.gestor_documental.util.DocumentoIdentidadCalidad;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
 import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson.IdentidadDetectada;
 import com.example.gestor_documental.util.NombrePersonaNormalizer;
@@ -220,6 +221,9 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 pero corrige solo cuando exista una unica alternativa compatible con el formato y el control. Si quedan varias alternativas, no inventes.
                 El identificador impreso es la fuente principal. Puedes usar la zona MRZ para corroborar o recuperar exactamente el DNI/NIE,
                 pero nunca devuelvas como identificador la cadena MRZ completa ni los campos IDESP, CAN o numero de soporte.
+                No trates numeros de tarjetas extranjeras, permisos de residencia extranjeros, codigos de soporte ni numeros de serie como DNI, NIE o CIF.
+                El nombre de una administracion, ministerio o entidad emisora no es una empresa detectada. Solo devuelve una empresa cuando aparezca
+                una razon social asociada a un CIF espanol cuyo caracter de control sea coherente.
                 Personas fisicas: separa nombre, apellido1 y apellido2 exactamente como aparezcan; no cambies el orden.
                 Si el documento tiene campos "Apellidos" y "Nombre", apellido1/apellido2 salen de Apellidos y nombre sale de Nombre.
                 Empresas: usa razonSocial y deja nombre/apellidos en null.
@@ -267,6 +271,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
 
     private void aplicarResultado(Documento documento, DocumentoIdentidadLectura lectura, JsonNode resultado, Usuario usuario, String modeloUsado) {
         List<IdentidadDetectada> identidades = DocumentoIdentidadLecturaJson.extraer(resultado);
+        List<IdentidadDetectada> identidadesValidas = DocumentoIdentidadLecturaJson.extraerValidas(resultado);
         IdentidadDetectada principal = identidadPrincipal(documento, identidades);
         String identificador = principal != null ? normalizarIdentificador(principal.identificador()) : null;
         Double confianza = principal != null ? principal.confianzaGlobal() : null;
@@ -287,10 +292,16 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
                 && identificador != null
                 && !coincideIdentificador(documento.getInteresado(), identificador);
         boolean documentoDeSolicitud = documento.getSolicitud() != null;
+        boolean datosDiferentes = DocumentoIdentidadCalidad.comparar(interesadoVinculado, principal).tieneDiferencias();
         boolean requiereRevision = !lecturaSegura
                 || multiplesIdentidadesSinCoincidencia
                 || (!documentoDeSolicitud && interesadoVinculado == null)
-                || conflictoInteresado;
+                || conflictoInteresado
+                || datosDiferentes;
+        boolean vinculoSeguro = lecturaSegura
+                && !multiplesIdentidadesSinCoincidencia
+                && !conflictoInteresado
+                && interesadoVinculado != null;
 
         lectura.setTipoDocumentoDetectado(tipoDetectado);
         lectura.setIdentificador(identificador);
@@ -320,15 +331,15 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         }
         lectura.setConfianzaGlobal(confianza);
         lectura.setInteresadoVinculado(interesadoVinculado);
-        lectura.setVinculadoAutomaticamente(!requiereRevision && interesadoVinculado != null);
+        lectura.setVinculadoAutomaticamente(vinculoSeguro);
         lectura.setRequiereRevision(requiereRevision);
         lectura.setModelo(modeloUsado);
         lectura.setFechaLectura(LocalDateTime.now());
         lectura.setResultadoJson(resultado.toString());
         lectura.setMensaje(mensajeLectura(identificador, identificadorInvalido, interesadoVinculado, conflictoInteresado,
-                requiereRevision, identidades.size(), multiplesIdentidadesSinCoincidencia));
+                requiereRevision, identidadesValidas.size(), multiplesIdentidadesSinCoincidencia, datosDiferentes));
 
-        if (!requiereRevision && interesadoVinculado != null) {
+        if (vinculoSeguro) {
             boolean documentoActualizado = false;
             if (documento.getInteresado() == null) {
                 documento.setInteresado(interesadoVinculado);
@@ -341,7 +352,9 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             if (documentoActualizado) {
                 documentoRepository.save(documento);
             }
-            actualizarInteresadoDesdeLectura(interesadoVinculado, lectura);
+            if (!datosDiferentes) {
+                actualizarInteresadoDesdeLectura(interesadoVinculado, lectura);
+            }
             sincronizarRequisitosExpediente(documento, usuario);
         }
     }
@@ -432,44 +445,44 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         }
         completarNombreEstructurado(interesado, lectura);
         String direccion = normalizarDireccionCompleta(lectura.getDireccionTexto());
-        if (direccion != null) {
+        if (TextNormalizer.upperOrNull(interesado.getDireccion()) == null && direccion != null) {
             interesado.setDireccion(direccion);
         }
         actualizarDireccionEstructurada(interesado, lectura);
     }
 
     private void actualizarDireccionEstructurada(Interesado interesado, DocumentoIdentidadLectura lectura) {
-        if (TextNormalizer.upperOrNull(lectura.getTipoVia()) != null) {
+        if (TextNormalizer.upperOrNull(interesado.getTipoVia()) == null && TextNormalizer.upperOrNull(lectura.getTipoVia()) != null) {
             interesado.setTipoVia(TextNormalizer.upperOrNull(lectura.getTipoVia()));
         }
-        if (TextNormalizer.upperOrNull(lectura.getNombreVia()) != null) {
+        if (TextNormalizer.upperOrNull(interesado.getNombreVia()) == null && TextNormalizer.upperOrNull(lectura.getNombreVia()) != null) {
             interesado.setNombreVia(TextNormalizer.upperOrNull(lectura.getNombreVia()));
         }
-        if (TextNormalizer.upperOrNull(lectura.getNumeroVia()) != null) {
+        if (TextNormalizer.upperOrNull(interesado.getNumeroVia()) == null && TextNormalizer.upperOrNull(lectura.getNumeroVia()) != null) {
             interesado.setNumeroVia(TextNormalizer.upperOrNull(lectura.getNumeroVia()));
         }
-        if (TextNormalizer.upperOrNull(lectura.getBloque()) != null) {
+        if (TextNormalizer.upperOrNull(interesado.getBloque()) == null && TextNormalizer.upperOrNull(lectura.getBloque()) != null) {
             interesado.setBloque(TextNormalizer.upperOrNull(lectura.getBloque()));
         }
-        if (TextNormalizer.upperOrNull(lectura.getPortal()) != null) {
+        if (TextNormalizer.upperOrNull(interesado.getPortal()) == null && TextNormalizer.upperOrNull(lectura.getPortal()) != null) {
             interesado.setPortal(TextNormalizer.upperOrNull(lectura.getPortal()));
         }
-        if (TextNormalizer.upperOrNull(lectura.getEscalera()) != null) {
+        if (TextNormalizer.upperOrNull(interesado.getEscalera()) == null && TextNormalizer.upperOrNull(lectura.getEscalera()) != null) {
             interesado.setEscalera(TextNormalizer.upperOrNull(lectura.getEscalera()));
         }
-        if (TextNormalizer.upperOrNull(lectura.getPiso()) != null) {
+        if (TextNormalizer.upperOrNull(interesado.getPiso()) == null && TextNormalizer.upperOrNull(lectura.getPiso()) != null) {
             interesado.setPiso(TextNormalizer.upperOrNull(lectura.getPiso()));
         }
-        if (TextNormalizer.upperOrNull(lectura.getPuerta()) != null) {
+        if (TextNormalizer.upperOrNull(interesado.getPuerta()) == null && TextNormalizer.upperOrNull(lectura.getPuerta()) != null) {
             interesado.setPuerta(TextNormalizer.upperOrNull(lectura.getPuerta()));
         }
-        if (TextNormalizer.upperOrNull(lectura.getCodigoPostal()) != null) {
+        if (TextNormalizer.upperOrNull(interesado.getCodigoPostal()) == null && TextNormalizer.upperOrNull(lectura.getCodigoPostal()) != null) {
             interesado.setCodigoPostal(TextNormalizer.upperOrNull(lectura.getCodigoPostal()));
         }
-        if (TextNormalizer.upperOrNull(lectura.getMunicipio()) != null) {
+        if (TextNormalizer.upperOrNull(interesado.getMunicipio()) == null && TextNormalizer.upperOrNull(lectura.getMunicipio()) != null) {
             interesado.setMunicipio(TextNormalizer.upperOrNull(lectura.getMunicipio()));
         }
-        if (TextNormalizer.upperOrNull(lectura.getProvincia()) != null) {
+        if (TextNormalizer.upperOrNull(interesado.getProvincia()) == null && TextNormalizer.upperOrNull(lectura.getProvincia()) != null) {
             interesado.setProvincia(TextNormalizer.upperOrNull(lectura.getProvincia()));
         }
     }
@@ -683,7 +696,8 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             boolean conflictoInteresado,
             boolean requiereRevision,
             int identidadesDetectadas,
-            boolean multiplesIdentidadesSinCoincidencia
+            boolean multiplesIdentidadesSinCoincidencia,
+            boolean datosDiferentes
     ) {
         if (multiplesIdentidadesSinCoincidencia) {
             return "Se detectaron varias identidades validas sin coincidencia con los interesados; asignacion manual requerida.";
@@ -699,6 +713,9 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         }
         if (conflictoInteresado) {
             return "El documento ya estaba asociado a otro interesado; revisar antes de validar.";
+        }
+        if (datosDiferentes) {
+            return "La identidad coincide por DNI/CIF, pero algunos datos difieren y no se han reemplazado.";
         }
         if (requiereRevision) {
             return "Identidad leida con dudas; revisar antes de vincular.";

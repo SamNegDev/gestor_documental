@@ -8,6 +8,7 @@ import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Documento;
+import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.DocumentoVehiculoLectura;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -193,6 +195,19 @@ class SolicitudDocumentacionIaServiceImplTest {
         assertThat(solicitud.getMatricula()).isNull();
         assertThat(solicitud.getVehiculoBastidor()).isNull();
     }
+
+    @Test
+    void noConsolidaIdentidadMarcadaParaRevisionAunqueLaConfianzaSeaAlta() {
+        DocumentoIdentidadLectura lectura = new DocumentoIdentidadLectura();
+        lectura.setIdentificador("12345678Z");
+        lectura.setConfianzaGlobal(1.0);
+        lectura.setRequiereRevision(true);
+
+        Boolean usable = ReflectionTestUtils.invokeMethod(service, "identidadUsable", lectura);
+
+        assertThat(usable).isFalse();
+    }
+
     private Solicitud solicitudCliente(Long id) {
         Solicitud solicitud = new Solicitud();
         solicitud.setId(id);

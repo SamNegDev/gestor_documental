@@ -79,4 +79,22 @@ class DocumentoIdentidadLecturaJsonTest {
         assertThat(identidades.get(0).codigoPostal()).isEqualTo("38329");
         assertThat(identidades.get(0).municipio()).isEqualTo("EL ROSARIO");
     }
+
+    @Test
+    void conservaCandidatosEnCrudoPeroSoloExponeIdentificadoresFiscalesValidos() throws Exception {
+        String resultado = """
+                {
+                  "identidades": [
+                    {"tipoDocumento":"NIE","identificador":"Y1234567X","nombre":"DELFINO","confianzaGlobal":0.98,"requiereRevision":false},
+                    {"tipoDocumento":"CIF","identificador":"CA29548JB","razonSocial":"MINISTERO DELL INTERNO","confianzaGlobal":1.0,"requiereRevision":false}
+                  ]
+                }
+                """;
+
+        assertThat(DocumentoIdentidadLecturaJson.extraer(resultado)).hasSize(2);
+        assertThat(DocumentoIdentidadLecturaJson.extraerValidas(
+                new com.fasterxml.jackson.databind.ObjectMapper().readTree(resultado)))
+                .extracting(IdentidadDetectada::identificador)
+                .containsExactly("Y1234567X");
+    }
 }

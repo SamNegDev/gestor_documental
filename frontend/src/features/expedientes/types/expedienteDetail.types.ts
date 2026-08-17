@@ -188,6 +188,12 @@ export interface DocumentoIdentidadLectura {
   fechaLectura?: string | null;
   identidadesDetectadasTotal?: number;
   identidadesDetectadas?: DocumentoIdentidadDetectada[];
+  calidadLectura?: "CONFIRMADA" | "CONSISTENTE" | "CON_DIFERENCIAS" | "REVISAR" | string;
+  calidadLecturaEtiqueta?: string | null;
+  indicadoresCalidad?: string[];
+  advertenciasCalidad?: string[];
+  datosDifierenInteresado?: boolean;
+  validadaManualmente?: boolean;
 }
 
 export interface DocumentoIdentidadDetectada {

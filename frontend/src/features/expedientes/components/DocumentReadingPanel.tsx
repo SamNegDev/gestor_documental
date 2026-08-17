@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from "react";
-import { ExternalLink, Loader2, RefreshCw, UserPlus, X } from "lucide-react";
+import { AlertTriangle, Check, ExternalLink, Loader2, RefreshCw, ShieldCheck, UserPlus, X } from "lucide-react";
 import { uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import type { DocumentoExpediente, DocumentoIdentidadDetectada, DocumentoIdentidadLectura } from "../types/expedienteDetail.types";
 import { humanizeEnum } from "../utils/formatters";
@@ -79,14 +79,23 @@ export function DocumentReadingPanel({
 
   if (identidad) {
     const detectadas = compactIdentityOptions(
-      identidad.identidadesDetectadas?.length ? identidad.identidadesDetectadas : [lecturaPrincipalComoIdentidad(identidad)],
+      identidad.identidadesDetectadas !== undefined
+        ? identidad.identidadesDetectadas
+        : [lecturaPrincipalComoIdentidad(identidad)],
     );
+    const quality = identityQuality(identidad);
     return (
-      <div className={identidad.requiereRevision ? "solicitud-reading is-warning" : "solicitud-reading is-success"}>
+      <div className={`solicitud-reading ${quality.tone}`}>
         <div className="solicitud-reading__header">
-          <strong>{detectadas.length > 1 ? `${detectadas.length} DNI/CIF detectados` : "DNI/CIF detectado"}</strong>
+          <strong>{detectadas.length > 1 ? `${detectadas.length} DNI/CIF detectados` : detectadas.length === 1 ? "DNI/CIF detectado" : "Identidad no validada"}</strong>
           <div className="solicitud-reading__header-actions">
-            <span>{confidenceLabel(identidad.confianzaGlobal)}</span>
+            <span className={`solicitud-reading__quality ${quality.tone}`}>
+              {quality.tone === "is-success" ? <ShieldCheck size={14} /> : <AlertTriangle size={14} />}
+              {quality.label}
+            </span>
+            <span className="solicitud-reading__ai-confidence" title="Estimación declarada por el modelo, no es una validación oficial">
+              IA {confidenceValue(identidad.confianzaGlobal)}
+            </span>
             {canRereadIdentity ? (
               <button
                 className="soft-button soft-button--compact"
@@ -100,7 +109,14 @@ export function DocumentReadingPanel({
             ) : null}
           </div>
         </div>
-        <div className="solicitud-reading-identities">
+        {identidad.indicadoresCalidad?.length ? (
+          <div className="solicitud-reading__signals" aria-label="Indicadores de calidad de la lectura">
+            {identidad.indicadoresCalidad.map((indicator) => (
+              <span key={indicator}><Check size={12} />{indicator}</span>
+            ))}
+          </div>
+        ) : null}
+        {detectadas.length ? <div className="solicitud-reading-identities">
           {detectadas.map((item, index) => {
             const key = identityKey(item, index);
             const normalizedId = normalizeIdentityIdentifier(item.identificador);
@@ -175,8 +191,15 @@ export function DocumentReadingPanel({
               </div>
             );
           })}
-        </div>
-        <em>{identidad.mensaje || (identidad.requiereRevision ? "Revisar lectura" : "Lectura valida")}</em>
+        </div> : (
+          <p className="solicitud-reading__empty">No se ha encontrado un DNI, NIE o CIF español con control válido. Los códigos auxiliares no se mostrarán como interesados.</p>
+        )}
+        {identidad.advertenciasCalidad?.length ? (
+          <div className="solicitud-reading__warnings">
+            {identidad.advertenciasCalidad.map((warning) => <span key={warning}>{warning}</span>)}
+          </div>
+        ) : null}
+        <em>{identidad.mensaje || (identidad.requiereRevision ? "Revisar lectura" : "Lectura válida")}</em>
         {reviewing ? (
           <IdentityReviewDialog
             addingIdentity={addingIdentity}
@@ -529,4 +552,17 @@ export function normalizeIdentityIdentifier(value?: string | null) {
 
 function confidenceLabel(value?: number | null) {
   return typeof value === "number" ? `${Math.round(value * 100)}% confianza` : "Sin confianza";
+}
+
+function confidenceValue(value?: number | null) {
+  return typeof value === "number" ? `${Math.round(value * 100)}%` : "sin estimación";
+}
+
+function identityQuality(lectura: DocumentoIdentidadLectura) {
+  const level = lectura.calidadLectura;
+  const warning = level === "REVISAR" || level === "CON_DIFERENCIAS" || lectura.requiereRevision;
+  return {
+    tone: warning ? "is-warning" : "is-success",
+    label: lectura.calidadLecturaEtiqueta || (warning ? "Revisar lectura" : "Lectura consistente"),
+  };
 }

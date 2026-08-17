@@ -1,6 +1,7 @@
 package com.example.gestor_documental.util;
 
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
+import com.example.gestor_documental.validation.IdentificadorFiscalValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -39,6 +40,24 @@ public final class DocumentoIdentidadLecturaJson {
                 lectura.getMensaje()
         );
         return fallback.tieneDatos() ? List.of(fallback) : List.of();
+    }
+
+    /**
+     * Devuelve solo identidades utilizables por los flujos operativos. El JSON original
+     * se conserva completo en la lectura para auditoria, pero codigos auxiliares, MRZ o
+     * identificadores extranjeros no deben convertirse en interesados ni mostrarse como
+     * identidades espanolas.
+     */
+    public static List<IdentidadDetectada> extraerValidas(DocumentoIdentidadLectura lectura) {
+        return extraer(lectura).stream()
+                .filter(identidad -> IdentificadorFiscalValidator.esValido(identidad.identificador()))
+                .toList();
+    }
+
+    public static List<IdentidadDetectada> extraerValidas(JsonNode root) {
+        return extraer(root).stream()
+                .filter(identidad -> IdentificadorFiscalValidator.esValido(identidad.identificador()))
+                .toList();
     }
 
     public static List<IdentidadDetectada> extraer(String resultadoJson) {
