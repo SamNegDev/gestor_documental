@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -247,20 +248,71 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
         });
     }
 
-    private ResultadoItem leer(ItemContext context, Usuario usuario) {
-        if (context.tipo() == TipoLecturaIa.IDENTIDAD) {
-            DocumentoIdentidadLecturaResponse response = identidadService.leerIdentidad(
+    ResultadoItem leer(ItemContext context, Usuario usuario) {
+        try {
+            if (context.tipo() == TipoLecturaIa.IDENTIDAD) {
+                DocumentoIdentidadLecturaResponse response = identidadService.leerIdentidad(
+                        context.documentoId(), context.forzar(), usuario);
+                return resultado(response.isRequiereRevision(), response.getModelo(), response.getConfianzaGlobal(), response.getMensaje());
+            }
+            if (context.tipo() == TipoLecturaIa.ROLES) {
+                DocumentoRolesLecturaResponse response = rolesService.leerRoles(
+                        context.documentoId(), context.forzar(), usuario);
+                return resultado(response.isRequiereRevision(), response.getModelo(), response.getConfianzaGlobal(), response.getMensaje());
+            }
+            DocumentoVehiculoLecturaResponse response = vehiculoService.leerVehiculo(
                     context.documentoId(), context.forzar(), usuario);
             return resultado(response.isRequiereRevision(), response.getModelo(), response.getConfianzaGlobal(), response.getMensaje());
+        } catch (RuntimeException exception) {
+            ResultadoItem reutilizado = resultadoPersistidoPorOtroProceso(context, exception);
+            if (reutilizado != null) {
+                log.info("Lectura IA de documento {} ya persistida por otro proceso; se reutiliza el resultado",
+                        context.documentoId());
+                return reutilizado;
+            }
+            throw exception;
         }
-        if (context.tipo() == TipoLecturaIa.ROLES) {
-            DocumentoRolesLecturaResponse response = rolesService.leerRoles(
-                    context.documentoId(), context.forzar(), usuario);
-            return resultado(response.isRequiereRevision(), response.getModelo(), response.getConfianzaGlobal(), response.getMensaje());
+    }
+
+    private ResultadoItem resultadoPersistidoPorOtroProceso(ItemContext context, RuntimeException exception) {
+        if (!esConflictoLecturaConcurrente(exception)) {
+            return null;
         }
-        DocumentoVehiculoLecturaResponse response = vehiculoService.leerVehiculo(
-                context.documentoId(), context.forzar(), usuario);
-        return resultado(response.isRequiereRevision(), response.getModelo(), response.getConfianzaGlobal(), response.getMensaje());
+        return resultadoPersistido(context);
+    }
+
+    private ResultadoItem resultadoPersistido(ItemContext context) {
+        String mensaje = "Lectura ya completada por otro proceso; se reutilizo el resultado disponible.";
+        return switch (context.tipo()) {
+            case IDENTIDAD -> identidadRepository.findByDocumentoId(context.documentoId())
+                    .map(DocumentoIdentidadLecturaResponse::from)
+                    .map(response -> resultado(response.isRequiereRevision(), response.getModelo(),
+                            response.getConfianzaGlobal(), mensaje))
+                    .orElse(null);
+            case ROLES -> rolesRepository.findByDocumentoId(context.documentoId())
+                    .map(DocumentoRolesLecturaResponse::from)
+                    .map(response -> resultado(response.isRequiereRevision(), response.getModelo(),
+                            response.getConfianzaGlobal(), mensaje))
+                    .orElse(null);
+            case VEHICULO -> vehiculoRepository.findByDocumentoId(context.documentoId())
+                    .map(DocumentoVehiculoLecturaResponse::from)
+                    .map(response -> resultado(response.isRequiereRevision(), response.getModelo(),
+                            response.getConfianzaGlobal(), mensaje))
+                    .orElse(null);
+        };
+    }
+
+    private boolean esConflictoLecturaConcurrente(Throwable throwable) {
+        boolean integridad = false;
+        boolean duplicado = false;
+        Throwable actual = throwable;
+        while (actual != null) {
+            integridad |= actual instanceof DataIntegrityViolationException;
+            String mensaje = actual.getMessage();
+            duplicado |= mensaje != null && mensaje.toLowerCase(Locale.ROOT).contains("duplicate entry");
+            actual = actual.getCause();
+        }
+        return integridad && duplicado;
     }
 
     private ResultadoItem resultado(boolean revision, String modelo, Double confianza, String mensaje) {
@@ -304,7 +356,9 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
             job.setMensaje("Todos los documentos compatibles se han leido correctamente.");
         }
         job.setProgreso(100);
-        job.setFechaFin(LocalDateTime.now());
+        if (job.getFechaFin() == null) {
+            job.setFechaFin(LocalDateTime.now());
+        }
         jobRepository.save(job);
     }
 
@@ -336,6 +390,37 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
             jobRepository.save(job);
             programarTrasCommit(job.getId());
         }
+        repararErroresConcurrentes();
+    }
+
+    void repararErroresConcurrentes() {
+        Set<Long> trabajosRecalculados = new LinkedHashSet<>();
+        int reparados = 0;
+        for (SolicitudLecturaIaItem item : itemRepository.findByEstadoAndMensajeContainingIgnoreCase(
+                EstadoLecturaIaItem.ERROR, "Duplicate entry")) {
+            if (item.getDocumento() == null || item.getDocumento().getId() == null || item.getTipoLectura() == null) {
+                continue;
+            }
+            ResultadoItem resultado = resultadoPersistido(new ItemContext(
+                    item.getDocumento().getId(), item.getTipoLectura(), false));
+            if (resultado == null) {
+                continue;
+            }
+            item.setEstado(resultado.estado());
+            item.setModelo(resultado.modelo());
+            item.setConfianza(resultado.confianza());
+            item.setMensaje(resultado.mensaje());
+            itemRepository.save(item);
+            if (item.getJob() != null && item.getJob().getId() != null) {
+                trabajosRecalculados.add(item.getJob().getId());
+            }
+            reparados++;
+        }
+        trabajosRecalculados.forEach(this::finalizarJob);
+        if (reparados > 0) {
+            log.info("Reparados {} elementos de lectura duplicados en {} trabajos de solicitud",
+                    reparados, trabajosRecalculados.size());
+        }
     }
 
     @PreDestroy
@@ -359,12 +444,19 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
         };
     }
 
-    private String mensajeSeguro(Throwable throwable) {
+    String mensajeSeguro(Throwable throwable) {
         String value = throwable.getMessage();
         if (value == null || value.isBlank()) value = "Error inesperado durante la lectura.";
+        String normalizado = value.toLowerCase(Locale.ROOT);
+        if (normalizado.contains("could not execute statement")
+                || normalizado.contains("duplicate entry")
+                || normalizado.contains("sql [")
+                || normalizado.contains("constraint [")) {
+            return "No se pudo guardar la lectura. Vuelve a intentarlo.";
+        }
         return value.length() > 950 ? value.substring(0, 950) : value;
     }
 
-    private record ItemContext(Long documentoId, TipoLecturaIa tipo, boolean forzar) {}
-    private record ResultadoItem(EstadoLecturaIaItem estado, String modelo, Double confianza, String mensaje) {}
+    record ItemContext(Long documentoId, TipoLecturaIa tipo, boolean forzar) {}
+    record ResultadoItem(EstadoLecturaIaItem estado, String modelo, Double confianza, String mensaje) {}
 }

@@ -30,6 +30,12 @@ public interface SolicitudLecturaIaItemRepository extends JpaRepository<Solicitu
 
     boolean existsByDocumentoIdAndEstadoIn(Long documentoId, Collection<EstadoLecturaIaItem> estados);
 
+    @EntityGraph(attributePaths = {"documento", "job"})
+    List<SolicitudLecturaIaItem> findByEstadoAndMensajeContainingIgnoreCase(
+            EstadoLecturaIaItem estado,
+            String mensaje
+    );
+
     @Modifying
     @Query(value = """
             update solicitud_lectura_ia_item

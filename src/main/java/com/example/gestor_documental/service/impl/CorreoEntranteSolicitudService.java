@@ -1,6 +1,5 @@
 package com.example.gestor_documental.service.impl;
 
-import com.example.gestor_documental.dto.expediente.SolicitudDocumentacionIaResponse;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
@@ -19,7 +18,6 @@ import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.OcrPdfService;
 import com.example.gestor_documental.service.PdfSplitService;
-import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
 import com.example.gestor_documental.util.TextNormalizer;
 import jakarta.mail.Address;
 import jakarta.mail.BodyPart;
@@ -81,7 +79,6 @@ public class CorreoEntranteSolicitudService {
     private final OcrPdfService ocrPdfService;
     private final PdfSplitService pdfSplitService;
     private final HistorialCambioService historialCambioService;
-    private final SolicitudDocumentacionIaService solicitudDocumentacionIaService;
     private final RestClient restClient = RestClient.create();
     private final AtomicBoolean processing = new AtomicBoolean(false);
 
@@ -294,8 +291,9 @@ public class CorreoEntranteSolicitudService {
                 "CORREO ENTRANTE",
                 "Solicitud creada automaticamente desde el buzon de correo."
         );
+        // La separacion publica AUTO_SEPARACION tras el commit. Esa cola es la unica responsable
+        // de leer y consolidar; una llamada directa aqui competiría por las mismas lecturas.
         documentoService.guardarParaSolicitud(guardada.getId(), archivo, TipoDocumento.EXPEDIENTE_COMPLETO, admin);
-        intentarLecturaIaSolicitud(guardada, admin);
         registrarProcesado(messageId, asunto, remitente, matricula, guardada.getId(), "PROCESADO",
                 adjuntos.size() > 1
                         ? "Solicitud creada desde " + adjuntos.size() + " PDFs adjuntos unificados."
@@ -324,23 +322,6 @@ public class CorreoEntranteSolicitudService {
                 .orElse("expediente_completo.pdf");
         String nombre = base.replaceAll("(?i)\\.pdf$", "");
         return nombre + "_unificado.pdf";
-    }
-
-    private void intentarLecturaIaSolicitud(Solicitud solicitud, Usuario admin) {
-        try {
-            SolicitudDocumentacionIaResponse response = solicitudDocumentacionIaService.procesarDocumentacion(solicitud.getId(), admin);
-            if (response.isDatosAplicados() || response.isYaEstabaCorrecta()) {
-                log.info("Solicitud {} lectura IA correo completada: {}", solicitud.getId(), response.getMensaje());
-            } else {
-                log.info("Solicitud {} lectura IA correo pendiente: {} Detalles: {}",
-                        solicitud.getId(),
-                        response.getMensaje(),
-                        response.getDetalles() != null ? String.join(" | ", response.getDetalles()) : "");
-            }
-        } catch (RuntimeException exception) {
-            log.info("Solicitud {} creada desde correo, pero la lectura IA queda pendiente: {}",
-                    solicitud.getId(), exception.getMessage());
-        }
     }
 
     private TipoTramiteEnum detectarTipoTramite(String texto) {

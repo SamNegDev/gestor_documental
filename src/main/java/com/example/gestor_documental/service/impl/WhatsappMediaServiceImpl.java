@@ -18,7 +18,6 @@ import com.example.gestor_documental.repository.WhatsappAdjuntoRepository;
 import com.example.gestor_documental.service.DocumentoService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.OcrPdfService;
-import com.example.gestor_documental.service.SolicitudDocumentacionIaService;
 import com.example.gestor_documental.service.WhatsappMediaService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,7 +55,6 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
     private final HistorialCambioService historialCambioService;
     private final OcrPdfService ocrPdfService;
     private final DocumentoService documentoService;
-    private final SolicitudDocumentacionIaService solicitudDocumentacionIaService;
 
     @Value("${app.whatsapp.access-token:}")
     private String accessToken;
@@ -195,6 +193,8 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
         Usuario usuario = Optional.ofNullable(usuarioCliente(null, solicitud))
                 .or(() -> primerAdminActivo())
                 .orElse(null);
+        // guardarParaSolicitud ya encola AUTO_SEPARACION al confirmar la transaccion.
+        // No iniciar otra lectura directa: duplicaria llamadas y estados para los mismos documentos.
         documentoService.guardarParaSolicitud(solicitud.getId(), new PathMultipartFile(
                 archivo,
                 adjunto.getNombreArchivoOriginal(),
@@ -206,19 +206,6 @@ public class WhatsappMediaServiceImpl implements WhatsappMediaService {
                         ? adjunto.getNombreArchivoOriginal()
                         : "Documento recibido por WhatsApp")
                         + ".");
-        intentarLecturaIaSolicitud(solicitud);
-    }
-
-    private void intentarLecturaIaSolicitud(Solicitud solicitud) {
-        Usuario admin = primerAdminActivo().orElse(null);
-        if (admin == null) {
-            return;
-        }
-        try {
-            solicitudDocumentacionIaService.procesarDocumentacion(solicitud.getId(), admin);
-        } catch (RuntimeException ignored) {
-            // La lectura IA es una ayuda posterior al OCR; el documento debe quedar igualmente disponible para revision manual.
-        }
     }
 
     private void registrarAdjuntoAutomatico(Expediente expediente, Solicitud solicitud, TipoDocumento tipo, Documento documento) {
