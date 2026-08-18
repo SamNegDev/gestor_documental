@@ -848,13 +848,30 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         if (!identidadCorroboraRol(solicitud, partes.vendedor().identificador(), identidades)) {
             faltas.add("No se aplica el vendedor inicial: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
         }
-        if (!identidadCorroboraRol(solicitud, partes.compraventa().identificador(), identidades)) {
+        if (!identidadCorroboraRol(solicitud, partes.compraventa().identificador(), identidades)
+                && !compraventaCorroboradaPorDobleOperacion(partes)) {
             faltas.add("No se aplica la compraventa: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
         }
         if (!identidadCorroboraRol(solicitud, partes.comprador().identificador(), identidades)) {
             faltas.add("No se aplica el comprador final: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
         }
         return faltas;
+    }
+
+    private boolean compraventaCorroboradaPorDobleOperacion(BatecomPartes partes) {
+        if (partes == null || partes.lecturaBate() == null || partes.lecturaCom() == null) {
+            return false;
+        }
+        String compradorBate = normalizarIdentificador(partes.lecturaBate().getCompradorIdentificador());
+        String vendedorCom = normalizarIdentificador(partes.lecturaCom().getVendedorIdentificador());
+        return compradorBate != null
+                && compradorBate.equals(vendedorCom)
+                && identificadorValido(compradorBate)
+                && rolesUsables(partes.lecturaBate())
+                && rolesUsables(partes.lecturaCom())
+                && nombresCompatibles(
+                partes.lecturaBate().getCompradorNombre(),
+                partes.lecturaCom().getVendedorNombre());
     }
 
     private boolean identidadCorroboraRol(Solicitud solicitud, String identificador, Map<String, IdentidadSolicitud> identidades) {

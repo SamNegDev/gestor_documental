@@ -1744,13 +1744,21 @@ public class SolicitudServiceImpl implements SolicitudService {
             throw new OperacionInvalidaException("No se puede eliminar una solicitud convertida o con expediente asociado");
         }
 
-        List<Long> documentoIds = new java.util.ArrayList<>();
-        documentoIds.addAll(documentoRepository.findBySolicitudId(id).stream().map(Documento::getId).toList());
+        List<Documento> documentosEliminar = new java.util.ArrayList<>(documentoRepository.findBySolicitudId(id));
         for (Incidencia incidencia : incidenciaRepository.findBySolicitudId(id)) {
-            documentoIds.addAll(documentoRepository.findByIncidenciaId(incidencia.getId()).stream().map(Documento::getId).toList());
+            documentosEliminar.addAll(documentoRepository.findByIncidenciaId(incidencia.getId()));
         }
         correccionClasificacionDocumentoRepository.eliminarPorSolicitud(id);
-        for (Long documentoId : documentoIds.stream().distinct().toList()) {
+        List<Long> documentoIds = documentosEliminar.stream()
+                .filter(java.util.Objects::nonNull)
+                .filter(documento -> documento.getId() != null)
+                .sorted(java.util.Comparator
+                        .comparing((Documento documento) -> documento.getTipoDocumento() == TipoDocumento.EXPEDIENTE_COMPLETO)
+                        .thenComparing(Documento::getId))
+                .map(Documento::getId)
+                .distinct()
+                .toList();
+        for (Long documentoId : documentoIds) {
             eliminarDocumentoSolicitud(documentoId);
         }
 

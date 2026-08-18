@@ -68,7 +68,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadLecturaService {
 
-    private static final int IDENTIDAD_RENDER_DPI = 300;
+    private static final int IDENTIDAD_RENDER_DPI = 220;
     private static final int IDENTIDAD_MAX_PAGINAS_PROCESADAS = 2;
     private static final double CONFIANZA_MINIMA_AUTOMATICA = 0.80;
 
@@ -255,15 +255,32 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
 
     private List<ImagenProcesada> procesarPdf(Path ruta) throws IOException {
         List<ImagenProcesada> imagenes = new ArrayList<>();
-        try (PDDocument document = PDDocument.load(Files.readAllBytes(ruta))) {
+        try (PDDocument document = PDDocument.load(ruta.toFile())) {
             PDFRenderer renderer = new PDFRenderer(document);
             int paginas = Math.min(document.getNumberOfPages(), IDENTIDAD_MAX_PAGINAS_PROCESADAS);
             for (int pageIndex = 0; pageIndex < paginas; pageIndex++) {
-                BufferedImage render = renderer.renderImageWithDPI(pageIndex, IDENTIDAD_RENDER_DPI, ImageType.RGB);
-                BufferedImage recorte = recortarZonaUtil(render);
-                ByteArrayOutputStream output = new ByteArrayOutputStream();
-                ImageIO.write(recorte, "png", output);
-                imagenes.add(new ImagenProcesada("identidad_pagina_" + (pageIndex + 1) + ".png", output.toByteArray()));
+                BufferedImage render = null;
+                BufferedImage recorte = null;
+                try {
+                    render = renderer.renderImageWithDPI(pageIndex, IDENTIDAD_RENDER_DPI, ImageType.RGB);
+                    recorte = recortarZonaUtil(render);
+                    try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                        ImageIO.write(recorte, "png", output);
+                        imagenes.add(new ImagenProcesada(
+                                "identidad_pagina_" + (pageIndex + 1) + ".png",
+                                output.toByteArray()));
+                    }
+                } catch (OutOfMemoryError error) {
+                    throw new OperacionInvalidaException(
+                            "No hay memoria suficiente para renderizar este documento de identidad. Vuelve a intentarlo.");
+                } finally {
+                    if (recorte != null && recorte != render) {
+                        recorte.flush();
+                    }
+                    if (render != null) {
+                        render.flush();
+                    }
+                }
             }
         }
         return imagenes;

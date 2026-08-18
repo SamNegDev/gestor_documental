@@ -4,13 +4,17 @@ import com.example.gestor_documental.config.OpenAiProperties;
 import com.example.gestor_documental.dto.expediente.LecturaIaSolicitudClienteResponse;
 import com.example.gestor_documental.dto.expediente.SolicitudDocumentacionIaResponse;
 import com.example.gestor_documental.enums.EstadoSolicitud;
+import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
+import com.example.gestor_documental.model.DocumentoRolesLectura;
 import com.example.gestor_documental.model.DocumentoVehiculoLectura;
 import com.example.gestor_documental.model.Solicitud;
+import com.example.gestor_documental.model.TipoTramite;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
@@ -208,6 +212,55 @@ class SolicitudDocumentacionIaServiceImplTest {
         assertThat(usable).isFalse();
     }
 
+    @Test
+    void batecomAceptaCompraventaCorroboradaEnLasDosOperaciones() {
+        Solicitud solicitud = solicitudCliente(34L);
+        cliente.setNif("B38436556");
+        cliente.setNombre("CANARIOALEMANA DE AUTOMOVILES SL");
+        solicitud.setTipoTramite(new TipoTramite(TipoTramiteEnum.BATECOM, "BATECOM"));
+
+        Documento contratoBate = documento(12L, TipoDocumento.CONTRATO_COMPRAVENTA);
+        Documento contratoCom = documento(13L, TipoDocumento.CONTRATO_COMPRAVENTA);
+        Documento dniVendedor = documento(14L, TipoDocumento.DNI);
+        DocumentoRolesLectura lecturaBate = lecturaRoles(
+                contratoBate,
+                "X8237277B", "FRANCISCUS WILHELMUS ADRIANUS CORNELIS",
+                "B38501631", "MG MOTOR CANARIAS, S.L.");
+        DocumentoRolesLectura lecturaCom = lecturaRoles(
+                contratoCom,
+                "B38501631", "MG MOTOR CANARIAS SL",
+                "B38436556", "CANARIOALEMANA DE AUTOMOVILES SL");
+        DocumentoIdentidadLectura identidadVendedor = new DocumentoIdentidadLectura();
+        identidadVendedor.setDocumento(dniVendedor);
+        identidadVendedor.setIdentificador("X8237277B");
+        identidadVendedor.setNombre("FRANCISCUS WILHELMUS ADRIANUS");
+        identidadVendedor.setApellido1("CORNELIS");
+        identidadVendedor.setConfianzaGlobal(1.0);
+        identidadVendedor.setRequiereRevision(false);
+
+        when(solicitudRepository.findById(34L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(34L)).thenReturn(List.of(contratoBate, contratoCom, dniVendedor));
+        when(rolesLecturaRepository.findByDocumentoId(12L)).thenReturn(Optional.of(lecturaBate));
+        when(rolesLecturaRepository.findByDocumentoId(13L)).thenReturn(Optional.of(lecturaCom));
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(12L, 13L))).thenReturn(List.of(lecturaBate, lecturaCom));
+        when(identidadLecturaRepository.findByDocumentoId(14L)).thenReturn(Optional.of(identidadVendedor));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(14L))).thenReturn(List.of(identidadVendedor));
+        when(solicitudRepository.save(solicitud)).thenReturn(solicitud);
+        Usuario admin = new Usuario();
+        admin.setRolUsuario(RolUsuario.ADMIN);
+
+        SolicitudDocumentacionIaResponse response = service.procesarDocumentacion(34L, admin);
+
+        assertThat(response.isDatosAplicados()).isTrue();
+        assertThat(response.isRequiereRevision()).isFalse();
+        assertThat(solicitud.getInteresado1Rol()).isEqualTo(RolInteresado.VENDEDOR);
+        assertThat(solicitud.getInteresado1Dni()).isEqualTo("X8237277B");
+        assertThat(solicitud.getInteresado2Rol()).isEqualTo(RolInteresado.COMPRAVENTA);
+        assertThat(solicitud.getInteresado2Dni()).isEqualTo("B38501631");
+        assertThat(solicitud.getInteresado3Rol()).isEqualTo(RolInteresado.COMPRADOR);
+        assertThat(solicitud.getInteresado3Dni()).isEqualTo("B38436556");
+    }
+
     private Solicitud solicitudCliente(Long id) {
         Solicitud solicitud = new Solicitud();
         solicitud.setId(id);
@@ -221,5 +274,23 @@ class SolicitudDocumentacionIaServiceImplTest {
         documento.setId(id);
         documento.setTipoDocumento(tipo);
         return documento;
+    }
+
+    private DocumentoRolesLectura lecturaRoles(
+            Documento documento,
+            String vendedorDni,
+            String vendedorNombre,
+            String compradorDni,
+            String compradorNombre
+    ) {
+        DocumentoRolesLectura lectura = new DocumentoRolesLectura();
+        lectura.setDocumento(documento);
+        lectura.setVendedorIdentificador(vendedorDni);
+        lectura.setVendedorNombre(vendedorNombre);
+        lectura.setCompradorIdentificador(compradorDni);
+        lectura.setCompradorNombre(compradorNombre);
+        lectura.setConfianzaGlobal(0.99);
+        lectura.setRequiereRevision(false);
+        return lectura;
     }
 }

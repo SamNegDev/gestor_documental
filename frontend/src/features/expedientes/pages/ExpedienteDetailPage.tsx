@@ -1556,9 +1556,13 @@ export function ExpedienteDetailPage() {
 
   const handleDeleteDocument = async (documento: DocumentoExpediente) => {
     if (!documento.id) return;
+    const lecturaActiva = documento.lecturaIa?.estado === "PENDIENTE" || documento.lecturaIa?.estado === "PROCESANDO";
+    const tieneLectura = lecturaActiva || Boolean(documento.lecturaIdentidad || documento.lecturaRoles || documento.lecturaVehiculo);
     const confirmed = await confirm({
       title: "Borrar documento",
-      description: `Se eliminara ${documento.nombreOriginal || documento.nombre}. Esta operacion no se puede deshacer.`,
+      description: `Se eliminara ${documento.nombreOriginal || documento.nombre}.${lecturaActiva
+        ? " La lectura IA en curso se cancelara."
+        : tieneLectura ? " Tambien se eliminara la lectura IA asociada." : ""} Esta operacion no se puede deshacer.`,
       confirmLabel: "Borrar",
       tone: "danger",
     });

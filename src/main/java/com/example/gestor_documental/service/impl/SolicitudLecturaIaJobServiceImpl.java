@@ -204,6 +204,9 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
         } catch (RuntimeException ex) {
             log.error("Error procesando trabajo de lectura IA {}", jobId, ex);
             finalizarConError(jobId, mensajeSeguro(ex));
+        } catch (OutOfMemoryError error) {
+            log.error("Memoria agotada procesando trabajo de lectura IA {}", jobId, error);
+            finalizarConError(jobId, "La lectura agoto la memoria disponible. Se puede reintentar de forma segura.");
         }
     }
 
@@ -222,6 +225,14 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
         ItemContext context = tx.execute(status -> {
             SolicitudLecturaIaItem item = itemRepository.findById(itemId).orElse(null);
             if (item == null || !item.getEstado().activo()) return null;
+            if (item.getDocumento() == null) {
+                item.setEstado(EstadoLecturaIaItem.ERROR);
+                item.setMensaje("Documento eliminado durante la lectura.");
+                item.setFechaFin(LocalDateTime.now());
+                itemRepository.save(item);
+                recalcularJob(item.getJob().getId());
+                return null;
+            }
             item.setEstado(EstadoLecturaIaItem.PROCESANDO);
             item.setIntentos(item.getIntentos() + 1);
             item.setFechaInicio(LocalDateTime.now());
@@ -238,11 +249,23 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
             resultado = leer(context, usuario);
         } catch (RuntimeException ex) {
             resultado = new ResultadoItem(EstadoLecturaIaItem.ERROR, null, null, mensajeSeguro(ex));
+        } catch (OutOfMemoryError error) {
+            resultado = new ResultadoItem(EstadoLecturaIaItem.ERROR, null, null,
+                    "La lectura agoto la memoria disponible. Vuelve a intentarlo.");
         }
         ResultadoItem finalResultado = resultado;
         tx.executeWithoutResult(status -> {
             SolicitudLecturaIaItem item = itemRepository.findById(itemId).orElse(null);
             if (item == null) return;
+            if (item.getDocumento() == null) {
+                item.setEstado(EstadoLecturaIaItem.ERROR);
+                item.setMensaje("Documento eliminado durante la lectura.");
+                item.setFechaFin(LocalDateTime.now());
+                item.setDuracionMs(Duration.between(inicio, item.getFechaFin()).toMillis());
+                itemRepository.save(item);
+                recalcularJob(item.getJob().getId());
+                return;
+            }
             item.setEstado(finalResultado.estado());
             item.setModelo(finalResultado.modelo());
             item.setConfianza(finalResultado.confianza());

@@ -27,8 +27,8 @@ public class ExpedienteLecturaIaItem {
     @JoinColumn(name = "job_id", nullable = false)
     private ExpedienteLecturaIaJob job;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "documento_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "documento_id")
     private Documento documento;
 
     @Enumerated(EnumType.STRING)

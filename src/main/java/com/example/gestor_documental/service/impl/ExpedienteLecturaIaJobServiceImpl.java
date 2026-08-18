@@ -178,6 +178,9 @@ public class ExpedienteLecturaIaJobServiceImpl implements ExpedienteLecturaIaJob
         } catch (RuntimeException ex) {
             log.error("Error procesando trabajo de lectura IA de expediente {}", jobId, ex);
             finalizarConError(jobId, mensajeSeguro(ex));
+        } catch (OutOfMemoryError error) {
+            log.error("Memoria agotada procesando trabajo de lectura IA de expediente {}", jobId, error);
+            finalizarConError(jobId, "La lectura agoto la memoria disponible. Se puede reintentar de forma segura.");
         }
     }
 
@@ -198,6 +201,14 @@ public class ExpedienteLecturaIaJobServiceImpl implements ExpedienteLecturaIaJob
         ItemContext context = tx.execute(status -> {
             ExpedienteLecturaIaItem item = itemRepository.findById(itemId).orElse(null);
             if (item == null || !item.getEstado().activo()) return null;
+            if (item.getDocumento() == null) {
+                item.setEstado(EstadoLecturaIaItem.ERROR);
+                item.setMensaje("Documento eliminado durante la lectura.");
+                item.setFechaFin(LocalDateTime.now());
+                itemRepository.save(item);
+                recalcularProgreso(item.getJob().getId());
+                return null;
+            }
             item.setEstado(EstadoLecturaIaItem.PROCESANDO);
             item.setIntentos(item.getIntentos() + 1);
             item.setFechaInicio(LocalDateTime.now());
@@ -213,11 +224,22 @@ public class ExpedienteLecturaIaJobServiceImpl implements ExpedienteLecturaIaJob
             resultado = leer(context, usuario);
         } catch (RuntimeException ex) {
             resultado = error(mensajeSeguro(ex));
+        } catch (OutOfMemoryError error) {
+            resultado = error("La lectura agoto la memoria disponible. Vuelve a intentarlo.");
         }
         Resultado finalResultado = resultado;
         tx.executeWithoutResult(status -> {
             ExpedienteLecturaIaItem item = itemRepository.findById(itemId).orElse(null);
             if (item == null) return;
+            if (item.getDocumento() == null) {
+                item.setEstado(EstadoLecturaIaItem.ERROR);
+                item.setMensaje("Documento eliminado durante la lectura.");
+                item.setFechaFin(LocalDateTime.now());
+                item.setDuracionMs(Duration.between(inicio, item.getFechaFin()).toMillis());
+                itemRepository.save(item);
+                recalcularProgreso(item.getJob().getId());
+                return;
+            }
             item.setEstado(finalResultado.estado());
             item.setModelo(finalResultado.modelo());
             item.setConfianza(finalResultado.confianza());
@@ -276,6 +298,13 @@ public class ExpedienteLecturaIaJobServiceImpl implements ExpedienteLecturaIaJob
         if (job == null) return;
         LocalDateTime fin = LocalDateTime.now();
         for (ExpedienteLecturaIaItem item : itemRepository.findByJobIdOrderById(jobId)) {
+            if (item.getDocumento() == null) {
+                item.setEstado(EstadoLecturaIaItem.ERROR);
+                item.setMensaje("Documento eliminado durante la lectura.");
+                item.setFechaFin(fin);
+                itemRepository.save(item);
+                continue;
+            }
             Resultado resultado = resultado(item.getDocumento().getId(), item.getTipoLectura());
             item.setEstado(resultado.estado());
             item.setModelo(resultado.modelo());
