@@ -138,6 +138,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         requisito.setEstado(EstadoRequisitoDocumental.OMITIDO);
         requisito.setMotivoOmision(motivo);
         requisito.setDocumento(null);
+        requisito.setSoporteRecurrenteExterno(false);
         requisito.setFechaResolucion(LocalDateTime.now());
         requisito.setResueltoPor(usuario);
         RequisitoDocumentalExpediente guardado = requisitoRepository.save(requisito);
@@ -151,6 +152,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         RequisitoDocumentalExpediente requisito = obtenerRequisitoConPermiso(requisitoId, usuario);
         requisito.setEstado(EstadoRequisitoDocumental.REQUERIDO);
         requisito.setDocumento(null);
+        requisito.setSoporteRecurrenteExterno(false);
         requisito.setMotivoOmision(null);
         requisito.setFechaResolucion(null);
         requisito.setResueltoPor(null);
@@ -215,6 +217,7 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
             documentoRepository.save(documento);
         }
         requisito.setDocumento(documento);
+        requisito.setSoporteRecurrenteExterno(false);
         requisito.setEstado(EstadoRequisitoDocumental.APORTADO);
         requisito.setMotivoOmision(null);
         requisito.setFechaResolucion(LocalDateTime.now());
@@ -270,22 +273,50 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
                 continue;
             }
 
-            documentos.stream()
+            boolean teniaSoporteRecurrenteExterno = requisito.isSoporteRecurrenteExterno();
+            if (teniaSoporteRecurrenteExterno) {
+                requisito.setEstado(EstadoRequisitoDocumental.REQUERIDO);
+                requisito.setSoporteRecurrenteExterno(false);
+                requisito.setFechaResolucion(null);
+                requisito.setResueltoPor(null);
+            }
+
+            Optional<Documento> documentoReutilizable = documentos.stream()
                     .filter(documento -> documentoCubreRequisito(documento, requisito))
                     .findFirst()
                     .or(() -> documentoHabitualCubreRequisito(expediente, requisito))
                     .or(() -> documentoClienteCubreRequisito(expediente, requisito))
-                    .or(() -> documentoIdentidadGaCubreRequisito(identidadesGa, requisito))
-                    .ifPresent(documento -> {
-                        vincularDocumentoIdentidadSiProcede(documento, requisito);
-                        requisito.setDocumento(documento);
-                        requisito.setEstado(EstadoRequisitoDocumental.APORTADO);
-                        requisito.setFechaResolucion(LocalDateTime.now());
-                        requisito.setResueltoPor(usuario);
-                        requisitoRepository.save(requisito);
-                    });
+                    .or(() -> documentoIdentidadGaCubreRequisito(identidadesGa, requisito));
+
+            if (documentoReutilizable.isEmpty()) {
+                if (teniaSoporteRecurrenteExterno) {
+                    requisitoRepository.save(requisito);
+                }
+                continue;
+            }
+
+            Documento documento = documentoReutilizable.get();
+            if (documentoPerteneceAOtroCliente(documento, expediente)) {
+                requisito.setDocumento(null);
+                requisito.setSoporteRecurrenteExterno(true);
+            } else {
+                vincularDocumentoIdentidadSiProcede(documento, requisito);
+                requisito.setDocumento(documento);
+                requisito.setSoporteRecurrenteExterno(false);
+            }
+            requisito.setEstado(EstadoRequisitoDocumental.APORTADO);
+            requisito.setFechaResolucion(LocalDateTime.now());
+            requisito.setResueltoPor(usuario);
+            requisitoRepository.save(requisito);
         }
         expedienteService.reanudarTrasDocumentacion(expediente.getId(), usuario);
+    }
+
+    private boolean documentoPerteneceAOtroCliente(Documento documento, Expediente expediente) {
+        if (documento == null || documento.getCliente() == null || expediente == null || expediente.getCliente() == null) {
+            return false;
+        }
+        return !Objects.equals(documento.getCliente().getId(), expediente.getCliente().getId());
     }
 
     private void generarRequisitosBase(Expediente expediente, List<ExpedienteInteresado> interesados, Usuario usuario) {
@@ -1425,11 +1456,15 @@ public class RequisitoDocumentalExpedienteServiceImpl implements RequisitoDocume
         if (!esDocumentoReutilizableCliente(requisito.getTipoDocumento())) {
             return java.util.Optional.empty();
         }
-        return documentoRepository.findByClienteIdAndInteresadoIdOrderByFechaSubidaDesc(
+        List<Documento> documentos = esDocumentoIdentidad(requisito.getTipoDocumento())
+                ? documentoRepository.findByInteresadoIdAndClienteIsNotNullAndExpedienteIsNullAndSolicitudIsNullOrderByFechaSubidaDesc(
+                        requisito.getInteresado().getId(),
+                        PageRequest.of(0, MAX_DOCUMENTOS_CLIENTE_REUTILIZABLES))
+                : documentoRepository.findByClienteIdAndInteresadoIdOrderByFechaSubidaDesc(
                         expediente.getCliente().getId(),
                         requisito.getInteresado().getId(),
-                        PageRequest.of(0, MAX_DOCUMENTOS_CLIENTE_REUTILIZABLES)
-                ).stream()
+                        PageRequest.of(0, MAX_DOCUMENTOS_CLIENTE_REUTILIZABLES));
+        return documentos.stream()
                 .filter(documento -> documentoCubreRequisito(documento, requisito))
                 .findFirst();
     }

@@ -5,6 +5,7 @@ import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoLecturaIaItem;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.enums.TipoPersona;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
 import com.example.gestor_documental.event.DocumentoLecturaIaSolicitadaEvent;
 import com.example.gestor_documental.event.ExpedienteLecturaIaSolicitadaEvent;
@@ -12,9 +13,11 @@ import com.example.gestor_documental.exception.AccesoDenegadoException;
 import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.CorreccionClasificacionDocumento;
+import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Expediente;
 import com.example.gestor_documental.model.Incidencia;
+import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.OperacionExpediente;
 import com.example.gestor_documental.model.RequisitoDocumentalExpediente;
 import com.example.gestor_documental.model.Solicitud;
@@ -32,11 +35,13 @@ import com.example.gestor_documental.repository.SolicitudLecturaIaItemRepository
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.*;
 import com.example.gestor_documental.util.TextNormalizer;
+import com.example.gestor_documental.validation.IdentificadorFiscalValidator;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -401,11 +406,55 @@ public class DocumentoServiceImpl implements DocumentoService {
                     .orElseThrow(() -> new RecursoNoEncontradoException("Cliente no encontrado"));
             Documento documento = construirDocumentoBase(archivo, tipoDocumento, usuario);
             documento.setCliente(cliente);
+            vincularIdentidadAlInteresadoCliente(documento, cliente);
             documentoRepository.save(documento);
             return documento;
         } catch (IOException e) {
             throw new RuntimeException("Error al guardar el archivo", e);
         }
+    }
+
+    private void vincularIdentidadAlInteresadoCliente(Documento documento, Cliente cliente) {
+        if (documento == null || cliente == null || documento.getTipoDocumento() == null) {
+            return;
+        }
+        String identificador = IdentificadorFiscalValidator.normalizar(cliente.getNif());
+        boolean cifCliente = documento.getTipoDocumento() == TipoDocumento.CIF
+                && IdentificadorFiscalValidator.esCifValido(identificador);
+        boolean identidadPersonal = documento.getTipoDocumento() == TipoDocumento.DNI
+                && IdentificadorFiscalValidator.esDniNieValido(identificador);
+        if (!cifCliente && !identidadPersonal) {
+            return;
+        }
+
+        Interesado interesado = interesadoRepository
+                .findByIdentificadorNormalizado(identificador, PageRequest.of(0, 1)).stream()
+                .findFirst()
+                .orElseGet(() -> crearInteresadoDesdeCliente(cliente, identificador, cifCliente));
+        documento.setInteresado(interesado);
+    }
+
+    private Interesado crearInteresadoDesdeCliente(Cliente cliente, String identificador, boolean empresa) {
+        Interesado interesado = new Interesado();
+        interesado.setDni(identificador);
+        interesado.setNombre(TextNormalizer.upperOrNull(cliente.getNombre()));
+        interesado.setTipoPersona(empresa ? TipoPersona.EMPRESA : TipoPersona.PARTICULAR);
+        interesado.setRazonSocial(empresa ? TextNormalizer.upperOrNull(cliente.getNombre()) : null);
+        interesado.setTelefono(TextNormalizer.upperOrNull(cliente.getTelefono()));
+        interesado.setDireccion(TextNormalizer.upperOrNull(cliente.getDireccion()));
+        interesado.setTipoVia(TextNormalizer.upperOrNull(cliente.getTipoVia()));
+        interesado.setNombreVia(TextNormalizer.upperOrNull(cliente.getNombreVia()));
+        interesado.setNumeroVia(TextNormalizer.upperOrNull(cliente.getNumeroVia()));
+        interesado.setBloque(TextNormalizer.upperOrNull(cliente.getBloque()));
+        interesado.setPortal(TextNormalizer.upperOrNull(cliente.getPortal()));
+        interesado.setEscalera(TextNormalizer.upperOrNull(cliente.getEscalera()));
+        interesado.setPiso(TextNormalizer.upperOrNull(cliente.getPiso()));
+        interesado.setPuerta(TextNormalizer.upperOrNull(cliente.getPuerta()));
+        interesado.setCodigoPostal(TextNormalizer.upperOrNull(cliente.getCodigoPostal()));
+        interesado.setMunicipio(TextNormalizer.upperOrNull(cliente.getMunicipio()));
+        interesado.setLocalidad(TextNormalizer.upperOrNull(cliente.getLocalidad()));
+        interesado.setProvincia(TextNormalizer.upperOrNull(cliente.getProvincia()));
+        return interesadoRepository.save(interesado);
     }
 
     @Override

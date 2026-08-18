@@ -79,6 +79,10 @@ public class RequisitoDocumentalExpediente {
     @JoinColumn(name = "documento_id")
     private Documento documento;
 
+    @Column(name = "soporte_recurrente_externo", nullable = false,
+            columnDefinition = "boolean default false")
+    private boolean soporteRecurrenteExterno;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "operacion_id")
     private OperacionExpediente operacion;

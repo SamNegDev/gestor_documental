@@ -9,6 +9,7 @@ import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
+import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.TipoTramite;
 import com.example.gestor_documental.model.Usuario;
@@ -206,7 +207,7 @@ class SolicitudPreparacionTraspasoServiceImplTest {
                 lecturaIdentidad(dniVendedor, "43332629P")
         ));
         when(rolesLecturaRepository.findByDocumentoIdIn(List.of(40L, 41L, 42L, 44L, 45L))).thenReturn(List.of());
-        when(documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(eq(3L), any()))
+        when(documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(eq(3L), any(), any()))
                 .thenReturn(List.of(cifCliente));
         when(identidadLecturaRepository.findByDocumentoIdIn(List.of(56L))).thenReturn(List.of());
         when(clienteInteresadoRepository.findByClienteIdAndHabitualTrueOrderByInteresadoNombreAsc(3L)).thenReturn(List.of());
@@ -218,6 +219,41 @@ class SolicitudPreparacionTraspasoServiceImplTest {
         assertThat(itemEstado(response, "INTERESADOS", "direccion_1")).isEqualTo("OK");
         assertThat(itemEstado(response, "INTERESADOS", "direccion_2")).isEqualTo("OK");
         assertThat(documento(response, "MANDATO").faltantes()).doesNotContain("Localidad del mandante");
+    }
+
+    @Test
+    void reconoceCifRecurrenteDelInteresadoAunquePertenezcaAOtroCliente() {
+        Solicitud solicitud = solicitudBase(18L);
+        Cliente clienteSolicitud = new Cliente("B38436556", "Canarioalemana", "cliente@example.com");
+        clienteSolicitud.setId(4L);
+        solicitud.setCliente(clienteSolicitud);
+        solicitud.setInteresado1Rol(RolInteresado.VENDEDOR);
+        solicitud.setInteresado1Nombre("Maria Luisa Menendez Morejudo");
+        solicitud.setInteresado1Dni("50975033H");
+        solicitud.setInteresado2Rol(RolInteresado.COMPRADOR);
+        solicitud.setInteresado2Nombre("MG Motor Canarias SL");
+        solicitud.setInteresado2Dni("B38501631");
+
+        Interesado mgMotor = new Interesado("B38501631", "MG MOTOR CANARIAS SL");
+        mgMotor.setId(593L);
+        Documento cifMg = documento(9191L, TipoDocumento.CIF);
+        cifMg.setInteresado(mgMotor);
+        Cliente clienteDocumento = new Cliente("B38501631", "MG Motor Canarias SL", "mg@example.com");
+        clienteDocumento.setId(6L);
+        cifMg.setCliente(clienteDocumento);
+
+        when(solicitudRepository.findById(18L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(18L)).thenReturn(List.of());
+        when(documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(eq(4L), any(), any()))
+                .thenReturn(List.of());
+        when(documentoRepository.findIdentidadesRecurrentesPorIdentificadores(any(), any(), any()))
+                .thenReturn(List.of(cifMg));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(9191L))).thenReturn(List.of());
+        when(clienteInteresadoRepository.findByClienteIdAndHabitualTrueOrderByInteresadoNombreAsc(4L)).thenReturn(List.of());
+
+        SolicitudPreparacionTraspasoResponse response = service.obtenerPreparacion(18L, usuario);
+
+        assertThat(itemEstado(response, "INTERESADOS", "soporte_identidad_2")).isEqualTo("OK");
     }
 
     @Test

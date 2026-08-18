@@ -14,9 +14,11 @@ import com.example.gestor_documental.util.DocumentoIdentidadLecturaJson;
 import com.example.gestor_documental.validation.DniNieValidator;
 import com.example.gestor_documental.validation.IdentificadorFiscalValidator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
 public class SolicitudDocumentacionBasicaService {
 
     private static final double CONFIANZA_MINIMA_IDENTIDAD = 0.80;
+    private static final int MAX_DOCUMENTOS_IDENTIDAD_REUTILIZABLES = 100;
     private static final Set<TipoDocumento> TIPOS_IDENTIDAD = EnumSet.of(TipoDocumento.DNI, TipoDocumento.CIF);
     private static final Set<TipoDocumento> TIPOS_ROLES = EnumSet.of(TipoDocumento.CONTRATO_COMPRAVENTA, TipoDocumento.FACTURA);
 
@@ -107,7 +110,7 @@ public class SolicitudDocumentacionBasicaService {
                 context.documentosCliente(),
                 context.lecturasIdentidadCliente(),
                 context.relacionesCliente()
-        ) ? new DocumentoSoporte(true, "FICHA_CLIENTE") : DocumentoSoporte.noAportado();
+        ) ? new DocumentoSoporte(true, "REGISTRO") : DocumentoSoporte.noAportado();
     }
 
     public RepresentanteSoporte soporteRepresentanteLegal(Solicitud solicitud, List<Documento> documentos, String dniEmpresa) {
@@ -198,6 +201,12 @@ public class SolicitudDocumentacionBasicaService {
             return false;
         }
         TipoDocumento tipoEsperado = esPersonaJuridica(identificador) ? TipoDocumento.CIF : TipoDocumento.DNI;
+        boolean documentoDelInteresado = documentosCliente.stream()
+                .filter(documento -> documento.getTipoDocumento() == tipoEsperado)
+                .anyMatch(documento -> documentoInteresadoCoincide(documento, identificador));
+        if (documentoDelInteresado) {
+            return true;
+        }
         String nifCliente = normalizarIdentificador(solicitud.getCliente().getNif());
         if (identificador.equals(nifCliente)
                 && documentoFichaClienteCoincide(documentosCliente, lecturasIdentidadCliente, tipoEsperado, null, identificador)) {
@@ -248,9 +257,7 @@ public class SolicitudDocumentacionBasicaService {
                 .toList();
         Map<Long, DocumentoIdentidadLectura> lecturasIdentidad = lecturasIdentidad(documentosConId);
         Long clienteId = solicitud.getCliente() != null ? solicitud.getCliente().getId() : null;
-        List<Documento> documentosCliente = clienteId == null
-                ? List.of()
-                : documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(clienteId, TIPOS_IDENTIDAD);
+        List<Documento> documentosCliente = documentosIdentidadReutilizables(solicitud);
         Map<Long, DocumentoIdentidadLectura> lecturasIdentidadCliente = lecturasIdentidad(documentosCliente);
         List<ClienteInteresado> relacionesCliente = clienteId == null
                 ? List.of()
@@ -262,6 +269,37 @@ public class SolicitudDocumentacionBasicaService {
                 lecturasIdentidadCliente,
                 relacionesCliente
         );
+    }
+
+    public List<Documento> documentosIdentidadReutilizables(Solicitud solicitud) {
+        LinkedHashMap<Long, Documento> documentos = new LinkedHashMap<>();
+        Long clienteId = solicitud != null && solicitud.getCliente() != null
+                ? solicitud.getCliente().getId()
+                : null;
+        if (clienteId != null) {
+            documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(
+                            clienteId,
+                            TIPOS_IDENTIDAD,
+                            PageRequest.of(0, MAX_DOCUMENTOS_IDENTIDAD_REUTILIZABLES))
+                    .forEach(documento -> documentos.put(documento.getId(), documento));
+        }
+
+        List<String> identificadores = solicitud == null
+                ? List.of()
+                : interesados(solicitud).stream()
+                        .map(InteresadoBasico::dni)
+                        .map(this::normalizarIdentificador)
+                        .filter(java.util.Objects::nonNull)
+                        .distinct()
+                        .toList();
+        if (!identificadores.isEmpty()) {
+            documentoRepository.findIdentidadesRecurrentesPorIdentificadores(
+                            TIPOS_IDENTIDAD,
+                            identificadores,
+                            PageRequest.of(0, MAX_DOCUMENTOS_IDENTIDAD_REUTILIZABLES))
+                    .forEach(documento -> documentos.putIfAbsent(documento.getId(), documento));
+        }
+        return List.copyOf(documentos.values());
     }
 
     private Map<Long, DocumentoIdentidadLectura> lecturasIdentidad(List<Documento> documentos) {

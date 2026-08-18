@@ -80,12 +80,8 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
                         .filter(lectura -> lectura.getDocumento() != null && lectura.getDocumento().getId() != null)
                         .collect(Collectors.toMap(lectura -> lectura.getDocumento().getId(), lectura -> lectura, (first, second) -> first));
         Long clienteId = solicitud.getCliente() != null ? solicitud.getCliente().getId() : null;
-        List<Documento> documentosCliente = clienteId == null
-                ? List.of()
-                : documentoRepository.findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(
-                        clienteId,
-                        solicitudDocumentacionBasicaService.tiposIdentidad()
-                );
+        List<Documento> documentosCliente = solicitudDocumentacionBasicaService
+                .documentosIdentidadReutilizables(solicitud);
         List<Long> documentosClienteIds = documentosCliente.stream()
                 .map(Documento::getId)
                 .filter(id -> id != null)

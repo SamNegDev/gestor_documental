@@ -68,6 +68,12 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long> {
     List<Documento> findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(Long clienteId, Collection<TipoDocumento> tipos);
 
     @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
+    List<Documento> findByClienteIdAndTipoDocumentoInOrderByFechaSubidaDesc(
+            Long clienteId,
+            Collection<TipoDocumento> tipos,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
     List<Documento> findByClienteIdAndInteresadoIsNullOrderByFechaSubidaDesc(Long clienteId);
 
     @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
@@ -80,6 +86,27 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long> {
     List<Documento> findByClienteIdAndInteresadoIdOrderByFechaSubidaDesc(
             Long clienteId,
             Long interesadoId,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
+    List<Documento> findByInteresadoIdAndClienteIsNotNullAndExpedienteIsNullAndSolicitudIsNullOrderByFechaSubidaDesc(
+            Long interesadoId,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {"cliente", "interesado", "subidoPor"})
+    @Query("""
+            select d from Documento d
+            join d.interesado i
+            where d.cliente is not null
+              and d.expediente is null
+              and d.solicitud is null
+              and d.tipoDocumento in :tipos
+              and upper(replace(replace(replace(coalesce(i.dni, ''), ' ', ''), '-', ''), '.', '')) in :identificadores
+            order by d.fechaSubida desc
+            """)
+    List<Documento> findIdentidadesRecurrentesPorIdentificadores(
+            @Param("tipos") Collection<TipoDocumento> tipos,
+            @Param("identificadores") Collection<String> identificadores,
             Pageable pageable);
 
     @Query("""

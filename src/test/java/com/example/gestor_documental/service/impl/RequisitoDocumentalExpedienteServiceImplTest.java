@@ -27,6 +27,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
@@ -118,6 +119,54 @@ class RequisitoDocumentalExpedienteServiceImplTest {
         assertThat(requisito.getEstado()).isEqualTo(EstadoRequisitoDocumental.APORTADO);
         assertThat(requisito.getDocumento()).isEqualTo(documentoMaestro);
         verify(expedienteService).reanudarTrasDocumentacion(588L, null);
+    }
+
+    @Test
+    void reconciliaIdentidadRecurrenteDelMismoInteresadoEntreClientes() {
+        RequisitoDocumentalExpedienteRepository requisitoRepository = mock(RequisitoDocumentalExpedienteRepository.class);
+        DocumentoRepository documentoRepository = mock(DocumentoRepository.class);
+        com.example.gestor_documental.service.ExpedienteService expedienteService =
+                mock(com.example.gestor_documental.service.ExpedienteService.class);
+        RequisitoDocumentalExpedienteServiceImpl service = new RequisitoDocumentalExpedienteServiceImpl(
+                requisitoRepository, expedienteService, null, null, documentoRepository, null, null, null,
+                null, null, null, null, null
+        );
+        Cliente clienteExpediente = new Cliente("B38436556", "CANARIOALEMANA", "cliente@example.com");
+        clienteExpediente.setId(4L);
+        Cliente clienteDocumento = new Cliente("B38501631", "MG MOTOR", "mg@example.com");
+        clienteDocumento.setId(6L);
+        Expediente expediente = new Expediente();
+        expediente.setId(693L);
+        expediente.setCliente(clienteExpediente);
+        Interesado mgMotor = new Interesado("B38501631", "MG MOTOR CANARIAS SL");
+        mgMotor.setId(593L);
+        RequisitoDocumentalExpediente requisito = new RequisitoDocumentalExpediente();
+        requisito.setExpediente(expediente);
+        requisito.setInteresado(mgMotor);
+        requisito.setRolInteresado(RolInteresado.COMPRAVENTA);
+        requisito.setTipoDocumento(TipoDocumento.CIF);
+        requisito.setEstado(EstadoRequisitoDocumental.REQUERIDO);
+        Documento cifMg = new Documento();
+        cifMg.setId(9191L);
+        cifMg.setCliente(clienteDocumento);
+        cifMg.setInteresado(mgMotor);
+        cifMg.setTipoDocumento(TipoDocumento.CIF);
+        when(requisitoRepository.findByExpedienteIdOrderByIdAsc(693L)).thenReturn(List.of(requisito));
+        when(documentoRepository.findByInteresadoIdAndClienteIsNotNullAndExpedienteIsNullAndSolicitudIsNullOrderByFechaSubidaDesc(
+                any(), any())).thenReturn(List.of(cifMg), List.of());
+
+        ReflectionTestUtils.invokeMethod(service, "reconciliarConDocumentos", expediente, List.of(), null);
+
+        assertThat(requisito.getEstado()).isEqualTo(EstadoRequisitoDocumental.APORTADO);
+        assertThat(requisito.getDocumento()).isNull();
+        assertThat(requisito.isSoporteRecurrenteExterno()).isTrue();
+
+        ReflectionTestUtils.invokeMethod(service, "reconciliarConDocumentos", expediente, List.of(), null);
+
+        assertThat(requisito.getEstado()).isEqualTo(EstadoRequisitoDocumental.REQUERIDO);
+        assertThat(requisito.getDocumento()).isNull();
+        assertThat(requisito.isSoporteRecurrenteExterno()).isFalse();
+        verify(expedienteService, times(2)).reanudarTrasDocumentacion(693L, null);
     }
 
     @Test

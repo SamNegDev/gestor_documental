@@ -51,6 +51,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -110,6 +111,26 @@ class DocumentoServiceImplTest {
                         TipoDocumento.CAMBIO_TITULARIDAD, TipoDocumento.MANDATO, TipoDocumento.OTROS,
                         TipoDocumento.DNI, TipoDocumento.CIF, TipoDocumento.PERMISO_CIRCULACION,
                         TipoDocumento.FICHA_TECNICA, TipoDocumento.INFORME_DGT, TipoDocumento.MODELO_620);
+    }
+
+    @Test
+    void vinculaElCifDelClienteConSuInteresadoGlobalAlSubirlo() {
+        Cliente cliente = new Cliente("B38501631", "MG MOTOR CANARIAS SL", "mg@example.com");
+        cliente.setId(6L);
+        Interesado mgMotor = new Interesado("B38501631", "MG MOTOR CANARIAS SL");
+        mgMotor.setId(593L);
+        Usuario admin = new Usuario("Admin", "Test", "admin@example.com", "secret", RolUsuario.ADMIN, true);
+        MockMultipartFile archivo = new MockMultipartFile(
+                "archivo", "cif_mg_motor.pdf", "application/pdf", "pdf".getBytes());
+        when(clienteRepository.findById(6L)).thenReturn(Optional.of(cliente));
+        when(interesadoRepository.findByIdentificadorNormalizado(eq("B38501631"), any()))
+                .thenReturn(List.of(mgMotor));
+        when(documentoRepository.save(any(Documento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Documento guardado = service.guardarParaCliente(6L, archivo, TipoDocumento.CIF, admin);
+
+        assertThat(guardado.getCliente()).isSameAs(cliente);
+        assertThat(guardado.getInteresado()).isSameAs(mgMotor);
     }
 
     @Test
