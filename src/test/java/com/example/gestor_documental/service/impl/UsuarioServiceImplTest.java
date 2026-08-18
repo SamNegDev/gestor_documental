@@ -45,6 +45,15 @@ class UsuarioServiceImplTest {
     }
 
     @Test
+    void listaLosUsuariosAsociadosAUnCliente() {
+        Usuario usuario = new Usuario("Cliente", "Test", "cliente@test.local", "secret", RolUsuario.CLIENTE, true);
+        when(usuarioRepository.findAsociadosAlCliente(20L)).thenReturn(List.of(usuario));
+
+        assertThat(service.listarAsociadosAlCliente(20L)).containsExactly(usuario);
+        verify(usuarioRepository).findAsociadosAlCliente(20L);
+    }
+
+    @Test
     void administradorPuedeSeleccionarUnClienteOCambiarATodos() {
         Usuario admin = new Usuario("Admin", "Test", "admin@test.local", "secret", RolUsuario.ADMIN, true);
         admin.setId(1L);

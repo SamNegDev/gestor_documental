@@ -36,6 +36,11 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     @Override
+    public List<Usuario> listarAsociadosAlCliente(Long clienteId) {
+        return usuarioRepository.findAsociadosAlCliente(clienteId);
+    }
+
+    @Override
     public Usuario buscarPorEmail(String email) {
         return usuarioRepository.findWithClienteByEmail(email)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));

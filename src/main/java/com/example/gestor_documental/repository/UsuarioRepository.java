@@ -33,4 +33,14 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     @Query("select usuario from Usuario usuario where usuario.id = :id")
     Optional<Usuario> findWithClientesById(@Param("id") Long id);
 
+    @EntityGraph(attributePaths = {"cliente", "clientesAutorizados"})
+    @Query("""
+            select distinct usuario
+            from Usuario usuario
+            left join usuario.clientesAutorizados clienteAutorizado
+            where usuario.cliente.id = :clienteId or clienteAutorizado.id = :clienteId
+            order by usuario.nombre, usuario.apellidos, usuario.id
+            """)
+    List<Usuario> findAsociadosAlCliente(@Param("clienteId") Long clienteId);
+
 }

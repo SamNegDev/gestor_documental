@@ -11,6 +11,8 @@ public interface UsuarioService {
 
     Optional<Usuario> buscarPorId(Long id);
 
+    List<Usuario> listarAsociadosAlCliente(Long clienteId);
+
     Usuario buscarPorEmail(String email);
 
     Usuario guardar(Usuario usuario);

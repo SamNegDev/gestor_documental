@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { BellRing, Mail, Pencil, Phone, Plus, Trash2, UsersRound } from "lucide-react";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
+import { ApiError } from "../../../shared/api/http";
 import { deleteCliente, getClientes } from "../services/adminApi";
 import type { ClienteAdmin } from "../types";
 
@@ -16,7 +17,9 @@ export function ClientesListPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteCliente,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "clientes"] }),
-    onError: () => alert("No se pudo eliminar el cliente. Puede tener registros asociados."),
+    onError: (cause) => alert(cause instanceof ApiError
+      ? cause.details || "No se pudo eliminar el cliente. Puede tener registros asociados."
+      : "No se pudo eliminar el cliente. Puede tener registros asociados."),
   });
 
   const clientes = clientesQuery.data ?? [];

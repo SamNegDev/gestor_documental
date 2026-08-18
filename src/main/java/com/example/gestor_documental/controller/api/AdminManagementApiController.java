@@ -117,6 +117,25 @@ public class AdminManagementApiController {
         requireAdmin(authentication);
         Cliente cliente = clienteService.buscarPorId(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
+        List<Usuario> usuariosAsociados = usuarioService.listarAsociadosAlCliente(id);
+        if (!usuariosAsociados.isEmpty()) {
+            String usuarios = usuariosAsociados.stream()
+                    .limit(3)
+                    .map(usuario -> {
+                        String nombre = nombreCompleto(usuario);
+                        return (nombre.isBlank() ? usuario.getEmail() : nombre) + " (" + usuario.getEmail() + ")";
+                    })
+                    .reduce((primero, siguiente) -> primero + ", " + siguiente)
+                    .orElse("");
+            String adicionales = usuariosAsociados.size() > 3
+                    ? " y " + (usuariosAsociados.size() - 3) + " usuario(s) mas"
+                    : "";
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "No se puede eliminar el cliente porque tiene usuarios de acceso asociados: "
+                            + usuarios + adicionales
+                            + ". Reasignalos a otro cliente o eliminalos desde Usuarios antes de continuar.");
+        }
         clienteService.eliminar(id);
         clienteLogoService.eliminarArchivos(cliente);
         return ResponseEntity.noContent().build();

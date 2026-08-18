@@ -17,8 +17,9 @@ import {
   uploadClienteLogo,
 } from "../services/adminApi";
 import type { AdministradorCliente, AdministradorClienteInput, ClienteInput } from "../types";
-import type { DocumentoExpediente } from "../../expedientes/types/expedienteDetail.types";
+import type { DocumentoExpediente, InteresadoSearchResult } from "../../expedientes/types/expedienteDetail.types";
 import { readDocumentIdentity } from "../../expedientes/services/documentosApi";
+import { InteresadoAutocomplete } from "../../expedientes/components/InteresadoAutocomplete";
 import { cleanLowerText, cleanUpperText, uppercaseInput, uppercaseInputPreservingCursor } from "../../../shared/utils/text";
 import { useConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { AddressFields, type AddressValue } from "../../../shared/ui/AddressFields";
@@ -605,6 +606,7 @@ const emptyAdministrador = (): AdministradorClienteInput => ({
 function AdministradoresPanel({ clienteId, items, onChanged }: { clienteId: string; items: AdministradorCliente[]; onChanged: () => Promise<unknown> }) {
   const [editing, setEditing] = useState<AdministradorCliente | null>(null);
   const [draft, setDraft] = useState<AdministradorClienteInput>(emptyAdministrador);
+  const [personSearch, setPersonSearch] = useState("");
   const [open, setOpen] = useState(false);
   const mutation = useMutation({
     mutationFn: async () => {
@@ -616,12 +618,14 @@ function AdministradoresPanel({ clienteId, items, onChanged }: { clienteId: stri
       setOpen(false);
       setEditing(null);
       setDraft(emptyAdministrador());
+      setPersonSearch("");
       await onChanged();
     },
   });
   const removeMutation = useMutation({ mutationFn: (id: number) => deleteAdministradorCliente(clienteId, id), onSuccess: onChanged });
   const begin = (item?: AdministradorCliente) => {
     setEditing(item || null);
+    setPersonSearch("");
     setDraft(item ? {
       dni: item.dni,
       nombre: item.nombre,
@@ -642,6 +646,27 @@ function AdministradoresPanel({ clienteId, items, onChanged }: { clienteId: stri
     } : emptyAdministrador());
     setOpen(true);
   };
+  const selectExistingPerson = (person: InteresadoSearchResult) => {
+    setPersonSearch([person.dni, person.nombre].filter(Boolean).join(" - "));
+    setDraft({
+      dni: person.dni || "",
+      nombre: person.nombre || "",
+      telefono: person.telefono || "",
+      direccion: person.direccion || "",
+      tipoVia: person.tipoVia || "",
+      nombreVia: person.nombreVia || "",
+      numeroVia: person.numeroVia || "",
+      bloque: person.bloque || "",
+      portal: person.portal || "",
+      escalera: person.escalera || "",
+      piso: person.piso || "",
+      puerta: person.puerta || "",
+      codigoPostal: person.codigoPostal || "",
+      municipio: person.municipio || "",
+      localidad: person.localidad || "",
+      provincia: person.provincia || "",
+    });
+  };
   return (
     <section className="client-branding-panel">
       <div className="client-branding-panel__heading">
@@ -651,6 +676,18 @@ function AdministradoresPanel({ clienteId, items, onChanged }: { clienteId: stri
       </div>
       {open ? (
         <div className="edit-form-grid">
+          {!editing ? (
+            <div className="edit-form-grid__wide">
+              <InteresadoAutocomplete
+                label="Buscar persona existente"
+                value={personSearch}
+                placeholder="DNI, NIE o nombre"
+                onChange={setPersonSearch}
+                onSelect={selectExistingPerson}
+              />
+              <small>Selecciona una persona del registro o completa los datos manualmente.</small>
+            </div>
+          ) : null}
           <label>DNI / NIE<input value={draft.dni} onChange={(event) => setDraft({ ...draft, dni: uppercaseInput(event.target.value) })} /></label>
           <label>Nombre completo<input value={draft.nombre} onChange={(event) => setDraft({ ...draft, nombre: uppercaseInput(event.target.value) })} /></label>
           <label>Teléfono<input value={draft.telefono || ""} onChange={(event) => setDraft({ ...draft, telefono: event.target.value })} /></label>
