@@ -27,12 +27,12 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     public List<Usuario> listarTodos() {
-        return usuarioRepository.findAll();
+        return usuarioRepository.findAllWithClientes();
     }
 
     @Override
     public Optional<Usuario> buscarPorId(Long id) {
-        return usuarioRepository.findById(id);
+        return usuarioRepository.findWithClientesById(id);
     }
 
     @Override

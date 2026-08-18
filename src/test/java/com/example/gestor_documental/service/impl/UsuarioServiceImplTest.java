@@ -2,6 +2,7 @@ package com.example.gestor_documental.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.gestor_documental.enums.RolUsuario;
@@ -9,6 +10,7 @@ import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.Usuario;
 import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.UsuarioRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +25,24 @@ class UsuarioServiceImplTest {
     @Mock ClienteRepository clienteRepository;
     @Mock PasswordEncoder passwordEncoder;
     @InjectMocks UsuarioServiceImpl service;
+
+    @Test
+    void listadoCargaUsuariosConSusClientesAutorizados() {
+        Usuario usuario = new Usuario("Cliente", "Test", "cliente@test.local", "secret", RolUsuario.CLIENTE, true);
+        when(usuarioRepository.findAllWithClientes()).thenReturn(List.of(usuario));
+
+        assertThat(service.listarTodos()).containsExactly(usuario);
+        verify(usuarioRepository).findAllWithClientes();
+    }
+
+    @Test
+    void detalleCargaUsuarioConSusClientesAutorizados() {
+        Usuario usuario = new Usuario("Cliente", "Test", "cliente@test.local", "secret", RolUsuario.CLIENTE, true);
+        when(usuarioRepository.findWithClientesById(2L)).thenReturn(Optional.of(usuario));
+
+        assertThat(service.buscarPorId(2L)).contains(usuario);
+        verify(usuarioRepository).findWithClientesById(2L);
+    }
 
     @Test
     void administradorPuedeSeleccionarUnClienteOCambiarATodos() {
