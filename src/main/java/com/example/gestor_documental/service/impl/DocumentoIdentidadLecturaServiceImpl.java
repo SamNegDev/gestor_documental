@@ -526,6 +526,16 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
         if (documento.getInteresado() != null) {
             return coincideIdentificador(documento.getInteresado(), identificador) ? documento.getInteresado() : null;
         }
+        // Una lectura IA de una solicitud es evidencia pendiente de validar, no una
+        // autorización para crear una ficha global de interesado. Solo reutilizamos una
+        // ficha existente cuando también coincide el nombre; la validación manual o la
+        // conversión serán quienes consoliden definitivamente la persona.
+        if (documento.getSolicitud() != null) {
+            return interesadoRepository.findByDni(identificador)
+                    .filter(interesado -> NombrePersonaNormalizer.equivalentes(
+                            interesado.getNombre(), nombreCompletoResultado(resultado, identificador)))
+                    .orElse(null);
+        }
         if (documento.getExpediente() == null || documento.getExpediente().getId() == null) {
             return resolverInteresadoCliente(documento, identificador, resultado, tipoDetectado);
         }
@@ -539,7 +549,7 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             return coincidencias.get(0);
         }
         Cliente cliente = clienteContexto(documento);
-        if (cliente != null && normalizarIdentificador(cliente.getNif()).equals(identificador)) {
+        if (cliente != null && java.util.Objects.equals(normalizarIdentificador(cliente.getNif()), identificador)) {
             return resolverInteresadoCliente(documento, identificador, resultado, tipoDetectado);
         }
         return null;
@@ -551,6 +561,12 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             return null;
         }
         Interesado interesado = interesadoRepository.findByDni(identificador).orElse(null);
+        boolean empresaCliente = java.util.Objects.equals(normalizarIdentificador(cliente.getNif()), identificador);
+        boolean relacionClienteExistente = interesado != null
+                && clienteInteresadoRepository.existsByClienteIdAndInteresadoId(cliente.getId(), interesado.getId());
+        if (!empresaCliente && !relacionClienteExistente) {
+            return null;
+        }
         if (interesado == null) {
             interesado = new Interesado();
             interesado.setDni(identificador);
@@ -567,7 +583,6 @@ public class DocumentoIdentidadLecturaServiceImpl implements DocumentoIdentidadL
             aplicarDireccionEstructurada(interesado, resultado);
             interesado = interesadoRepository.save(interesado);
         }
-        boolean empresaCliente = normalizarIdentificador(cliente.getNif()).equals(identificador);
         boolean interesadoActualizado = false;
         if (empresaCliente && interesado.getTipoPersona() != TipoPersona.EMPRESA) {
             interesado.setTipoPersona(TipoPersona.EMPRESA);

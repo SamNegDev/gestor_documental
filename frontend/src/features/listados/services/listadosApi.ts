@@ -82,8 +82,9 @@ export function deleteSolicitud(id: string | number) {
   return apiDelete(`/api/solicitudes/${id}`);
 }
 
-export function convertirSolicitud(id: number) {
-  return apiPostJson<{ id: number }>(`/api/solicitudes/${id}/convertir`, {});
+export function convertirSolicitud(id: number, usarDatosRegistrados = false) {
+  const query = usarDatosRegistrados ? "?usarDatosRegistrados=true" : "";
+  return apiPostJson<{ id: number }>(`/api/solicitudes/${id}/convertir${query}`, {});
 }
 
 export function procesarSolicitudDocumentacionIa(id: number, options?: { forzarRelectura?: boolean; documentoId?: number }) {

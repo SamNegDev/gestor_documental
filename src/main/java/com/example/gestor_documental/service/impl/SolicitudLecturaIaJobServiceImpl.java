@@ -3,6 +3,7 @@ package com.example.gestor_documental.service.impl;
 import com.example.gestor_documental.dto.expediente.*;
 import com.example.gestor_documental.enums.*;
 import com.example.gestor_documental.exception.AccesoDenegadoException;
+import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.exception.RecursoNoEncontradoException;
 import com.example.gestor_documental.model.*;
 import com.example.gestor_documental.repository.*;
@@ -61,10 +62,15 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
     @Transactional
     public synchronized SolicitudLecturaIaJobResponse crear(
             Long solicitudId, Usuario usuario, boolean forzarRelectura, String origen, Long documentoId) {
-        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+        Solicitud solicitud = solicitudRepository.findByIdForUpdate(solicitudId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Solicitud no encontrada"));
         if (usuario == null || !solicitudService.tienePermisoSolicitud(solicitud, usuario)) {
             throw new AccesoDenegadoException("No tienes permiso para procesar esta solicitud");
+        }
+        if (solicitud.getEstadoSolicitud() == com.example.gestor_documental.enums.EstadoSolicitud.CONVERTIDA
+                || solicitud.getEstadoSolicitud() == com.example.gestor_documental.enums.EstadoSolicitud.RECHAZADO
+                || solicitud.getExpediente() != null) {
+            throw new OperacionInvalidaException("No se puede iniciar una lectura IA sobre una solicitud cerrada.");
         }
 
         Optional<SolicitudLecturaIaJob> activo = jobRepository

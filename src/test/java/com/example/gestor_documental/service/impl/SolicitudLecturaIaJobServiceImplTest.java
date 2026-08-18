@@ -10,6 +10,9 @@ import com.example.gestor_documental.model.DocumentoVehiculoLectura;
 import com.example.gestor_documental.model.SolicitudLecturaIaItem;
 import com.example.gestor_documental.model.SolicitudLecturaIaJob;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.model.Solicitud;
+import com.example.gestor_documental.enums.EstadoSolicitud;
+import com.example.gestor_documental.exception.OperacionInvalidaException;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
@@ -36,6 +39,7 @@ import java.util.Optional;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -109,6 +113,20 @@ class SolicitudLecturaIaJobServiceImplTest {
 
         assertThat(service.mensajeSeguro(exception))
                 .isEqualTo("No se pudo guardar la lectura. Vuelve a intentarlo.");
+    }
+
+    @Test
+    void noEncolaLecturaIaSiLaSolicitudYaFueConvertida() {
+        Solicitud solicitud = new Solicitud();
+        solicitud.setId(522L);
+        solicitud.setEstadoSolicitud(EstadoSolicitud.CONVERTIDA);
+        Usuario usuario = new Usuario();
+        when(solicitudRepository.findByIdForUpdate(522L)).thenReturn(Optional.of(solicitud));
+        when(solicitudService.tienePermisoSolicitud(solicitud, usuario)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.crear(522L, usuario, false, "MANUAL", null))
+                .isInstanceOf(OperacionInvalidaException.class)
+                .hasMessageContaining("solicitud cerrada");
     }
 
     @Test

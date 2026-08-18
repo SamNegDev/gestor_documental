@@ -273,6 +273,22 @@ class ExpedienteServiceImplTest {
     }
 
     @Test
+    void usaLaFichaRegistradaCuandoElAdministradorConfirmaLaDiferencia() {
+        Expediente expediente = expediente(EstadoExpediente.EN_TRAMITE, TipoTramiteEnum.TRASPASO);
+        Interesado existente = new Interesado("12345678Z", "MARIA LOPEZ");
+        existente.setId(22L);
+        InteresadoFormDto recibido = interesado("12345678Z", "PEDRO MARTIN", RolInteresado.COMPRADOR);
+        when(interesadoService.buscarInteresadoPorDNI("12345678Z")).thenReturn(Optional.of(existente));
+
+        service.guardarInteresadoSiValido(expediente, recibido, true);
+
+        ArgumentCaptor<ExpedienteInteresado> relacion = ArgumentCaptor.forClass(ExpedienteInteresado.class);
+        verify(expedienteInteresadoRepository).save(relacion.capture());
+        assertEquals(existente, relacion.getValue().getInteresado());
+        assertEquals(RolInteresado.COMPRADOR, relacion.getValue().getRol());
+    }
+
+    @Test
     void aceptaElMismoNombreAunqueCambienLosAcentos() {
         Expediente expediente = expediente(EstadoExpediente.EN_TRAMITE, TipoTramiteEnum.TRASPASO);
         Interesado existente = new Interesado("12345678Z", "RAÚL POUQUET");

@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.util.Map;
 
@@ -33,6 +34,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Map<String, String>> handleMissingResource(NoResourceFoundException ex) {
         return error(HttpStatus.NOT_FOUND, "NOT_FOUND", "Recurso no encontrado");
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, String>> handleConcurrentUpdate(OptimisticLockingFailureException ex) {
+        return error(HttpStatus.CONFLICT, "CONCURRENT_UPDATE",
+                "Otro proceso actualizo estos datos al mismo tiempo. Recarga la pantalla y vuelve a intentarlo.");
     }
 
     @ExceptionHandler(Exception.class)

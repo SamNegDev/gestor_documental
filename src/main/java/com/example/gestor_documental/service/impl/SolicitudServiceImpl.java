@@ -6,6 +6,7 @@ import com.example.gestor_documental.dto.expediente.SolicitudIdentidadDetectadaR
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoHabitualRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
 import com.example.gestor_documental.enums.EstadoExpediente;
+import com.example.gestor_documental.enums.EstadoLecturaIaJob;
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
@@ -25,6 +26,7 @@ import com.example.gestor_documental.repository.HistorialCambioRepository;
 import com.example.gestor_documental.repository.IncidenciaRepository;
 import com.example.gestor_documental.repository.MensajeRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
+import com.example.gestor_documental.repository.SolicitudLecturaIaJobRepository;
 import com.example.gestor_documental.service.ExpedienteService;
 import com.example.gestor_documental.service.HistorialCambioService;
 import com.example.gestor_documental.service.InteresadoService;
@@ -61,8 +63,12 @@ import java.util.Optional;
 public class SolicitudServiceImpl implements SolicitudService {
 
     private static final double CONFIANZA_IDENTIDAD_VALIDADA_MANUALMENTE = 1.0;
+    private static final List<EstadoLecturaIaJob> ESTADOS_IA_ACTIVOS = List.of(
+            EstadoLecturaIaJob.PENDIENTE,
+            EstadoLecturaIaJob.PROCESANDO);
 
     private final SolicitudRepository solicitudRepository;
+    private final SolicitudLecturaIaJobRepository solicitudLecturaIaJobRepository;
     private final TipoTramiteService tipoTramiteService;
     private final ExpedienteRepository expedienteRepository;
     private final ExpedienteService expedienteService;
@@ -306,9 +312,22 @@ public class SolicitudServiceImpl implements SolicitudService {
     @Override
     @Transactional
     public Expediente convertirAExpediente(Long solicitudId, Usuario admin) {
+        return convertirAExpediente(solicitudId, admin, false);
+    }
 
-        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+    @Override
+    @Transactional
+    public Expediente convertirAExpediente(Long solicitudId, Usuario admin, boolean usarDatosRegistrados) {
+
+        Solicitud solicitud = solicitudRepository.findByIdForUpdate(solicitudId)
                 .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+
+        if (solicitudLecturaIaJobRepository
+                .findTopBySolicitudIdAndEstadoInOrderByFechaCreacionDescIdDesc(solicitudId, ESTADOS_IA_ACTIVOS)
+                .isPresent()) {
+            throw new OperacionInvalidaException(
+                    "La lectura IA de la solicitud sigue en curso. Espera a que termine antes de convertirla.");
+        }
 
         if (solicitud.getEstadoSolicitud() == EstadoSolicitud.CONVERTIDA) {
             throw new RuntimeException("La solicitud ya ha sido convertida");
@@ -419,9 +438,9 @@ public class SolicitudServiceImpl implements SolicitudService {
 
         expedienteService.validarInteresados(List.of(interesado1dto, interesado2dto, interesado3dto));
 
-        expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado1dto);
-        expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado2dto);
-        expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado3dto);
+         expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado1dto, usarDatosRegistrados);
+         expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado2dto, usarDatosRegistrados);
+         expedienteService.guardarInteresadoSiValido(expedienteGuardado, interesado3dto, usarDatosRegistrados);
         sincronizarDocumentacionExpedienteConvertido(expedienteGuardado, admin);
         
         historialCambioService.registrarCambioSolicitud(
@@ -543,6 +562,14 @@ public class SolicitudServiceImpl implements SolicitudService {
                     if (diferencias.isEmpty()) {
                         return Optional.empty();
                     }
+                    String identificador = IdentificadorFiscalValidator.normalizar(interesado.getDni());
+                    DocumentoIdentidadLectura origen = identificador == null ? null
+                            : documentoIdentidadLecturaRepository
+                            .findTopByIdentificadorOrderByFechaLecturaDescIdDesc(identificador)
+                            .orElse(null);
+                    Documento documentoOrigen = origen != null ? origen.getDocumento() : null;
+                    Solicitud solicitudOrigen = documentoOrigen != null ? documentoOrigen.getSolicitud() : null;
+                    String mensajeOrigen = origen != null ? TextNormalizer.upperOrNull(origen.getMensaje()) : null;
                     return Optional.of(SolicitudInteresadoCoincidenciaResponse.builder()
                             .rol(rol != null ? rol.name() : null)
                             .dni(interesado.getDni())
@@ -553,6 +580,16 @@ public class SolicitudServiceImpl implements SolicitudService {
                             .direccionRegistrada(interesado.getDireccion())
                             .direccionDeclarada(TextNormalizer.upperOrNull(direccionDeclarada))
                             .camposDiferentes(diferencias)
+                            .interesadoId(interesado.getId())
+                            .expedientesAsociados(interesado.getId() != null
+                                    ? expedienteInteresadoRepository.countByInteresadoId(interesado.getId())
+                                    : 0L)
+                            .origenSolicitudId(solicitudOrigen != null ? solicitudOrigen.getId() : null)
+                            .origenDocumentoId(documentoOrigen != null ? documentoOrigen.getId() : null)
+                            .origenDocumentoNombre(documentoOrigen != null ? documentoOrigen.getNombreArchivoOriginal() : null)
+                            .origenLectura(mensajeOrigen != null && mensajeOrigen.contains("MANUAL")
+                                    ? "VALIDACION_MANUAL"
+                                    : origen != null ? "LECTURA_IA" : null)
                             .build());
                 });
     }
@@ -884,7 +921,9 @@ public class SolicitudServiceImpl implements SolicitudService {
         if (slotExistente != 0) {
             validarRolInteresadoExistente(solicitud, slotExistente, request.getRol());
             completarInteresadoExistente(solicitud, slotExistente, request.getRol(), nombre, request);
-            validarLecturaIdentidadManual(solicitud, request, identificador, null);
+            Interesado vinculado = resolverInteresadoVinculadoManual(
+                    solicitud, request, identificador, slotExistente, nombre);
+            validarLecturaIdentidadManual(solicitud, request, identificador, vinculado);
             validarInteresadosSolicitud(solicitud);
             normalizarSolicitud(solicitud);
             solicitud.setFechaUltimaModificacion(LocalDateTime.now());
@@ -905,7 +944,8 @@ public class SolicitudServiceImpl implements SolicitudService {
         }
 
         aplicarInteresadoDetectado(solicitud, slot, request.getRol(), nombre, identificador, request);
-        validarLecturaIdentidadManual(solicitud, request, identificador, null);
+        Interesado vinculado = resolverInteresadoVinculadoManual(solicitud, request, identificador, slot, nombre);
+        validarLecturaIdentidadManual(solicitud, request, identificador, vinculado);
         validarInteresadosSolicitud(solicitud);
         normalizarSolicitud(solicitud);
         solicitud.setFechaUltimaModificacion(LocalDateTime.now());
@@ -1028,6 +1068,10 @@ public class SolicitudServiceImpl implements SolicitudService {
                 : "Identidad corregida y validada manualmente.");
         lectura.setResultadoJson(resultadoIdentidadManual(lectura.getResultadoJson(), request, identificador, tipoDetectado));
         documentoIdentidadLecturaRepository.save(lectura);
+        if (interesadoVinculado != null) {
+            documento.setInteresado(interesadoVinculado);
+            documentoRepository.save(documento);
+        }
         boolean documentoActualizado = false;
         if (documento.getTipoDocumento() != tipoDetectado) {
             documento.setTipoDocumento(tipoDetectado);
@@ -1233,16 +1277,31 @@ public class SolicitudServiceImpl implements SolicitudService {
         Optional<Interesado> existente = interesadoService.buscarInteresadoPorDNI(identificador);
         if (existente.isPresent()) {
             Interesado interesado = existente.get();
+            String nombreExistente = NombrePersonaNormalizer.normalizar(interesado.getNombre());
+            boolean nombreCoincidente = NombrePersonaNormalizer.equivalentes(nombreExistente, nombre);
+            if (!nombreCoincidente && !esFichaProvisionalSinExpedientes(interesado)) {
+                return null;
+            }
             boolean cambiado = false;
-            if (TextNormalizer.upperOrNull(interesado.getNombre()) == null && nombre != null) {
+            if (!nombreCoincidente && nombre != null) {
+                interesado.setNombre(nombre);
+                interesado.setNombrePila(TextNormalizer.upperOrNull(request.getNombre()));
+                interesado.setApellido1(TextNormalizer.upperOrNull(request.getApellido1()));
+                interesado.setApellido2(TextNormalizer.upperOrNull(request.getApellido2()));
+                interesado.setRazonSocial(NombrePersonaNormalizer.normalizar(request.getRazonSocial()));
+                interesado.setTipoPersona(esCif(identificador) ? TipoPersona.EMPRESA : TipoPersona.PARTICULAR);
+                cambiado = true;
+            } else if (TextNormalizer.upperOrNull(interesado.getNombre()) == null && nombre != null) {
                 interesado.setNombre(nombre);
                 cambiado = true;
             }
-            if (TextNormalizer.upperOrNull(interesado.getDireccion()) == null && direccion != null) {
+            if ((!nombreCoincidente || TextNormalizer.upperOrNull(interesado.getDireccion()) == null) && direccion != null) {
                 interesado.setDireccion(direccion);
                 cambiado = true;
             }
-            cambiado |= completarDireccionEstructuradaInteresado(interesado, request);
+            cambiado |= !nombreCoincidente
+                    ? reemplazarDireccionEstructuradaInteresado(interesado, request)
+                    : completarDireccionEstructuradaInteresado(interesado, request);
             return cambiado ? interesadoService.guardar(interesado) : interesado;
         }
 
@@ -1253,6 +1312,34 @@ public class SolicitudServiceImpl implements SolicitudService {
         nuevo.setTipoPersona(esCif(identificador) ? TipoPersona.EMPRESA : TipoPersona.PARTICULAR);
         completarDireccionEstructuradaInteresado(nuevo, request);
         return interesadoService.guardar(nuevo);
+    }
+
+    private boolean esFichaProvisionalSinExpedientes(Interesado interesado) {
+        if (interesado == null || interesado.getId() == null
+                || expedienteInteresadoRepository.existsByInteresadoId(interesado.getId())) {
+            return false;
+        }
+        return clienteInteresadoRepository.findByInteresadoId(interesado.getId()).stream()
+                .noneMatch(relacion -> Boolean.TRUE.equals(relacion.getHabitual())
+                        || Boolean.TRUE.equals(relacion.getRepresentanteLegal()));
+    }
+
+    private boolean reemplazarDireccionEstructuradaInteresado(
+            Interesado interesado,
+            SolicitudIdentidadDetectadaRequest request
+    ) {
+        interesado.setTipoVia(TextNormalizer.upperOrNull(request.getTipoVia()));
+        interesado.setNombreVia(TextNormalizer.upperOrNull(request.getNombreVia()));
+        interesado.setNumeroVia(TextNormalizer.upperOrNull(request.getNumeroVia()));
+        interesado.setBloque(TextNormalizer.upperOrNull(request.getBloque()));
+        interesado.setPortal(TextNormalizer.upperOrNull(request.getPortal()));
+        interesado.setEscalera(TextNormalizer.upperOrNull(request.getEscalera()));
+        interesado.setPiso(TextNormalizer.upperOrNull(request.getPiso()));
+        interesado.setPuerta(TextNormalizer.upperOrNull(request.getPuerta()));
+        interesado.setCodigoPostal(TextNormalizer.upperOrNull(request.getCodigoPostal()));
+        interesado.setMunicipio(TextNormalizer.upperOrNull(request.getMunicipio()));
+        interesado.setProvincia(TextNormalizer.upperOrNull(request.getProvincia()));
+        return true;
     }
 
     private String primerTexto(String... values) {

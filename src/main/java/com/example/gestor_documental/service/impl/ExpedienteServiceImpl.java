@@ -158,6 +158,15 @@ public class ExpedienteServiceImpl implements ExpedienteService {
     }
 
     public void guardarInteresadoSiValido(Expediente expediente, InteresadoFormDto dto) {
+        guardarInteresadoSiValido(expediente, dto, false);
+    }
+
+    @Override
+    public void guardarInteresadoSiValido(
+            Expediente expediente,
+            InteresadoFormDto dto,
+            boolean usarDatosRegistrados
+    ) {
 
         if (interesadoVacio(dto)) {
             return;
@@ -172,7 +181,9 @@ public class ExpedienteServiceImpl implements ExpedienteService {
         boolean empresa = esCif(dto.getDni());
         boolean empresaPrincipalCliente = empresa && empresaPrincipalCliente(expediente, dto.getDni());
         Optional<Interesado> interesadoExistente = interesadoService.buscarInteresadoPorDNI(dto.getDni());
-        interesadoExistente.ifPresent(interesado -> validarIdentidadCoincidente(interesado, dto, empresaPrincipalCliente));
+        if (!usarDatosRegistrados) {
+            interesadoExistente.ifPresent(interesado -> validarIdentidadCoincidente(interesado, dto, empresaPrincipalCliente));
+        }
         Interesado interesado = interesadoExistente.orElseGet(() -> {
                     Interesado nuevoInteresado = new Interesado();
                     nuevoInteresado.setNombre(NombrePersonaNormalizer.normalizar(dto.getNombre()));

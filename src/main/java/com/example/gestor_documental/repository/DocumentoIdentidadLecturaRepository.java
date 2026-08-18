@@ -15,4 +15,7 @@ public interface DocumentoIdentidadLecturaRepository extends JpaRepository<Docum
 
     @EntityGraph(attributePaths = {"documento", "interesadoVinculado"})
     List<DocumentoIdentidadLectura> findByDocumentoIdIn(Collection<Long> documentoIds);
+
+    @EntityGraph(attributePaths = {"documento", "documento.solicitud", "interesadoVinculado"})
+    Optional<DocumentoIdentidadLectura> findTopByIdentificadorOrderByFechaLecturaDescIdDesc(String identificador);
 }

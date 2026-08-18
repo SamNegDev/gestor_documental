@@ -184,6 +184,12 @@ export interface SolicitudInteresadoCoincidencia {
   direccionRegistrada?: string | null;
   direccionDeclarada?: string | null;
   camposDiferentes: string[];
+  interesadoId?: number | null;
+  expedientesAsociados: number;
+  origenSolicitudId?: number | null;
+  origenDocumentoId?: number | null;
+  origenDocumentoNombre?: string | null;
+  origenLectura?: string | null;
 }
 
 export interface SolicitudIdentidadDetectadaInput {

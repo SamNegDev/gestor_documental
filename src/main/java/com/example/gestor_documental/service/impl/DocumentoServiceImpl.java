@@ -2,6 +2,7 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.dto.DocumentoDetectadoDto;
 import com.example.gestor_documental.enums.EstadoExpediente;
+import com.example.gestor_documental.enums.EstadoLecturaIaItem;
 import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.EstadoRequisitoDocumental;
@@ -63,6 +64,9 @@ public class DocumentoServiceImpl implements DocumentoService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentoServiceImpl.class);
     private static final String ACCION_CARGAR_DOCUMENTO = "CARGAR DOCUMENTO";
+    private static final List<EstadoLecturaIaItem> ESTADOS_LECTURA_ACTIVOS = List.of(
+            EstadoLecturaIaItem.PENDIENTE,
+            EstadoLecturaIaItem.PROCESANDO);
 
     private final DocumentoRepository documentoRepository;
     private final ExpedienteRepository expedienteRepository;
@@ -1113,6 +1117,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     public void extraerPaginasDocumento(Long idOriginal, String rangoPaginas, TipoDocumento nuevoTipo,
             String nuevoNombre, Long operacionId, Usuario usuario) {
         Documento documentoOriginal = obtenerDocumentoConPermiso(idOriginal, usuario);
+        validarSinLecturaIaActiva(documentoOriginal);
         validarTransformacionExpedienteOSolicitud(documentoOriginal);
 
         Path rutaOriginal = obtenerCarpetaUploads().resolve(documentoOriginal.getNombreArchivo()).normalize();
@@ -1185,6 +1190,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     @Transactional
     public void eliminarPaginasDocumento(Long id, String rangoPaginas, Usuario usuario) {
         Documento documento = obtenerDocumentoConPermiso(id, usuario);
+        validarSinLecturaIaActiva(documento);
         validarTransformacionExpedienteOSolicitud(documento);
         Path ruta = obtenerCarpetaUploads().resolve(documento.getNombreArchivo()).normalize();
 
@@ -1226,6 +1232,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     @Transactional
     public void unirDocumentos(Long documentoPrincipalId, List<Long> documentoIds, TipoDocumento tipoDocumento, String nombreArchivo, Long operacionId, Usuario usuario) {
         Documento principal = obtenerDocumentoConPermiso(documentoPrincipalId, usuario);
+        validarSinLecturaIaActiva(principal);
         validarTransformacionExpedienteOSolicitud(principal);
         TipoDocumento tipoAnterior = principal.getTipoDocumento();
         List<Long> ids = documentoIds == null ? List.of() : documentoIds.stream()
@@ -1241,6 +1248,7 @@ public class DocumentoServiceImpl implements DocumentoService {
             documentos.add(principal);
             for (Long id : ids) {
                 Documento documento = obtenerDocumentoConPermiso(id, usuario);
+                validarSinLecturaIaActiva(documento);
                 validarMismoContenedor(principal, documento);
                 documentos.add(documento);
             }
@@ -1336,6 +1344,15 @@ public class DocumentoServiceImpl implements DocumentoService {
                 || !java.util.Objects.equals(solicitudPrincipal, solicitudDocumento)
                 || !java.util.Objects.equals(clientePrincipal, clienteDocumento)) {
             throw new OperacionInvalidaException("Solo se pueden unir documentos del mismo expediente o solicitud");
+        }
+    }
+
+    private void validarSinLecturaIaActiva(Documento documento) {
+        if (documento != null && documento.getId() != null
+                && solicitudLecturaIaItemRepository.existsByDocumentoIdAndEstadoIn(
+                        documento.getId(), ESTADOS_LECTURA_ACTIVOS)) {
+            throw new OperacionInvalidaException(
+                    "Este documento se esta leyendo con IA. Espera a que termine antes de separar, eliminar o unir paginas.");
         }
     }
 

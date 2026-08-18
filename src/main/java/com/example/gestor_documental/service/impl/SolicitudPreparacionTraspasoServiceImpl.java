@@ -792,6 +792,7 @@ public class SolicitudPreparacionTraspasoServiceImpl implements SolicitudPrepara
         return context.lecturasRoles().values().stream()
                 .map(DocumentoRolesLectura::getValorDeclarado)
                 .map(this::texto)
+                .filter(java.util.Objects::nonNull)
                 .findFirst()
                 .orElse(null);
     }

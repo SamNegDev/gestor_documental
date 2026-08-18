@@ -54,6 +54,8 @@ public interface SolicitudService {
 
     Expediente convertirAExpediente(Long solicitudId, Usuario admin);
 
+    Expediente convertirAExpediente(Long solicitudId, Usuario admin, boolean usarDatosRegistrados);
+
     List<SolicitudInteresadoCoincidenciaResponse> buscarCoincidenciasInteresadosConDiferencias(Long solicitudId, Usuario admin);
 
     void cambiarEstadoSolicitud(Long id, EstadoSolicitud nuevoEstado, Usuario admin);

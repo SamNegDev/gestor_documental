@@ -18,4 +18,10 @@ public class SolicitudInteresadoCoincidenciaResponse {
     private String direccionRegistrada;
     private String direccionDeclarada;
     private List<String> camposDiferentes;
+    private Long interesadoId;
+    private long expedientesAsociados;
+    private Long origenSolicitudId;
+    private Long origenDocumentoId;
+    private String origenDocumentoNombre;
+    private String origenLectura;
 }

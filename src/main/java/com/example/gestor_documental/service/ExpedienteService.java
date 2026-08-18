@@ -68,6 +68,8 @@ public interface ExpedienteService {
 
     public void guardarInteresadoSiValido(Expediente expediente, InteresadoFormDto dto);
 
+    public void guardarInteresadoSiValido(Expediente expediente, InteresadoFormDto dto, boolean usarDatosRegistrados);
+
     void cambiarEstado(Long id, EstadoExpediente nuevoEstado, Usuario usuarioLogueado);
 
     void solicitarInformacionAdicional(Long id, Usuario usuarioLogueado);

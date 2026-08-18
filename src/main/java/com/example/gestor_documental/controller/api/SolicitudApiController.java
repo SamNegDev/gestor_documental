@@ -206,9 +206,12 @@ public class SolicitudApiController {
     }
 
     @PostMapping("/{id}/convertir")
-    public ResponseEntity<java.util.Map<String, Long>> convertir(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<java.util.Map<String, Long>> convertir(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "false") boolean usarDatosRegistrados,
+            Authentication authentication) {
         Usuario usuarioLogueado = requireAdmin(authentication);
-        Expediente expediente = solicitudService.convertirAExpediente(id, usuarioLogueado);
+        Expediente expediente = solicitudService.convertirAExpediente(id, usuarioLogueado, usarDatosRegistrados);
         return ResponseEntity.ok(java.util.Map.of("id", expediente.getId()));
     }
 

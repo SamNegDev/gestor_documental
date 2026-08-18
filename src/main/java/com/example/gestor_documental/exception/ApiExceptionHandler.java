@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.util.Map;
 
@@ -37,6 +38,12 @@ public class ApiExceptionHandler {
         HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
         HttpStatus resolved = status != null ? status : HttpStatus.INTERNAL_SERVER_ERROR;
         return error(resolved, resolved.name(), ex.getReason() != null ? ex.getReason() : "La operacion no se pudo completar.");
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, String>> handleConcurrentUpdate(OptimisticLockingFailureException ex) {
+        return error(HttpStatus.CONFLICT, "CONCURRENT_UPDATE",
+                "Otro proceso actualizo estos datos al mismo tiempo. Recarga la pantalla y vuelve a intentarlo.");
     }
 
     @ExceptionHandler(Exception.class)

@@ -343,14 +343,18 @@ class SolicitudPreparacionTraspasoServiceImplTest {
         Documento dniComprador = documento(71L, TipoDocumento.DNI);
         Documento permiso = documento(72L, TipoDocumento.PERMISO_CIRCULACION);
         Documento ficha = documento(73L, TipoDocumento.FICHA_TECNICA);
+        Documento contrato = documento(74L, TipoDocumento.CONTRATO_COMPRAVENTA);
+        DocumentoRolesLectura lecturaSinPrecio = lecturaRoles(contrato);
+        lecturaSinPrecio.setValorDeclarado(null);
 
         when(solicitudRepository.findById(16L)).thenReturn(Optional.of(solicitud));
-        when(documentoRepository.findBySolicitudId(16L)).thenReturn(List.of(dniVendedor, dniComprador, permiso, ficha));
-        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(70L, 71L, 72L, 73L))).thenReturn(List.of(
+        when(documentoRepository.findBySolicitudId(16L)).thenReturn(List.of(dniVendedor, dniComprador, permiso, ficha, contrato));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(70L, 71L, 72L, 73L, 74L))).thenReturn(List.of(
                 lecturaIdentidad(dniVendedor, "50975033H"),
                 lecturaIdentidad(dniComprador, "42793999S")
         ));
-        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(70L, 71L, 72L, 73L))).thenReturn(List.of());
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(70L, 71L, 72L, 73L, 74L)))
+                .thenReturn(List.of(lecturaSinPrecio));
 
         SolicitudPreparacionTraspasoResponse response = service.obtenerPreparacion(16L, usuario);
 

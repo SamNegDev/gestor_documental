@@ -165,7 +165,8 @@ export function SolicitudDetailPage() {
   });
 
   const convertirMutation = useMutation({
-    mutationFn: (solicitudId: number) => convertirSolicitud(solicitudId),
+    mutationFn: ({ solicitudId, usarDatosRegistrados }: { solicitudId: number; usarDatosRegistrados: boolean }) =>
+      convertirSolicitud(solicitudId, usarDatosRegistrados),
     onSuccess: async (expediente) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
@@ -468,6 +469,7 @@ export function SolicitudDetailPage() {
     setCheckingInteresados(true);
     try {
       const coincidencias = await getSolicitudInteresadoCoincidencias(solicitudActual.id);
+      let usarDatosRegistrados = false;
       if (coincidencias.length > 0) {
         const confirmed = await confirm({
           title: "Interesado ya registrado",
@@ -477,8 +479,9 @@ export function SolicitudDetailPage() {
           tone: "default",
         });
         if (!confirmed) return;
+        usarDatosRegistrados = true;
       }
-      convertirMutation.mutate(solicitudActual.id);
+      convertirMutation.mutate({ solicitudId: solicitudActual.id, usarDatosRegistrados });
     } catch {
       alert("No se pudo comprobar si los interesados ya estaban registrados.");
     } finally {
@@ -1852,13 +1855,22 @@ function buildCoincidenciasDescription(coincidencias: Array<{
   telefonoDeclarado?: string | null;
   direccionRegistrada?: string | null;
   direccionDeclarada?: string | null;
+  expedientesAsociados: number;
+  origenSolicitudId?: number | null;
+  origenDocumentoNombre?: string | null;
 }>) {
   return coincidencias
     .map((item) => {
       const diferencias = item.camposDiferentes.join(", ");
       const registrado = [item.nombreRegistrado, item.telefonoRegistrado, item.direccionRegistrada].filter(Boolean).join(" / ");
       const declarado = [item.nombreDeclarado, item.telefonoDeclarado, item.direccionDeclarada].filter(Boolean).join(" / ");
-      return `${item.rol ? formatEnum(item.rol) + " - " : ""}${item.dni}: cambian ${diferencias}. Registro: ${registrado || "sin datos"}. Solicitud: ${declarado || "sin datos"}.`;
+      const uso = item.expedientesAsociados > 0
+        ? `${item.expedientesAsociados} expediente${item.expedientesAsociados === 1 ? "" : "s"} asociado${item.expedientesAsociados === 1 ? "" : "s"}`
+        : "sin expedientes asociados";
+      const origen = item.origenSolicitudId
+        ? `Origen: SOL-${item.origenSolicitudId}${item.origenDocumentoNombre ? `, ${item.origenDocumentoNombre}` : ""}`
+        : item.origenDocumentoNombre ? `Origen: ${item.origenDocumentoNombre}` : "Origen no trazado";
+      return `${item.rol ? formatEnum(item.rol) + " - " : ""}${item.dni}: cambian ${diferencias}. Registro: ${registrado || "sin datos"}. Solicitud: ${declarado || "sin datos"}. Ficha ${uso}. ${origen}.`;
     })
     .join("\n");
 }

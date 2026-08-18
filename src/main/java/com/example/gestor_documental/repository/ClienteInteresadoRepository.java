@@ -46,6 +46,8 @@ public interface ClienteInteresadoRepository extends JpaRepository<ClienteIntere
 
     Optional<ClienteInteresado> findByClienteIdAndInteresadoIdAndHabitualTrue(Long clienteId, Long interesadoId);
 
+    List<ClienteInteresado> findByInteresadoId(Long interesadoId);
+
     boolean existsByClienteIdAndInteresadoId(Long clienteId, Long interesadoId);
 
     boolean existsByClienteIdAndInteresadoIdAndHabitualTrue(Long clienteId, Long interesadoId);

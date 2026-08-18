@@ -15,6 +15,10 @@ public interface ExpedienteInteresadoRepository extends JpaRepository<Expediente
 
     List<ExpedienteInteresado> findByExpedienteId(Long expedienteId);
 
+    long countByInteresadoId(Long interesadoId);
+
+    boolean existsByInteresadoId(Long interesadoId);
+
     @Query("""
             select relacion
             from ExpedienteInteresado relacion
