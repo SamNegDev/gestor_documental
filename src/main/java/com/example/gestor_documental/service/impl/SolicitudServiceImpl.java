@@ -1744,6 +1744,7 @@ public class SolicitudServiceImpl implements SolicitudService {
             throw new OperacionInvalidaException("No se puede eliminar una solicitud convertida o con expediente asociado");
         }
 
+        solicitudLecturaIaJobRepository.deleteBySolicitudId(id);
         List<Documento> documentosEliminar = new java.util.ArrayList<>(documentoRepository.findBySolicitudId(id));
         for (Incidencia incidencia : incidenciaRepository.findBySolicitudId(id)) {
             documentosEliminar.addAll(documentoRepository.findByIncidenciaId(incidencia.getId()));
