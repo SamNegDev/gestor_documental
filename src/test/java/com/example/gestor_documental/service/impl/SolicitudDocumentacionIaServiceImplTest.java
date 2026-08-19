@@ -338,6 +338,107 @@ class SolicitudDocumentacionIaServiceImplTest {
     }
 
     @Test
+    void batecomCompletaCadenaConInteresadosValidadosClienteYOperacionFinal() {
+        Solicitud solicitud = solicitudCliente(549L);
+        cliente.setId(4L);
+        cliente.setNif("B38436556");
+        cliente.setNombre("CANARIOALEMANA DE AUTOMOVILES");
+        cliente.setTelefono("922111111");
+        solicitud.setTipoTramite(new TipoTramite(TipoTramiteEnum.BATECOM, "BATECOM"));
+        solicitud.setInteresado1Rol(RolInteresado.COMPRADOR);
+        solicitud.setInteresado1Dni("79083702L");
+        solicitud.setInteresado1Nombre("PEDRO JOSE DEL BOSQUE DE ARMAS");
+        solicitud.setInteresado2Rol(RolInteresado.VENDEDOR);
+        solicitud.setInteresado2Dni("43780353Z");
+        solicitud.setInteresado2Nombre("CRISTINA PEREZ BENCOMO");
+
+        Documento factura = documento(9248L, TipoDocumento.FACTURA);
+        Documento contrato = documento(9249L, TipoDocumento.CONTRATO_COMPRAVENTA);
+        Documento dniComprador = documento(9252L, TipoDocumento.DNI);
+        Documento dniVendedor = documento(9331L, TipoDocumento.DNI);
+        DocumentoRolesLectura lecturaFactura = lecturaRoles(
+                factura,
+                null, "CANAAUTO SL",
+                "79083702L", "PEDRO JOSE DEL BOSQUE DE ARMAS");
+        lecturaFactura.setConfianzaGlobal(0.95);
+        lecturaFactura.setRequiereRevision(true);
+        DocumentoRolesLectura lecturaFinal = lecturaRoles(
+                contrato,
+                "B38436556", "CANARIOALEMANA DE AUTOMOVILES SL",
+                "79083702L", "PEDRO JOSE DEL BOSQUE DE ARMAS");
+        lecturaFinal.setConfianzaGlobal(0.98);
+        DocumentoIdentidadLectura identidadComprador = identidad(
+                dniComprador, "79083702L", "PEDRO JOSE", "DEL BOSQUE", "DE ARMAS", 0.99);
+        DocumentoIdentidadLectura identidadVendedor = identidad(
+                dniVendedor, "43780353Z", "CRISTINA", "PEREZ", "BENCOMO", 1.0);
+
+        when(solicitudRepository.findById(549L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(549L)).thenReturn(List.of(
+                factura, contrato, dniComprador, dniVendedor));
+        when(rolesLecturaRepository.findByDocumentoId(9248L)).thenReturn(Optional.of(lecturaFactura));
+        when(rolesLecturaRepository.findByDocumentoId(9249L)).thenReturn(Optional.of(lecturaFinal));
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(9248L, 9249L)))
+                .thenReturn(List.of(lecturaFactura, lecturaFinal));
+        when(identidadLecturaRepository.findByDocumentoId(9252L)).thenReturn(Optional.of(identidadComprador));
+        when(identidadLecturaRepository.findByDocumentoId(9331L)).thenReturn(Optional.of(identidadVendedor));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(9252L, 9331L)))
+                .thenReturn(List.of(identidadComprador, identidadVendedor));
+        when(solicitudRepository.save(solicitud)).thenReturn(solicitud);
+        Usuario admin = new Usuario();
+        admin.setRolUsuario(RolUsuario.ADMIN);
+
+        SolicitudDocumentacionIaResponse response = service.procesarDocumentacion(549L, admin);
+
+        assertThat(response.isDatosAplicados()).isTrue();
+        assertThat(response.isRequiereRevision()).isFalse();
+        assertThat(response.getDetalles()).anyMatch(detalle -> detalle.contains("Cadena BATECOM completada"));
+        assertThat(solicitud.getInteresado1Rol()).isEqualTo(RolInteresado.COMPRADOR);
+        assertThat(solicitud.getInteresado1Dni()).isEqualTo("79083702L");
+        assertThat(solicitud.getInteresado2Rol()).isEqualTo(RolInteresado.VENDEDOR);
+        assertThat(solicitud.getInteresado2Dni()).isEqualTo("43780353Z");
+        assertThat(solicitud.getInteresado3Rol()).isEqualTo(RolInteresado.COMPRAVENTA);
+        assertThat(solicitud.getInteresado3Dni()).isEqualTo("B38436556");
+        assertThat(solicitud.getInteresado3Nombre()).isEqualTo("CANARIOALEMANA DE AUTOMOVILES");
+        assertThat(solicitud.getInteresado3Telefono()).isEqualTo("922111111");
+    }
+
+    @Test
+    void batecomNoInfiereCadenaSinVendedorValidadoEnLaSolicitud() {
+        Solicitud solicitud = solicitudCliente(550L);
+        cliente.setNif("B38436556");
+        cliente.setNombre("CANARIOALEMANA DE AUTOMOVILES");
+        solicitud.setTipoTramite(new TipoTramite(TipoTramiteEnum.BATECOM, "BATECOM"));
+        solicitud.setInteresado1Rol(RolInteresado.COMPRADOR);
+        solicitud.setInteresado1Dni("79083702L");
+        solicitud.setInteresado1Nombre("PEDRO JOSE DEL BOSQUE DE ARMAS");
+        Documento contrato = documento(9253L, TipoDocumento.CONTRATO_COMPRAVENTA);
+        Documento dniComprador = documento(9254L, TipoDocumento.DNI);
+        DocumentoRolesLectura lecturaFinal = lecturaRoles(
+                contrato,
+                "B38436556", "CANARIOALEMANA DE AUTOMOVILES SL",
+                "79083702L", "PEDRO JOSE DEL BOSQUE DE ARMAS");
+        lecturaFinal.setConfianzaGlobal(0.98);
+        DocumentoIdentidadLectura identidadComprador = identidad(
+                dniComprador, "79083702L", "PEDRO JOSE", "DEL BOSQUE", "DE ARMAS", 0.99);
+
+        when(solicitudRepository.findById(550L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(550L)).thenReturn(List.of(contrato, dniComprador));
+        when(rolesLecturaRepository.findByDocumentoId(9253L)).thenReturn(Optional.of(lecturaFinal));
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(9253L))).thenReturn(List.of(lecturaFinal));
+        when(identidadLecturaRepository.findByDocumentoId(9254L)).thenReturn(Optional.of(identidadComprador));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(9254L))).thenReturn(List.of(identidadComprador));
+        Usuario admin = new Usuario();
+        admin.setRolUsuario(RolUsuario.ADMIN);
+
+        SolicitudDocumentacionIaResponse response = service.procesarDocumentacion(550L, admin);
+
+        assertThat(response.isDatosAplicados()).isFalse();
+        assertThat(response.isRequiereRevision()).isTrue();
+        assertThat(solicitud.getInteresado2Rol()).isNull();
+        assertThat(solicitud.getInteresado3Rol()).isNull();
+    }
+
+    @Test
     void noUsaEntidadConocidaSiLaLecturaDeRolesNoEsPerfecta() {
         Solicitud solicitud = solicitudCliente(36L);
         cliente.setNif("B38436556");
@@ -395,6 +496,25 @@ class SolicitudDocumentacionIaServiceImplTest {
         lectura.setCompradorIdentificador(compradorDni);
         lectura.setCompradorNombre(compradorNombre);
         lectura.setConfianzaGlobal(0.99);
+        lectura.setRequiereRevision(false);
+        return lectura;
+    }
+
+    private DocumentoIdentidadLectura identidad(
+            Documento documento,
+            String identificador,
+            String nombre,
+            String apellido1,
+            String apellido2,
+            double confianza
+    ) {
+        DocumentoIdentidadLectura lectura = new DocumentoIdentidadLectura();
+        lectura.setDocumento(documento);
+        lectura.setIdentificador(identificador);
+        lectura.setNombre(nombre);
+        lectura.setApellido1(apellido1);
+        lectura.setApellido2(apellido2);
+        lectura.setConfianzaGlobal(confianza);
         lectura.setRequiereRevision(false);
         return lectura;
     }

@@ -1,9 +1,12 @@
 package com.example.gestor_documental.service.impl;
 
+import com.example.gestor_documental.dto.expediente.SolicitudDocumentacionIaResponse;
+import com.example.gestor_documental.dto.expediente.SolicitudLecturaIaJobResponse;
 import com.example.gestor_documental.enums.EstadoLecturaIaItem;
 import com.example.gestor_documental.enums.EstadoLecturaIaJob;
 import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoLecturaIa;
+import com.example.gestor_documental.enums.RolUsuario;
 import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.DocumentoVehiculoLectura;
@@ -35,8 +38,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 
-import java.util.Optional;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -127,6 +131,42 @@ class SolicitudLecturaIaJobServiceImplTest {
         assertThatThrownBy(() -> service.crear(522L, usuario, false, "MANUAL", null))
                 .isInstanceOf(OperacionInvalidaException.class)
                 .hasMessageContaining("solicitud cerrada");
+    }
+
+    @Test
+    void consolidaAunqueTodasLasLecturasYaExistan() {
+        Solicitud solicitud = new Solicitud();
+        solicitud.setId(559L);
+        solicitud.setEstadoSolicitud(EstadoSolicitud.PENDIENTE_REVISION);
+        Usuario admin = new Usuario();
+        admin.setRolUsuario(RolUsuario.ADMIN);
+        Documento dni = documento(9356L, TipoDocumento.DNI);
+        DocumentoIdentidadLectura lectura = identidad(9356L, false, 0.98);
+        SolicitudDocumentacionIaResponse consolidacion = SolicitudDocumentacionIaResponse.builder()
+                .solicitudId(559L)
+                .datosAplicados(true)
+                .requiereRevision(false)
+                .mensaje("Datos BATECOM actualizados desde la documentacion.")
+                .build();
+
+        when(solicitudRepository.findByIdForUpdate(559L)).thenReturn(Optional.of(solicitud));
+        when(solicitudService.tienePermisoSolicitud(solicitud, admin)).thenReturn(true);
+        when(documentoRepository.findBySolicitudId(559L)).thenReturn(List.of(dni));
+        when(identidadRepository.findByDocumentoId(9356L)).thenReturn(Optional.of(lectura));
+        when(jobRepository.saveAndFlush(any(SolicitudLecturaIaJob.class))).thenAnswer(invocation -> {
+            SolicitudLecturaIaJob job = invocation.getArgument(0);
+            job.setId(205L);
+            return job;
+        });
+        when(consolidacionService.procesarDocumentacion(559L, admin, false)).thenReturn(consolidacion);
+
+        SolicitudLecturaIaJobResponse response = service.crear(559L, admin, false, "MANUAL", null);
+
+        assertThat(response.getTotalItems()).isZero();
+        assertThat(response.getEstado()).isEqualTo("COMPLETADO");
+        assertThat(response.getFaseActual()).isEqualTo("Datos consolidados");
+        assertThat(response.getMensaje()).isEqualTo("Datos BATECOM actualizados desde la documentacion.");
+        verify(consolidacionService).procesarDocumentacion(559L, admin, false);
     }
 
     @Test

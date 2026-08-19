@@ -273,6 +273,12 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         List<DocumentoRolesLectura> lecturas = lecturasRolesUsables(documentosRoles);
         BatecomPartes partes = detectarPartesBatecom(lecturas, identidades);
         if (partes == null) {
+            partes = detectarPartesBatecomDesdeSolicitud(solicitud, lecturas, identidades);
+            if (partes != null) {
+                detalles.add("Cadena BATECOM completada con vendedor y comprador validados en la solicitud, cliente conocido y operacion final leida.");
+            }
+        }
+        if (partes == null) {
             detalles.add(lecturas.size() < 2
                     ? "BATECOM necesita dos lecturas validas: entrega a compraventa y venta final al comprador."
                     : "No se ha detectado una compraventa comun que aparezca como comprador en una operacion y vendedor en otra.");
@@ -736,6 +742,138 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return mejor;
     }
 
+    private BatecomPartes detectarPartesBatecomDesdeSolicitud(
+            Solicitud solicitud,
+            List<DocumentoRolesLectura> lecturas,
+            Map<String, IdentidadSolicitud> identidades
+    ) {
+        if (solicitud == null || solicitud.getCliente() == null) {
+            return null;
+        }
+        String clienteId = normalizarIdentificador(solicitud.getCliente().getNif());
+        if (clienteId == null || !identificadorValido(clienteId)) {
+            return null;
+        }
+        PersonaSolicitud vendedor = personaValidadaEnSolicitud(solicitud, RolInteresado.VENDEDOR, identidades);
+        PersonaSolicitud compradorGuardado = personaValidadaEnSolicitud(solicitud, RolInteresado.COMPRADOR, identidades);
+        if (vendedor == null || compradorGuardado == null
+                || clienteId.equals(vendedor.identificador())
+                || clienteId.equals(compradorGuardado.identificador())
+                || vendedor.identificador().equals(compradorGuardado.identificador())) {
+            return null;
+        }
+
+        List<DocumentoRolesLectura> operacionesFinales = lecturas.stream()
+                .filter(this::rolesCorroboranEntidadConocida)
+                .filter(lectura -> clienteId.equals(normalizarIdentificador(lectura.getVendedorIdentificador())))
+                .filter(lectura -> compradorGuardado.identificador().equals(
+                        normalizarIdentificador(lectura.getCompradorIdentificador())))
+                .toList();
+        if (operacionesFinales.isEmpty()) {
+            return null;
+        }
+        DocumentoRolesLectura lecturaFinal = operacionesFinales.stream()
+                .max(Comparator.comparing(lectura -> confianza(lectura.getConfianzaGlobal())))
+                .orElse(null);
+        if (lecturaFinal == null) {
+            return null;
+        }
+        PersonaSolicitud comprador = personaDesdeLectura(lecturaFinal, false, identidades);
+        PersonaSolicitud compraventa = personaDesdeCliente(solicitud.getCliente());
+        return new BatecomPartes(vendedor, compraventa, comprador, null, lecturaFinal);
+    }
+
+    private PersonaSolicitud personaValidadaEnSolicitud(
+            Solicitud solicitud,
+            RolInteresado rol,
+            Map<String, IdentidadSolicitud> identidades
+    ) {
+        PersonaSolicitud persona = personaValidadaEnBloque(
+                solicitud.getInteresado1Rol(), solicitud.getInteresado1Dni(), solicitud.getInteresado1Nombre(),
+                solicitud.getInteresado1Telefono(), solicitud.getInteresado1Direccion(),
+                DireccionEstructurada.of(
+                        solicitud.getInteresado1TipoVia(), solicitud.getInteresado1NombreVia(), solicitud.getInteresado1NumeroVia(),
+                        solicitud.getInteresado1Bloque(), solicitud.getInteresado1Portal(), solicitud.getInteresado1Escalera(),
+                        solicitud.getInteresado1Piso(), solicitud.getInteresado1Puerta(), solicitud.getInteresado1CodigoPostal(),
+                        solicitud.getInteresado1Municipio(), solicitud.getInteresado1Provincia()),
+                rol, identidades);
+        if (persona != null) {
+            return persona;
+        }
+        persona = personaValidadaEnBloque(
+                solicitud.getInteresado2Rol(), solicitud.getInteresado2Dni(), solicitud.getInteresado2Nombre(),
+                solicitud.getInteresado2Telefono(), solicitud.getInteresado2Direccion(),
+                DireccionEstructurada.of(
+                        solicitud.getInteresado2TipoVia(), solicitud.getInteresado2NombreVia(), solicitud.getInteresado2NumeroVia(),
+                        solicitud.getInteresado2Bloque(), solicitud.getInteresado2Portal(), solicitud.getInteresado2Escalera(),
+                        solicitud.getInteresado2Piso(), solicitud.getInteresado2Puerta(), solicitud.getInteresado2CodigoPostal(),
+                        solicitud.getInteresado2Municipio(), solicitud.getInteresado2Provincia()),
+                rol, identidades);
+        if (persona != null) {
+            return persona;
+        }
+        return personaValidadaEnBloque(
+                solicitud.getInteresado3Rol(), solicitud.getInteresado3Dni(), solicitud.getInteresado3Nombre(),
+                solicitud.getInteresado3Telefono(), solicitud.getInteresado3Direccion(),
+                DireccionEstructurada.of(
+                        solicitud.getInteresado3TipoVia(), solicitud.getInteresado3NombreVia(), solicitud.getInteresado3NumeroVia(),
+                        solicitud.getInteresado3Bloque(), solicitud.getInteresado3Portal(), solicitud.getInteresado3Escalera(),
+                        solicitud.getInteresado3Piso(), solicitud.getInteresado3Puerta(), solicitud.getInteresado3CodigoPostal(),
+                        solicitud.getInteresado3Municipio(), solicitud.getInteresado3Provincia()),
+                rol, identidades);
+    }
+
+    private PersonaSolicitud personaValidadaEnBloque(
+            RolInteresado rolActual,
+            String identificadorActual,
+            String nombreActual,
+            String telefonoActual,
+            String direccionActual,
+            DireccionEstructurada direccionEstructuradaActual,
+            RolInteresado rolEsperado,
+            Map<String, IdentidadSolicitud> identidades
+    ) {
+        if (rolActual != rolEsperado) {
+            return null;
+        }
+        String identificador = normalizarIdentificador(identificadorActual);
+        IdentidadSolicitud identidad = identificador != null ? identidades.get(identificador) : null;
+        if (identidad == null || !identidadUsable(identidad)
+                || (!enBlanco(nombreActual) && !nombresCompatibles(nombreActual, identidad.nombreCompleto()))) {
+            return null;
+        }
+        return new PersonaSolicitud(
+                identificador,
+                nombreMasCompleto(identidad.nombreCompleto(), nombreActual, nombreCatalogoGestion(identificador)),
+                identidad.nombrePila(),
+                identidad.apellido1(),
+                identidad.apellido2(),
+                identidad.razonSocial(),
+                normalizarTexto(telefonoActual),
+                direccionMasCompleta(identidad.direccionTexto(), direccionActual),
+                DireccionEstructurada.combinar(identidad.direccion(), direccionEstructuradaActual)
+        );
+    }
+
+    private PersonaSolicitud personaDesdeCliente(Cliente cliente) {
+        String identificador = cliente != null ? normalizarIdentificador(cliente.getNif()) : null;
+        EntidadConocida entidad = cliente != null ? entidadDesdeCliente(cliente) : null;
+        if (identificador == null || entidad == null) {
+            return null;
+        }
+        return new PersonaSolicitud(
+                identificador,
+                entidad.nombre(),
+                entidad.nombrePila(),
+                entidad.apellido1(),
+                entidad.apellido2(),
+                entidad.razonSocial(),
+                entidad.telefono(),
+                entidad.direccion(),
+                entidad.direccionEstructurada()
+        );
+    }
+
     private boolean mismaLectura(DocumentoRolesLectura first, DocumentoRolesLectura second) {
         Long firstId = first != null && first.getDocumento() != null ? first.getDocumento().getId() : null;
         Long secondId = second != null && second.getDocumento() != null ? second.getDocumento().getId() : null;
@@ -978,6 +1116,9 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             DocumentoRolesLectura lecturaRoles,
             Map<String, IdentidadSolicitud> identidades
     ) {
+        if (lecturaRoles == null) {
+            return List.of();
+        }
         List<String> avisos = new ArrayList<>();
         avisarNombreIdentidad(lecturaRoles.getVendedorIdentificador(), lecturaRoles.getVendedorNombre(), "vendedor", identidades, avisos);
         avisarNombreIdentidad(lecturaRoles.getCompradorIdentificador(), lecturaRoles.getCompradorNombre(), "comprador", identidades, avisos);

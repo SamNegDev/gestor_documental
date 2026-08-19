@@ -120,6 +120,17 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
         }
 
         SolicitudLecturaIaJob guardado = jobRepository.saveAndFlush(job);
+        if (guardado.getTotalItems() == 0) {
+            SolicitudDocumentacionIaResponse consolidacion = consolidar(solicitudId, usuario);
+            guardado.setEstado(consolidacion.isRequiereRevision()
+                    ? EstadoLecturaIaJob.REQUIERE_REVISION
+                    : EstadoLecturaIaJob.COMPLETADO);
+            guardado.setFaseActual(consolidacion.isRequiereRevision()
+                    ? "Consolidacion pendiente de revision"
+                    : consolidacion.isDatosAplicados() ? "Datos consolidados" : "Lectura al dia");
+            guardado.setMensaje(consolidacion.getMensaje());
+            guardado = jobRepository.saveAndFlush(guardado);
+        }
         if (guardado.getEstado().activo()) {
             Long jobId = guardado.getId();
             if (jobId == null) {
@@ -195,7 +206,7 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
                     .map(job -> job.getSolicitud().getId()).orElse(null));
             if (solicitudId != null) {
                 try {
-                    consolidacionService.procesarDocumentacion(solicitudId, usuario, false);
+                    consolidar(solicitudId, usuario);
                 } catch (RuntimeException ex) {
                     log.warn("Lecturas completadas pero fallo la consolidacion de solicitud {}: {}", solicitudId, ex.getMessage());
                 }
@@ -208,6 +219,13 @@ public class SolicitudLecturaIaJobServiceImpl implements SolicitudLecturaIaJobSe
             log.error("Memoria agotada procesando trabajo de lectura IA {}", jobId, error);
             finalizarConError(jobId, "La lectura agoto la memoria disponible. Se puede reintentar de forma segura.");
         }
+    }
+
+    private SolicitudDocumentacionIaResponse consolidar(Long solicitudId, Usuario usuario) {
+        if (usuario != null && usuario.getRolUsuario() == RolUsuario.ADMIN) {
+            return consolidacionService.procesarDocumentacion(solicitudId, usuario, false);
+        }
+        return consolidacionService.procesarDocumentacionInterna(solicitudId, usuario);
     }
 
     private Long iniciarJob(Long jobId) {
