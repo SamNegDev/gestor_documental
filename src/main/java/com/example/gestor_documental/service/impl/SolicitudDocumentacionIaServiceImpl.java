@@ -15,15 +15,19 @@ import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
 import com.example.gestor_documental.model.DocumentoVehiculoLectura;
+import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.GestionPersonaCatalogo;
+import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoVehiculoLecturaRepository;
 import com.example.gestor_documental.repository.GestionPersonaCatalogoRepository;
 import com.example.gestor_documental.repository.HistorialCambioRepository;
+import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
@@ -40,6 +44,7 @@ import com.example.gestor_documental.validation.DniNieValidator;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,6 +70,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private static final Logger log = LoggerFactory.getLogger(SolicitudDocumentacionIaServiceImpl.class);
     private static final double CONFIANZA_MINIMA_IDENTIDAD = 0.80;
     private static final double CONFIANZA_MINIMA_ROLES = 0.90;
+    private static final double CONFIANZA_MINIMA_ROLES_ENTIDAD_CONOCIDA = 0.97;
     private static final int USOS_CLIENTE_SIN_LIMITE = 0;
     private static final int USOS_RESTANTES_SIN_LIMITE = Integer.MAX_VALUE;
     private static final String ACCION_IA_CLIENTE_SOLICITUD = "IA DOCUMENTACION CLIENTE";
@@ -75,6 +81,8 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
     private final DocumentoRolesLecturaRepository rolesLecturaRepository;
     private final DocumentoVehiculoLecturaRepository vehiculoLecturaRepository;
     private final GestionPersonaCatalogoRepository gestionPersonaCatalogoRepository;
+    private final InteresadoRepository interesadoRepository;
+    private final ClienteRepository clienteRepository;
     private final HistorialCambioRepository historialCambioRepository;
     private final DocumentoIdentidadLecturaService documentoIdentidadLecturaService;
     private final DocumentoRolesLecturaService documentoRolesLecturaService;
@@ -198,7 +206,8 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         if (vendedor.identificador().equals(comprador.identificador())) {
             throw new OperacionInvalidaException("Comprador y vendedor tienen el mismo DNI/CIF.");
         }
-        List<String> faltasCorroboracion = faltasCorroboracionIdentidad(solicitud, vendedor, comprador, identidades);
+        List<String> faltasCorroboracion = faltasCorroboracionIdentidad(
+                solicitud, vendedor, comprador, identidades, lecturaRoles);
         if (!faltasCorroboracion.isEmpty()) {
             detalles.addAll(faltasCorroboracion);
             if (vehiculoActualizado) {
@@ -745,18 +754,29 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         String nombreCom = normalizarNombreRol(lecturaCom.getVendedorNombre(), identificador);
         String nombreRoles = nombreMasCompleto(nombreBate, nombreCom, null);
         String nombreCatalogo = nombreCatalogoGestion(identificador);
+        EntidadConocida entidadConocida = entidadConocidaCompatible(identificador, nombreRoles);
         String direccionIdentidad = identidad != null ? identidad.direccionTexto() : null;
         String direccionBate = normalizarTexto(lecturaBate.getCompradorDireccion());
         String direccionCom = normalizarTexto(lecturaCom.getVendedorDireccion());
         return new PersonaSolicitud(
                 identificador,
-                nombreMasCompleto(nombreIdentidad, nombreRoles, nombreCatalogo),
-                identidad != null ? identidad.nombrePila() : null,
-                identidad != null ? identidad.apellido1() : null,
-                identidad != null ? identidad.apellido2() : null,
-                identidad != null ? identidad.razonSocial() : null,
-                direccionMasCompleta(direccionIdentidad, direccionBate, direccionCom),
-                identidad != null ? identidad.direccion() : null
+                entidadConocida != null
+                        ? nombreMasCompleto(nombreIdentidad, entidadConocida.nombre(), nombreRoles)
+                        : nombreMasCompleto(nombreIdentidad, nombreRoles, nombreCatalogo),
+                primerNoVacio(identidad != null ? identidad.nombrePila() : null,
+                        entidadConocida != null ? entidadConocida.nombrePila() : null),
+                primerNoVacio(identidad != null ? identidad.apellido1() : null,
+                        entidadConocida != null ? entidadConocida.apellido1() : null),
+                primerNoVacio(identidad != null ? identidad.apellido2() : null,
+                        entidadConocida != null ? entidadConocida.apellido2() : null),
+                primerNoVacio(identidad != null ? identidad.razonSocial() : null,
+                        entidadConocida != null ? entidadConocida.razonSocial() : null),
+                entidadConocida != null ? entidadConocida.telefono() : null,
+                direccionMasCompleta(direccionIdentidad, direccionBate, direccionCom,
+                        entidadConocida != null ? entidadConocida.direccion() : null),
+                DireccionEstructurada.combinar(
+                        identidad != null ? identidad.direccion() : null,
+                        entidadConocida != null ? entidadConocida.direccionEstructurada() : null)
         );
     }
 
@@ -827,14 +847,16 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             Solicitud solicitud,
             PersonaSolicitud vendedor,
             PersonaSolicitud comprador,
-            Map<String, IdentidadSolicitud> identidades
+            Map<String, IdentidadSolicitud> identidades,
+            DocumentoRolesLectura lecturaRoles
     ) {
         List<String> faltas = new ArrayList<>();
-        if (!identidadCorroboraRol(solicitud, vendedor.identificador(), identidades)) {
-            faltas.add("No se aplica el vendedor: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
+        boolean rolesPerfectos = rolesCorroboranEntidadConocida(lecturaRoles);
+        if (!identidadCorroboraRol(solicitud, vendedor, RolInteresado.VENDEDOR, identidades, rolesPerfectos)) {
+            faltas.add("No se aplica el vendedor: su DNI/CIF no esta corroborado por identidad leida, por una ficha conocida o por un cliente documentado.");
         }
-        if (!identidadCorroboraRol(solicitud, comprador.identificador(), identidades)) {
-            faltas.add("No se aplica el comprador: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
+        if (!identidadCorroboraRol(solicitud, comprador, RolInteresado.COMPRADOR, identidades, rolesPerfectos)) {
+            faltas.add("No se aplica el comprador: su DNI/CIF no esta corroborado por identidad leida, por una ficha conocida o por un cliente documentado.");
         }
         return faltas;
     }
@@ -845,15 +867,31 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             Map<String, IdentidadSolicitud> identidades
     ) {
         List<String> faltas = new ArrayList<>();
-        if (!identidadCorroboraRol(solicitud, partes.vendedor().identificador(), identidades)) {
-            faltas.add("No se aplica el vendedor inicial: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
+        if (!identidadCorroboraRol(
+                solicitud,
+                partes.vendedor(),
+                RolInteresado.VENDEDOR,
+                identidades,
+                rolesCorroboranEntidadConocida(partes.lecturaBate()))) {
+            faltas.add("No se aplica el vendedor inicial: su DNI/CIF no esta corroborado por identidad leida, por una ficha conocida o por un cliente documentado.");
         }
-        if (!identidadCorroboraRol(solicitud, partes.compraventa().identificador(), identidades)
+        if (!identidadCorroboraRol(
+                solicitud,
+                partes.compraventa(),
+                RolInteresado.COMPRAVENTA,
+                identidades,
+                rolesCorroboranEntidadConocida(partes.lecturaBate())
+                        && rolesCorroboranEntidadConocida(partes.lecturaCom()))
                 && !compraventaCorroboradaPorDobleOperacion(partes)) {
-            faltas.add("No se aplica la compraventa: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
+            faltas.add("No se aplica la compraventa: su DNI/CIF no esta corroborado por identidad leida, por una ficha conocida o por un cliente documentado.");
         }
-        if (!identidadCorroboraRol(solicitud, partes.comprador().identificador(), identidades)) {
-            faltas.add("No se aplica el comprador final: su DNI/CIF no esta corroborado por identidad leida ni por el cliente de la solicitud.");
+        if (!identidadCorroboraRol(
+                solicitud,
+                partes.comprador(),
+                RolInteresado.COMPRADOR,
+                identidades,
+                rolesCorroboranEntidadConocida(partes.lecturaCom()))) {
+            faltas.add("No se aplica el comprador final: su DNI/CIF no esta corroborado por identidad leida, por una ficha conocida o por un cliente documentado.");
         }
         return faltas;
     }
@@ -874,15 +912,66 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
                 partes.lecturaCom().getVendedorNombre());
     }
 
-    private boolean identidadCorroboraRol(Solicitud solicitud, String identificador, Map<String, IdentidadSolicitud> identidades) {
+    private boolean identidadCorroboraRol(
+            Solicitud solicitud,
+            PersonaSolicitud persona,
+            RolInteresado rol,
+            Map<String, IdentidadSolicitud> identidades,
+            boolean rolesPerfectos
+    ) {
+        String identificador = persona != null ? normalizarIdentificador(persona.identificador()) : null;
         if (identificador == null) {
             return false;
         }
         if (identidades.containsKey(identificador)) {
             return true;
         }
-        return solicitud.getCliente() != null
-                && identificador.equals(normalizarIdentificador(solicitud.getCliente().getNif()));
+        if (interesadoYaValidadoEnSolicitud(solicitud, identificador, rol)) {
+            return true;
+        }
+        if (solicitud.getCliente() != null
+                && identificador.equals(normalizarIdentificador(solicitud.getCliente().getNif()))) {
+            return true;
+        }
+        return rolesPerfectos && esEmpresaConocida(persona);
+    }
+
+    private boolean rolesCorroboranEntidadConocida(DocumentoRolesLectura lectura) {
+        return rolesUsables(lectura)
+                && confianza(lectura.getConfianzaGlobal()) >= CONFIANZA_MINIMA_ROLES_ENTIDAD_CONOCIDA;
+    }
+
+    private boolean interesadoYaValidadoEnSolicitud(Solicitud solicitud, String identificador, RolInteresado rol) {
+        if (solicitud == null || identificador == null || rol == null) {
+            return false;
+        }
+        return bloqueSolicitudCoincide(solicitud.getInteresado1Rol(), solicitud.getInteresado1Dni(), rol, identificador)
+                || bloqueSolicitudCoincide(solicitud.getInteresado2Rol(), solicitud.getInteresado2Dni(), rol, identificador)
+                || bloqueSolicitudCoincide(solicitud.getInteresado3Rol(), solicitud.getInteresado3Dni(), rol, identificador);
+    }
+
+    private boolean bloqueSolicitudCoincide(
+            RolInteresado rolActual,
+            String identificadorActual,
+            RolInteresado rolEsperado,
+            String identificadorEsperado
+    ) {
+        return rolActual == rolEsperado
+                && identificadorEsperado.equals(normalizarIdentificador(identificadorActual));
+    }
+
+    private boolean esEmpresaConocida(PersonaSolicitud persona) {
+        if (persona == null || esPersonaFisica(persona.identificador())) {
+            return false;
+        }
+        String identificador = normalizarIdentificador(persona.identificador());
+        if (!identificadorValido(identificador)) {
+            return false;
+        }
+        if (interesadoConocidoCompatible(identificador, persona.nombre()) != null) {
+            return true;
+        }
+        return clienteDocumentadoCompatible(identificador);
     }
 
     private List<String> avisosNombreIdentidad(
@@ -928,16 +1017,27 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         String direccionIdentidad = identidad != null ? identidad.direccionTexto() : null;
         String nombreRoles = normalizarNombreRol(vendedor ? lectura.getVendedorNombre() : lectura.getCompradorNombre(), identificador);
         String nombreCatalogo = nombreCatalogoGestion(identificador);
+        EntidadConocida entidadConocida = entidadConocidaCompatible(identificador, nombreRoles);
         String direccionRoles = normalizarTexto(vendedor ? lectura.getVendedorDireccion() : lectura.getCompradorDireccion());
         return new PersonaSolicitud(
                 identificador,
-                nombreMasCompleto(nombreIdentidad, nombreRoles, nombreCatalogo),
-                identidad != null ? identidad.nombrePila() : null,
-                identidad != null ? identidad.apellido1() : null,
-                identidad != null ? identidad.apellido2() : null,
-                identidad != null ? identidad.razonSocial() : null,
-                direccionMasCompleta(direccionIdentidad, direccionRoles),
-                identidad != null ? identidad.direccion() : null
+                entidadConocida != null
+                        ? nombreMasCompleto(nombreIdentidad, entidadConocida.nombre(), nombreRoles)
+                        : nombreMasCompleto(nombreIdentidad, nombreRoles, nombreCatalogo),
+                primerNoVacio(identidad != null ? identidad.nombrePila() : null,
+                        entidadConocida != null ? entidadConocida.nombrePila() : null),
+                primerNoVacio(identidad != null ? identidad.apellido1() : null,
+                        entidadConocida != null ? entidadConocida.apellido1() : null),
+                primerNoVacio(identidad != null ? identidad.apellido2() : null,
+                        entidadConocida != null ? entidadConocida.apellido2() : null),
+                primerNoVacio(identidad != null ? identidad.razonSocial() : null,
+                        entidadConocida != null ? entidadConocida.razonSocial() : null),
+                entidadConocida != null ? entidadConocida.telefono() : null,
+                direccionMasCompleta(direccionIdentidad, direccionRoles,
+                        entidadConocida != null ? entidadConocida.direccion() : null),
+                DireccionEstructurada.combinar(
+                        identidad != null ? identidad.direccion() : null,
+                        entidadConocida != null ? entidadConocida.direccionEstructurada() : null)
         );
     }
 
@@ -1002,6 +1102,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             solicitud.setInteresado1Apellido1(persona.apellido1());
             solicitud.setInteresado1Apellido2(persona.apellido2());
             solicitud.setInteresado1RazonSocial(persona.razonSocial());
+            solicitud.setInteresado1Telefono(persona.telefono());
             if (persona.direccion() != null) {
                 solicitud.setInteresado1Direccion(persona.direccion());
             }
@@ -1017,6 +1118,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             solicitud.setInteresado2Apellido1(persona.apellido1());
             solicitud.setInteresado2Apellido2(persona.apellido2());
             solicitud.setInteresado2RazonSocial(persona.razonSocial());
+            solicitud.setInteresado2Telefono(persona.telefono());
             if (persona.direccion() != null) {
                 solicitud.setInteresado2Direccion(persona.direccion());
             }
@@ -1032,6 +1134,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             solicitud.setInteresado3Apellido1(persona.apellido1());
             solicitud.setInteresado3Apellido2(persona.apellido2());
             solicitud.setInteresado3RazonSocial(persona.razonSocial());
+            solicitud.setInteresado3Telefono(persona.telefono());
             if (persona.direccion() != null) {
                 solicitud.setInteresado3Direccion(persona.direccion());
             }
@@ -1321,6 +1424,104 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
         return identidad != null ? identidad.nombreCompleto() : null;
     }
 
+    private EntidadConocida entidadConocidaCompatible(String identificador, String nombreLeido) {
+        String normalizado = normalizarIdentificador(identificador);
+        if (normalizado == null || esPersonaFisica(normalizado)) {
+            return null;
+        }
+        Interesado interesado = interesadoConocidoCompatible(normalizado, nombreLeido);
+        if (interesado != null) {
+            return entidadDesdeInteresado(interesado);
+        }
+        return clienteRepository.findByNifIgnoreCase(normalizado)
+                .filter(cliente -> nombresCompatibles(cliente.getNombre(), nombreLeido)
+                        || clienteDocumentadoCompatible(normalizado))
+                .map(this::entidadDesdeCliente)
+                .orElse(null);
+    }
+
+    private Interesado interesadoConocidoCompatible(String identificador, String nombreLeido) {
+        String normalizado = normalizarIdentificador(identificador);
+        if (normalizado == null || esPersonaFisica(normalizado)) {
+            return null;
+        }
+        List<Interesado> coincidencias = interesadoRepository.findByIdentificadorNormalizado(
+                normalizado, PageRequest.of(0, 2));
+        if (coincidencias.size() != 1) {
+            return null;
+        }
+        Interesado interesado = coincidencias.get(0);
+        return nombresCompatibles(interesado.getNombre(), nombreLeido) ? interesado : null;
+    }
+
+    private boolean clienteDocumentadoCompatible(String identificador) {
+        String normalizado = normalizarIdentificador(identificador);
+        Cliente cliente = normalizado != null
+                ? clienteRepository.findByNifIgnoreCase(normalizado).orElse(null)
+                : null;
+        if (cliente == null) {
+            return false;
+        }
+        return documentoRepository.findIdentidadesRecurrentesPorIdentificadores(
+                        List.of(TipoDocumento.CIF),
+                        List.of(normalizado),
+                        PageRequest.of(0, 10))
+                .stream()
+                .anyMatch(documento -> documento.getCliente() != null
+                        && cliente.getId() != null
+                        && cliente.getId().equals(documento.getCliente().getId())
+                        && documento.getInteresado() != null
+                        && normalizado.equals(normalizarIdentificador(documento.getInteresado().getDni())));
+    }
+
+    private EntidadConocida entidadDesdeInteresado(Interesado interesado) {
+        return new EntidadConocida(
+                normalizarNombre(interesado.getNombre()),
+                normalizarTexto(interesado.getNombrePila()),
+                normalizarTexto(interesado.getApellido1()),
+                normalizarTexto(interesado.getApellido2()),
+                normalizarNombre(primerNoVacio(interesado.getRazonSocial(), interesado.getNombre())),
+                normalizarTexto(interesado.getTelefono()),
+                normalizarTexto(interesado.getDireccion()),
+                DireccionEstructurada.of(
+                        interesado.getTipoVia(),
+                        interesado.getNombreVia(),
+                        interesado.getNumeroVia(),
+                        interesado.getBloque(),
+                        interesado.getPortal(),
+                        interesado.getEscalera(),
+                        interesado.getPiso(),
+                        interesado.getPuerta(),
+                        interesado.getCodigoPostal(),
+                        interesado.getMunicipio(),
+                        interesado.getProvincia())
+        );
+    }
+
+    private EntidadConocida entidadDesdeCliente(Cliente cliente) {
+        return new EntidadConocida(
+                normalizarNombre(cliente.getNombre()),
+                null,
+                null,
+                null,
+                normalizarNombre(cliente.getNombre()),
+                normalizarTexto(cliente.getTelefono()),
+                normalizarTexto(cliente.getDireccion()),
+                DireccionEstructurada.of(
+                        cliente.getTipoVia(),
+                        cliente.getNombreVia(),
+                        cliente.getNumeroVia(),
+                        cliente.getBloque(),
+                        cliente.getPortal(),
+                        cliente.getEscalera(),
+                        cliente.getPiso(),
+                        cliente.getPuerta(),
+                        cliente.getCodigoPostal(),
+                        cliente.getMunicipio(),
+                        cliente.getProvincia())
+        );
+    }
+
     private String nombreCatalogoGestion(String identificador) {
         String normalizado = normalizarIdentificador(identificador);
         if (normalizado == null) {
@@ -1540,6 +1741,7 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             String apellido1,
             String apellido2,
             String razonSocial,
+            String telefono,
             String direccion,
             DireccionEstructurada direccionEstructurada
     ) {
@@ -1566,6 +1768,18 @@ public class SolicitudDocumentacionIaServiceImpl implements SolicitudDocumentaci
             PersonaSolicitud comprador,
             DocumentoRolesLectura lecturaBate,
             DocumentoRolesLectura lecturaCom
+    ) {
+    }
+
+    private record EntidadConocida(
+            String nombre,
+            String nombrePila,
+            String apellido1,
+            String apellido2,
+            String razonSocial,
+            String telefono,
+            String direccion,
+            DireccionEstructurada direccionEstructurada
     ) {
     }
 

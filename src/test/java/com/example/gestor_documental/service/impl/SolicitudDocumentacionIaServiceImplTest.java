@@ -13,15 +13,18 @@ import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.DocumentoIdentidadLectura;
 import com.example.gestor_documental.model.DocumentoRolesLectura;
 import com.example.gestor_documental.model.DocumentoVehiculoLectura;
+import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.TipoTramite;
 import com.example.gestor_documental.model.Usuario;
+import com.example.gestor_documental.repository.ClienteRepository;
 import com.example.gestor_documental.repository.DocumentoIdentidadLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoRepository;
 import com.example.gestor_documental.repository.DocumentoRolesLecturaRepository;
 import com.example.gestor_documental.repository.DocumentoVehiculoLecturaRepository;
 import com.example.gestor_documental.repository.GestionPersonaCatalogoRepository;
 import com.example.gestor_documental.repository.HistorialCambioRepository;
+import com.example.gestor_documental.repository.InteresadoRepository;
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.service.DocumentoIdentidadLecturaService;
 import com.example.gestor_documental.service.DocumentoRolesLecturaService;
@@ -39,6 +42,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,6 +61,10 @@ class SolicitudDocumentacionIaServiceImplTest {
     private DocumentoVehiculoLecturaRepository vehiculoLecturaRepository;
     @Mock
     private GestionPersonaCatalogoRepository gestionPersonaCatalogoRepository;
+    @Mock
+    private InteresadoRepository interesadoRepository;
+    @Mock
+    private ClienteRepository clienteRepository;
     @Mock
     private HistorialCambioRepository historialCambioRepository;
     @Mock
@@ -82,6 +91,8 @@ class SolicitudDocumentacionIaServiceImplTest {
                 rolesLecturaRepository,
                 vehiculoLecturaRepository,
                 gestionPersonaCatalogoRepository,
+                interesadoRepository,
+                clienteRepository,
                 historialCambioRepository,
                 documentoIdentidadLecturaService,
                 documentoRolesLecturaService,
@@ -259,6 +270,100 @@ class SolicitudDocumentacionIaServiceImplTest {
         assertThat(solicitud.getInteresado2Dni()).isEqualTo("B38501631");
         assertThat(solicitud.getInteresado3Rol()).isEqualTo(RolInteresado.COMPRADOR);
         assertThat(solicitud.getInteresado3Dni()).isEqualTo("B38436556");
+    }
+
+    @Test
+    void batecomCompletaCadenaConEntidadConocidaClienteEInteresadoValidadoEnSolicitud() {
+        Solicitud solicitud = solicitudCliente(35L);
+        cliente.setId(4L);
+        cliente.setNif("B38436556");
+        cliente.setNombre("CANARIOALEMANA DE AUTOMOVILES SL");
+        cliente.setTelefono("922111111");
+        solicitud.setTipoTramite(new TipoTramite(TipoTramiteEnum.BATECOM, "BATECOM"));
+        solicitud.setInteresado1Rol(RolInteresado.COMPRADOR);
+        solicitud.setInteresado1Dni("B76631407");
+        solicitud.setInteresado1Nombre("ALBERTO'S FERROGRUPO SL");
+
+        Documento contratoBate = documento(15L, TipoDocumento.CONTRATO_COMPRAVENTA);
+        Documento contratoCom = documento(16L, TipoDocumento.CONTRATO_COMPRAVENTA);
+        DocumentoRolesLectura lecturaBate = lecturaRoles(
+                contratoBate,
+                "B38501631", "MG MOTOR CANARIAS SL",
+                "B38436556", "CANAAUTO SL");
+        DocumentoRolesLectura lecturaCom = lecturaRoles(
+                contratoCom,
+                "B38436556", "CANARIOALEMANA DE AUTOMOVILES SL",
+                "B76631407", "ALBERTOS FERROGRUPO SL");
+        lecturaCom.setConfianzaGlobal(0.98);
+
+        Interesado mgMotor = new Interesado("B38501631", "MG MOTOR CANARIAS SL");
+        mgMotor.setId(593L);
+        mgMotor.setRazonSocial("MG MOTOR CANARIAS SL");
+        mgMotor.setTelefono("922000000");
+        mgMotor.setDireccion("CALLE EJEMPLO 1, 38001 SANTA CRUZ DE TENERIFE");
+        Interesado canauto = new Interesado("B38436556", "CANARIOALEMANA DE AUTOMOVILES SL");
+        canauto.setId(555L);
+        Documento cifCanauto = documento(18L, TipoDocumento.CIF);
+        cifCanauto.setCliente(cliente);
+        cifCanauto.setInteresado(canauto);
+
+        when(solicitudRepository.findById(35L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(35L)).thenReturn(List.of(contratoBate, contratoCom));
+        when(rolesLecturaRepository.findByDocumentoId(15L)).thenReturn(Optional.of(lecturaBate));
+        when(rolesLecturaRepository.findByDocumentoId(16L)).thenReturn(Optional.of(lecturaCom));
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(15L, 16L))).thenReturn(List.of(lecturaBate, lecturaCom));
+        when(interesadoRepository.findByIdentificadorNormalizado(eq("B38501631"), any()))
+                .thenReturn(List.of(mgMotor));
+        when(clienteRepository.findByNifIgnoreCase("B38436556")).thenReturn(Optional.of(cliente));
+        when(documentoRepository.findIdentidadesRecurrentesPorIdentificadores(
+                any(), eq(List.of("B38436556")), any())).thenReturn(List.of(cifCanauto));
+        when(solicitudRepository.save(solicitud)).thenReturn(solicitud);
+        Usuario admin = new Usuario();
+        admin.setRolUsuario(RolUsuario.ADMIN);
+
+        SolicitudDocumentacionIaResponse response = service.procesarDocumentacion(35L, admin);
+
+        assertThat(response.isDatosAplicados()).isTrue();
+        assertThat(response.isRequiereRevision()).isFalse();
+        assertThat(solicitud.getInteresado1Rol()).isEqualTo(RolInteresado.COMPRADOR);
+        assertThat(solicitud.getInteresado1Dni()).isEqualTo("B76631407");
+        assertThat(solicitud.getInteresado2Rol()).isEqualTo(RolInteresado.VENDEDOR);
+        assertThat(solicitud.getInteresado2Dni()).isEqualTo("B38501631");
+        assertThat(solicitud.getInteresado2Telefono()).isEqualTo("922000000");
+        assertThat(solicitud.getInteresado2Direccion()).contains("CALLE EJEMPLO 1");
+        assertThat(solicitud.getInteresado3Rol()).isEqualTo(RolInteresado.COMPRAVENTA);
+        assertThat(solicitud.getInteresado3Dni()).isEqualTo("B38436556");
+        assertThat(solicitud.getInteresado3Nombre()).isEqualTo("CANARIOALEMANA DE AUTOMOVILES SL");
+        assertThat(solicitud.getInteresado3Telefono()).isEqualTo("922111111");
+    }
+
+    @Test
+    void noUsaEntidadConocidaSiLaLecturaDeRolesNoEsPerfecta() {
+        Solicitud solicitud = solicitudCliente(36L);
+        cliente.setNif("B38436556");
+        Documento contrato = documento(17L, TipoDocumento.CONTRATO_COMPRAVENTA);
+        DocumentoRolesLectura lectura = lecturaRoles(
+                contrato,
+                "B38501631", "MG MOTOR CANARIAS SL",
+                "B38436556", "CANARIOALEMANA DE AUTOMOVILES SL");
+        lectura.setConfianzaGlobal(0.96);
+        Interesado mgMotor = new Interesado("B38501631", "MG MOTOR CANARIAS SL");
+
+        when(solicitudRepository.findById(36L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(36L)).thenReturn(List.of(contrato));
+        when(rolesLecturaRepository.findByDocumentoId(17L)).thenReturn(Optional.of(lectura));
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(17L))).thenReturn(List.of(lectura));
+        when(interesadoRepository.findByIdentificadorNormalizado(eq("B38501631"), any()))
+                .thenReturn(List.of(mgMotor));
+        Usuario admin = new Usuario();
+        admin.setRolUsuario(RolUsuario.ADMIN);
+
+        SolicitudDocumentacionIaResponse response = service.procesarDocumentacion(36L, admin);
+
+        assertThat(response.isDatosAplicados()).isFalse();
+        assertThat(response.isRequiereRevision()).isTrue();
+        assertThat(solicitud.getInteresado1Rol()).isNull();
+        assertThat(solicitud.getInteresado2Rol()).isNull();
     }
 
     private Solicitud solicitudCliente(Long id) {
