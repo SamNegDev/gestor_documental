@@ -403,6 +403,66 @@ class SolicitudDocumentacionIaServiceImplTest {
     }
 
     @Test
+    void batecomCompletaCadena598TrasValidarManualmenteAmbasIdentidades() {
+        Solicitud solicitud = solicitudCliente(598L);
+        cliente.setId(4L);
+        cliente.setNif("B38436556");
+        cliente.setNombre("CANARIOALEMANA DE AUTOMOVILES");
+        solicitud.setTipoTramite(new TipoTramite(TipoTramiteEnum.BATECOM, "BATECOM"));
+        solicitud.setInteresado1Rol(RolInteresado.VENDEDOR);
+        solicitud.setInteresado1Dni("78642521R");
+        solicitud.setInteresado1Nombre("NELSON DE LA CRUZ CABRERA");
+        solicitud.setInteresado2Rol(RolInteresado.COMPRADOR);
+        solicitud.setInteresado2Dni("79083702L");
+        solicitud.setInteresado2Nombre("PEDRO JOSE DEL BOSQUE DE ARMAS");
+
+        Documento contratoInicial = documento(9875L, TipoDocumento.CONTRATO_COMPRAVENTA);
+        Documento contratoFinal = documento(9879L, TipoDocumento.CONTRATO_COMPRAVENTA);
+        Documento dniComprador = documento(9882L, TipoDocumento.DNI);
+        Documento dniVendedor = documento(9914L, TipoDocumento.DNI);
+        DocumentoRolesLectura lecturaInicial = lecturaRoles(
+                contratoInicial,
+                "78642521R", "NESTOR CRUZ CABRERA",
+                "B38436556", "CANARIOALEMANA DE AUTOMOVILES SL");
+        lecturaInicial.setConfianzaGlobal(0.93);
+        DocumentoRolesLectura lecturaFinal = lecturaRoles(
+                contratoFinal,
+                "B38436556", "CANARIOALEMANA DE AUTOMOVILES SL",
+                "79083702L", "PEDRO JOSE DEL BOSQUE DE ARMAS");
+        lecturaFinal.setConfianzaGlobal(0.97);
+        DocumentoIdentidadLectura identidadComprador = identidad(
+                dniComprador, "79083702L", "PEDRO JOSE", "DEL BOSQUE", "DE ARMAS", 1.0);
+        DocumentoIdentidadLectura identidadVendedor = identidad(
+                dniVendedor, "78642521R", "NELSON", "DE LA CRUZ", "CABRERA", 1.0);
+
+        when(solicitudRepository.findById(598L)).thenReturn(Optional.of(solicitud));
+        when(documentoRepository.findBySolicitudId(598L)).thenReturn(List.of(
+                contratoInicial, contratoFinal, dniComprador, dniVendedor));
+        when(rolesLecturaRepository.findByDocumentoId(9875L)).thenReturn(Optional.of(lecturaInicial));
+        when(rolesLecturaRepository.findByDocumentoId(9879L)).thenReturn(Optional.of(lecturaFinal));
+        when(rolesLecturaRepository.findByDocumentoIdIn(List.of(9875L, 9879L)))
+                .thenReturn(List.of(lecturaInicial, lecturaFinal));
+        when(identidadLecturaRepository.findByDocumentoId(9882L)).thenReturn(Optional.of(identidadComprador));
+        when(identidadLecturaRepository.findByDocumentoId(9914L)).thenReturn(Optional.of(identidadVendedor));
+        when(identidadLecturaRepository.findByDocumentoIdIn(List.of(9882L, 9914L)))
+                .thenReturn(List.of(identidadComprador, identidadVendedor));
+        when(solicitudRepository.save(solicitud)).thenReturn(solicitud);
+        Usuario admin = new Usuario();
+        admin.setRolUsuario(RolUsuario.ADMIN);
+
+        SolicitudDocumentacionIaResponse response = service.procesarDocumentacion(598L, admin);
+
+        assertThat(response.isDatosAplicados()).isTrue();
+        assertThat(response.isRequiereRevision()).isFalse();
+        assertThat(solicitud.getInteresado1Rol()).isEqualTo(RolInteresado.VENDEDOR);
+        assertThat(solicitud.getInteresado1Dni()).isEqualTo("78642521R");
+        assertThat(solicitud.getInteresado2Rol()).isEqualTo(RolInteresado.COMPRADOR);
+        assertThat(solicitud.getInteresado2Dni()).isEqualTo("79083702L");
+        assertThat(solicitud.getInteresado3Rol()).isEqualTo(RolInteresado.COMPRAVENTA);
+        assertThat(solicitud.getInteresado3Dni()).isEqualTo("B38436556");
+    }
+
+    @Test
     void batecomNoInfiereCadenaSinVendedorValidadoEnLaSolicitud() {
         Solicitud solicitud = solicitudCliente(550L);
         cliente.setNif("B38436556");

@@ -4,6 +4,9 @@ import com.example.gestor_documental.dto.expediente.SolicitudIdentidadDetectadaR
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolInteresado;
 import com.example.gestor_documental.enums.RolUsuario;
+import com.example.gestor_documental.enums.TipoDocumento;
+import com.example.gestor_documental.event.DocumentoLecturaIaSolicitadaEvent;
+import com.example.gestor_documental.model.Documento;
 import com.example.gestor_documental.model.Interesado;
 import com.example.gestor_documental.model.Solicitud;
 import com.example.gestor_documental.model.Usuario;
@@ -32,11 +35,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -62,6 +68,7 @@ class SolicitudServiceImplIdentidadManualTest {
     @Mock VehiculoService vehiculoService;
     @Mock ObjectProvider<RequisitoDocumentalExpedienteService> requisitoDocumentalExpedienteService;
     @Mock DniNieValidator dniNieValidator;
+    @Mock ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks SolicitudServiceImpl service;
 
@@ -89,13 +96,24 @@ class SolicitudServiceImplIdentidadManualTest {
         request.setCodigoPostal("38001");
         request.setMunicipio("SANTA CRUZ DE TENERIFE");
         request.setProvincia("SANTA CRUZ DE TENERIFE");
+        request.setDocumentoId(50L);
+
+        Documento documento = new Documento();
+        documento.setId(50L);
+        documento.setSolicitud(solicitud);
+        documento.setTipoDocumento(TipoDocumento.DNI);
+
+        Usuario admin = admin();
+        admin.setId(7L);
 
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
         when(solicitudRepository.save(any(Solicitud.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(documentoRepository.findByIdConRelaciones(50L)).thenReturn(Optional.of(documento));
+        when(documentoIdentidadLecturaRepository.findByDocumentoId(50L)).thenReturn(Optional.empty());
         when(interesadoService.buscarInteresadoPorDNI("12345678Z")).thenReturn(Optional.of(fichaConsolidada));
         when(interesadoService.guardar(any(Interesado.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Solicitud actualizada = service.anadirInteresadoDetectado(1L, request, admin());
+        Solicitud actualizada = service.anadirInteresadoDetectado(1L, request, admin);
 
         assertThat(actualizada.getInteresado1Nombre()).isEqualTo("ANA PEREZ GARCIA");
         assertThat(actualizada.getInteresado1NombrePila()).isEqualTo("ANA");
@@ -105,6 +123,11 @@ class SolicitudServiceImplIdentidadManualTest {
         assertThat(actualizada.getInteresado1Telefono()).isEqualTo("600000000");
         assertThat(fichaConsolidada.getNombre()).isEqualTo("ANA PEREZ GARCIA");
         assertThat(fichaConsolidada.getNombreVia()).isEqualTo("MAYOR");
+        verify(applicationEventPublisher).publishEvent(argThat((Object evento) ->
+                evento instanceof DocumentoLecturaIaSolicitadaEvent solicitudEvent
+                        && solicitudEvent.solicitudId().equals(1L)
+                        && solicitudEvent.usuarioId().equals(7L)
+                        && solicitudEvent.origen().equals("AUTO_VALIDACION_IDENTIDAD")));
     }
 
     @Test

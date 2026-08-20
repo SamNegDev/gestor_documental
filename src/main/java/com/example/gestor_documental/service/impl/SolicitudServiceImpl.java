@@ -5,6 +5,7 @@ import com.example.gestor_documental.dto.historial.DetalleCambioHistorial;
 import com.example.gestor_documental.dto.expediente.SolicitudIdentidadDetectadaRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoHabitualRequest;
 import com.example.gestor_documental.dto.expediente.SolicitudInteresadoCoincidenciaResponse;
+import com.example.gestor_documental.event.DocumentoLecturaIaSolicitadaEvent;
 import com.example.gestor_documental.enums.EstadoExpediente;
 import com.example.gestor_documental.enums.EstadoLecturaIaJob;
 import com.example.gestor_documental.enums.EstadoSolicitud;
@@ -48,6 +49,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -87,6 +89,7 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final VehiculoService vehiculoService;
     private final ObjectProvider<RequisitoDocumentalExpedienteService> requisitoDocumentalExpedienteService;
     private final DniNieValidator dniNieValidator;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.upload.dir:uploads}")
@@ -949,6 +952,7 @@ public class SolicitudServiceImpl implements SolicitudService {
                     "Se reviso y actualizo el documento de identidad de " + nombreSlot(guardada, slotAActualizar)
                             + " (" + identificador + ")."
             );
+            solicitarReconsolidacionTrasIdentidadManual(guardada, request, usuarioLogueado);
             return guardada;
         }
 
@@ -972,7 +976,21 @@ public class SolicitudServiceImpl implements SolicitudService {
                 "IDENTIDAD DETECTADA",
                 "Se incorporo " + request.getRol().name() + " " + nombre + " (" + identificador + ") desde lectura de documento validada."
         );
+        solicitarReconsolidacionTrasIdentidadManual(guardada, request, usuarioLogueado);
         return guardada;
+    }
+
+    private void solicitarReconsolidacionTrasIdentidadManual(
+            Solicitud solicitud,
+            SolicitudIdentidadDetectadaRequest request,
+            Usuario usuario
+    ) {
+        if (solicitud == null || solicitud.getId() == null || request == null || request.getDocumentoId() == null
+                || usuario == null || usuario.getId() == null) {
+            return;
+        }
+        applicationEventPublisher.publishEvent(new DocumentoLecturaIaSolicitadaEvent(
+                solicitud.getId(), usuario.getId(), "AUTO_VALIDACION_IDENTIDAD"));
     }
 
     @Override

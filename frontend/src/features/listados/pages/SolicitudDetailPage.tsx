@@ -229,6 +229,7 @@ export function SolicitudDetailPage() {
     onSuccess: async (actualizada) => {
       queryClient.setQueryData(["solicitudes", "detalle", id], actualizada);
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["solicitudes", "detalle", id] }),
         queryClient.invalidateQueries({ queryKey: ["solicitudes"] }),
         queryClient.invalidateQueries({ queryKey: ["solicitudes", "preparacion-traspaso", id] }),
         queryClient.invalidateQueries({ queryKey: ["tareas"] }),
