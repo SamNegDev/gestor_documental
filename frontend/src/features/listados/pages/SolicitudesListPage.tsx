@@ -34,6 +34,7 @@ export function SolicitudesListPage() {
     queryKey: ["solicitudes", "listado", appliedFilters],
     queryFn: () => getSolicitudes(appliedFilters),
     placeholderData: (previousData) => previousData,
+    refetchInterval: isAdmin ? 15_000 : false,
   });
 
   function applyFilters(filters: ListFilters) {

@@ -2,7 +2,6 @@ package com.example.gestor_documental.service.impl;
 
 import com.example.gestor_documental.enums.EstadoSolicitud;
 import com.example.gestor_documental.enums.RolUsuario;
-import com.example.gestor_documental.enums.TipoDocumento;
 import com.example.gestor_documental.enums.TipoTramiteEnum;
 import com.example.gestor_documental.model.Cliente;
 import com.example.gestor_documental.model.CorreoEntranteProcesado;
@@ -14,9 +13,8 @@ import com.example.gestor_documental.repository.CorreoEntranteProcesadoRepositor
 import com.example.gestor_documental.repository.SolicitudRepository;
 import com.example.gestor_documental.repository.TipoTramiteRepository;
 import com.example.gestor_documental.repository.UsuarioRepository;
-import com.example.gestor_documental.service.DocumentoService;
+import com.example.gestor_documental.service.ExpedienteCompletoProcesamientoService;
 import com.example.gestor_documental.service.HistorialCambioService;
-import com.example.gestor_documental.service.OcrPdfService;
 import com.example.gestor_documental.service.PdfSplitService;
 import com.example.gestor_documental.util.TextNormalizer;
 import jakarta.mail.Address;
@@ -62,7 +60,10 @@ public class CorreoEntranteSolicitudService {
 
     private static final Logger log = LoggerFactory.getLogger(CorreoEntranteSolicitudService.class);
     private static final int GRAPH_MAX_JSON_STRING_LENGTH = 128 * 1024 * 1024;
-    private static final Pattern MATRICULA_MODERNA = Pattern.compile("\\b(\\d{4})\\s*[- ]?\\s*([BCDFGHJKLMNPRSTVWXYZ]{3})\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MATRICULA_MODERNA = Pattern.compile(
+            "(?<![A-Z0-9])(\\d{4})\\s*[- ]?\\s*([BCDFGHJKLMNPRSTVWXYZ]{3})(?![A-Z0-9])",
+            Pattern.CASE_INSENSITIVE
+    );
 
     static {
         StreamReadConstraints.overrideDefaultStreamReadConstraints(
@@ -75,8 +76,7 @@ public class CorreoEntranteSolicitudService {
     private final UsuarioRepository usuarioRepository;
     private final TipoTramiteRepository tipoTramiteRepository;
     private final SolicitudRepository solicitudRepository;
-    private final DocumentoService documentoService;
-    private final OcrPdfService ocrPdfService;
+    private final ExpedienteCompletoProcesamientoService expedienteCompletoProcesamientoService;
     private final PdfSplitService pdfSplitService;
     private final HistorialCambioService historialCambioService;
     private final RestClient restClient = RestClient.create();
@@ -104,7 +104,7 @@ public class CorreoEntranteSolicitudService {
     private String adminEmail;
     @Value("${app.mail.inbound.default-tipo-tramite:TRASPASO}")
     private TipoTramiteEnum defaultTipoTramite;
-    @Value("${app.mail.inbound.max-messages:10}")
+    @Value("${app.mail.inbound.max-messages:50}")
     private int maxMessages;
     @Value("${app.mail.graph.tenant-id:}")
     private String graphTenantId;
@@ -115,7 +115,7 @@ public class CorreoEntranteSolicitudService {
     @Value("${app.mail.inbound.graph.mailbox:${app.mail.graph.sender:${app.mail.from:}}}")
     private String graphMailbox;
 
-    @Scheduled(fixedDelayString = "${app.mail.inbound.poll-delay-ms:300000}", initialDelayString = "${app.mail.inbound.initial-delay-ms:60000}")
+    @Scheduled(fixedDelayString = "${app.mail.inbound.poll-delay-ms:60000}", initialDelayString = "${app.mail.inbound.initial-delay-ms:15000}")
     public void procesarBuzon() {
         intentarProcesarBuzon();
     }
@@ -262,16 +262,16 @@ public class CorreoEntranteSolicitudService {
         }
     }
 
-    private void crearSolicitudDesdeAdjuntos(String messageId, String asunto, String remitente, List<AdjuntoPdf> adjuntos) {
+    void crearSolicitudDesdeAdjuntos(String messageId, String asunto, String remitente, List<AdjuntoPdf> adjuntos) {
+        long inicio = System.nanoTime();
         Cliente cliente = resolverCliente(remitente)
                 .orElseThrow(() -> new IllegalStateException("No se encontro cliente para el remitente ni cliente por defecto configurado."));
         Usuario admin = resolverAdmin();
         AdjuntoPdf adjunto = prepararExpedienteCompleto(adjuntos);
 
         MultipartFile archivo = new BytesMultipartFile(adjunto.nombre(), adjunto.contenido(), "application/pdf");
-        String textoDeteccion = asunto + " " + adjunto.nombre() + " " + ocrPdfService.extraerTextoCompleto(archivo);
-        String matricula = detectarMatricula(textoDeteccion)
-                .orElseThrow(() -> new IllegalStateException("No se pudo detectar matricula en el correo " + messageId));
+        String textoDeteccion = metadatosDeteccion(asunto, adjuntos);
+        String matricula = detectarMatricula(textoDeteccion).orElse(null);
         TipoTramiteEnum tramiteDetectado = detectarTipoTramite(textoDeteccion);
         TipoTramite tipoTramite = tipoTramiteRepository.findByNombre(tramiteDetectado)
                 .orElseThrow(() -> new IllegalStateException("No existe el tipo de tramite configurado: " + tramiteDetectado));
@@ -291,13 +291,30 @@ public class CorreoEntranteSolicitudService {
                 "CORREO ENTRANTE",
                 "Solicitud creada automaticamente desde el buzon de correo."
         );
-        // La separacion publica AUTO_SEPARACION tras el commit. Esa cola es la unica responsable
-        // de leer y consolidar; una llamada directa aqui competiría por las mismas lecturas.
-        documentoService.guardarParaSolicitud(guardada.getId(), archivo, TipoDocumento.EXPEDIENTE_COMPLETO, admin);
+        expedienteCompletoProcesamientoService.iniciarSolicitud(guardada.getId(), archivo, false, admin);
         registrarProcesado(messageId, asunto, remitente, matricula, guardada.getId(), "PROCESADO",
                 adjuntos.size() > 1
-                        ? "Solicitud creada desde " + adjuntos.size() + " PDFs adjuntos unificados."
-                        : "Solicitud creada desde PDF adjunto.");
+                        ? detalleProcesado("Solicitud creada desde " + adjuntos.size() + " PDFs adjuntos unificados", matricula)
+                        : detalleProcesado("Solicitud creada desde PDF adjunto", matricula));
+        log.info("Correo entrante recibido y encolado solicitudId={} adjuntos={} matriculaDetectada={} duracionMs={}",
+                guardada.getId(), adjuntos.size(), matricula != null, (System.nanoTime() - inicio) / 1_000_000);
+    }
+
+    private String metadatosDeteccion(String asunto, List<AdjuntoPdf> adjuntos) {
+        StringBuilder texto = new StringBuilder(safe(asunto));
+        if (adjuntos != null) {
+            adjuntos.stream()
+                    .map(AdjuntoPdf::nombre)
+                    .filter(nombre -> !isBlank(nombre))
+                    .forEach(nombre -> texto.append(' ').append(nombre));
+        }
+        return texto.toString();
+    }
+
+    private String detalleProcesado(String base, String matricula) {
+        return base + (matricula != null
+                ? ". Separacion y lectura documental en cola."
+                : ". Matricula pendiente de lectura documental en segundo plano.");
     }
 
     private AdjuntoPdf prepararExpedienteCompleto(List<AdjuntoPdf> adjuntos) {
@@ -342,6 +359,7 @@ public class CorreoEntranteSolicitudService {
                         .scheme("https")
                         .host("graph.microsoft.com")
                         .pathSegment("v1.0", "users", graphMailbox.trim(), "messages", messageId, "attachments")
+                        .queryParam("$select", "id,name,contentType,size")
                         .build())
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
@@ -583,7 +601,7 @@ public class CorreoEntranteSolicitudService {
         }
     }
 
-    private record AdjuntoPdf(String nombre, byte[] contenido) {
+    record AdjuntoPdf(String nombre, byte[] contenido) {
     }
 
     private record BytesMultipartFile(String originalFilename, byte[] bytes, String contentType) implements MultipartFile {
